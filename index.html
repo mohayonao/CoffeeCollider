@@ -14,7 +14,7 @@
         var cc = new CoffeeCollider();
         window.run = function() {
           var code = document.getElementById("code").value.trim();
-          cc.send(code, function(res) {
+          cc.exec(code, function(res) {
             console.log(res);
           });
         };
