@@ -41,7 +41,7 @@ define(function(require, exports, module) {
     CoffeeCollider.prototype.pause = function() {
       return this;
     };
-    CoffeeCollider.prototype.send = function(msg) {
+    CoffeeCollider.prototype.send = function(msg, callback) {
       this.cclang.postMessage(msg, "*");
       if (typeof callback === "function") {
         callback(/* result */);

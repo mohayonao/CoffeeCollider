@@ -124,7 +124,7 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
     CoffeeCollider.prototype.pause = function() {
       return this;
     };
-    CoffeeCollider.prototype.send = function(msg) {
+    CoffeeCollider.prototype.send = function(msg, callback) {
       this.cclang.postMessage(msg, "*");
       if (typeof callback === "function") {
         callback(/* result */);

@@ -6,7 +6,8 @@ module.exports = function(grunt) {
   grunt.initConfig({
     "pkg": grunt.file.readJSON("package.json"),
     "jshint": {
-      "files": "src/cc/**/*.js"
+      "files": "src/cc/**/*.js",
+      "options": grunt.file.readJSON(".jshintrc")
     }
   });
 
@@ -94,7 +95,7 @@ module.exports = function(grunt) {
     });
   });
 
-  grunt.registerTask("default", ["jshint","test"]);
+  grunt.registerTask("default", ["jshint","test","build"]);
   grunt.registerTask("travis" , ["jshint","test:travis"]);
 
 };
