@@ -127,6 +127,7 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       };
       iframe.contentDocument.body.appendChild(script);
 
+      this.iframe = iframe;
       this.cclang = iframe.contentWindow;
       this.isConnected = false;
       this.execId = 0;
@@ -149,16 +150,18 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
     }
+    CoffeeColliderImpl.prototype.destroy = function() {
+      this.context.remove(this);
+      document.body.removeChild(this.iframe);
+    };
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.context.play();
         this.sendToLang(["/play"]);
       }
-      return this;
     };
     CoffeeColliderImpl.prototype.reset = function() {
-      return this;
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
@@ -166,7 +169,6 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         this.context.pause();
         this.sendToLang(["/pause"]);
       }
-      return this;
     };
     CoffeeColliderImpl.prototype.process = function() {
       var strm = this.strmList[this.strmListReadIndex];
@@ -183,7 +185,6 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         }
         this.execId += 1;
       }
-      return this;
     };
     CoffeeColliderImpl.prototype.sendToLang = function(msg) {
       this.cclang.postMessage(msg, "*");
@@ -228,20 +229,37 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
     }
+    CoffeeCollider.prototype.destroy = function() {
+      if (this.impl) {
+        this.impl.destroy();
+        delete this.impl;
+        delete this.sampleRate;
+        delete this.channels;
+      }
+      return this;
+    };
     CoffeeCollider.prototype.play = function() {
-      this.impl.play();
+      if (this.impl) {
+        this.impl.play();
+      }
       return this;
     };
     CoffeeCollider.prototype.reset = function() {
-      this.impl.reset();
+      if (this.impl) {
+        this.impl.reset();
+      }
       return this;
     };
     CoffeeCollider.prototype.pause = function() {
-      this.impl.pause();
+      if (this.impl) {
+        this.impl.pause();
+      }
       return this;
     };
     CoffeeCollider.prototype.exec = function(code, callback) {
-      this.impl.exec(code, callback);
+      if (this.impl) {
+        this.impl.exec(code, callback);
+      }
       return this;
     };
     return CoffeeCollider;
@@ -276,9 +294,25 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
       this.isPlaying = false;
     }
     AudioContext.prototype.append = function(cc) {
-      this.colliders.push(cc);
+      var index = this.colliders.indexOf(cc);
+      if (index === -1) {
+        this.colliders.push(cc);
+        if (this.colliders.length === 1) {
+          this.process = process1;
+        } else {
+          this.process = processN;
+        }
+      }
+    };
+    AudioContext.prototype.remove = function(cc) {
+      var index = this.colliders.indexOf(cc);
+      if (index !== -1) {
+        this.colliders.splice(index, 1);
+      }
       if (this.colliders.length === 1) {
         this.process = process1;
+      } else if (this.colliders.length === 0) {
+        this.process = process0;
       } else {
         this.process = processN;
       }

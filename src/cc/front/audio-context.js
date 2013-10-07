@@ -22,9 +22,25 @@ define(function(require, exports, module) {
       this.isPlaying = false;
     }
     AudioContext.prototype.append = function(cc) {
-      this.colliders.push(cc);
+      var index = this.colliders.indexOf(cc);
+      if (index === -1) {
+        this.colliders.push(cc);
+        if (this.colliders.length === 1) {
+          this.process = process1;
+        } else {
+          this.process = processN;
+        }
+      }
+    };
+    AudioContext.prototype.remove = function(cc) {
+      var index = this.colliders.indexOf(cc);
+      if (index !== -1) {
+        this.colliders.splice(index, 1);
+      }
       if (this.colliders.length === 1) {
         this.process = process1;
+      } else if (this.colliders.length === 0) {
+        this.process = process0;
       } else {
         this.process = processN;
       }
