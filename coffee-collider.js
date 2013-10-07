@@ -39,7 +39,7 @@ var normalizeModule = function(parentId, moduleName) {
   return moduleName;
 };
 var define = _define;
-define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-collider', 'cc/lang/server'], function(require, exports, module) {
+define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-collider', 'cc/lang/lang-server', 'cc/synth/synth-server'], function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
@@ -65,10 +65,15 @@ define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-
     }
 
     if (!cc.isLangMode) {
+      cc.context = "window";
       global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
-      require("./lang/server");
+      cc.context = "server";
+      require("./lang/lang-server");
     }
+  } else if (typeof WorkerLocation !== "undefined") {
+    cc.context = "synth";
+    require("./synth/synth-server");
   }
   
   module.exports = {
@@ -89,9 +94,9 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
 
   var commands = {};
   
-  var CoffeeCollider = (function() {
+  var CoffeeColliderImpl = (function() {
     var context = null;
-    function CoffeeCollider() {
+    function CoffeeColliderImpl() {
       var that = this;
       var iframe = document.createElement("iframe");
       iframe.style.width  = 0;
@@ -109,7 +114,13 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         script.src = src + "#lang";
         script.onload = function() {
           window.addEventListener("message", function(e) {
-            that._recv(e.data);
+            var msg = e.data;
+            if (msg instanceof Float32Array) {
+              that.strmList[that.strmListWriteIndex] = msg;
+              that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
+            } else {
+              that.recv(e.data);
+            }
           });
         };
         iframe.contentDocument.body.appendChild(script);
@@ -118,8 +129,8 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
 
       this.cclang = iframe.contentWindow;
       this.isConnected = false;
-      this._execId = 0;
-      this._execCallbacks = {};
+      this.execId = 0;
+      this.execCallbacks = {};
 
       if (!context) {
         context = new AudioContext();
@@ -127,42 +138,57 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       this.context = context;
       this.context.append(this);
 
+      this.sampleRate = this.context.sampleRate;
+      this.channels   = this.context.channels;
+      this.strmLength = this.context.strmLength;
+      this.bufLength  = this.context.bufLength;
+      
       this.isPlaying = false;
-      this.strm = new Float32Array(this.context.strmLength * this.context.channels);
+      this.strm = new Float32Array(this.strmLength * this.channels);
+      this.strmList = new Array(8);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
     }
-    CoffeeCollider.prototype.play = function() {
+    CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.context.play();
+        this.sendToLang(["/play"]);
       }
       return this;
     };
-    CoffeeCollider.prototype.reset = function() {
+    CoffeeColliderImpl.prototype.reset = function() {
       return this;
     };
-    CoffeeCollider.prototype.pause = function() {
+    CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
         this.context.pause();
+        this.sendToLang(["/pause"]);
       }
       return this;
     };
-    CoffeeCollider.prototype.process = function() {
-      for (var i = 0; i < this.strm.length; i++) {
-        this.strm[i] = Math.random() - 0.5;
+    CoffeeColliderImpl.prototype.process = function() {
+      var strm = this.strmList[this.strmListReadIndex];
+      if (strm) {
+        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strm.set(strm);
       }
     };
-    CoffeeCollider.prototype.exec = function(code, callback) {
+    CoffeeColliderImpl.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
-        this.cclang.postMessage(["/exec", this._execId, code], "*");
+        this.sendToLang(["/exec", this.execId, code]);
         if (typeof callback === "function") {
-          this._execCallbacks[this._execId] = callback;
+          this.execCallbacks[this.execId] = callback;
         }
-        this._execId += 1;
+        this.execId += 1;
       }
       return this;
     };
-    CoffeeCollider.prototype._recv = function(msg) {
+    CoffeeColliderImpl.prototype.sendToLang = function(msg) {
+      this.cclang.postMessage(msg, "*");
+    };
+    CoffeeColliderImpl.prototype.recv = function(msg) {
       if (!msg) {
         return;
       }
@@ -171,24 +197,55 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         func.call(this, msg);
       }
     };
-    return CoffeeCollider;
+    CoffeeColliderImpl.prototype.sync = function(syncItems) {
+      this.sendToLang(syncItems);
+    };
+    return CoffeeColliderImpl;
   })();
 
   commands["/connect"] = function() {
     this.isConnected = true;
+    this.sendToLang([
+      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.context.syncCount
+    ]);
   };
   commands["/exec"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
-    var callback = this._execCallbacks[execId];
+    var callback = this.execCallbacks[execId];
     if (callback) {
       if (result !== undefined) {
         result = JSON.parse(result);
       }
       callback(result);
-      delete this._execCallbacks[execId];
+      delete this.execCallbacks[execId];
     }
   };
+
+  var CoffeeCollider = (function() {
+    function CoffeeCollider() {
+      this.impl = new CoffeeColliderImpl();
+      this.sampleRate = this.impl.sampleRate;
+      this.channels   = this.impl.channels;
+    }
+    CoffeeCollider.prototype.play = function() {
+      this.impl.play();
+      return this;
+    };
+    CoffeeCollider.prototype.reset = function() {
+      this.impl.reset();
+      return this;
+    };
+    CoffeeCollider.prototype.pause = function() {
+      this.impl.pause();
+      return this;
+    };
+    CoffeeCollider.prototype.exec = function(code, callback) {
+      this.impl.exec(code, callback);
+      return this;
+    };
+    return CoffeeCollider;
+  })();
   
   module.exports = {
     CoffeeCollider: CoffeeCollider
@@ -209,19 +266,27 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
         this.channels   = this.driver.channels;
       }
       this.colliders  = [];
-      this.process    = process1;
+      this.process    = process0;
       this.strmLength = 1024;
       this.bufLength  = 64;
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
+      this.syncCount = 0;
+      this.syncItems = new Float32Array(6); // syncCount, currentTime
       this.isPlaying = false;
     }
     AudioContext.prototype.append = function(cc) {
       this.colliders.push(cc);
+      if (this.colliders.length === 1) {
+        this.process = process1;
+      } else {
+        this.process = processN;
+      }
     };
     AudioContext.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
+        this.syncCount = 0;
         this.driver.play();
       }
     };
@@ -237,10 +302,36 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
       }
     };
 
+    var process0 = function() {
+      this.strm.set(this.clear);
+    };
     var process1 = function() {
       var cc = this.colliders[0];
+      this.syncItems[0] = this.syncCount;
       cc.process();
       this.strm.set(cc.strm);
+      cc.sync(this.syncItems);
+      this.syncCount++;
+    };
+    var processN = function() {
+      var strm = this.strm;
+      var strmLength = strm.length;
+      var colliders  = this.colliders;
+      var syncItems  = this.syncItems;
+      var cc, tmp;
+      syncItems[0] = this.syncCount;
+      strm.set(this.clear);
+      for (var i = 0, imax = colliders.length; i < imax; ++i) {
+        cc = colliders[i];
+        cc.process();
+        tmp = cc.strm;
+        for (var j = 0; j < strmLength; j += 8) {
+          strm[j  ] += tmp[j  ]; strm[j+1] += tmp[j+1]; strm[j+2] += tmp[j+2]; strm[j+3] += tmp[j+3];
+          strm[j+4] += tmp[j+4]; strm[j+5] += tmp[j+5]; strm[j+6] += tmp[j+6]; strm[j+7] += tmp[j+7];
+        }
+        cc.sync(syncItems);
+      }
+      this.syncCount++;
     };
     
     return AudioContext;
@@ -310,20 +401,34 @@ define('cc/front/web-audio-api', ['require', 'exports', 'module' ], function(req
   klass = WebAudioAPI;
 
 });
-define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], function(require, exports, module) {
+define('cc/lang/lang-server', ['require', 'exports', 'module' , 'cc/cc', 'cc/lang/compiler'], function(require, exports, module) {
   "use strict";
 
+  var cc = require("cc/cc");
   var Compiler = require("./compiler").Compiler;
 
   var commands = {};
   
-  var Server = (function() {
-    function Server() {
+  var LangServer = (function() {
+    function LangServer() {
+      var that = this;
+      this.worker = new Worker(cc.coffeeColliderPath);
+      this.worker.addEventListener("message", function(e) {
+        var msg = e.data;
+        if (msg instanceof Float32Array) {
+          that.sendToCC(msg);
+        } else {
+          that.recv(msg);
+        }
+      });
     }
-    Server.prototype.send = function(msg) {
+    LangServer.prototype.sendToCC = function(msg) {
       window.parent.postMessage(msg, "*");
     };
-    Server.prototype.recv = function(msg) {
+    LangServer.prototype.sendToSynth = function(msg) {
+      this.worker.postMessage(msg);
+    };
+    LangServer.prototype.recv = function(msg) {
       if (!msg) {
         return;
       }
@@ -332,24 +437,50 @@ define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], 
         func.call(this, msg);
       }
     };
-    return Server;
+    return LangServer;
   })();
 
+  commands["/init"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/play"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/pause"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/console/log"] = function(msg) {
+    console.log.apply(console, msg[1]);
+  };
+  commands["/console/debug"] = function(msg) {
+    console.debug.apply(console, msg[1]);
+  };
+  commands["/console/info"] = function(msg) {
+    console.info.apply(console, msg[1]);
+  };
+  commands["/console/error"] = function(msg) {
+    console.error.apply(console, msg[1]);
+  };
   commands["/exec"] = function(msg) {
     var execId = msg[1];
     var code   = new Compiler().compile(msg[2].trim());
     var result = eval.call(global, code);
-    this.send(["/exec", execId, JSON.stringify(result)]);
+    this.sendToCC(["/exec", execId, JSON.stringify(result)]);
   };
 
-  var server = new Server();
+  var server = new LangServer();
   window.addEventListener("message", function(e) {
-    server.recv(e.data);
+    var msg = e.data;
+    if (msg instanceof Float32Array) {
+      server.sendToSynth(msg);
+    } else {
+      server.recv(msg);
+    }
   });
-  server.send("/connect");
+  server.sendToCC(["/connect"]);
 
   module.exports = {
-    Server: Server
+    LangServer: LangServer
   };
 
 });
@@ -397,6 +528,92 @@ define('cc/lang/compiler', ['require', 'exports', 'module' ], function(require, 
 
   module.exports = {
     Compiler: Compiler
+  };
+
+});
+define('cc/synth/synth-server', ['require', 'exports', 'module' ], function(require, exports, module) {
+  "use strict";
+
+  var commands = {};
+  
+  var SynthServer = (function() {
+    function SynthServer() {
+      this.sysSyncCount   = 0;
+      this.sysCurrentTime = 0;
+      this.syncItems = new Float32Array(6);
+      this.onaudioprocess = this.onaudioprocess.bind(this);
+      this.timerId = 0;
+    }
+    SynthServer.prototype.sendToLang = function(msg) {
+      postMessage(msg);
+    };
+    SynthServer.prototype.recv = function(msg) {
+      if (!msg) {
+        return;
+      }
+      var func = commands[msg[0]];
+      if (func) {
+        func.call(this, msg);
+      }
+    };
+    SynthServer.prototype.onaudioprocess = function() {
+      if (this.syncCount - this.sysSyncCount >= 4) {
+        return;
+      }
+      var strm = this.strm;
+      for (var i = 0; i < strm.length; i++) {
+        strm[i] = Math.random() * 0.5;
+      }
+      this.syncCount += 1;
+      this.sendToLang(strm);
+    };
+    return SynthServer;
+  })();
+
+  commands["/init"] = function(msg) {
+    this.sampleRate = msg[1];
+    this.channels   = msg[2];
+    this.strmLength = msg[3];
+    this.bufLength  = msg[4];
+    this.syncCount  = msg[5];
+    this.strm = new Float32Array(this.strmLength * this.channels);
+  };
+  commands["/play"] = function() {
+    if (this.timerId === 0) {
+      this.timerId = setInterval(this.onaudioprocess, 10);
+    }
+  };
+  commands["/pause"] = function() {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = 0;
+    }
+  };
+  
+  var server = new SynthServer();
+  addEventListener("message", function(e) {
+    var msg = e.data;
+    if (msg instanceof Float32Array) {
+      server.sysSyncCount   = msg[0]|0;
+      server.sysCurrentTime = msg[1]|0;
+      server.syncItems.set(msg);
+    } else {
+      server.recv(msg);
+    }
+  });
+
+  global.console = (function() {
+    var console = {};
+    ["log", "debug", "info", "error"].forEach(function(method) {
+      console[method] = function() {
+        server.sendToLang(["/console/" + method, Array.prototype.slice.call(arguments)]);
+      };
+    });
+    return console;
+  })();
+  
+  module.exports = {
+    SynthServer: SynthServer
   };
 
 });

@@ -24,10 +24,15 @@ define(function(require, exports, module) {
     }
 
     if (!cc.isLangMode) {
+      cc.context = "window";
       global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
-      require("./lang/server");
+      cc.context = "server";
+      require("./lang/lang-server");
     }
+  } else if (typeof WorkerLocation !== "undefined") {
+    cc.context = "synth";
+    require("./synth/synth-server");
   }
   
   module.exports = {
