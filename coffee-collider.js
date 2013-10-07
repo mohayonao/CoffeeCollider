@@ -85,6 +85,8 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
   "use strict";
 
   var cc = require("cc/cc");
+
+  var commands = {};
   
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
@@ -114,6 +116,8 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
 
       this.cclang = iframe.contentWindow;
       this.isConnected = false;
+      this._execId = 0;
+      this._execCallbacks = {};
     }
     CoffeeCollider.prototype.play = function() {
       return this;
@@ -125,21 +129,42 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
       return this;
     };
     CoffeeCollider.prototype.exec = function(code, callback) {
-      this.cclang.postMessage(code, "*");
-      if (typeof callback === "function") {
-        callback(/* result */);
+      if (typeof code === "string") {
+        this.cclang.postMessage(["/exec", this._execId, code], "*");
+        if (typeof callback === "function") {
+          this._execCallbacks[this._execId] = callback;
+        }
+        this._execId += 1;
       }
       return this;
     };
     CoffeeCollider.prototype._recv = function(msg) {
-      if (msg === "/connect") {
-        this.isConnected = true;
-      } else {
-        console.log(msg);
+      if (!msg) {
+        return;
+      }
+      var func = commands[msg[0]];
+      if (func) {
+        func.call(this, msg);
       }
     };
     return CoffeeCollider;
   })();
+
+  commands["/connect"] = function() {
+    this.isConnected = true;
+  };
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var result = msg[2];
+    var callback = this._execCallbacks[execId];
+    if (callback) {
+      if (result !== undefined) {
+        result = JSON.parse(result);
+      }
+      callback(result);
+      delete this._execCallbacks[execId];
+    }
+  };
   
   module.exports = {
     CoffeeCollider: CoffeeCollider
@@ -151,9 +176,10 @@ define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], 
 
   var Compiler = require("./compiler").Compiler;
 
+  var commands = {};
+  
   var Server = (function() {
     function Server() {
-      this.commands = {};
     }
     Server.prototype.send = function(msg) {
       window.parent.postMessage(msg, "*");
@@ -162,17 +188,20 @@ define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], 
       if (!msg) {
         return;
       }
-      var func = this.commands[msg[0]];
+      var func = commands[msg[0]];
       if (func) {
         func.call(this, msg);
-      } else if (typeof msg === "string") {
-        var code = new Compiler().compile(msg);
-        var result = eval.call(global, code);
-        console.log(result);
       }
     };
     return Server;
   })();
+
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var code   = new Compiler().compile(msg[2].trim());
+    var result = eval.call(global, code);
+    this.send(["/exec", execId, JSON.stringify(result)]);
+  };
 
   var server = new Server();
   window.addEventListener("message", function(e) {

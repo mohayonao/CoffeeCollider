@@ -15,7 +15,9 @@
         window.run = function() {
           var code = document.getElementById("code").value.trim();
           cc.exec(code, function(res) {
-            console.log(res);
+            if (res !== undefined) {
+              console.log(res);
+            }
           });
         };
       };

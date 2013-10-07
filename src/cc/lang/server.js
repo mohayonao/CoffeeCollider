@@ -3,9 +3,10 @@ define(function(require, exports, module) {
 
   var Compiler = require("./compiler").Compiler;
 
+  var commands = {};
+  
   var Server = (function() {
     function Server() {
-      this.commands = {};
     }
     Server.prototype.send = function(msg) {
       window.parent.postMessage(msg, "*");
@@ -14,17 +15,20 @@ define(function(require, exports, module) {
       if (!msg) {
         return;
       }
-      var func = this.commands[msg[0]];
+      var func = commands[msg[0]];
       if (func) {
         func.call(this, msg);
-      } else if (typeof msg === "string") {
-        var code = new Compiler().compile(msg);
-        var result = eval.call(global, code);
-        console.log(result);
       }
     };
     return Server;
   })();
+
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var code   = new Compiler().compile(msg[2].trim());
+    var result = eval.call(global, code);
+    this.send(["/exec", execId, JSON.stringify(result)]);
+  };
 
   var server = new Server();
   window.addEventListener("message", function(e) {
