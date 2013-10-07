@@ -59,9 +59,8 @@ module.exports = function(grunt) {
     });
     copy({
       source: cc,
-      dest  : "./build/coffee-collider.js"
+      dest  : "./coffee-collider.js"
     });
-
     
   });
 
