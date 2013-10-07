@@ -10,6 +10,60 @@ module.exports = function(grunt) {
     }
   });
 
+  grunt.registerTask("build", function() {
+    var copy = require("dryice").copy;
+    var srcroot = "./src";
+    var main = "cc/loader";
+    var dest = "coffee-collider"
+    
+    var coffeeColliderProject = {
+      roots: [srcroot]
+    };
+    var project = copy.createCommonJsProject(coffeeColliderProject);
+    var cc = copy.createDataObject();
+    var filter;
+
+    var header = function() {
+      var header = "";
+      header += "(function(global) {" + "\n";
+      header += '"use strict";' + "\n";
+      return header;
+    };
+    var firstRequire = function(text) {
+      return text + '_require("cc/cc", "' + main + '");\n';
+    };
+    var footer = function() {
+      var footer = "";
+      footer += "})(this.self||global);" + "\n";
+      return footer;
+    };
+    
+    copy({
+      source: { value:header() },
+      dest  : cc
+    });
+    copy({
+      source: [ srcroot + "/require.js" ],
+      dest  : cc
+    });
+    filter = [ copy.filter.moduleDefines, firstRequire ];
+    copy({
+      source: [ { project:project, require:main } ],
+      filter: filter,
+      dest  : cc
+    });
+    copy({
+      source: { value:footer() },
+      dest  : cc
+    });
+    copy({
+      source: cc,
+      dest  : "./build/coffee-collider.js"
+    });
+
+    
+  });
+
   grunt.registerTask("test", function() {
     require("./src/amd-loader");
 
