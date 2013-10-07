@@ -9,10 +9,15 @@ define(function(require, exports, module) {
     before(function() {
       compiler = new Compiler();
     });
-    it("1 + 1", function() {
-      var code = "1 + 1";
+    it("0 + -pi * 1", function() {
+      var code = "0 + -pi * 1";
       var result = eval(compiler.compile(code));
-      assert.equal(result, 2);
+      assert.equal(result, 0 + -Math.PI * 1);
+    });
+    it("0 + 2pi * 1", function() {
+      var code = "0 + 2pi * 1";
+      var result = eval(compiler.compile(code));
+      assert.equal(result, 0 + 2 * Math.PI * 1);
     });
   });
 
