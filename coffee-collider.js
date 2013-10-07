@@ -81,14 +81,16 @@ define('cc/cc', ['require', 'exports', 'module' ], function(require, exports, mo
   module.exports = {};
 
 });
-define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], function(require, exports, module) {
+define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/audio-context'], function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
+  var AudioContext = require("./audio-context").AudioContext;
 
   var commands = {};
   
   var CoffeeCollider = (function() {
+    var context = null;
     function CoffeeCollider() {
       var that = this;
       var iframe = document.createElement("iframe");
@@ -118,15 +120,37 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
       this.isConnected = false;
       this._execId = 0;
       this._execCallbacks = {};
+
+      if (!context) {
+        context = new AudioContext();
+      }
+      this.context = context;
+      this.context.append(this);
+
+      this.isPlaying = false;
+      this.strm = new Float32Array(this.context.strmLength * this.context.channels);
     }
     CoffeeCollider.prototype.play = function() {
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        this.context.play();
+      }
       return this;
     };
     CoffeeCollider.prototype.reset = function() {
       return this;
     };
     CoffeeCollider.prototype.pause = function() {
+      if (this.isPlaying) {
+        this.isPlaying = false;
+        this.context.pause();
+      }
       return this;
+    };
+    CoffeeCollider.prototype.process = function() {
+      for (var i = 0; i < this.strm.length; i++) {
+        this.strm[i] = Math.random() - 0.5;
+      }
     };
     CoffeeCollider.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
@@ -169,6 +193,121 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
   module.exports = {
     CoffeeCollider: CoffeeCollider
   };
+
+});
+define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web-audio-api'], function(require, exports, module) {
+  "use strict";
+
+  var AudioContext = (function() {
+    function AudioContext() {
+      var SoundAPI    = getAPI();
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      if (SoundAPI) {
+        this.driver = new SoundAPI(this);
+        this.sampleRate = this.driver.sampleRate;
+        this.channels   = this.driver.channels;
+      }
+      this.colliders  = [];
+      this.process    = process1;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.isPlaying = false;
+    }
+    AudioContext.prototype.append = function(cc) {
+      this.colliders.push(cc);
+    };
+    AudioContext.prototype.play = function() {
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        this.driver.play();
+      }
+    };
+    AudioContext.prototype.pause = function() {
+      if (this.isPlaying) {
+        var flag = this.colliders.every(function(cc) {
+          return !cc.isPlaying;
+        });
+        if (flag) {
+          this.isPlaying = false;
+          this.driver.pause();
+        }
+      }
+    };
+
+    var process1 = function() {
+      var cc = this.colliders[0];
+      cc.process();
+      this.strm.set(cc.strm);
+    };
+    
+    return AudioContext;
+  })();
+
+  var getAPI = function() {
+    return require("./web-audio-api").getAPI();
+  };
+
+  module.exports = {
+    AudioContext: AudioContext
+  };
+
+});
+define('cc/front/web-audio-api', ['require', 'exports', 'module' ], function(require, exports, module) {
+  "use strict";
+
+  var klass;
+  module.exports = {
+    getAPI: function() {
+      return klass;
+    }
+  };
+
+  var AudioContext = global.AudioContext || global.webkitAudioContext;
+  if (!AudioContext) {
+    return;
+  }
+
+  function WebAudioAPI(sys) {
+    this.sys = sys;
+    this.context = new AudioContext();
+    this.sampleRate = this.context.sampleRate;
+    this.channels   = sys.channels;
+  }
+
+  WebAudioAPI.prototype.play = function() {
+    var sys = this.sys;
+    var onaudioprocess;
+    var strmLength  = sys.strmLength;
+    var strmLength4 = strmLength * 4;
+    var buffer = sys.strm.buffer;
+    if (this.sys.sampleRate === this.sampleRate) {
+      onaudioprocess = function(e) {
+        var outs = e.outputBuffer;
+        sys.process();
+        outs.getChannelData(0).set(new Float32Array(
+          buffer.slice(0, strmLength4)
+        ));
+        outs.getChannelData(1).set(new Float32Array(
+          buffer.slice(strmLength4)
+        ));
+      };
+    }
+    this.bufSrc = this.context.createBufferSource();
+    this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
+    this.jsNode.onaudioprocess = onaudioprocess;
+    this.bufSrc.noteOn(0);
+    this.bufSrc.connect(this.jsNode);
+    this.jsNode.connect(this.context.destination);
+  };
+  WebAudioAPI.prototype.pause = function() {
+    this.bufSrc.disconnect();
+    this.jsNode.disconnect();
+  };
+
+  klass = WebAudioAPI;
 
 });
 define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], function(require, exports, module) {

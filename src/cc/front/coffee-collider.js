@@ -2,10 +2,12 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
+  var AudioContext = require("./audio-context").AudioContext;
 
   var commands = {};
   
   var CoffeeCollider = (function() {
+    var context = null;
     function CoffeeCollider() {
       var that = this;
       var iframe = document.createElement("iframe");
@@ -35,15 +37,37 @@ define(function(require, exports, module) {
       this.isConnected = false;
       this._execId = 0;
       this._execCallbacks = {};
+
+      if (!context) {
+        context = new AudioContext();
+      }
+      this.context = context;
+      this.context.append(this);
+
+      this.isPlaying = false;
+      this.strm = new Float32Array(this.context.strmLength * this.context.channels);
     }
     CoffeeCollider.prototype.play = function() {
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        this.context.play();
+      }
       return this;
     };
     CoffeeCollider.prototype.reset = function() {
       return this;
     };
     CoffeeCollider.prototype.pause = function() {
+      if (this.isPlaying) {
+        this.isPlaying = false;
+        this.context.pause();
+      }
       return this;
+    };
+    CoffeeCollider.prototype.process = function() {
+      for (var i = 0; i < this.strm.length; i++) {
+        this.strm[i] = Math.random() - 0.5;
+      }
     };
     CoffeeCollider.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
