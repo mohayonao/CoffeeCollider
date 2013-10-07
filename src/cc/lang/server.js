@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var Compiler = require("cc/lang/compiler").Compiler;
+  var Compiler = require("./compiler").Compiler;
 
   var Server = (function() {
     function Server() {

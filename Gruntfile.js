@@ -13,7 +13,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask("build", function() {
     var copy = require("dryice").copy;
-    var srcroot = "./src";
+    var srcroot = "src";
     var main = "cc/loader";
     var dest = "coffee-collider"
     
@@ -44,7 +44,7 @@ module.exports = function(grunt) {
       dest  : cc
     });
     copy({
-      source: [ srcroot + "/require.js" ],
+      source: [ "./src/require.js" ],
       dest  : cc
     });
     filter = [ copy.filter.moduleDefines, firstRequire ];

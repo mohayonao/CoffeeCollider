@@ -42,7 +42,7 @@ var define = _define;
 define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-collider', 'cc/lang/server'], function(require, exports, module) {
   "use strict";
 
-  var cc = require("cc/cc");
+  var cc = require("./cc");
 
   if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
@@ -65,9 +65,9 @@ define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-
     }
 
     if (!cc.isLangMode) {
-      global.CoffeeCollider = require("cc/front/coffee-collider").CoffeeCollider;
+      global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
-      require("cc/lang/server");
+      require("./lang/server");
     }
   }
   
@@ -149,7 +149,7 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc'], f
 define('cc/lang/server', ['require', 'exports', 'module' , 'cc/lang/compiler'], function(require, exports, module) {
   "use strict";
 
-  var Compiler = require("cc/lang/compiler").Compiler;
+  var Compiler = require("./compiler").Compiler;
 
   var Server = (function() {
     function Server() {

@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("cc/cc");
+  var cc = require("./cc");
 
   if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
@@ -24,9 +24,9 @@ define(function(require, exports, module) {
     }
 
     if (!cc.isLangMode) {
-      global.CoffeeCollider = require("cc/front/coffee-collider").CoffeeCollider;
+      global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
-      require("cc/lang/server");
+      require("./lang/server");
     }
   }
   
