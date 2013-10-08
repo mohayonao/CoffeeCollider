@@ -62,6 +62,9 @@ define(function(require, exports, module) {
     var result = eval.call(global, code);
     this.send(["/exec", execId, JSON.stringify(result)]);
   };
+  commands["/loadScript"] = function(msg) {
+    importScripts(msg[1]);
+  };
 
   var install = function() {
     var server = new SynthServer();

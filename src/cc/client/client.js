@@ -75,16 +75,9 @@ define(function(require, exports, module) {
         this.execId += 1;
       }
     };
-    // SynthClient.prototype.loadJavaScript = function(path, callback) {
-    //   var script = document.createElement("script");
-    //   script.src = path;
-    //   if (typeof callback === "function") {
-    //     script.onload = function() {
-    //       callback();
-    //     };
-    //   }
-    //   this.iframe.contentDocument.body.appendChild(script);
-    // };
+    SynthClient.prototype.loadScript = function(path) {
+      this.send(["/loadScript", path]);
+    };
     SynthClient.prototype.send = function(msg) {
       this.worker.postMessage(msg);
     };

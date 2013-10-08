@@ -142,9 +142,9 @@ define('cc/client/coffee-collider', ['require', 'exports', 'module' , 'cc/client
         return this.client.strm;
       }
     };
-    CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
+    CoffeeCollider.prototype.loadScript = function(path) {
       if (this.client) {
-        this.client.loadJavaScript(path, callback);
+        this.client.loadScript(path);
       }
       return this;
     };
@@ -233,16 +233,9 @@ define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client
         this.execId += 1;
       }
     };
-    // SynthClient.prototype.loadJavaScript = function(path, callback) {
-    //   var script = document.createElement("script");
-    //   script.src = path;
-    //   if (typeof callback === "function") {
-    //     script.onload = function() {
-    //       callback();
-    //     };
-    //   }
-    //   this.iframe.contentDocument.body.appendChild(script);
-    // };
+    SynthClient.prototype.loadScript = function(path) {
+      this.send(["/loadScript", path]);
+    };
     SynthClient.prototype.send = function(msg) {
       this.worker.postMessage(msg);
     };
@@ -740,6 +733,9 @@ define('cc/server/server', ['require', 'exports', 'module' ], function(require, 
     var code   = msg[2];
     var result = eval.call(global, code);
     this.send(["/exec", execId, JSON.stringify(result)]);
+  };
+  commands["/loadScript"] = function(msg) {
+    importScripts(msg[1]);
   };
 
   var install = function() {

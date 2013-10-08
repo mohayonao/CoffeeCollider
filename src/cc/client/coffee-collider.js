@@ -47,9 +47,9 @@ define(function(require, exports, module) {
         return this.client.strm;
       }
     };
-    CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
+    CoffeeCollider.prototype.loadScript = function(path) {
       if (this.client) {
-        this.client.loadJavaScript(path, callback);
+        this.client.loadScript(path);
       }
       return this;
     };
