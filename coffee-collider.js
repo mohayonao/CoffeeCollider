@@ -204,7 +204,7 @@ define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.sys.play();
-        this.send(["/play"]);
+        this.send(["/play", this.sys.syncCount]);
       }
     };
     SynthClient.prototype.reset = function() {
@@ -717,9 +717,10 @@ define('cc/server/server', ['require', 'exports', 'module' ], function(require, 
     this.syncCount  = msg[5];
     this.strm = new Float32Array(this.strmLength * this.channels);
   };
-  commands["/play"] = function() {
+  commands["/play"] = function(msg) {
     if (this.timerId === 0) {
       this.timerId = setInterval(this.onaudioprocess, 10);
+      this.syncCount = msg[1];
     }
   };
   commands["/pause"] = function() {

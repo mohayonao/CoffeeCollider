@@ -46,7 +46,7 @@ define(function(require, exports, module) {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.sys.play();
-        this.send(["/play"]);
+        this.send(["/play", this.sys.syncCount]);
       }
     };
     SynthClient.prototype.reset = function() {
