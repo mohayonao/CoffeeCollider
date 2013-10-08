@@ -11,11 +11,7 @@
         box-sizing        : border-box;
       }
       #code {
-        position: absolute;
-        top  : 0;
-        left : 0;
-        right: 320px;
-        bottom: 0;
+        position:absolute; top:0; left:0; right:320px; bottom:0;
         font-family: Monaco,Consolas,'Lucida Console',monospace;
         font-size: 18px;
         color: #34495e;
@@ -25,30 +21,54 @@
         padding: 5px;
       }
       #canvas {
-        position: absolute;
-        top  : 0;
-        right: 0;
-        width: 320px;
-        height: 100%;
-        background: #2c3e50;
+        position:absolute; top:0; right:0;
+        width:320px; height:100%;
+        background:#2c3e50;
       }
       #run {
-        position: absolute;
-        top  : 5px;
-        right: 325px;
+        position:absolute; top:5px; right:325px;
       }
       #play {
-        position: absolute;
-        top  : 5px;
-        right: 5px;
+        position:absolute; top:5px; right:5px;
+      }
+      .btn {
+        width:80px; height:30px;
+        font-size:18px;
+        border:none; border-radius:4px;
+        transition:0.25s;
+        color:white; background-color:#bdc3c7;
+      }
+      .btn:hover, .btn:focus {
+        background-color:#cacfd2;
+      }
+      .btn:active {
+        background-color:#a1a6a9;
+      }
+      .btn-primary {
+        background-color:#1abc9c;
+      }
+      .btn-primary:hover, .btn:focus {
+        background-color:#2fe2bf;
+      }
+      .btn-primary:active {
+        background-color:#16a085;
+      }
+      .btn-danger {
+        background-color:#e74c3c;
+      }
+      .btn-danger:hover, .btn-danger:focus {
+        background-color:#ec7063;
+      }
+      .btn-danger:active {
+        background-color:#dc2d1b;
       }
     </style>
   </head>
   <body>
     <textarea id="code" spellcheck="false" placeholder="# write a code here"></textarea>
     <canvas id="canvas"></canvas>
-    <button id="run" onclick="run()">Run</button>
-    <button id="play" onclick="play()">Play</button>
+    <button id="run" class="btn btn-primary" onclick="run()">Run</button>
+    <button id="play" class="btn btn" onclick="play()">Play</button>
     <script src="./documents/vendor/coffee-script.js"></script>
     <script src="./coffee-collider.js"></script>
     <script>
@@ -63,13 +83,16 @@
           });
         };
         var isPlaying = false;
+        var $play = document.getElementById("play");
         window.play = function() {
           isPlaying = !isPlaying;
           if (isPlaying) {
             cc.play();
+            $play.className = "btn btn-danger";
             requestAnimationFrame(animate);
           } else {
             cc.pause();
+            $play.className = "btn";
           }
         };
         var canvas = document.getElementById("canvas");
