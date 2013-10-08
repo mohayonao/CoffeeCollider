@@ -272,6 +272,11 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       }
       return this;
     };
+    CoffeeCollider.prototype.getStream = function() {
+      if (this.impl) {
+        return this.impl.strm;
+      }
+    };
     CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
       if (this.impl) {
         this.impl.loadJavaScript(path, callback);

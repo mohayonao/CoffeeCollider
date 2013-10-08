@@ -184,6 +184,11 @@ define(function(require, exports, module) {
       }
       return this;
     };
+    CoffeeCollider.prototype.getStream = function() {
+      if (this.impl) {
+        return this.impl.strm;
+      }
+    };
     CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
       if (this.impl) {
         this.impl.loadJavaScript(path, callback);
