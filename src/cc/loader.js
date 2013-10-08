@@ -5,25 +5,31 @@ define(function(require, exports, module) {
 
   if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
+    var langMode = false;
     if (scripts && scripts.length) {
       var m;
       for (var i = 0; i < scripts.length; i++) {
-        m = /^(.*\/coffee-script\.js)/.exec(scripts[i].src);
-        if (m) {
-          cc.coffeeScriptPath = m[1];
-        } else {
+        if (!cc.coffeeScriptPath) {
+          m = /^(.*\/coffee-script\.js)/.exec(scripts[i].src);
+          if (m) {
+            cc.coffeeScriptPath = m[1];
+            continue;
+          }
+        }
+        if (!cc.coffeeColliderPath) {
           m = /^(.*\/coffee-collider(?:-min)?\.js)(#lang)?/.exec(scripts[i].src);
           if (m) {
             cc.coffeeColliderPath = m[1];
             if (m[2] === "#lang") {
-              cc.isLangMode = true;
+              langMode = true;
             }
+            continue;
           }
         }
       }
     }
 
-    if (!cc.isLangMode) {
+    if (!langMode) {
       cc.context = "window";
       global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
