@@ -1,6 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var bop = require("./bop");
+
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
       return global.CoffeeScript;
@@ -16,8 +18,9 @@ define(function(require, exports, module) {
     }
     Compiler.prototype.compile = function(code) {
       var tokens = CoffeeScript.tokens(code);
-      this.doPI(tokens);
-      return CoffeeScript.nodes(tokens).compile({bare:true});
+      tokens = this.doPI(tokens);
+      tokens = this.doBOP(tokens);
+      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
     Compiler.prototype.doPI = function(tokens) {
       var i, token, prev = [];
@@ -37,6 +40,73 @@ define(function(require, exports, module) {
       }
       return tokens;
     };
+    Compiler.prototype.doBOP = (function() {
+      var CALL = 0, BRACKET = 1;
+      var REPLACE = bop.replaceTable;
+      var peek = function(list) {
+        return list[list.length - 1];
+      };
+      var pop = function(list) {
+        list.pop();
+        return list[list.length - 1];
+      };
+      var push = function(list, item) {
+        list.push(item);
+        return list[list.length - 1];
+      };
+      var beginCall = function(dst, sel) {
+        dst.push(["."         , ".", _]);
+        dst.push(["IDENTIFIER", sel, _]);
+        dst.push(["CALL_START", "(", _]);
+      };
+      var closeCall = function(dst) {
+        dst.push(["CALL_END", ")", _]);
+      };
+      return function(tokens) {
+        var dstTokens = [], bracketStack = [];
+        var bracket, token, replaceable = false;
+        while ((token = tokens.shift())) {
+          if (replaceable && REPLACE[token[VALUE]]) {
+            beginCall(dstTokens, REPLACE[token[VALUE]]);
+            bracket = { type:CALL };
+            push(bracketStack, bracket);
+            replaceable = false;
+            continue;
+          }
+          replaceable = true;
+          bracket = peek(bracketStack);
+          switch (token[TAG]) {
+          case ",": case "TERMINATOR": case "INDENT": case "OUTDENT":
+            while (bracket && bracket.type === CALL) {
+              closeCall(dstTokens);
+              bracket = pop(bracketStack);
+            }
+            replaceable = false;
+            break;
+          case "CALL_START": case "(": case "[": case "{":
+            push(bracketStack, {type:BRACKET});
+            replaceable = false;
+            break;
+          case "}": case "]": case ")": case "CALL_END":
+            while (bracket && bracket.type === CALL) {
+              closeCall(dstTokens);
+              bracket = pop(bracketStack);
+            }
+            if (bracket && bracket.type === BRACKET) {
+              dstTokens.push(token);
+              bracket = pop(bracketStack);
+            }
+            while (bracket && bracket.type === CALL) {
+              closeCall(dstTokens, bracket);
+              bracket = pop(bracketStack);
+            }
+            continue;
+          }
+          dstTokens.push(token);
+        }
+        return dstTokens;
+      };
+    })();
     return Compiler;
   })();
 

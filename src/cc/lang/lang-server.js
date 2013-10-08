@@ -65,19 +65,22 @@ define(function(require, exports, module) {
     this.sendToCC(["/exec", execId, JSON.stringify(result)]);
   };
 
-  var server = new LangServer();
-  window.addEventListener("message", function(e) {
-    var msg = e.data;
-    if (msg instanceof Float32Array) {
-      server.sendToSynth(msg);
-    } else {
-      server.recv(msg);
-    }
-  });
-  server.sendToCC(["/connect"]);
+  var install = function() {
+    var server = new LangServer();
+    window.addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        server.sendToSynth(msg);
+      } else {
+        server.recv(msg);
+      }
+    });
+    server.sendToCC(["/connect"]);
+  };
 
   module.exports = {
-    LangServer: LangServer
+    LangServer: LangServer,
+    install: install
   };
 
 });

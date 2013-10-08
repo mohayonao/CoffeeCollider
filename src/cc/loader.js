@@ -28,7 +28,7 @@ define(function(require, exports, module) {
       global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
     } else {
       cc.context = "server";
-      require("./lang/lang-server");
+      require("./lang/installer").install();
     }
   } else if (typeof WorkerLocation !== "undefined") {
     cc.context = "synth";
