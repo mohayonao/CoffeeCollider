@@ -29,7 +29,7 @@ define(function(require, exports, module) {
       }
       var strm = this.strm;
       for (var i = 0; i < strm.length; i++) {
-        strm[i] = Math.random() * 0.5;
+        strm[i] = Math.random() * 0.5 - 0.25;
       }
       this.syncCount += 1;
       this.sendToLang(strm);
