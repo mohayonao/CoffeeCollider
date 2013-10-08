@@ -10,11 +10,45 @@
         -ms-box-sizing    : border-box;
         box-sizing        : border-box;
       }
+      #code {
+        position: absolute;
+        top  : 0;
+        left : 0;
+        right: 320px;
+        bottom: 0;
+        font-family: Monaco,Consolas,'Lucida Console',monospace;
+        font-size: 18px;
+        color: #34495e;
+        background: #ecf0f1;
+        border-width: 0;
+        margin: 0;
+        padding: 5px;
+      }
+      #canvas {
+        position: absolute;
+        top  : 0;
+        right: 0;
+        width: 320px;
+        height: 100%;
+        background: #2c3e50;
+      }
+      #run {
+        position: absolute;
+        top  : 5px;
+        right: 325px;
+      }
+      #play {
+        position: absolute;
+        top  : 5px;
+        right: 5px;
+      }
     </style>
   </head>
   <body>
-    <textarea id="code" style="position:absolute;top:0;left:0;width:100%;height:100%;font-family:Monaco,Consolas,'Lucida Console',monospace;font-size:18px;color:#34495e;background:#ecf0f1;border:0;padding:5px;" spellcheck="false"></textarea>
-    <button style="position:absolute;top:5px;right:5px;" onclick="run()">Run</button>
+    <textarea id="code" spellcheck="false" placeholder="# write a code here"></textarea>
+    <canvas id="canvas"></canvas>
+    <button id="run" onclick="run()">Run</button>
+    <button id="play" onclick="play()">Play</button>
     <script src="./documents/vendor/coffee-script.js"></script>
     <script src="./coffee-collider.js"></script>
     <script>
@@ -27,6 +61,50 @@
               console.log(res);
             }
           });
+        };
+        var isPlaying = false;
+        window.play = function() {
+          isPlaying = !isPlaying;
+          if (isPlaying) {
+            cc.play();
+            requestAnimationFrame(animate);
+          } else {
+            cc.pause();
+          }
+        };
+        var canvas = document.getElementById("canvas");
+        canvas.width  = 480;
+        canvas.height = 640;
+        var context = canvas.getContext("2d");
+        context.fillStyle   = "#2c3e50";
+        context.strokeStyle = "#f1c40f";
+        context.lineWidth   =  8;
+        context.lineJoin    = "round";
+        context.shadowBlur  = 20;
+        context.shadowColor = "#f1c40f";
+        var calcX = function(val) {
+          return val * 0.5 * canvas.width + (canvas.width >> 1);
+        };
+        var prevt = 0;
+        var animate = function(t) {
+          if (t - prevt > 60) {
+            var strm = cc.getStream();
+            var len  = strm.length >> 1;
+            var dy   = canvas.height / len;
+            var step = 8;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.beginPath();
+            context.moveTo(calcX((strm[0]+strm[len])*0.5), 0);
+            for (var i = step; i < len; i += step) {
+              context.lineTo(calcX((strm[i]+strm[i+len])*0.5), i * dy);
+            }
+            context.lineTo(calcX((strm[len-1]+strm[strm.length-1])*0.5), canvas.height);
+            context.stroke();
+            prevt = t;
+          }
+          if (isPlaying) {
+            requestAnimationFrame(animate);
+          }
         };
       };
     </script>
