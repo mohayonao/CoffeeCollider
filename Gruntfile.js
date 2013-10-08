@@ -1,21 +1,59 @@
 module.exports = function(grunt) {
   "use strict";
 
+  grunt.loadNpmTasks("grunt-contrib-watch");
+  grunt.loadNpmTasks("grunt-contrib-connect");
   grunt.loadNpmTasks("grunt-contrib-jshint");
+  grunt.loadNpmTasks("grunt-contrib-uglify");
 
   grunt.initConfig({
-    "pkg": grunt.file.readJSON("package.json"),
-    "jshint": {
-      "files": "src/cc/**/*.js",
-      "options": grunt.file.readJSON(".jshintrc")
+    pkg: grunt.file.readJSON("package.json"),
+    watch: {
+      livereload: {
+        files: [ "index.html", "coffee-collider.js" ],
+        options: {
+          livereload: true
+        },
+      },
+      build: {
+        files: [ "src/cc/**/*.js", "!src/cc/**/*_test.js" ],
+        tasks: [ "build" ],
+      },
+      test: {
+        files: [ "src/cc/**/*_test.js" ],
+        tasks: [ "test" ],
+      },
+    },
+    connect: {
+      livereload: {
+        options: {
+          port    : process.env.PORT || 3000,
+          hostname: "*"
+        }
+      }
+    },
+    jshint: {
+      files: "src/cc/**/*.js",
+      options: grunt.file.readJSON(".jshintrc")
+    },
+    uglify: {
+      cc: {
+        files: {
+          "coffee-collider-min.js": [ "coffee-collider.js" ]
+        },
+        options: {
+          sourceMap: "coffee-collider-min.map",
+          report: "gzip"
+        }
+      }
     }
   });
 
-  grunt.registerTask("build", function() {
+  grunt.registerTask("dryice", function() {
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
-    var dest = "coffee-collider"
+    var dest = "coffee-collider";
     
     var coffeeColliderProject = {
       roots: [srcroot]
@@ -59,9 +97,8 @@ module.exports = function(grunt) {
     });
     copy({
       source: cc,
-      dest  : "./coffee-collider.js"
+      dest  : dest + ".js"
     });
-    
   });
 
   grunt.registerTask("test", function() {
@@ -94,7 +131,9 @@ module.exports = function(grunt) {
     });
   });
 
-  grunt.registerTask("default", ["jshint","test","build"]);
-  grunt.registerTask("travis" , ["jshint","test:travis"]);
+  grunt.registerTask("check"  , ["jshint", "test"]);
+  grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
+  grunt.registerTask("default", ["build", "connect", "watch"]);
+  grunt.registerTask("travis" , ["jshint", "test:travis"]);
 
 };
