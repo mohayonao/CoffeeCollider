@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
-  var Compiler = require("./compiler").Compiler;
 
   var commands = {};
   
@@ -60,7 +59,7 @@ define(function(require, exports, module) {
   };
   commands["/exec"] = function(msg) {
     var execId = msg[1];
-    var code   = new Compiler().compile(msg[2].trim());
+    var code   = msg[2];
     var result = eval.call(global, code);
     this.sendToCC(["/exec", execId, JSON.stringify(result)]);
   };

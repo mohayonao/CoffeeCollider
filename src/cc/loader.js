@@ -9,13 +9,6 @@ define(function(require, exports, module) {
     if (scripts && scripts.length) {
       var m;
       for (var i = 0; i < scripts.length; i++) {
-        if (!cc.coffeeScriptPath) {
-          m = /^(.*\/coffee-script\.js)/.exec(scripts[i].src);
-          if (m) {
-            cc.coffeeScriptPath = m[1];
-            continue;
-          }
-        }
         if (!cc.coffeeColliderPath) {
           m = /^(.*\/coffee-collider(?:-min)?\.js)(#lang)?/.exec(scripts[i].src);
           if (m) {
@@ -23,7 +16,7 @@ define(function(require, exports, module) {
             if (m[2] === "#lang") {
               langMode = true;
             }
-            continue;
+            break;
           }
         }
       }

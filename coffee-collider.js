@@ -50,13 +50,6 @@ define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-
     if (scripts && scripts.length) {
       var m;
       for (var i = 0; i < scripts.length; i++) {
-        if (!cc.coffeeScriptPath) {
-          m = /^(.*\/coffee-script\.js)/.exec(scripts[i].src);
-          if (m) {
-            cc.coffeeScriptPath = m[1];
-            continue;
-          }
-        }
         if (!cc.coffeeColliderPath) {
           m = /^(.*\/coffee-collider(?:-min)?\.js)(#lang)?/.exec(scripts[i].src);
           if (m) {
@@ -64,7 +57,7 @@ define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-
             if (m[2] === "#lang") {
               langMode = true;
             }
-            continue;
+            break;
           }
         }
       }
@@ -92,11 +85,12 @@ define('cc/cc', ['require', 'exports', 'module' ], function(require, exports, mo
   module.exports = {};
 
 });
-define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/audio-context'], function(require, exports, module) {
+define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/audio-context', 'cc/front/compiler'], function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
   var AudioContext = require("./audio-context").AudioContext;
+  var Compiler = require("./compiler").Compiler;
 
   var commands = {};
   
@@ -112,24 +106,18 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       document.body.appendChild(iframe);
 
       var script = document.createElement("script");
-      var src = cc.coffeeScriptPath;
-      script.src = src;
+      var src = cc.coffeeColliderPath;
+      script.src = src + "#lang";
       script.onload = function() {
-        var script = document.createElement("script");
-        var src = cc.coffeeColliderPath;
-        script.src = src + "#lang";
-        script.onload = function() {
-          window.addEventListener("message", function(e) {
-            var msg = e.data;
-            if (msg instanceof Float32Array) {
-              that.strmList[that.strmListWriteIndex] = msg;
-              that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
-            } else {
-              that.recv(e.data);
-            }
-          });
-        };
-        iframe.contentDocument.body.appendChild(script);
+        window.addEventListener("message", function(e) {
+          var msg = e.data;
+          if (msg instanceof Float32Array) {
+            that.strmList[that.strmListWriteIndex] = msg;
+            that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
+          } else {
+            that.recv(e.data);
+          }
+        });
       };
       iframe.contentDocument.body.appendChild(script);
 
@@ -185,6 +173,7 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
     };
     CoffeeColliderImpl.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
+        code = new Compiler().compile(code.trim());
         this.sendToLang(["/exec", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
@@ -462,109 +451,10 @@ define('cc/front/web-audio-api', ['require', 'exports', 'module' ], function(req
   klass = WebAudioAPI;
 
 });
-define('cc/lang/installer', ['require', 'exports', 'module' , 'cc/lang/lang-server', 'cc/lang/bop'], function(require, exports, module) {
+define('cc/front/compiler', ['require', 'exports', 'module' , 'cc/lang/bop'], function(require, exports, module) {
   "use strict";
 
-  var install = function() {
-    require("./lang-server").install();
-    require("./bop").install();
-  };
-
-  module.exports = {
-    install: install
-  };
-
-});
-define('cc/lang/lang-server', ['require', 'exports', 'module' , 'cc/cc', 'cc/lang/compiler'], function(require, exports, module) {
-  "use strict";
-
-  var cc = require("cc/cc");
-  var Compiler = require("./compiler").Compiler;
-
-  var commands = {};
-  
-  var LangServer = (function() {
-    function LangServer() {
-      var that = this;
-      this.worker = new Worker(cc.coffeeColliderPath);
-      this.worker.addEventListener("message", function(e) {
-        var msg = e.data;
-        if (msg instanceof Float32Array) {
-          that.sendToCC(msg);
-        } else {
-          that.recv(msg);
-        }
-      });
-    }
-    LangServer.prototype.sendToCC = function(msg) {
-      window.parent.postMessage(msg, "*");
-    };
-    LangServer.prototype.sendToSynth = function(msg) {
-      this.worker.postMessage(msg);
-    };
-    LangServer.prototype.recv = function(msg) {
-      if (!msg) {
-        return;
-      }
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
-      }
-    };
-    return LangServer;
-  })();
-
-  commands["/init"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/play"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/pause"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/console/log"] = function(msg) {
-    console.log.apply(console, msg[1]);
-  };
-  commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, msg[1]);
-  };
-  commands["/console/info"] = function(msg) {
-    console.info.apply(console, msg[1]);
-  };
-  commands["/console/error"] = function(msg) {
-    console.error.apply(console, msg[1]);
-  };
-  commands["/exec"] = function(msg) {
-    var execId = msg[1];
-    var code   = new Compiler().compile(msg[2].trim());
-    var result = eval.call(global, code);
-    this.sendToCC(["/exec", execId, JSON.stringify(result)]);
-  };
-
-  var install = function() {
-    var server = new LangServer();
-    window.addEventListener("message", function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        server.sendToSynth(msg);
-      } else {
-        server.recv(msg);
-      }
-    });
-    server.sendToCC(["/connect"]);
-  };
-
-  module.exports = {
-    LangServer: LangServer,
-    install: install
-  };
-
-});
-define('cc/lang/compiler', ['require', 'exports', 'module' , 'cc/lang/bop'], function(require, exports, module) {
-  "use strict";
-
-  var bop = require("./bop");
+  var bop = require("../lang/bop");
 
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
@@ -753,6 +643,104 @@ define('cc/lang/bop', ['require', 'exports', 'module' ], function(require, expor
   module.exports = {
     install: install,
     replaceTable: replaceTable
+  };
+
+});
+define('cc/lang/installer', ['require', 'exports', 'module' , 'cc/lang/lang-server', 'cc/lang/bop'], function(require, exports, module) {
+  "use strict";
+
+  var install = function() {
+    require("./lang-server").install();
+    require("./bop").install();
+  };
+
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/lang/lang-server', ['require', 'exports', 'module' , 'cc/cc'], function(require, exports, module) {
+  "use strict";
+
+  var cc = require("cc/cc");
+
+  var commands = {};
+  
+  var LangServer = (function() {
+    function LangServer() {
+      var that = this;
+      this.worker = new Worker(cc.coffeeColliderPath);
+      this.worker.addEventListener("message", function(e) {
+        var msg = e.data;
+        if (msg instanceof Float32Array) {
+          that.sendToCC(msg);
+        } else {
+          that.recv(msg);
+        }
+      });
+    }
+    LangServer.prototype.sendToCC = function(msg) {
+      window.parent.postMessage(msg, "*");
+    };
+    LangServer.prototype.sendToSynth = function(msg) {
+      this.worker.postMessage(msg);
+    };
+    LangServer.prototype.recv = function(msg) {
+      if (!msg) {
+        return;
+      }
+      var func = commands[msg[0]];
+      if (func) {
+        func.call(this, msg);
+      }
+    };
+    return LangServer;
+  })();
+
+  commands["/init"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/play"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/pause"] = function(msg) {
+    this.sendToSynth(msg);
+  };
+  commands["/console/log"] = function(msg) {
+    console.log.apply(console, msg[1]);
+  };
+  commands["/console/debug"] = function(msg) {
+    console.debug.apply(console, msg[1]);
+  };
+  commands["/console/info"] = function(msg) {
+    console.info.apply(console, msg[1]);
+  };
+  commands["/console/error"] = function(msg) {
+    console.error.apply(console, msg[1]);
+  };
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var code   = msg[2];
+    var result = eval.call(global, code);
+    this.sendToCC(["/exec", execId, JSON.stringify(result)]);
+  };
+
+  var install = function() {
+    var server = new LangServer();
+    window.addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        server.sendToSynth(msg);
+      } else {
+        server.recv(msg);
+      }
+    });
+    server.sendToCC(["/connect"]);
+  };
+
+  module.exports = {
+    LangServer: LangServer,
+    install: install
   };
 
 });

@@ -3,12 +3,10 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var Compiler = require("./compiler").Compiler;
-  var bop = require("./bop");
 
   describe("compile:", function() {
     var compiler;
     before(function() {
-      bop.install();
       compiler = new Compiler();
     });
     it("0 + -pi * 1", function() {

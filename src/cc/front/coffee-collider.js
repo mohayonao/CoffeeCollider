@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("cc/cc");
   var AudioContext = require("./audio-context").AudioContext;
+  var Compiler = require("./compiler").Compiler;
 
   var commands = {};
   
@@ -18,24 +19,18 @@ define(function(require, exports, module) {
       document.body.appendChild(iframe);
 
       var script = document.createElement("script");
-      var src = cc.coffeeScriptPath;
-      script.src = src;
+      var src = cc.coffeeColliderPath;
+      script.src = src + "#lang";
       script.onload = function() {
-        var script = document.createElement("script");
-        var src = cc.coffeeColliderPath;
-        script.src = src + "#lang";
-        script.onload = function() {
-          window.addEventListener("message", function(e) {
-            var msg = e.data;
-            if (msg instanceof Float32Array) {
-              that.strmList[that.strmListWriteIndex] = msg;
-              that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
-            } else {
-              that.recv(e.data);
-            }
-          });
-        };
-        iframe.contentDocument.body.appendChild(script);
+        window.addEventListener("message", function(e) {
+          var msg = e.data;
+          if (msg instanceof Float32Array) {
+            that.strmList[that.strmListWriteIndex] = msg;
+            that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
+          } else {
+            that.recv(e.data);
+          }
+        });
       };
       iframe.contentDocument.body.appendChild(script);
 
@@ -91,6 +86,7 @@ define(function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
+        code = new Compiler().compile(code.trim());
         this.sendToLang(["/exec", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
