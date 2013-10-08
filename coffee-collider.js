@@ -186,6 +186,16 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         this.execId += 1;
       }
     };
+    CoffeeColliderImpl.prototype.loadJavaScript = function(path, callback) {
+      var script = document.createElement("script");
+      script.src = path;
+      if (typeof callback === "function") {
+        script.onload = function() {
+          callback();
+        };
+      }
+      this.iframe.contentDocument.body.appendChild(script);
+    };
     CoffeeColliderImpl.prototype.sendToLang = function(msg) {
       this.cclang.postMessage(msg, "*");
     };
@@ -259,6 +269,12 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
     CoffeeCollider.prototype.exec = function(code, callback) {
       if (this.impl) {
         this.impl.exec(code, callback);
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
+      if (this.impl) {
+        this.impl.loadJavaScript(path, callback);
       }
       return this;
     };
