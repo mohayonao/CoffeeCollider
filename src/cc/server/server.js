@@ -11,7 +11,7 @@ define(function(require, exports, module) {
       this.onaudioprocess = this.onaudioprocess.bind(this);
       this.timerId = 0;
     }
-    SynthServer.prototype.sendToLang = function(msg) {
+    SynthServer.prototype.send = function(msg) {
       postMessage(msg);
     };
     SynthServer.prototype.recv = function(msg) {
@@ -32,7 +32,7 @@ define(function(require, exports, module) {
         strm[i] = Math.random() * 0.5 - 0.25;
       }
       this.syncCount += 1;
-      this.sendToLang(strm);
+      this.send(strm);
     };
     return SynthServer;
   })();
@@ -56,31 +56,40 @@ define(function(require, exports, module) {
       this.timerId = 0;
     }
   };
-  
-  var server = new SynthServer();
-  addEventListener("message", function(e) {
-    var msg = e.data;
-    if (msg instanceof Float32Array) {
-      server.sysSyncCount   = msg[0]|0;
-      server.sysCurrentTime = msg[1]|0;
-      server.syncItems.set(msg);
-    } else {
-      server.recv(msg);
-    }
-  });
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var code   = msg[2];
+    var result = eval.call(global, code);
+    this.send(["/exec", execId, JSON.stringify(result)]);
+  };
 
-  global.console = (function() {
-    var console = {};
-    ["log", "debug", "info", "error"].forEach(function(method) {
-      console[method] = function() {
-        server.sendToLang(["/console/" + method, Array.prototype.slice.call(arguments)]);
-      };
+  var install = function() {
+    var server = new SynthServer();
+    addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        server.sysSyncCount   = msg[0]|0;
+        server.sysCurrentTime = msg[1]|0;
+        server.syncItems.set(msg);
+      } else {
+        server.recv(msg);
+      }
     });
-    return console;
-  })();
+    server.send(["/connect"]);
+    global.console = (function() {
+      var console = {};
+      ["log", "debug", "info", "error"].forEach(function(method) {
+        console[method] = function() {
+          server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+        };
+      });
+      return console;
+    })();
+  };
   
   module.exports = {
-    SynthServer: SynthServer
+    SynthServer: SynthServer,
+    install: install
   };
 
 });

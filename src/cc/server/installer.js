@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function() {
-    require("./lang-server").install();
-    require("./bop").install();
+  var install = function(global) {
+    require("./server").install(global);
+    require("./bop").install(global);
   };
 
   module.exports = {

@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var bop = require("../lang/bop");
+  var bop = require("../server/bop");
 
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {

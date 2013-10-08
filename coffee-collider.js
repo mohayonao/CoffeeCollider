@@ -39,40 +39,17 @@ var normalizeModule = function(parentId, moduleName) {
   return moduleName;
 };
 var define = _define;
-define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/coffee-collider', 'cc/lang/installer', 'cc/synth/synth-server'], function(require, exports, module) {
+define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/installer', 'cc/server/installer'], function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
 
   if (typeof document !== "undefined") {
-    var scripts = document.getElementsByTagName("script");
-    var langMode = false;
-    if (scripts && scripts.length) {
-      var m;
-      for (var i = 0; i < scripts.length; i++) {
-        if (!cc.coffeeColliderPath) {
-          m = /^(.*\/coffee-collider(?:-min)?\.js)(#lang)?/.exec(scripts[i].src);
-          if (m) {
-            cc.coffeeColliderPath = m[1];
-            if (m[2] === "#lang") {
-              langMode = true;
-            }
-            break;
-          }
-        }
-      }
-    }
-
-    if (!langMode) {
-      cc.context = "window";
-      global.CoffeeCollider = require("./front/coffee-collider").CoffeeCollider;
-    } else {
-      cc.context = "server";
-      require("./lang/installer").install();
-    }
+    cc.context = "client";
+    require("./client/installer").install(global);
   } else if (typeof WorkerLocation !== "undefined") {
-    cc.context = "synth";
-    require("./synth/synth-server");
+    cc.context = "server";
+    require("./server/installer").install(global);
   }
   
   module.exports = {
@@ -85,58 +62,133 @@ define('cc/cc', ['require', 'exports', 'module' ], function(require, exports, mo
   module.exports = {};
 
 });
-define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'cc/front/audio-context', 'cc/front/compiler'], function(require, exports, module) {
+define('cc/client/installer', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/coffee-collider'], function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
-  var AudioContext = require("./audio-context").AudioContext;
+  var CoffeeCollider = require("./coffee-collider").CoffeeCollider;
+
+  if (typeof document !== "undefined") {
+    var scripts = document.getElementsByTagName("script");
+    if (scripts && scripts.length) {
+      var m;
+      for (var i = 0; i < scripts.length; i++) {
+        if (!cc.coffeeColliderPath) {
+          m = /^.*\/coffee-collider(?:-min)?\.js/.exec(scripts[i].src);
+          if (m) {
+            cc.coffeeColliderPath = m[0];
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  var install = function(global) {
+    global.CoffeeCollider = CoffeeCollider;
+  };
+
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/client/coffee-collider', ['require', 'exports', 'module' , 'cc/client/client'], function(require, exports, module) {
+  "use strict";
+
+  var SynthClient = require("./client").SynthClient;
+
+  var CoffeeCollider = (function() {
+    function CoffeeCollider() {
+      this.client = new SynthClient();
+      this.sampleRate = this.client.sampleRate;
+      this.channels   = this.client.channels;
+    }
+    CoffeeCollider.prototype.destroy = function() {
+      if (this.client) {
+        this.client.destroy();
+        delete this.client;
+        delete this.sampleRate;
+        delete this.channels;
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.play = function() {
+      if (this.client) {
+        this.client.play();
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.reset = function() {
+      if (this.client) {
+        this.client.reset();
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.pause = function() {
+      if (this.client) {
+        this.client.pause();
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.exec = function(code, callback) {
+      if (this.client) {
+        this.client.exec(code, callback);
+      }
+      return this;
+    };
+    CoffeeCollider.prototype.getStream = function() {
+      if (this.client) {
+        return this.client.strm;
+      }
+    };
+    CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
+      if (this.client) {
+        this.client.loadJavaScript(path, callback);
+      }
+      return this;
+    };
+    return CoffeeCollider;
+  })();
+
+  module.exports = {
+    CoffeeCollider: CoffeeCollider
+  };
+
+});
+define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/sound-system', 'cc/client/compiler'], function(require, exports, module) {
+  "use strict";
+
+  var cc = require("cc/cc");
+  var SoundSystem = require("./sound-system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
 
   var commands = {};
   
-  var CoffeeColliderImpl = (function() {
-    var context = null;
-    function CoffeeColliderImpl() {
+  var SynthClient = (function() {
+    function SynthClient() {
       var that = this;
-      var iframe = document.createElement("iframe");
-      iframe.style.width  = 0;
-      iframe.style.height = 0;
-      iframe.style.border = 0;
-      iframe.sandbox = "allow-scripts allow-same-origin";
-      document.body.appendChild(iframe);
-
-      var script = document.createElement("script");
-      var src = cc.coffeeColliderPath;
-      script.src = src + "#lang";
-      script.onload = function() {
-        window.addEventListener("message", function(e) {
-          var msg = e.data;
-          if (msg instanceof Float32Array) {
+      this.worker = new Worker(cc.coffeeColliderPath);
+      this.worker.addEventListener("message", function(e) {
+        var msg = e.data;
+        if (msg instanceof Float32Array) {
             that.strmList[that.strmListWriteIndex] = msg;
             that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
-          } else {
-            that.recv(e.data);
-          }
-        });
-      };
-      iframe.contentDocument.body.appendChild(script);
-
-      this.iframe = iframe;
-      this.cclang = iframe.contentWindow;
+        } else {
+          that.recv(msg);
+        }
+      });
       this.isConnected = false;
       this.execId = 0;
       this.execCallbacks = {};
 
-      if (!context) {
-        context = new AudioContext();
-      }
-      this.context = context;
-      this.context.append(this);
+      this.sys = SoundSystem.getInstance();
+      this.sys.append(this);
 
-      this.sampleRate = this.context.sampleRate;
-      this.channels   = this.context.channels;
-      this.strmLength = this.context.strmLength;
-      this.bufLength  = this.context.bufLength;
+      this.sampleRate = this.sys.sampleRate;
+      this.channels   = this.sys.channels;
+      this.strmLength = this.sys.strmLength;
+      this.bufLength  = this.sys.bufLength;
       
       this.isPlaying = false;
       this.strm = new Float32Array(this.strmLength * this.channels);
@@ -144,57 +196,57 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
     }
-    CoffeeColliderImpl.prototype.destroy = function() {
-      this.context.remove(this);
-      document.body.removeChild(this.iframe);
+    SynthClient.prototype.destroy = function() {
+      this.sys.remove(this);
+      delete this.worker;
     };
-    CoffeeColliderImpl.prototype.play = function() {
+    SynthClient.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        this.context.play();
-        this.sendToLang(["/play"]);
+        this.sys.play();
+        this.send(["/play"]);
       }
     };
-    CoffeeColliderImpl.prototype.reset = function() {
+    SynthClient.prototype.reset = function() {
     };
-    CoffeeColliderImpl.prototype.pause = function() {
+    SynthClient.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        this.context.pause();
-        this.sendToLang(["/pause"]);
+        this.sys.pause();
+        this.send(["/pause"]);
       }
     };
-    CoffeeColliderImpl.prototype.process = function() {
+    SynthClient.prototype.process = function() {
       var strm = this.strmList[this.strmListReadIndex];
       if (strm) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this.strm.set(strm);
       }
     };
-    CoffeeColliderImpl.prototype.exec = function(code, callback) {
+    SynthClient.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
         code = new Compiler().compile(code.trim());
-        this.sendToLang(["/exec", this.execId, code]);
+        this.send(["/exec", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
         }
         this.execId += 1;
       }
     };
-    CoffeeColliderImpl.prototype.loadJavaScript = function(path, callback) {
-      var script = document.createElement("script");
-      script.src = path;
-      if (typeof callback === "function") {
-        script.onload = function() {
-          callback();
-        };
-      }
-      this.iframe.contentDocument.body.appendChild(script);
+    // SynthClient.prototype.loadJavaScript = function(path, callback) {
+    //   var script = document.createElement("script");
+    //   script.src = path;
+    //   if (typeof callback === "function") {
+    //     script.onload = function() {
+    //       callback();
+    //     };
+    //   }
+    //   this.iframe.contentDocument.body.appendChild(script);
+    // };
+    SynthClient.prototype.send = function(msg) {
+      this.worker.postMessage(msg);
     };
-    CoffeeColliderImpl.prototype.sendToLang = function(msg) {
-      this.cclang.postMessage(msg, "*");
-    };
-    CoffeeColliderImpl.prototype.recv = function(msg) {
+    SynthClient.prototype.recv = function(msg) {
       if (!msg) {
         return;
       }
@@ -203,16 +255,16 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
         func.call(this, msg);
       }
     };
-    CoffeeColliderImpl.prototype.sync = function(syncItems) {
-      this.sendToLang(syncItems);
+    SynthClient.prototype.sync = function(syncItems) {
+      this.send(syncItems);
     };
-    return CoffeeColliderImpl;
+    return SynthClient;
   })();
 
   commands["/connect"] = function() {
     this.isConnected = true;
-    this.sendToLang([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.context.syncCount
+    this.send([
+      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.sys.syncCount
     ]);
   };
   commands["/exec"] = function(msg) {
@@ -227,70 +279,29 @@ define('cc/front/coffee-collider', ['require', 'exports', 'module' , 'cc/cc', 'c
       delete this.execCallbacks[execId];
     }
   };
-
-  var CoffeeCollider = (function() {
-    function CoffeeCollider() {
-      this.impl = new CoffeeColliderImpl();
-      this.sampleRate = this.impl.sampleRate;
-      this.channels   = this.impl.channels;
-    }
-    CoffeeCollider.prototype.destroy = function() {
-      if (this.impl) {
-        this.impl.destroy();
-        delete this.impl;
-        delete this.sampleRate;
-        delete this.channels;
-      }
-      return this;
-    };
-    CoffeeCollider.prototype.play = function() {
-      if (this.impl) {
-        this.impl.play();
-      }
-      return this;
-    };
-    CoffeeCollider.prototype.reset = function() {
-      if (this.impl) {
-        this.impl.reset();
-      }
-      return this;
-    };
-    CoffeeCollider.prototype.pause = function() {
-      if (this.impl) {
-        this.impl.pause();
-      }
-      return this;
-    };
-    CoffeeCollider.prototype.exec = function(code, callback) {
-      if (this.impl) {
-        this.impl.exec(code, callback);
-      }
-      return this;
-    };
-    CoffeeCollider.prototype.getStream = function() {
-      if (this.impl) {
-        return this.impl.strm;
-      }
-    };
-    CoffeeCollider.prototype.loadJavaScript = function(path, callback) {
-      if (this.impl) {
-        this.impl.loadJavaScript(path, callback);
-      }
-      return this;
-    };
-    return CoffeeCollider;
-  })();
+  commands["/console/log"] = function(msg) {
+    console.log.apply(console, msg[1]);
+  };
+  commands["/console/debug"] = function(msg) {
+    console.debug.apply(console, msg[1]);
+  };
+  commands["/console/info"] = function(msg) {
+    console.info.apply(console, msg[1]);
+  };
+  commands["/console/error"] = function(msg) {
+    console.error.apply(console, msg[1]);
+  };
   
   module.exports = {
-    CoffeeCollider: CoffeeCollider
+    SynthClient: SynthClient
   };
 
 });
-define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web-audio-api'], function(require, exports, module) {
+define('cc/client/sound-system', ['require', 'exports', 'module' , 'cc/client/web-audio-api'], function(require, exports, module) {
   "use strict";
 
-  var AudioContext = (function() {
-    function AudioContext() {
+  var SoundSystem = (function() {
+    function SoundSystem() {
       var SoundAPI    = getAPI();
       this.sampleRate = 44100;
       this.channels   = 2;
@@ -309,7 +320,14 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
       this.syncItems = new Float32Array(6); // syncCount, currentTime
       this.isPlaying = false;
     }
-    AudioContext.prototype.append = function(cc) {
+    var instance = null;
+    SoundSystem.getInstance = function() {
+      if (!instance) {
+        instance = new SoundSystem();
+      }
+      return instance;
+    };
+    SoundSystem.prototype.append = function(cc) {
       var index = this.colliders.indexOf(cc);
       if (index === -1) {
         this.colliders.push(cc);
@@ -320,7 +338,7 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
         }
       }
     };
-    AudioContext.prototype.remove = function(cc) {
+    SoundSystem.prototype.remove = function(cc) {
       var index = this.colliders.indexOf(cc);
       if (index !== -1) {
         this.colliders.splice(index, 1);
@@ -333,14 +351,14 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
         this.process = processN;
       }
     };
-    AudioContext.prototype.play = function() {
+    SoundSystem.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.syncCount = 0;
         this.driver.play();
       }
     };
-    AudioContext.prototype.pause = function() {
+    SoundSystem.prototype.pause = function() {
       if (this.isPlaying) {
         var flag = this.colliders.every(function(cc) {
           return !cc.isPlaying;
@@ -384,7 +402,7 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
       this.syncCount++;
     };
     
-    return AudioContext;
+    return SoundSystem;
   })();
 
   var getAPI = function() {
@@ -392,11 +410,11 @@ define('cc/front/audio-context', ['require', 'exports', 'module' , 'cc/front/web
   };
 
   module.exports = {
-    AudioContext: AudioContext
+    SoundSystem: SoundSystem
   };
 
 });
-define('cc/front/web-audio-api', ['require', 'exports', 'module' ], function(require, exports, module) {
+define('cc/client/web-audio-api', ['require', 'exports', 'module' ], function(require, exports, module) {
   "use strict";
 
   var klass;
@@ -451,10 +469,10 @@ define('cc/front/web-audio-api', ['require', 'exports', 'module' ], function(req
   klass = WebAudioAPI;
 
 });
-define('cc/front/compiler', ['require', 'exports', 'module' , 'cc/lang/bop'], function(require, exports, module) {
+define('cc/client/compiler', ['require', 'exports', 'module' , 'cc/server/bop'], function(require, exports, module) {
   "use strict";
 
-  var bop = require("../lang/bop");
+  var bop = require("../server/bop");
 
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
@@ -568,7 +586,7 @@ define('cc/front/compiler', ['require', 'exports', 'module' , 'cc/lang/bop'], fu
   };
 
 });
-define('cc/lang/bop', ['require', 'exports', 'module' ], function(require, exports, module) {
+define('cc/server/bop', ['require', 'exports', 'module' ], function(require, exports, module) {
   "use strict";
 
   var install = function() {
@@ -646,12 +664,12 @@ define('cc/lang/bop', ['require', 'exports', 'module' ], function(require, expor
   };
 
 });
-define('cc/lang/installer', ['require', 'exports', 'module' , 'cc/lang/lang-server', 'cc/lang/bop'], function(require, exports, module) {
+define('cc/server/installer', ['require', 'exports', 'module' , 'cc/server/server', 'cc/server/bop'], function(require, exports, module) {
   "use strict";
 
-  var install = function() {
-    require("./lang-server").install();
-    require("./bop").install();
+  var install = function(global) {
+    require("./server").install(global);
+    require("./bop").install(global);
   };
 
   module.exports = {
@@ -659,92 +677,7 @@ define('cc/lang/installer', ['require', 'exports', 'module' , 'cc/lang/lang-serv
   };
 
 });
-define('cc/lang/lang-server', ['require', 'exports', 'module' , 'cc/cc'], function(require, exports, module) {
-  "use strict";
-
-  var cc = require("cc/cc");
-
-  var commands = {};
-  
-  var LangServer = (function() {
-    function LangServer() {
-      var that = this;
-      this.worker = new Worker(cc.coffeeColliderPath);
-      this.worker.addEventListener("message", function(e) {
-        var msg = e.data;
-        if (msg instanceof Float32Array) {
-          that.sendToCC(msg);
-        } else {
-          that.recv(msg);
-        }
-      });
-    }
-    LangServer.prototype.sendToCC = function(msg) {
-      window.parent.postMessage(msg, "*");
-    };
-    LangServer.prototype.sendToSynth = function(msg) {
-      this.worker.postMessage(msg);
-    };
-    LangServer.prototype.recv = function(msg) {
-      if (!msg) {
-        return;
-      }
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
-      }
-    };
-    return LangServer;
-  })();
-
-  commands["/init"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/play"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/pause"] = function(msg) {
-    this.sendToSynth(msg);
-  };
-  commands["/console/log"] = function(msg) {
-    console.log.apply(console, msg[1]);
-  };
-  commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, msg[1]);
-  };
-  commands["/console/info"] = function(msg) {
-    console.info.apply(console, msg[1]);
-  };
-  commands["/console/error"] = function(msg) {
-    console.error.apply(console, msg[1]);
-  };
-  commands["/exec"] = function(msg) {
-    var execId = msg[1];
-    var code   = msg[2];
-    var result = eval.call(global, code);
-    this.sendToCC(["/exec", execId, JSON.stringify(result)]);
-  };
-
-  var install = function() {
-    var server = new LangServer();
-    window.addEventListener("message", function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        server.sendToSynth(msg);
-      } else {
-        server.recv(msg);
-      }
-    });
-    server.sendToCC(["/connect"]);
-  };
-
-  module.exports = {
-    LangServer: LangServer,
-    install: install
-  };
-
-});
-define('cc/synth/synth-server', ['require', 'exports', 'module' ], function(require, exports, module) {
+define('cc/server/server', ['require', 'exports', 'module' ], function(require, exports, module) {
   "use strict";
 
   var commands = {};
@@ -757,7 +690,7 @@ define('cc/synth/synth-server', ['require', 'exports', 'module' ], function(requ
       this.onaudioprocess = this.onaudioprocess.bind(this);
       this.timerId = 0;
     }
-    SynthServer.prototype.sendToLang = function(msg) {
+    SynthServer.prototype.send = function(msg) {
       postMessage(msg);
     };
     SynthServer.prototype.recv = function(msg) {
@@ -778,7 +711,7 @@ define('cc/synth/synth-server', ['require', 'exports', 'module' ], function(requ
         strm[i] = Math.random() * 0.5 - 0.25;
       }
       this.syncCount += 1;
-      this.sendToLang(strm);
+      this.send(strm);
     };
     return SynthServer;
   })();
@@ -802,31 +735,40 @@ define('cc/synth/synth-server', ['require', 'exports', 'module' ], function(requ
       this.timerId = 0;
     }
   };
-  
-  var server = new SynthServer();
-  addEventListener("message", function(e) {
-    var msg = e.data;
-    if (msg instanceof Float32Array) {
-      server.sysSyncCount   = msg[0]|0;
-      server.sysCurrentTime = msg[1]|0;
-      server.syncItems.set(msg);
-    } else {
-      server.recv(msg);
-    }
-  });
+  commands["/exec"] = function(msg) {
+    var execId = msg[1];
+    var code   = msg[2];
+    var result = eval.call(global, code);
+    this.send(["/exec", execId, JSON.stringify(result)]);
+  };
 
-  global.console = (function() {
-    var console = {};
-    ["log", "debug", "info", "error"].forEach(function(method) {
-      console[method] = function() {
-        server.sendToLang(["/console/" + method, Array.prototype.slice.call(arguments)]);
-      };
+  var install = function() {
+    var server = new SynthServer();
+    addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        server.sysSyncCount   = msg[0]|0;
+        server.sysCurrentTime = msg[1]|0;
+        server.syncItems.set(msg);
+      } else {
+        server.recv(msg);
+      }
     });
-    return console;
-  })();
+    server.send(["/connect"]);
+    global.console = (function() {
+      var console = {};
+      ["log", "debug", "info", "error"].forEach(function(method) {
+        console[method] = function() {
+          server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+        };
+      });
+      return console;
+    })();
+  };
   
   module.exports = {
-    SynthServer: SynthServer
+    SynthServer: SynthServer,
+    install: install
   };
 
 });

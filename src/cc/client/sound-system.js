@@ -1,8 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var AudioContext = (function() {
-    function AudioContext() {
+  var SoundSystem = (function() {
+    function SoundSystem() {
       var SoundAPI    = getAPI();
       this.sampleRate = 44100;
       this.channels   = 2;
@@ -21,7 +21,14 @@ define(function(require, exports, module) {
       this.syncItems = new Float32Array(6); // syncCount, currentTime
       this.isPlaying = false;
     }
-    AudioContext.prototype.append = function(cc) {
+    var instance = null;
+    SoundSystem.getInstance = function() {
+      if (!instance) {
+        instance = new SoundSystem();
+      }
+      return instance;
+    };
+    SoundSystem.prototype.append = function(cc) {
       var index = this.colliders.indexOf(cc);
       if (index === -1) {
         this.colliders.push(cc);
@@ -32,7 +39,7 @@ define(function(require, exports, module) {
         }
       }
     };
-    AudioContext.prototype.remove = function(cc) {
+    SoundSystem.prototype.remove = function(cc) {
       var index = this.colliders.indexOf(cc);
       if (index !== -1) {
         this.colliders.splice(index, 1);
@@ -45,14 +52,14 @@ define(function(require, exports, module) {
         this.process = processN;
       }
     };
-    AudioContext.prototype.play = function() {
+    SoundSystem.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.syncCount = 0;
         this.driver.play();
       }
     };
-    AudioContext.prototype.pause = function() {
+    SoundSystem.prototype.pause = function() {
       if (this.isPlaying) {
         var flag = this.colliders.every(function(cc) {
           return !cc.isPlaying;
@@ -96,7 +103,7 @@ define(function(require, exports, module) {
       this.syncCount++;
     };
     
-    return AudioContext;
+    return SoundSystem;
   })();
 
   var getAPI = function() {
@@ -104,7 +111,7 @@ define(function(require, exports, module) {
   };
 
   module.exports = {
-    AudioContext: AudioContext
+    SoundSystem: SoundSystem
   };
 
 });
