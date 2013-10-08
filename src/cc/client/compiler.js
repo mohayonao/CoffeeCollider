@@ -16,12 +16,47 @@ define(function(require, exports, module) {
     var TAG = 0, VALUE = 1, _ = {};
     function Compiler() {
     }
-    Compiler.prototype.compile = function(code) {
+    Compiler.prototype.tokens = function(code) {
       var tokens = CoffeeScript.tokens(code);
       tokens = this.doPI(tokens);
       tokens = this.doBOP(tokens);
+      return tokens;
+    };
+    Compiler.prototype.compile = function(code) {
+      var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
+    Compiler.prototype.toString = (function() {
+      var tab = function(n) {
+        var t = "";
+        while (n--) {
+          t += " ";
+        }
+        return t;
+      };
+      return function(tokens) {
+        var indent = 0;
+        if (typeof tokens === "string") {
+          tokens = this.tokens(tokens);
+        }
+        return tokens.map(function(token) {
+          switch (token[TAG]) {
+          case "TERMINATOR":
+            return "\n" + tab(indent);
+          case "INDENT":
+            indent += token[VALUE]|0;
+            return "\n" + tab(indent);
+          case "OUTDENT":
+            indent -= token[VALUE]|0;
+            return "\n" + tab(indent);
+          case ",":
+            return token[VALUE] + " ";
+          default:
+            return token[VALUE];
+          }
+        }).join("").trim();
+      };
+    })();
     Compiler.prototype.doPI = function(tokens) {
       var i, token, prev = [];
       i = 0;

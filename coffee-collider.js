@@ -103,6 +103,7 @@ define('cc/client/coffee-collider', ['require', 'exports', 'module' , 'cc/client
       this.client = new SynthClient();
       this.sampleRate = this.client.sampleRate;
       this.channels   = this.client.channels;
+      this.compiler   = this.client.compiler;
     }
     CoffeeCollider.prototype.destroy = function() {
       if (this.client) {
@@ -178,6 +179,8 @@ define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client
           that.recv(msg);
         }
       });
+      this.compiler = new Compiler();
+      
       this.isConnected = false;
       this.execId = 0;
       this.execCallbacks = {};
@@ -225,7 +228,7 @@ define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client
     };
     SynthClient.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
-        code = new Compiler().compile(code.trim());
+        code = this.compiler.compile(code.trim());
         this.send(["/exec", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
@@ -480,12 +483,47 @@ define('cc/client/compiler', ['require', 'exports', 'module' , 'cc/server/bop'],
     var TAG = 0, VALUE = 1, _ = {};
     function Compiler() {
     }
-    Compiler.prototype.compile = function(code) {
+    Compiler.prototype.tokens = function(code) {
       var tokens = CoffeeScript.tokens(code);
       tokens = this.doPI(tokens);
       tokens = this.doBOP(tokens);
+      return tokens;
+    };
+    Compiler.prototype.compile = function(code) {
+      var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
+    Compiler.prototype.toString = (function() {
+      var tab = function(n) {
+        var t = "";
+        while (n--) {
+          t += " ";
+        }
+        return t;
+      };
+      return function(tokens) {
+        var indent = 0;
+        if (typeof tokens === "string") {
+          tokens = this.tokens(tokens);
+        }
+        return tokens.map(function(token) {
+          switch (token[TAG]) {
+          case "TERMINATOR":
+            return "\n" + tab(indent);
+          case "INDENT":
+            indent += token[VALUE]|0;
+            return "\n" + tab(indent);
+          case "OUTDENT":
+            indent -= token[VALUE]|0;
+            return "\n" + tab(indent);
+          case ",":
+            return token[VALUE] + " ";
+          default:
+            return token[VALUE];
+          }
+        }).join("").trim();
+      };
+    })();
     Compiler.prototype.doPI = function(tokens) {
       var i, token, prev = [];
       i = 0;

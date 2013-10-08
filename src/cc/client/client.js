@@ -20,6 +20,8 @@ define(function(require, exports, module) {
           that.recv(msg);
         }
       });
+      this.compiler = new Compiler();
+      
       this.isConnected = false;
       this.execId = 0;
       this.execCallbacks = {};
@@ -67,7 +69,7 @@ define(function(require, exports, module) {
     };
     SynthClient.prototype.exec = function(code, callback) {
       if (typeof code === "string") {
-        code = new Compiler().compile(code.trim());
+        code = this.compiler.compile(code.trim());
         this.send(["/exec", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;

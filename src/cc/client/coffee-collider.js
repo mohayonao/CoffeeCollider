@@ -8,6 +8,7 @@ define(function(require, exports, module) {
       this.client = new SynthClient();
       this.sampleRate = this.client.sampleRate;
       this.channels   = this.client.channels;
+      this.compiler   = this.client.compiler;
     }
     CoffeeCollider.prototype.destroy = function() {
       if (this.client) {

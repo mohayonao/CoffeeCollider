@@ -94,16 +94,20 @@
         var cc = window.cc = new CoffeeCollider();
         var isPlaying = false;
       
-        $exec.addEventListener("click", function() {
+        $exec.addEventListener("click", function(e) {
           var code = $code.value.trim();
-          cc.exec(code, function(res) {
-            if (res !== undefined) {
-              console.log(res);
-            }
-          });
+          if (e.shiftKey) {
+            console.log(cc.compiler.toString(code));
+          } else {
+            cc.exec(code, function(res) {
+              if (res !== undefined) {
+                console.log(res);
+              }
+            });
+          }
         }, false);
 
-        $link.addEventListener("click", function(e) {
+        $link.addEventListener("click", function() {
           var code = $code.value.trim();
           window.location = "#" + srcFragment + encodeURIComponent(code);
         }, false);
