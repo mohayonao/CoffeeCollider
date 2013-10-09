@@ -512,9 +512,9 @@ define('cc/client/compiler', function(require, exports, module) {
     }
     Compiler.prototype.tokens = function(code) {
       var tokens = CoffeeScript.tokens(code);
-      tokens = this.doPI(tokens);
-      tokens = this.doPrecedence(tokens);
-      tokens = this.doBOP(tokens);
+      tokens = this.replacePi(tokens);
+      tokens = this.replacePrecedence(tokens);
+      tokens = this.replaceBinaryOp(tokens);
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
@@ -552,7 +552,7 @@ define('cc/client/compiler', function(require, exports, module) {
         }).join("").trim();
       };
     })();
-    Compiler.prototype.doPI = function(tokens) {
+    Compiler.prototype.replacePi = function(tokens) {
       var i, token, prev = [];
       i = 0;
       while (i < tokens.length) {
@@ -570,7 +570,7 @@ define('cc/client/compiler', function(require, exports, module) {
       }
       return tokens;
     };
-    Compiler.prototype.doPrecedence = (function() {
+    Compiler.prototype.replacePrecedence = (function() {
       var find = function(tokens, index, vector) {
         var bracket = 0;
         index += vector;
@@ -635,7 +635,7 @@ define('cc/client/compiler', function(require, exports, module) {
         return tokens;
       };
     })();
-    Compiler.prototype.doBOP = (function() {
+    Compiler.prototype.replaceBinaryOp = (function() {
       var REPLACE = {
         "+": "__add__",
         "-": "__sub__",

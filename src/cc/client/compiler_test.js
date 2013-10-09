@@ -9,7 +9,7 @@ define(function(require, exports, module) {
     before(function() {
       compiler = new Compiler();
     });
-    describe("doPI:", function() {
+    describe("replacePi:", function() {
       it("pi => Math.PI", function() {
         var tokens = [
           [ "IDENTIFIER", "pi", _ ],
@@ -21,7 +21,7 @@ define(function(require, exports, module) {
           [ "IDENTIFIER", "PI"  , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPI(tokens);
+        var actual = compiler.replacePi(tokens);
         assert.deepEqual(actual, expected);
       });
       it("10pi => 10 * Math.PI", function() {
@@ -38,11 +38,11 @@ define(function(require, exports, module) {
           [ "IDENTIFIER", "PI"  , _ ],
           [ "TERMINATOR", "\n"  , _ ],
         ];
-        var actual = compiler.doPI(tokens);
+        var actual = compiler.replacePi(tokens);
         assert.deepEqual(actual, expected);
       });
     });
-    describe("doPrecedence:", function() {
+    describe("replacePrecedence:", function() {
       it("a * b + c => (a * b) + c", function() {
         var tokens = [
           [ "IDENTIFIER", "a" , _ ],
@@ -62,7 +62,7 @@ define(function(require, exports, module) {
           [ "IDENTIFIER", "c" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a + b * c => a + (b * c)", function() {
@@ -84,7 +84,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a * [b, c] => (a * [b, c])", function() {
@@ -110,7 +110,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("[a, b] * c => ([a, b] * c)", function() {
@@ -136,7 +136,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a * (b + c) => ((a * (b + c))", function() {
@@ -162,7 +162,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("(a + b) * c => ((a + b) * c)", function() {
@@ -188,7 +188,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a * f(b, c) => (a * f(b, c))", function() {
@@ -216,7 +216,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("f(a, b) * c => (f(a, b) * c)", function() {
@@ -244,7 +244,7 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a.a * b.b + c.c => (a.a * b.b) + c.c", function() {
@@ -278,7 +278,7 @@ define(function(require, exports, module) {
           [ "IDENTIFIER", "c" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a * b * c => ((a * b) * c)", function() {
@@ -302,11 +302,11 @@ define(function(require, exports, module) {
           [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
-        var actual = compiler.doPrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens);
         assert.deepEqual(actual, expected);
       });
     });
-    describe("doBOP:", function() {
+    describe("replaceBinaryOp:", function() {
       it("a + b => a.__add__(b)", function() {
         var tokens = [
           [ "IDENTIFIER", "a" , _ ],
@@ -323,7 +323,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a - b => a.__sub__(b)", function() {
@@ -342,7 +342,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a * b => a.__mul__(b)", function() {
@@ -361,7 +361,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a / b => a.__div__(b)", function() {
@@ -380,7 +380,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a % b => a.__mod__(b)", function() {
@@ -399,7 +399,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a + [1, 2] => a.__add__([1, 2])", function() {
@@ -426,7 +426,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("a + b.c => a.__add__(b.c)", function() {
@@ -449,7 +449,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"       , _ ],
           [ "TERMINATOR", "\n"      , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("+a + -b => +a.__add__(-b)", function() {
@@ -472,7 +472,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"      , _ ],
           [ "TERMINATOR", "\n"     , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
       it("[+a, -b] => [+a, -b]", function() {
@@ -487,7 +487,7 @@ define(function(require, exports, module) {
           [ "TERMINATOR", "\n", _ ],
         ];
         var expected = tokens;
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
     });
@@ -510,7 +510,7 @@ define(function(require, exports, module) {
           [ "CALL_END"  , ")"      , _ ],
           [ "TERMINATOR", "\n"     , _ ],
         ];
-        var actual = compiler.doBOP(tokens);
+        var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
     });
