@@ -699,6 +699,37 @@ define('cc/client/compiler', function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
+
+  var replaceCompoundAssignTable = {
+    "+=": "__add__",
+    "-=": "__sub__",
+    "*=": "__mul__",
+    "/=": "__div__",
+    "%=": "__mod__",
+  };
+  
+  var replaceCompoundAssign = function(tokens) {
+    var i = 0, j;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      var selector = replaceCompoundAssignTable[token[VALUE]];
+      if (selector) {
+        var a = findOperandHead(tokens, i);
+        var b = findOperandTail(tokens, i) + 1;
+        tokens[i++] = ["=", "=", _];
+        tokens.splice(b, 0, ["CALL_END"  , ")"     , _]);
+        tokens.splice(i, 0, ["CALL_START", "("     , _]);
+        tokens.splice(i, 0, ["IDENTIFIER", selector, _]);
+        tokens.splice(i, 0, ["."         , "."     , _]);
+        for (j = i - 2; j >= a; --j) {
+          tokens.splice(i, 0, tokens[j]);
+        }
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
   
   var Compiler = (function() {
     function Compiler() {
@@ -708,6 +739,7 @@ define('cc/client/compiler', function(require, exports, module) {
       tokens = replacePi(tokens);
       tokens = replacePrecedence(tokens);
       tokens = replaceBinaryOp(tokens);
+      tokens = replaceCompoundAssign(tokens);
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
@@ -740,13 +772,14 @@ define('cc/client/compiler', function(require, exports, module) {
   })();
 
   module.exports = {
-    Compiler: Compiler,
-    dumpTokens       : dumpTokens,
-    findOperandHead  : findOperandHead,
-    findOperandTail  : findOperandTail,
-    replacePi        : replacePi,
-    replacePrecedence: replacePrecedence,
-    replaceBinaryOp  : replaceBinaryOp,
+    Compiler  : Compiler,
+    dumpTokens: dumpTokens,
+    findOperandHead: findOperandHead,
+    findOperandTail: findOperandTail,
+    replacePi            : replacePi,
+    replacePrecedence    : replacePrecedence,
+    replaceBinaryOp      : replaceBinaryOp,
+    replaceCompoundAssign: replaceCompoundAssign,
   };
 
 });

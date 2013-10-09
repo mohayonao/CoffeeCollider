@@ -170,99 +170,33 @@ define(function(require, exports, module) {
         var actual = compiler.replaceBinaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
-      it("a - b => a.__sub__(b)", function() {
-        var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "-"         , "-" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "TERMINATOR", "\n", _ ],
-        ];
-        var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__sub__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
-        ];
-        var actual = compiler.replaceBinaryOp(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("a * b => a.__mul__(b)", function() {
-        var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "MATH"      , "*" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "TERMINATOR", "\n", _ ],
-        ];
-        var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__mul__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
-        ];
-        var actual = compiler.replaceBinaryOp(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("a / b => a.__div__(b)", function() {
-        var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "MATH"      , "/" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "TERMINATOR", "\n", _ ],
-        ];
-        var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__div__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
-        ];
-        var actual = compiler.replaceBinaryOp(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("a % b => a.__mod__(b)", function() {
-        var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "MATH"      , "%" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "TERMINATOR", "\n", _ ],
-        ];
-        var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__mod__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
-        ];
-        var actual = compiler.replaceBinaryOp(tokens);
-        assert.deepEqual(actual, expected);
-      });
     });
-    describe.skip("replaceCompoundAssign:", function() {
-      it("a += 10 => a = a.__add__(10)", function() {
+    describe("replaceCompoundAssign:", function() {
+      it("a.a += b.b => a.a = a.a.__add__(b.b)", function() {
         var tokens = [
-          [ "IDENTIFIER"     , "a" , _ ],          
+          [ "IDENTIFIER"     , "a" , _ ],
+          [ "."              , "." , _ ],
+          [ "IDENTIFIER"     , "a" , _ ],
           [ "COMPOUND_ASSIGN", "+=", _ ],
-          [ "NUMBER"         , "10", _ ],
-          [ "TERMINATOR", "\n", _ ],
+          [ "IDENTIFIER"     , "b" , _ ],
+          [ "."              , "." , _ ],
+          [ "IDENTIFIER"     , "b" , _ ],
+          [ "TERMINATOR"     , "\n", _ ],
         ];
         var expected = [
+          [ "IDENTIFIER", "a"      , _ ],
+          [ "."         , "."      , _ ],
           [ "IDENTIFIER", "a"      , _ ],
           [ "="         , "="      , _ ],
           [ "IDENTIFIER", "a"      , _ ],
           [ "."         , "."      , _ ],
+          [ "IDENTIFIER", "a"      , _ ],
+          [ "."         , "."      , _ ],
           [ "IDENTIFIER", "__add__", _ ],
           [ "CALL_START", "("      , _ ],
-          [ "NUMBER"    , "10"     , _ ],
+          [ "IDENTIFIER", "b"      , _ ],
+          [ "."         , "."      , _ ],
+          [ "IDENTIFIER", "b"      , _ ],
           [ "CALL_END"  , ")"      , _ ],
           [ "TERMINATOR", "\n"     , _ ],
         ];
