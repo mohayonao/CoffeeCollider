@@ -228,6 +228,7 @@ define(function(require, exports, module) {
           }
           tokens.splice(i, 1);
         }
+        continue; // for a consecutive unary operator
       }
       i += 1;
     }

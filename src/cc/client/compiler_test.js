@@ -210,6 +210,32 @@ define(function(require, exports, module) {
         var actual = compiler.replaceUnaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
+      it.only("!!a.a => a.a.not().not()", function() {
+        var tokens = [
+          [ "UNARY"     , "!" , _ ],
+          [ "UNARY"     , "!" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "."         , "." , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "IDENTIFIER", "a"  , _ ],
+          [ "."         , "."  , _ ],
+          [ "IDENTIFIER", "a"  , _ ],
+          [ "."         , "."  , _ ],
+          [ "IDENTIFIER", "not", _ ],
+          [ "CALL_START", "("  , _ ],
+          [ "CALL_END"  , ")"  , _ ],
+          [ "."         , "."  , _ ],
+          [ "IDENTIFIER", "not", _ ],
+          [ "CALL_START", "("  , _ ],
+          [ "CALL_END"  , ")"  , _ ],
+          [ "TERMINATOR", "\n" , _ ],
+        ];
+        var actual = compiler.replaceUnaryOp(tokens);
+        assert.deepEqual(actual, expected);
+      });
     });
     describe("replaceCompoundAssign:", function() {
       it("a.a += b.b => a.a = a.a.__add__(b.b)", function() {
