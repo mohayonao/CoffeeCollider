@@ -204,7 +204,7 @@ define(function(require, exports, module) {
     "+": "+",
     "-": "neg",
     "!": "not",
-    "~": "bitComp", // TODO: rename?
+    "~": "tilde",
   };
 
   var replaceUnaryOp = function(tokens) {
