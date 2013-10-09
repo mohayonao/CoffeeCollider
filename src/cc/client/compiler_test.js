@@ -452,6 +452,44 @@ define(function(require, exports, module) {
         var actual = compiler.doBOP(tokens);
         assert.deepEqual(actual, expected);
       });
+      it("+a + -b => +a.__add__(-b)", function() {
+        var tokens = [
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "-"         , "-" , _ ],
+          [ "IDENTIFIER", "b" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "+"         , "+"      , _ ],
+          [ "IDENTIFIER", "a"      , _ ],
+          [ "."         , "."      , _ ],
+          [ "IDENTIFIER", "__add__", _ ],
+          [ "CALL_START", "("      , _ ],
+          [ "-"         , "-"      , _ ],
+          [ "IDENTIFIER", "b"      , _ ],
+          [ "CALL_END"  , ")"      , _ ],
+          [ "TERMINATOR", "\n"     , _ ],
+        ];
+        var actual = compiler.doBOP(tokens);
+        assert.deepEqual(actual, expected);
+      });
+      it("[+a, -b] => [+a, -b]", function() {
+        var tokens = [
+          [ "["         , "[" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ ","         , "," , _ ],
+          [ "-"         , "-" , _ ],
+          [ "IDENTIFIER", "b" , _ ],
+          [ "]"         , "]" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = tokens;
+        var actual = compiler.doBOP(tokens);
+        assert.deepEqual(actual, expected);
+      });
     });
   });
 

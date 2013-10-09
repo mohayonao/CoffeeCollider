@@ -619,8 +619,7 @@ define('cc/client/compiler', function(require, exports, module) {
         return Math.max(0, Math.min(index, tokens.length - 1));
       };
       return function(tokens) {
-        var i;
-        i = 0;
+        var i = 0;
         while (i < tokens.length) {
           var token = tokens[i];
           if (token[TAG] === "MATH") {
@@ -637,76 +636,81 @@ define('cc/client/compiler', function(require, exports, module) {
       };
     })();
     Compiler.prototype.doBOP = (function() {
-      var CALL = 0, BRACKET = 1;
-      var replaceTable = {
+      var REPLACE = {
         "+": "__add__",
         "-": "__sub__",
         "*": "__mul__",
         "/": "__div__",
         "%": "__mod__",
       };
-      var peek = function(list) {
-        return list[list.length - 1];
-      };
-      var pop = function(list) {
-        list.pop();
-        return list[list.length - 1];
-      };
-      var push = function(list, item) {
-        list.push(item);
-        return list[list.length - 1];
-      };
-      var beginCall = function(dst, sel) {
-        dst.push(["."         , ".", _]);
-        dst.push(["IDENTIFIER", sel, _]);
-        dst.push(["CALL_START", "(", _]);
-      };
-      var closeCall = function(dst) {
-        dst.push(["CALL_END", ")", _]);
+      var find = function(tokens, index) {
+        var bracket = 0;
+        index += 1;
+        while (index < tokens.length) {
+          var token;
+          token = tokens[index + 1];
+          if (!token || token[TAG] !== ".") {
+            token = tokens[index];
+            switch (token[TAG]) {
+            case "IDENTIFIER":
+              token = tokens[index + 1];
+              if (token && token[TAG] === "CALL_START") {
+                bracket += 1;
+                break;
+              }
+              return index;
+            case "NUMBER": case "STRING": case "BOOL":
+            case "REGEX": case "NULL": case "UNDEFINED":
+              if (bracket === 0) {
+                return index;
+              }
+              break;
+            case "(": case "[": case "{":
+              bracket += 1;
+              break;
+            case "}": case "]": case ")": case "CALL_END":
+              bracket -= 1;
+              if (bracket === 0) {
+                return index;
+              }
+              break;
+            }
+          }
+          index += 1;
+        }
+        return tokens.length - 1;
       };
       return function(tokens) {
-        var dstTokens = [], bracketStack = [];
-        var bracket, token, replaceable = false;
-        while ((token = tokens.shift())) {
-          if (replaceable && replaceTable[token[VALUE]]) {
-            beginCall(dstTokens, replaceTable[token[VALUE]]);
-            bracket = { type:CALL };
-            push(bracketStack, bracket);
-            replaceable = false;
-            continue;
+        var i = 0;
+        var replaceable = false;
+        while (i < tokens.length) {
+          var token = tokens[i];
+          if (replaceable) {
+            var selector = REPLACE[token[VALUE]];
+            if (selector) {
+              var a = find(tokens, i) + 1;
+              tokens.splice(i++, 1, ["."         , "."     , _]);
+              tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
+              tokens.splice(i++, 0, ["CALL_START", "("     , _]);
+              tokens.splice(a+2, 0, ["CALL_END"  , ")"     , _]);
+              replaceable = false;
+              continue;
+            }
           }
-          replaceable = true;
-          bracket = peek(bracketStack);
           switch (token[TAG]) {
-          case ",": case "TERMINATOR": case "INDENT": case "OUTDENT":
-            while (bracket && bracket.type === CALL) {
-              closeCall(dstTokens);
-              bracket = pop(bracketStack);
-            }
+          case "INDENT": case "OUTDENT": case "CALL_START":
+          case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
+          case "SHIFT": case "COMPARE": case "=": case "..": case "...":
+          case "[": case "(": case "{": case ",": case "?":
             replaceable = false;
             break;
-          case "CALL_START": case "(": case "[": case "{":
-            push(bracketStack, {type:BRACKET});
-            replaceable = false;
-            break;
-          case "}": case "]": case ")": case "CALL_END":
-            while (bracket && bracket.type === CALL) {
-              closeCall(dstTokens);
-              bracket = pop(bracketStack);
-            }
-            if (bracket && bracket.type === BRACKET) {
-              dstTokens.push(token);
-              bracket = pop(bracketStack);
-            }
-            while (bracket && bracket.type === CALL) {
-              closeCall(dstTokens, bracket);
-              bracket = pop(bracketStack);
-            }
-            continue;
+          default:
+            replaceable = true;
           }
-          dstTokens.push(token);
+          i += 1;
         }
-        return dstTokens;
+        // Compiler.dumpTokens(tokens);
+        return tokens;
       };
     })();
     Compiler.dumpTokens = function(tokens) {
