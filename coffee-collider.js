@@ -460,8 +460,6 @@ define('cc/client/web-audio-api', function(require, exports, module) {
 });
 define('cc/client/compiler', function(require, exports, module) {
 
-  var bop = require("../server/bop");
-
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
       return global.CoffeeScript;
@@ -471,6 +469,43 @@ define('cc/client/compiler', function(require, exports, module) {
     } catch(e) {}
   })();
 
+  // CoffeeScript tags
+  // IDENTIFIER
+  // NUMBER
+  // STRING
+  // REGEX
+  // BOOL
+  // NULL
+  // UNDEFINED
+  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
+  // UNARY           !, ~, new, typeof, delete, do
+  // LOGIC           &&, ||, &, |, ^
+  // SHIFT           <<, >>, >>>
+  // COMPARE         ==, !=, <, >, <=, >=
+  // MATH            *, div, %, 
+  // RELATION        in, of, instanceof
+  // =
+  // +
+  // -
+  // ..
+  // ...
+  // ++
+  // --
+  // (
+  // )
+  // [
+  // ]
+  // {
+  // }
+  // ?
+  // ::
+  // @
+  // THIS
+  // SUPER
+  // INDENT
+  // OUTDENT
+  // TERMINATOR
+
   var Compiler = (function() {
     var TAG = 0, VALUE = 1, _ = {};
     function Compiler() {
@@ -478,6 +513,7 @@ define('cc/client/compiler', function(require, exports, module) {
     Compiler.prototype.tokens = function(code) {
       var tokens = CoffeeScript.tokens(code);
       tokens = this.doPI(tokens);
+      tokens = this.doPrecedence(tokens);
       tokens = this.doBOP(tokens);
       return tokens;
     };
@@ -534,9 +570,81 @@ define('cc/client/compiler', function(require, exports, module) {
       }
       return tokens;
     };
+    Compiler.prototype.doPrecedence = (function() {
+      var find = function(tokens, index, vector) {
+        var bracket = 0;
+        index += vector;
+        while (0 < index && index < tokens.length) {
+          var token;
+          token = tokens[index + vector];
+          if (!token || token[TAG] !== ".") {
+            token = tokens[index];
+            switch (token[TAG]) {
+            case "TERMINATOR":
+              return index - 1;
+            case "IDENTIFIER":
+              if (vector === +1) {
+                token = tokens[index + 1];
+                if (token && token[TAG] === "CALL_START") {
+                  bracket += 1;
+                  break;
+                }
+              }
+              if (bracket === 0) {
+                return index;
+              }
+              break;
+            case "NUMBER": case "STRING": case "BOOL":
+            case "REGEX": case "NULL": case "UNDEFINED":
+              if (bracket === 0) {
+                return index;
+              }
+              break;
+            case "(": case "[": case "{":
+              bracket += vector;
+              break;
+            case "}": case "]": case ")":
+              bracket -= vector;
+              break;
+            case "CALL_END":
+              bracket -= vector;
+              if (bracket === 0) {
+                return index;
+              }
+              break;
+            }
+          }
+          index += vector;
+        }
+        return Math.max(0, Math.min(index, tokens.length - 1));
+      };
+      return function(tokens) {
+        var i;
+        i = 0;
+        while (i < tokens.length) {
+          var token = tokens[i];
+          if (token[TAG] === "MATH") {
+            var a = find(tokens, i , -1);
+            var b = find(tokens, i , +1) + 1;
+            tokens.splice(b, 0, [")", ")" , _]);
+            tokens.splice(a, 0, ["(", "(" , _]);
+            i += 1;
+          }
+          i += 1;
+        }
+        // Compiler.dumpTokens(tokens);
+        return tokens;
+      };
+    })();
     Compiler.prototype.doBOP = (function() {
       var CALL = 0, BRACKET = 1;
-      var REPLACE = bop.replaceTable;
+      var replaceTable = {
+        "+": "__add__",
+        "-": "__sub__",
+        "*": "__mul__",
+        "/": "__div__",
+        "%": "__mod__",
+      };
       var peek = function(list) {
         return list[list.length - 1];
       };
@@ -560,8 +668,8 @@ define('cc/client/compiler', function(require, exports, module) {
         var dstTokens = [], bracketStack = [];
         var bracket, token, replaceable = false;
         while ((token = tokens.shift())) {
-          if (replaceable && REPLACE[token[VALUE]]) {
-            beginCall(dstTokens, REPLACE[token[VALUE]]);
+          if (replaceable && replaceTable[token[VALUE]]) {
+            beginCall(dstTokens, replaceTable[token[VALUE]]);
             bracket = { type:CALL };
             push(bracketStack, bracket);
             replaceable = false;
@@ -601,88 +709,17 @@ define('cc/client/compiler', function(require, exports, module) {
         return dstTokens;
       };
     })();
+    Compiler.dumpTokens = function(tokens) {
+      console.log(tokens.map(function(t) {
+        return t[0] + "\t" + t[1];
+      }).join("\n"));
+    };
     return Compiler;
   })();
 
+
   module.exports = {
     Compiler: Compiler
-  };
-
-});
-define('cc/server/bop', function(require, exports, module) {
-
-  var install = function() {
-    var scalarFunc = function(selector, func) {
-      return function(b) {
-        if (Array.isArray(b)) {
-          return b.map(function(b) {
-            return this[selector](b);
-          }, this);
-        }
-        return func(this, b);
-      };
-    };
-    var arrayFunc = function(selector) {
-      return function(b) {
-        var a = this;
-        if (Array.isArray(b)) {
-          return b.map(function(b, index) {
-            return a[index % a.length][selector](b);
-          });
-        }
-        return a.map(function(a) {
-          return a[selector](b);
-        });
-      };
-    };
-    
-    Number.prototype.__add__ = scalarFunc("__add__", function(a, b) {
-      return a + b;
-    });
-    Number.prototype.__sub__ = scalarFunc("__sub__", function(a, b) {
-      return a - b;
-    });
-    Number.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
-      return a * b;
-    });
-    Number.prototype.__div__ = scalarFunc("__div__", function(a, b) {
-      return a / b;
-    });
-    Number.prototype.__mod__ = scalarFunc("__mod__", function(a, b) {
-      return a % b;
-    });
-    Array.prototype.__add__ = arrayFunc("__add__");
-    Array.prototype.__sub__ = arrayFunc("__sub__");
-    Array.prototype.__mul__ = arrayFunc("__mul__");
-    Array.prototype.__div__ = arrayFunc("__div__");
-    Array.prototype.__mod__ = arrayFunc("__mod__");
-    
-    String.prototype.__add__ = scalarFunc("__add__", function(a, b) {
-      return a + b;
-    });
-    String.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
-      if (typeof b === "number") {
-        var list = new Array(b);
-        for (var i = 0; i < b; i++) {
-          list[i] = a;
-        }
-        return list.join("");
-      }
-      return a;
-    });
-  };
-
-  var replaceTable = {
-    "+": "__add__",
-    "-": "__sub__",
-    "*": "__mul__",
-    "/": "__div__",
-    "%": "__mod__",
-  };
-  
-  module.exports = {
-    install: install,
-    replaceTable: replaceTable
   };
 
 });
@@ -793,6 +830,83 @@ define('cc/server/server', function(require, exports, module) {
   module.exports = {
     SynthServer: SynthServer,
     install: install
+  };
+
+});
+define('cc/server/bop', function(require, exports, module) {
+
+  var install = function() {
+    var scalarFunc = function(selector, func) {
+      return function(b) {
+        if (Array.isArray(b)) {
+          return b.map(function(b) {
+            return this[selector](b);
+          }, this);
+        }
+        return func(this, b);
+      };
+    };
+    var arrayFunc = function(selector) {
+      return function(b) {
+        var a = this;
+        if (Array.isArray(b)) {
+          return b.map(function(b, index) {
+            return a[index % a.length][selector](b);
+          });
+        }
+        return a.map(function(a) {
+          return a[selector](b);
+        });
+      };
+    };
+    
+    Number.prototype.__add__ = scalarFunc("__add__", function(a, b) {
+      return a + b;
+    });
+    Number.prototype.__sub__ = scalarFunc("__sub__", function(a, b) {
+      return a - b;
+    });
+    Number.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
+      return a * b;
+    });
+    Number.prototype.__div__ = scalarFunc("__div__", function(a, b) {
+      return a / b;
+    });
+    Number.prototype.__mod__ = scalarFunc("__mod__", function(a, b) {
+      return a % b;
+    });
+    Array.prototype.__add__ = arrayFunc("__add__");
+    Array.prototype.__sub__ = arrayFunc("__sub__");
+    Array.prototype.__mul__ = arrayFunc("__mul__");
+    Array.prototype.__div__ = arrayFunc("__div__");
+    Array.prototype.__mod__ = arrayFunc("__mod__");
+    
+    String.prototype.__add__ = scalarFunc("__add__", function(a, b) {
+      return a + b;
+    });
+    String.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
+      if (typeof b === "number") {
+        var list = new Array(b);
+        for (var i = 0; i < b; i++) {
+          list[i] = a;
+        }
+        return list.join("");
+      }
+      return a;
+    });
+  };
+
+  var replaceTable = {
+    "+": "__add__",
+    "-": "__sub__",
+    "*": "__mul__",
+    "/": "__div__",
+    "%": "__mod__",
+  };
+  
+  module.exports = {
+    install: install,
+    replaceTable: replaceTable
   };
 
 });
