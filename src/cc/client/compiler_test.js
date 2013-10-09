@@ -171,6 +171,46 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
+    describe("replaceUnaryOp:", function() {
+      it("+a + a => a + a", function() {
+        var tokens = [
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var actual = compiler.replaceUnaryOp(tokens);
+        assert.deepEqual(actual, expected);
+      });
+      it("-a + a => a.neg() + a", function() {
+        var tokens = [
+          [ "-"         , "-" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "IDENTIFIER", "a"  , _ ],
+          [ "."         , "."  , _ ],
+          [ "IDENTIFIER", "neg", _ ],
+          [ "CALL_START", "("  , _ ],
+          [ "CALL_END"  , ")"  , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "TERMINATOR", "\n" , _ ],
+        ];
+        var actual = compiler.replaceUnaryOp(tokens);
+        assert.deepEqual(actual, expected);
+      });
+    });
     describe("replaceCompoundAssign:", function() {
       it("a.a += b.b => a.a = a.a.__add__(b.b)", function() {
         var tokens = [

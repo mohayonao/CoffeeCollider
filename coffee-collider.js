@@ -659,6 +659,41 @@ define('cc/client/compiler', function(require, exports, module) {
     return tokens;
   };
 
+  var replaceUnaryOpTable = {
+    "+": "+",
+    "-": "neg",
+    "!": "not",
+    "~": "bitComp", // TODO: rename?
+  };
+
+  var replaceUnaryOp = function(tokens) {
+    var i = 0;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      var selector = replaceUnaryOpTable[token[VALUE]];
+      if (selector) {
+        token = tokens[i - 1] || { 0:"TERMINATOR" };
+        switch (token[TAG]) {
+        case "INDENT": case "TERMINATOR": case "CALL_START":
+        case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
+        case "SHIFT": case "COMPARE": case "=": case "..": case "...":
+        case "[": case "(": case "{": case ",": case "?":
+          if (selector !== "+") {
+            var a = findOperandTail(tokens, i);
+            tokens.splice(a+1, 0, ["."         , "."     , _]);
+            tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
+            tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
+            tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
+          }
+          tokens.splice(i, 1);
+        }
+      }
+      i += 1;
+    }
+    dumpTokens(tokens);
+    return tokens;
+  };
+  
   var replaceBinaryOpTable = {
     "+": "__add__",
     "-": "__sub__",
@@ -737,6 +772,7 @@ define('cc/client/compiler', function(require, exports, module) {
     Compiler.prototype.tokens = function(code) {
       var tokens = CoffeeScript.tokens(code);
       tokens = replacePi(tokens);
+      tokens = replaceUnaryOp(tokens);
       tokens = replacePrecedence(tokens);
       tokens = replaceBinaryOp(tokens);
       tokens = replaceCompoundAssign(tokens);
@@ -779,6 +815,7 @@ define('cc/client/compiler', function(require, exports, module) {
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
     replaceBinaryOp      : replaceBinaryOp,
+    replaceUnaryOp       : replaceUnaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
   };
 
