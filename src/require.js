@@ -1,4 +1,4 @@
-var _define = function(module, deps, payload) {
+var _define = function(module, /*deps,*/ payload) {
   if (!_define.modules) {
     _define.modules  = {};
     _define.payloads = {};

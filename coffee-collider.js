@@ -1,6 +1,6 @@
 (function(global) {
 "use strict";
-var _define = function(module, deps, payload) {
+var _define = function(module, /*deps,*/ payload) {
   if (!_define.modules) {
     _define.modules  = {};
     _define.payloads = {};
@@ -39,8 +39,7 @@ var normalizeModule = function(parentId, moduleName) {
   return moduleName;
 };
 var define = _define;
-define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/installer', 'cc/server/installer'], function(require, exports, module) {
-  "use strict";
+define('cc/loader', function(require, exports, module) {
 
   var cc = require("./cc");
 
@@ -56,14 +55,12 @@ define('cc/loader', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/instal
   };
 
 });
-define('cc/cc', ['require', 'exports', 'module' ], function(require, exports, module) {
-  "use strict";
+define('cc/cc', function(require, exports, module) {
 
   module.exports = {};
 
 });
-define('cc/client/installer', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/coffee-collider'], function(require, exports, module) {
-  "use strict";
+define('cc/client/installer', function(require, exports, module) {
 
   var cc = require("cc/cc");
   var CoffeeCollider = require("./coffee-collider").CoffeeCollider;
@@ -93,8 +90,7 @@ define('cc/client/installer', ['require', 'exports', 'module' , 'cc/cc', 'cc/cli
   };
 
 });
-define('cc/client/coffee-collider', ['require', 'exports', 'module' , 'cc/client/client'], function(require, exports, module) {
-  "use strict";
+define('cc/client/coffee-collider', function(require, exports, module) {
 
   var SynthClient = require("./client").SynthClient;
 
@@ -157,8 +153,7 @@ define('cc/client/coffee-collider', ['require', 'exports', 'module' , 'cc/client
   };
 
 });
-define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client/sound-system', 'cc/client/compiler'], function(require, exports, module) {
-  "use strict";
+define('cc/client/client', function(require, exports, module) {
 
   var cc = require("cc/cc");
   var SoundSystem = require("./sound-system").SoundSystem;
@@ -293,8 +288,7 @@ define('cc/client/client', ['require', 'exports', 'module' , 'cc/cc', 'cc/client
   };
 
 });
-define('cc/client/sound-system', ['require', 'exports', 'module' , 'cc/client/web-audio-api'], function(require, exports, module) {
-  "use strict";
+define('cc/client/sound-system', function(require, exports, module) {
 
   var SoundSystem = (function() {
     function SoundSystem() {
@@ -410,8 +404,7 @@ define('cc/client/sound-system', ['require', 'exports', 'module' , 'cc/client/we
   };
 
 });
-define('cc/client/web-audio-api', ['require', 'exports', 'module' ], function(require, exports, module) {
-  "use strict";
+define('cc/client/web-audio-api', function(require, exports, module) {
 
   var klass;
   module.exports = {
@@ -465,8 +458,7 @@ define('cc/client/web-audio-api', ['require', 'exports', 'module' ], function(re
   klass = WebAudioAPI;
 
 });
-define('cc/client/compiler', ['require', 'exports', 'module' , 'cc/server/bop'], function(require, exports, module) {
-  "use strict";
+define('cc/client/compiler', function(require, exports, module) {
 
   var bop = require("../server/bop");
 
@@ -617,8 +609,7 @@ define('cc/client/compiler', ['require', 'exports', 'module' , 'cc/server/bop'],
   };
 
 });
-define('cc/server/bop', ['require', 'exports', 'module' ], function(require, exports, module) {
-  "use strict";
+define('cc/server/bop', function(require, exports, module) {
 
   var install = function() {
     var scalarFunc = function(selector, func) {
@@ -695,8 +686,7 @@ define('cc/server/bop', ['require', 'exports', 'module' ], function(require, exp
   };
 
 });
-define('cc/server/installer', ['require', 'exports', 'module' , 'cc/server/server', 'cc/server/bop'], function(require, exports, module) {
-  "use strict";
+define('cc/server/installer', function(require, exports, module) {
 
   var install = function(global) {
     require("./server").install(global);
@@ -708,8 +698,7 @@ define('cc/server/installer', ['require', 'exports', 'module' , 'cc/server/serve
   };
 
 });
-define('cc/server/server', ['require', 'exports', 'module' ], function(require, exports, module) {
-  "use strict";
+define('cc/server/server', function(require, exports, module) {
 
   var commands = {};
   

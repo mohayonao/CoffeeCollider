@@ -49,6 +49,30 @@ module.exports = function(grunt) {
     }
   });
 
+  grunt.registerTask("typo", function() {
+    var check = 0;
+    var typo  = 0;
+    var re = /^define\(function\(require, exports, module\) {$/;
+    var files = grunt.file.expand("src/cc/**/*.js").filter(function(file) {
+      return !/_test\.js$/.test(file);
+    });
+    files.forEach(function(file) {
+      var code = grunt.file.read(file).split("\n")[0];
+      if (!re.test(code)) {
+        grunt.verbose.or.write("Typong " + file + "...");
+        grunt.log.error();
+        grunt.log.writeln("  " + code);
+        typo += 1;
+      }
+      check += 1;
+    });
+    if (typo === 0) {
+      grunt.log.ok(check + " files typo free.");
+      return true;
+    }
+    return false;      
+  });
+
   grunt.registerTask("dryice", function() {
     var copy = require("dryice").copy;
     var srcroot = "src";
@@ -62,37 +86,36 @@ module.exports = function(grunt) {
     var cc = copy.createDataObject();
     var filter;
 
-    var header = function() {
-      var header = "";
-      header += "(function(global) {" + "\n";
-      header += '"use strict";' + "\n";
-      return header;
-    };
-    var firstRequire = function(text) {
-      return text + '_require("cc/cc", "' + main + '");\n';
-    };
-    var footer = function() {
-      var footer = "";
-      footer += "})(this.self||global);" + "\n";
-      return footer;
-    };
+    var header = "";
+    header += "(function(global) {" + "\n";
+    header += '"use strict";' + "\n";
+
+    var footer = "";
+    footer += "})(this.self||global);" + "\n";
     
     copy({
-      source: { value:header() },
+      source: { value:header },
       dest  : cc
     });
     copy({
       source: [ "./src/require.js" ],
       dest  : cc
     });
-    filter = [ copy.filter.moduleDefines, firstRequire ];
+    filter = [
+      copy.filter.moduleDefines,
+      function(text) {
+        text = text.replace(/^define\((['"].+?['"]), \[(.+?)\], function\(require, exports, module\) {$/gm, "define($1, function(require, exports, module) {");
+        text = text.replace(/\s*['"]use strict['"];$/gm, "");
+        return text + '_require("cc/cc", "' + main + '");\n';  
+      }
+    ];
     copy({
       source: [ { project:project, require:main } ],
       filter: filter,
       dest  : cc
     });
     copy({
-      source: { value:footer() },
+      source: { value:footer },
       dest  : cc
     });
     copy({
@@ -131,9 +154,9 @@ module.exports = function(grunt) {
     });
   });
 
-  grunt.registerTask("check"  , ["jshint", "test"]);
+  grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
   grunt.registerTask("default", ["build", "connect", "watch"]);
-  grunt.registerTask("travis" , ["jshint", "test:travis"]);
+  grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
 };
