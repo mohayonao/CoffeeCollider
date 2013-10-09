@@ -1,9 +1,10 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function(global) {
-    require("./server").install(global);
-    require("./bop").install(global);
+  var install = function(namespace) {
+    require("./server").install(namespace);
+    require("./bop").install(namespace);
+    require("./uop").install(namespace);
   };
 
   module.exports = {

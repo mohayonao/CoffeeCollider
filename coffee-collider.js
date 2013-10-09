@@ -858,9 +858,10 @@ define('cc/client/compiler', function(require, exports, module) {
 });
 define('cc/server/installer', function(require, exports, module) {
 
-  var install = function(global) {
-    require("./server").install(global);
-    require("./bop").install(global);
+  var install = function(namespace) {
+    require("./server").install(namespace);
+    require("./bop").install(namespace);
+    require("./uop").install(namespace);
   };
 
   module.exports = {
@@ -1040,6 +1041,70 @@ define('cc/server/bop', function(require, exports, module) {
   module.exports = {
     install: install,
     replaceTable: replaceTable
+  };
+
+});
+define('cc/server/uop', function(require, exports, module) {
+
+  var install = function(namespace) {
+    Number.prototype.neg = function() {
+      return -this;
+    };
+    Boolean.prototype.neg = function() {
+      return !this;
+    };
+    Array.prototype.neg = function() {
+      return this.map(function(i) {
+        return i.neg();
+      });
+    };
+    String.prototype.neg = function() {
+      return this;
+    };
+    namespace.neg = function(that) {
+      that.neg();
+    };
+
+    Number.prototype.not = function() {
+      return !this;
+    };
+    Boolean.prototype.not = function() {
+      return !this;
+    };
+    Array.prototype.not = function() {
+      return this.map(function(i) {
+        return i.not();
+      });
+    };
+    String.prototype.not = function() {
+      return !this;
+    };
+    namespace.not = function(that) {
+      that.not();
+    };
+
+    Number.prototype.tilde = function() {
+      return ~this;
+    };
+    Boolean.prototype.tilde = function() {
+      return this;
+    };
+    Array.prototype.tilde = function() {
+      return this.map(function(i) {
+        return i.tilde();
+      });
+    };
+    String.prototype.tilde = function() {
+      return this;
+    };
+    namespace.tilde = function(that) {
+      that.tilde();
+    };
+    
+  };
+
+  module.exports = {
+    install: install
   };
 
 });
