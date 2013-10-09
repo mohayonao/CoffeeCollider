@@ -585,7 +585,6 @@ define('cc/client/compiler', function(require, exports, module) {
       token = tokens[index + 1];
       if (!token || token[TAG] !== ".") {
         token = tokens[index];
-        console.log(token);
         switch (token[TAG]) {
         case "TERMINATOR": case "OUTDENT":
           return index - 1;
@@ -621,44 +620,45 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replacePi = function(tokens) {
-    var i = 0, a;
-    while (i < tokens.length) {
-      var token = tokens[i];
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var a, b, token = tokens[i];
       if (token[VALUE] === "pi") {
         tokens.splice(i, 1);
         token = tokens[i - 1];
         if (token && token[TAG] === "NUMBER") {
           a = findOperandHead(tokens, i);
-          tokens.splice(i++, 0, ["MATH", "*", _]);
+          tokens.splice(i, 0, ["MATH", "*", _]);
+          b = i;
         } else {
           a = -1;
+          b = i - 1;
         }
-        tokens.splice(i++, 0, ["IDENTIFIER", "Math", _]);
-        tokens.splice(i++, 0, ["."         , "."   , _]);
-        tokens.splice(i++, 0, ["IDENTIFIER", "PI"  , _]);
+        tokens.splice(b+1, 0, ["IDENTIFIER", "Math", _]);
+        tokens.splice(b+2, 0, ["."         , "."   , _]);
+        tokens.splice(b+3, 0, ["IDENTIFIER", "PI"  , _]);
         if (a !== -1) {
-          tokens.splice(i, 0, [")", ")", _]);
+          tokens.splice(b+4, 0, [")", ")", _]);
           tokens.splice(a, 0, ["(", "(", _]);
         }
       }
-      i += 1;
+      i -= 1;
     }
     // dumpTokens(tokens);
     return tokens;
   };
 
   var replacePrecedence = function(tokens) {
-    var i = 0;
-    while (i < tokens.length) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
       var token = tokens[i];
       if (token[TAG] === "MATH") {
         var a = findOperandHead(tokens, i);
         var b = findOperandTail(tokens, i) + 1;
         tokens.splice(b, 0, [")", ")" , _]);
         tokens.splice(a, 0, ["(", "(" , _]);
-        i += 1;
       }
-      i += 1;
+      i -= 1;
     }
     // dumpTokens(tokens);
     return tokens;
@@ -708,17 +708,17 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var replaceBinaryOp = function(tokens) {
-    var i = 0;
+    var i = tokens.length - 1;
     var replaceable = false;
-    while (i < tokens.length) {
+    while (0 <= i) {
       var token = tokens[i];
       if (replaceable) {
         var selector = replaceBinaryOpTable[token[VALUE]];
         if (selector) {
           var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i++, 0, ["CALL_START", "("     , _]);
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
           tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
           replaceable = false;
           continue;
@@ -734,7 +734,7 @@ define('cc/client/compiler', function(require, exports, module) {
       default:
         replaceable = true;
       }
-      i += 1;
+      i -= 1;
     }
     // dumpTokens(tokens);
     return tokens;
@@ -749,30 +749,30 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var replaceCompoundAssign = function(tokens) {
-    var i = 0, j;
-    while (i < tokens.length) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
       var token = tokens[i];
       var selector = replaceCompoundAssignTable[token[VALUE]];
       if (selector) {
         var a = findOperandHead(tokens, i);
         var b = findOperandTail(tokens, i) + 1;
-        tokens[i++] = ["=", "=", _];
-        tokens.splice(b, 0, ["CALL_END"  , ")"     , _]);
-        tokens.splice(i, 0, ["CALL_START", "("     , _]);
-        tokens.splice(i, 0, ["IDENTIFIER", selector, _]);
-        tokens.splice(i, 0, ["."         , "."     , _]);
-        for (j = i - 2; j >= a; --j) {
-          tokens.splice(i, 0, tokens[j]);
+        tokens[i] = ["=", "=", _];
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 0, ["IDENTIFIER", selector, _]);
+        tokens.splice(i+3, 0, ["CALL_START", "("     , _]);
+        tokens.splice(b+3, 0, ["CALL_END"  , ")"     , _]);
+        for (var j = a; j < i; j++) {
+          tokens.splice(i+1, 0, tokens[j]);
         }
       }
-      i += 1;
+      i -= 1;
     }
     // dumpTokens(tokens);
     return tokens;
   };
 
   var cleanupParenthesis = function(tokens) {
-    var i = 0, j;
+    var i = 0;
     var bracket = 0;
     while (i < tokens.length) {
       var token = tokens[i];
@@ -780,7 +780,7 @@ define('cc/client/compiler', function(require, exports, module) {
         token = tokens[i + 1];
         if (token && token[TAG] === "(") {
           bracket = 2;
-          for (j = i + 2; j < tokens.length; j++) {
+          for (var j = i + 2; j < tokens.length; j++) {
             token = tokens[j][TAG];
             if (token === "(") {
               bracket += 1;
