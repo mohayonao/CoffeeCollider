@@ -193,6 +193,8 @@ define(function(require, exports, module) {
           if (!token || token[TAG] !== ".") {
             token = tokens[index];
             switch (token[TAG]) {
+            case "TERMINATOR":
+              return index - 1;
             case "IDENTIFIER":
               token = tokens[index + 1];
               if (token && token[TAG] === "CALL_START") {
@@ -239,7 +241,7 @@ define(function(require, exports, module) {
             }
           }
           switch (token[TAG]) {
-          case "INDENT": case "OUTDENT": case "CALL_START":
+          case "INDENT": case "OUTDENT": case "TERMINATOR": case "CALL_START":
           case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
           case "SHIFT": case "COMPARE": case "=": case "..": case "...":
           case "[": case "(": case "{": case ",": case "?":
