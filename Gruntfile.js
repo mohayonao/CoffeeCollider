@@ -148,7 +148,15 @@ module.exports = function(grunt) {
     var done = this.async();
     mocha.reporter(reporter).run(function(failures) {
       if (failures) {
-        grunt.fail.fatal("test failed");
+        grunt.fail.fatal("test failed.");
+      }
+      if (args === "travis") {
+        files.forEach(function(file) {
+          var code = grunt.file.read(file);
+          if (/^\s*(describe|it)\.only\("/m.test(code)) {
+            grunt.fail.warn("test succeeded, but not completely.");
+          }
+        });
       }
       done();
     });
