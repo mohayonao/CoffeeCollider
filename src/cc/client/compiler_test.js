@@ -491,6 +491,29 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
+    describe.skip("doCompoundAssign:", function() {
+      it("a += 10 => a = a.__add__(10)", function() {
+        var tokens = [
+          [ "IDENTIFIER"     , "a"  , _ ],          
+          [ "COMPOUND_ASSIGN", "+=" , _ ],
+          [ "NUMBER"         , "10" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "IDENTIFIER", "a"      , _ ],
+          [ "="         , "="      , _ ],
+          [ "IDENTIFIER", "a"      , _ ],
+          [ "."         , "."      , _ ],
+          [ "IDENTIFIER", "__add__", _ ],
+          [ "CALL_START", "("      , _ ],
+          [ "NUMBER"    , "10"     , _ ],
+          [ "CALL_END"  , ")"      , _ ],
+          [ "TERMINATOR", "\n"     , _ ],
+        ];
+        var actual = compiler.doBOP(tokens);
+        assert.deepEqual(actual, expected);
+      });
+    });
   });
 
 });
