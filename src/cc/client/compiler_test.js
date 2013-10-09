@@ -244,6 +244,47 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
+    describe("cleanupParenthesis:", function() {
+      it("((a + b)) => (a + b)", function() {
+        var tokens = [
+          [ "("         , "(" , _ ],
+          [ "("         , "(" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "b" , _ ],
+          [ ")"         , ")" , _ ],
+          [ ")"         , ")" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = [
+          [ "("         , "(" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "b" , _ ],
+          [ ")"         , ")" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var actual = compiler.cleanupParenthesis(tokens);
+        assert.deepEqual(actual, expected);
+      });
+      it("((a + b) + c) => ((a + b) + c)", function() {
+        var tokens = [
+          [ "("         , "(" , _ ],
+          [ "("         , "(" , _ ],
+          [ "IDENTIFIER", "a" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "b" , _ ],
+          [ ")"         , ")" , _ ],
+          [ "+"         , "+" , _ ],
+          [ "IDENTIFIER", "c" , _ ],
+          [ ")"         , ")" , _ ],
+          [ "TERMINATOR", "\n", _ ],
+        ];
+        var expected = tokens;
+        var actual = compiler.cleanupParenthesis(tokens);
+        assert.deepEqual(actual, expected);
+      });
+    });    
   });
 
 });

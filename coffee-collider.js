@@ -690,7 +690,7 @@ define('cc/client/compiler', function(require, exports, module) {
       }
       i += 1;
     }
-    dumpTokens(tokens);
+    // dumpTokens(tokens);
     return tokens;
   };
   
@@ -765,6 +765,39 @@ define('cc/client/compiler', function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
+
+  var cleanupParenthesis = function(tokens) {
+    var i = 0, j;
+    var bracket = 0;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (token[TAG] === "(") {
+        token = tokens[i + 1];
+        if (token && token[TAG] === "(") {
+          bracket = 2;
+          for (j = i + 2; j < tokens.length; j++) {
+            token = tokens[j][TAG];
+            if (token === "(") {
+              bracket += 1;
+            } if (token === ")") {
+              bracket -= 1;
+              if (bracket === 0) {
+                if (tokens[j - 1][TAG] === ")") {
+                  tokens.splice(j, 1);
+                  tokens.splice(i, 1);
+                  i -= 1;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
   
   var Compiler = (function() {
     function Compiler() {
@@ -776,6 +809,7 @@ define('cc/client/compiler', function(require, exports, module) {
       tokens = replacePrecedence(tokens);
       tokens = replaceBinaryOp(tokens);
       tokens = replaceCompoundAssign(tokens);
+      tokens = cleanupParenthesis(tokens);
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
@@ -817,6 +851,7 @@ define('cc/client/compiler', function(require, exports, module) {
     replaceBinaryOp      : replaceBinaryOp,
     replaceUnaryOp       : replaceUnaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
+    cleanupParenthesis   : cleanupParenthesis,
   };
 
 });
