@@ -74,14 +74,15 @@ define(function(require, exports, module) {
       });
       it("with a function", function() {
         var tokens = [
-          [ "NUMBER"    , 10    , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
+          [ "("         , "("   , _ ],
+          [ "UNARY"     , "~"   , _ ], // <-- from
+          [ "["         , "["   , _ ],
+          [ "]"         , "]"   , _ ],
+          [ "."         , "."   , _ ],
           [ "IDENTIFIER", "func", _ ],
           [ "CALL_START", "("   , _ ],
-          [ "IDENTIFIER", "a"   , _ ],
-          [ ","         , ","   , _ ],
-          [ "IDENTIFIER", "b"   , _ ],
           [ "CALL_END"  , ")"   , _ ], // <-- tail
+          [ ")"         , ")"   , _ ],
           [ "TERMINATOR", "\n"  , _ ],
         ];
         var expected = 7;
@@ -210,28 +211,30 @@ define(function(require, exports, module) {
         var actual = compiler.replaceUnaryOp(tokens);
         assert.deepEqual(actual, expected);
       });
-      it.only("!!a.a => a.a.not().not()", function() {
+      it("(~-[]) => ([].neg().tilde())", function() {
         var tokens = [
-          [ "UNARY"     , "!" , _ ],
-          [ "UNARY"     , "!" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "."         , "." , _ ],
-          [ "IDENTIFIER", "a" , _ ],
+          [ "("         , "(" , _ ],
+          [ "UNARY"     , "~" , _ ],
+          [ "UNARY"     , "-" , _ ],
+          [ "["         , "[" , _ ],
+          [ "]"         , "]" , _ ],
+          [ ")"         , ")" , _ ],
           [ "TERMINATOR", "\n", _ ],
         ];
         var expected = [
-          [ "IDENTIFIER", "a"  , _ ],
-          [ "."         , "."  , _ ],
-          [ "IDENTIFIER", "a"  , _ ],
-          [ "."         , "."  , _ ],
-          [ "IDENTIFIER", "not", _ ],
-          [ "CALL_START", "("  , _ ],
-          [ "CALL_END"  , ")"  , _ ],
-          [ "."         , "."  , _ ],
-          [ "IDENTIFIER", "not", _ ],
-          [ "CALL_START", "("  , _ ],
-          [ "CALL_END"  , ")"  , _ ],
-          [ "TERMINATOR", "\n" , _ ],
+          [ "("         , "("    , _ ],
+          [ "["         , "["    , _ ],
+          [ "]"         , "]"    , _ ],
+          [ "."         , "."    , _ ],
+          [ "IDENTIFIER", "neg"  , _ ],
+          [ "CALL_START", "("    , _ ],
+          [ "CALL_END"  , ")"    , _ ],
+          [ "."         , "."    , _ ],
+          [ "IDENTIFIER", "tilde", _ ],
+          [ "CALL_START", "("    , _ ],
+          [ "CALL_END"  , ")"    , _ ],
+          [ ")"         , ")"    , _ ],
+          [ "TERMINATOR", "\n"   , _ ],
         ];
         var actual = compiler.replaceUnaryOp(tokens);
         assert.deepEqual(actual, expected);

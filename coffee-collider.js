@@ -577,9 +577,15 @@ define('cc/client/compiler', function(require, exports, module) {
     var bracket = 0;
     index += 1;
     while (index < tokens.length) {
-      var token = tokens[index + 1];
+      var token = tokens[index];
+      switch (token[TAG]) {
+        case "}": case "]": case ")": case "CALL_END":
+        bracket -= 1;
+      }
+      token = tokens[index + 1];
       if (!token || token[TAG] !== ".") {
         token = tokens[index];
+        console.log(token);
         switch (token[TAG]) {
         case "TERMINATOR": case "OUTDENT":
           return index - 1;
@@ -603,7 +609,6 @@ define('cc/client/compiler', function(require, exports, module) {
           bracket += 1;
           break;
         case "}": case "]": case ")": case "CALL_END":
-          bracket -= 1;
           if (bracket === 0) {
             return index;
           }
@@ -667,8 +672,8 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replaceUnaryOp = function(tokens) {
-    var i = 0;
-    while (i < tokens.length) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
       var token = tokens[i];
       var selector = replaceUnaryOpTable[token[VALUE]];
       if (selector) {
@@ -677,7 +682,7 @@ define('cc/client/compiler', function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?":
+        case "[": case "(": case "{": case ",": case "?": case "UNARY":
           if (selector !== "+") {
             var a = findOperandTail(tokens, i);
             tokens.splice(a+1, 0, ["."         , "."     , _]);
@@ -687,9 +692,8 @@ define('cc/client/compiler', function(require, exports, module) {
           }
           tokens.splice(i, 1);
         }
-        continue; // for a consecutive unary operator
       }
-      i += 1;
+      i -= 1;
     }
     // dumpTokens(tokens);
     return tokens;
@@ -724,7 +728,7 @@ define('cc/client/compiler', function(require, exports, module) {
       case "INDENT": case "TERMINATOR": case "CALL_START":
       case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
       case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-      case "[": case "(": case "{": case ",": case "?":
+      case "[": case "(": case "{": case ",": case "?": case "UNARY":
         replaceable = false;
         break;
       default:
