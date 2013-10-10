@@ -2,6 +2,24 @@ define(function(require, exports, module) {
   "use strict";
 
   var install = function(namespace) {
+    Number.prototype.num = function() {
+      return +this;
+    };
+    Boolean.prototype.num = function() {
+      return +this;
+    };
+    Array.prototype.num = function() {
+      return this.map(function(i) {
+        return i.num();
+      });
+    };
+    String.prototype.num = function() {
+      return +this;
+    };
+    namespace.num = function(that) {
+      return that.num();
+    };
+    
     Number.prototype.neg = function() {
       return -this;
     };
@@ -17,7 +35,7 @@ define(function(require, exports, module) {
       return this;
     };
     namespace.neg = function(that) {
-      that.neg();
+      return that.neg();
     };
 
     Number.prototype.not = function() {
@@ -35,7 +53,7 @@ define(function(require, exports, module) {
       return !this;
     };
     namespace.not = function(that) {
-      that.not();
+      return that.not();
     };
 
     Number.prototype.tilde = function() {
@@ -53,7 +71,7 @@ define(function(require, exports, module) {
       return this;
     };
     namespace.tilde = function(that) {
-      that.tilde();
+      return that.tilde();
     };
     
   };

@@ -173,7 +173,7 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceUnaryOp:", function() {
-      it.only("+a + a => a.num() + a", function() {
+      it("+a + a => a.num() + a", function() {
         var tokens = [
           [ "+"         , "+" , _ ],
           [ "IDENTIFIER", "a" , _ ],

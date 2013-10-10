@@ -9,6 +9,11 @@ define(function(require, exports, module) {
     before(function() {
       uop.install(cc);
     });
+    it("num", function() {
+      var a = [-1, 0, 1,true ,false,"str","2",""].num();
+      var b = [-1, 0, 1,1    ,0    ,NaN  ,2  ,0 ];
+      assert.deepEqual(a, b);
+    });
     it("neg", function() {
       var a = [-1, 0, 1,true ,false,"str",""].neg();
       var b = [ 1,-0,-1,false,true ,"str",""];
