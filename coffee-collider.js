@@ -969,15 +969,17 @@ define('cc/server/server', function(require, exports, module) {
       }
     });
     server.send(["/connect"]);
-    global.console = (function() {
-      var console = {};
-      ["log", "debug", "info", "error"].forEach(function(method) {
-        console[method] = function() {
-          server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
-        };
-      });
-      return console;
-    })();
+    if (typeof global.console === "undefined") {
+      global.console = (function() {
+        var console = {};
+        ["log", "debug", "info", "error"].forEach(function(method) {
+          console[method] = function() {
+            server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+          };
+        });
+        return console;
+      })();
+    }
   };
   
   module.exports = {
