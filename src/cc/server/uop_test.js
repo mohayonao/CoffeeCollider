@@ -10,24 +10,24 @@ define(function(require, exports, module) {
       uop.install(cc);
     });
     it("num", function() {
-      var a = [-1, 0, 1,true ,false,"str","2",""].num();
-      var b = [-1, 0, 1,1    ,0    ,NaN  ,2  ,0 ];
-      assert.deepEqual(a, b);
+      var actual   = [-1, 0, 1,true ,false,"str","2",""].num();
+      var expected = [-1, 0, 1,1    ,0    ,NaN  ,2  ,0 ];
+      assert.deepEqual(actual, expected);
     });
     it("neg", function() {
-      var a = [-1, 0, 1,true ,false,"str","2",""].neg();
-      var b = [ 1,-0,-1,0    ,1    ,NaN  ,-2 ,-0];
-      assert.deepEqual(a, b);
+      var actual   = [-1, 0, 1,true ,false,"str","2",""].neg();
+      var expected = [ 1,-0,-1,0    ,1    ,NaN  ,-2 ,-0];
+      assert.deepEqual(actual, expected);
     });
     it("not", function() {
-      var a = [-1   ,0   , 1   ,true ,false,"str",""  ].not();
-      var b = [false,true,false,false,true ,false,true];
-      assert.deepEqual(a, b);
+      var actual   = [-1   ,0   , 1   ,true ,false,"str",""  ].not();
+      var expected = [false,true,false,false,true ,false,true];
+      assert.deepEqual(actual, expected);
     });
     it("tilde", function() {
-      var a = [ -1, 0, 1,true,false,"str",""].tilde();
-      var b = [~-1,~0,~1,true,false,"str",""];
-      assert.deepEqual(a, b);
+      var actual   = [ -1, 0, 1,true,false,"str",""].tilde();
+      var expected = [~-1,~0,~1,true,false,"str",""];
+      assert.deepEqual(actual, expected);
     });
   });  
 
