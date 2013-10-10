@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("cc/cc");
-  var SoundSystem = require("./sound-system").SoundSystem;
+  var SoundSystem = require("./sound_system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
 
   var commands = {};

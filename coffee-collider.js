@@ -63,7 +63,7 @@ define('cc/cc', function(require, exports, module) {
 define('cc/client/installer', function(require, exports, module) {
 
   var cc = require("cc/cc");
-  var CoffeeCollider = require("./coffee-collider").CoffeeCollider;
+  var CoffeeCollider = require("./coffee_collider").CoffeeCollider;
 
   if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
@@ -90,7 +90,7 @@ define('cc/client/installer', function(require, exports, module) {
   };
 
 });
-define('cc/client/coffee-collider', function(require, exports, module) {
+define('cc/client/coffee_collider', function(require, exports, module) {
 
   var SynthClient = require("./client").SynthClient;
 
@@ -156,7 +156,7 @@ define('cc/client/coffee-collider', function(require, exports, module) {
 define('cc/client/client', function(require, exports, module) {
 
   var cc = require("cc/cc");
-  var SoundSystem = require("./sound-system").SoundSystem;
+  var SoundSystem = require("./sound_system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
 
   var commands = {};
@@ -288,7 +288,7 @@ define('cc/client/client', function(require, exports, module) {
   };
 
 });
-define('cc/client/sound-system', function(require, exports, module) {
+define('cc/client/sound_system', function(require, exports, module) {
 
   var SoundSystem = (function() {
     function SoundSystem() {
@@ -396,7 +396,7 @@ define('cc/client/sound-system', function(require, exports, module) {
   })();
 
   var getAPI = function() {
-    return require("./web-audio-api").getAPI();
+    return require("./web_audio_api").getAPI();
   };
 
   module.exports = {
@@ -404,7 +404,7 @@ define('cc/client/sound-system', function(require, exports, module) {
   };
 
 });
-define('cc/client/web-audio-api', function(require, exports, module) {
+define('cc/client/web_audio_api', function(require, exports, module) {
 
   var klass;
   module.exports = {
