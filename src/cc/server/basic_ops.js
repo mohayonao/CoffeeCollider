@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var C  = require("./const");
   var fn = require("./fn");
-  var array = require("./array");
+  var array = require("./array").impl;
   var UGen  = require("./ugen").UGen;
 
   var asRate = function(obj) {
@@ -273,7 +273,7 @@ define(function(require, exports, module) {
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ]);
+      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
       var fixnum = 0;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {
@@ -320,7 +320,7 @@ define(function(require, exports, module) {
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ]);
+      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
       var fixnum = 1;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {

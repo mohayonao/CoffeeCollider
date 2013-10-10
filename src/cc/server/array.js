@@ -24,29 +24,25 @@ define(function(require, exports, module) {
     return a;
   };
 
-  var flatten = (function() {
-    var _flatten = function(that, level, list) {
-      for (var i = 0, imax = that.length; i < imax; ++i) {
-        if (level <= 0 || !Array.isArray(that[i])) {
-          list.push(that[i]);
-        } else {
-          list = _flatten(that[i], level - 1, list);
-        }
+  var _flatten = function(that, level, list) {
+    for (var i = 0, imax = that.length; i < imax; ++i) {
+      if (level <= 0 || !Array.isArray(that[i])) {
+        list.push(that[i]);
+      } else {
+        list = _flatten(that[i], level - 1, list);
       }
-      return list;
-    };
-    return fn(function(list, level) {
-      if (!Array.isArray(list)) {
-        return [list];
-      }
-      return _flatten(list, level, []);
-    }).defaults("list,level=Infinity").build();
-  })();
-
-  var clump = fn(function(list, groupSize) {
+    }
+    return list;
+  };
+  
+  var flatten = fn(function(list, level) {
     if (!Array.isArray(list)) {
       return [list];
     }
+    return _flatten(list, level, []);
+  }).defaults("list,level=Infinity").build();
+  
+  var _clump = function(list, groupSize) {
     var result  = [];
     var sublist = [];
     for (var i = 0, imax = list.length; i < imax; ++i) {
@@ -60,6 +56,13 @@ define(function(require, exports, module) {
       result.push(sublist);
     }
     return result;
+  };
+  
+  var clump = fn(function(list, groupSize) {
+    if (!Array.isArray(list)) {
+      return [list];
+    }
+    return _clump(list, groupSize);
   }).defaults("list,groupSize=2").build();
   
   var install = function(namespace) {
@@ -67,10 +70,10 @@ define(function(require, exports, module) {
       return zip.apply(null, this);
     };
     Array.prototype.flatten = fn(function(level) {
-      return flatten(this, level);
+      return _flatten(this, level, []);
     }).defaults("level=Infinity").build();
     Array.prototype.clump = fn(function(groupSize) {
-      return clump(this, groupSize);
+      return _clump(this, groupSize);
     }).defaults("groupSize=2").build();
     if (namespace) {
       namespace.zip     = zip;
@@ -84,6 +87,11 @@ define(function(require, exports, module) {
     zip    : zip,
     flatten: flatten,
     clump  : clump,
+    impl: {
+      zip    : zip,
+      flatten: _flatten,
+      clump  : _clump,
+    }
   };
 
 });
