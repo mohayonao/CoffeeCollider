@@ -173,7 +173,7 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceUnaryOp:", function() {
-      it("+a + a => a + a", function() {
+      it.only("+a + a => a.num() + a", function() {
         var tokens = [
           [ "+"         , "+" , _ ],
           [ "IDENTIFIER", "a" , _ ],
@@ -182,10 +182,14 @@ define(function(require, exports, module) {
           [ "TERMINATOR", "\n", _ ],
         ];
         var expected = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          [ "IDENTIFIER", "a"  , _ ],
+          [ "."         , "."  , _ ],
+          [ "IDENTIFIER", "num", _ ],
+          [ "CALL_START", "("  , _ ],
+          [ "CALL_END"  , ")"  , _ ],
+          [ "+"         , "+"  , _ ],
+          [ "IDENTIFIER", "a"  , _ ],
+          [ "TERMINATOR", "\n" , _ ],
         ];
         var actual = compiler.replaceUnaryOp(tokens);
         assert.deepEqual(actual, expected);

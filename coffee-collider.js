@@ -665,7 +665,7 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "+",
+    "+": "num",
     "-": "neg",
     "!": "not",
     "~": "tilde",
@@ -683,13 +683,11 @@ define('cc/client/compiler', function(require, exports, module) {
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
         case "[": case "(": case "{": case ",": case "?": case "UNARY":
-          if (selector !== "+") {
-            var a = findOperandTail(tokens, i);
-            tokens.splice(a+1, 0, ["."         , "."     , _]);
-            tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
-            tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
-            tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
-          }
+          var a = findOperandTail(tokens, i);
+          tokens.splice(a+1, 0, ["."         , "."     , _]);
+          tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
+          tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
           tokens.splice(i, 1);
         }
       }
