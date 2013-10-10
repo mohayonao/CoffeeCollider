@@ -19,7 +19,7 @@ define(function(require, exports, module) {
       this.def.split(",").forEach(function(items) {
         items = items.trim().split("=");
         keys.push( items[0].trim());
-        vals.push(+items[1].trim());
+        vals.push(items.length > 1 ? +items[1].trim() : undefined);
       });
       var ret = func;
       if (this.def !== "") {
