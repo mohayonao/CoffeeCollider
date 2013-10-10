@@ -76,7 +76,11 @@ define(function(require, exports, module) {
   fn.classmethod = (function() {
     var _classmethod = function(Klass, func) {
       return function() {
-        return func.apply(new Klass(), arguments);
+        if (this instanceof Klass) {
+          return func.apply(this, arguments);
+        } else {
+          return func.apply(new Klass(), arguments);
+        }
       };
     };
     return function(child) {
