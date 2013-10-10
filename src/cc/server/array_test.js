@@ -6,7 +6,7 @@ define(function(require, exports, module) {
 
   describe("array", function() {
     it("zip", function() {
-      var x = [
+      var list = [
         [ "moe", "larry", "curly" ],
         [    30,      40,      50 ],
            true,
@@ -16,9 +16,21 @@ define(function(require, exports, module) {
         [ "larry", 40, true ],
         [ "curly", 50, true ],
       ];
-      var actual = array.zip.apply(null, x);
+      var actual = array.zip.apply(null, list);
       assert.deepEqual(actual, expected);
     });
-  });  
+    it("flatten", function() {
+      var list = [1, [2], [3, [[4]]]];
+      var expected = [ 1, 2, 3, 4 ];
+      var actual = array.flatten(list);
+      assert.deepEqual(actual, expected);
+    });
+    it("flatten with level", function() {
+      var list = [1, [2], [3, [[4]]]];
+      var expected = [ 1, 2, 3, [4] ];
+      var actual = array.flatten(list, 2);
+      assert.deepEqual(actual, expected);
+    });
+  });
   
 });
