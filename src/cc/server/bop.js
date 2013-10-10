@@ -1,78 +1,94 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function() {
-    var scalarFunc = function(selector, func) {
+  var install = function(namespace) {
+    var nonCastFunc = function(key, func) {
       return function(b) {
         if (Array.isArray(b)) {
           return b.map(function(b) {
-            return this[selector](b);
+            return this[key](b);
           }, this);
         }
         return func(this, b);
       };
     };
-    var arrayFunc = function(selector) {
+    var numCastFunc = function(key, func) {
       return function(b) {
-        var a = this;
         if (Array.isArray(b)) {
-          return b.map(function(b, index) {
-            return a[index % a.length][selector](b);
-          });
+          return b.map(function(b) {
+            return (+this)[key](b);
+          }, this);
         }
-        return a.map(function(a) {
-          return a[selector](b);
-        });
+        return func(+this, b);
       };
     };
     
-    Number.prototype.__add__ = scalarFunc("__add__", function(a, b) {
-      return a + b;
-    });
-    Number.prototype.__sub__ = scalarFunc("__sub__", function(a, b) {
-      return a - b;
-    });
-    Number.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
-      return a * b;
-    });
-    Number.prototype.__div__ = scalarFunc("__div__", function(a, b) {
-      return a / b;
-    });
-    Number.prototype.__mod__ = scalarFunc("__mod__", function(a, b) {
-      return a % b;
-    });
-    Array.prototype.__add__ = arrayFunc("__add__");
-    Array.prototype.__sub__ = arrayFunc("__sub__");
-    Array.prototype.__mul__ = arrayFunc("__mul__");
-    Array.prototype.__div__ = arrayFunc("__div__");
-    Array.prototype.__mod__ = arrayFunc("__mod__");
-    
-    String.prototype.__add__ = scalarFunc("__add__", function(a, b) {
-      return a + b;
-    });
-    String.prototype.__mul__ = scalarFunc("__mul__", function(a, b) {
-      if (typeof b === "number") {
-        var list = new Array(b);
-        for (var i = 0; i < b; i++) {
-          list[i] = a;
-        }
-        return list.join("");
+    Object.keys(calcFunc).forEach(function(key) {
+      var func = calcFunc[key];
+      Number.prototype[key] = nonCastFunc(key, func);
+      if (calcFunc[key].array) {
+        func = calcFunc[key];
       }
-      return a;
+      Array.prototype[key] = function(b) {
+        var a = this;
+        if (Array.isArray(b)) {
+          return b.map(function(b, index) {
+            return a[index % a.length][key](b);
+          });
+        }
+        return a.map(function(a) {
+          return a[key](b);
+        });
+      };
+      if (calcFunc[key].bool) {
+        func = calcFunc[key];
+        Boolean.prototype[key] = nonCastFunc(key, func);
+      } else {
+        Boolean.prototype[key] = numCastFunc(key, func);
+      }
+      if (calcFunc[key].str) {
+        func = calcFunc[key].str;
+        String.prototype[key] = nonCastFunc(key, func);
+      } else {
+        String.prototype[key] = numCastFunc(key, func);
+      }
+      if (namespace && namespace.register) {
+        namespace.register(key);
+      }
     });
   };
 
-  var replaceTable = {
-    "+": "__add__",
-    "-": "__sub__",
-    "*": "__mul__",
-    "/": "__div__",
-    "%": "__mod__",
+  var calcFunc = {};
+
+  calcFunc.__add__ = function(a, b) {
+    return a + b;
+  };
+  calcFunc.__add__.str = calcFunc.__add__;
+  calcFunc.__sub__ = function(a, b) {
+    return a - b;
+  };
+  calcFunc.__mul__ = function(a, b) {
+    return a * b;
+  };
+  calcFunc.__mul__.str = function(a, b) {
+    if (typeof b === "number") {
+      var list = new Array(Math.max(0, b));
+      for (var i = 0; i < b; i++) {
+        list[i] = a;
+      }
+      return list.join("");
+    }
+    return a;
+  };
+  calcFunc.__div__ = function(a, b) {
+    return a / b;
+  };
+  calcFunc.__mod__ = function(a, b) {
+    return a % b;
   };
   
   module.exports = {
     install: install,
-    replaceTable: replaceTable
   };
 
 });

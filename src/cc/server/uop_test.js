@@ -16,17 +16,17 @@ define(function(require, exports, module) {
     });
     it("neg", function() {
       var actual   = [-1, 0, 1,true ,false,"str","2",""].neg();
-      var expected = [ 1,-0,-1,0    ,1    ,NaN  ,-2 ,-0];
+      var expected = [ 1,-0,-1,-1   ,-0   ,NaN  ,-2 ,-0];
       assert.deepEqual(actual, expected);
     });
     it("not", function() {
       var actual   = [-1   ,0   , 1   ,true ,false,"str",""  ].not();
-      var expected = [false,true,false,false,true ,false,true];
+      var expected = [false,true,false,false,true ,true ,true];
       assert.deepEqual(actual, expected);
     });
     it("tilde", function() {
       var actual   = [ -1, 0, 1,true,false,"str",""].tilde();
-      var expected = [~-1,~0,~1,true,false,"str",""];
+      var expected = [~-1,~0,~1,-2  ,-1   ,-1,  -1 ];
       assert.deepEqual(actual, expected);
     });
   });  
