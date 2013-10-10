@@ -42,6 +42,25 @@ define(function(require, exports, module) {
       return _flatten(list, level, []);
     }).defaults("list,level=Infinity").build();
   })();
+
+  var clump = fn(function(list, groupSize) {
+    if (!Array.isArray(list)) {
+      return [list];
+    }
+    var result  = [];
+    var sublist = [];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      sublist.push(list[i]);
+      if (sublist.length >= groupSize) {
+        result.push(sublist);
+        sublist = [];
+      }
+    }
+    if (sublist.length > 0) {
+      result.push(sublist);
+    }
+    return result;
+  }).defaults("list,groupSize=2").build();
   
   var install = function(namespace) {
     Array.prototype.zip = function() {
@@ -50,9 +69,13 @@ define(function(require, exports, module) {
     Array.prototype.flatten = fn(function(level) {
       return flatten(this, level);
     }).defaults("level=Infinity").build();
+    Array.prototype.clump = fn(function(groupSize) {
+      return clump(this, groupSize);
+    }).defaults("groupSize=2").build();
     if (namespace) {
       namespace.zip     = zip;
       namespace.flatten = flatten;
+      namespace.clump   = clump;
     }
   };
 
@@ -60,6 +83,7 @@ define(function(require, exports, module) {
     install: install,
     zip    : zip,
     flatten: flatten,
+    clump  : clump,
   };
 
 });

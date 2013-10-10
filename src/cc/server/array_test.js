@@ -31,6 +31,12 @@ define(function(require, exports, module) {
       var actual = array.flatten(list, 2);
       assert.deepEqual(actual, expected);
     });
+    it("clump", function() {
+      var list = [ 1, 2, 3, 4, 5, 6, 7, 8 ];
+      var expected = [ [ 1, 2, 3 ], [ 4, 5, 6 ], [ 7, 8 ] ];
+      var actual = array.clump(list, 3);
+      assert.deepEqual(actual, expected);
+    });
   });
   
 });
