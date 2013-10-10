@@ -682,7 +682,7 @@ define('cc/client/compiler', function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
@@ -706,23 +706,22 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var replaceBinaryOp = function(tokens) {
-    var i = tokens.length - 1;
+    var i = 0;
     var replaceable = false;
-    while (0 <= i) {
+    while (i < tokens.length) {
       var token = tokens[i];
       if (replaceable) {
         var selector = replaceBinaryOpTable[token[VALUE]];
         if (selector) {
           var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i  , 1, ["."         , "."     , _]);
-          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
+          tokens.splice(i++, 1, ["."         , "."     , _]);
+          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
           tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
           replaceable = false;
           continue;
         }
       }
-      token = tokens[i - 1] || { 0:"TERMINATOR" };
       switch (token[TAG]) {
       case "INDENT": case "TERMINATOR": case "CALL_START":
       case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
@@ -733,7 +732,7 @@ define('cc/client/compiler', function(require, exports, module) {
       default:
         replaceable = true;
       }
-      i -= 1;
+      i += 1;
     }
     // dumpTokens(tokens);
     return tokens;

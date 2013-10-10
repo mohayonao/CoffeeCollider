@@ -41,9 +41,15 @@ define(function(require, exports, module) {
       var actual = calc(expr);
       assert.equal(actual, expected);
     });
-    it("10 + [1, 2, 3]", function() {
-      var expr = "10 + [1, 2, 3]";
-      var expected = [ 11, 12, 13 ];
+    it("1000 + [1, 2, 3]", function() {
+      var expr = "1000 + [1, 2, 3]";
+      var expected = [ 1001, 1002, 1003 ];
+      var actual = calc(expr);
+      assert.deepEqual(actual, expected);
+    });
+    it("1 + +!![0..5]", function() {
+      var expr = "1 + +!![0..5]";
+      var expected = [ 1, 2, 2, 2, 2, 2 ];
       var actual = calc(expr);
       assert.deepEqual(actual, expected);
     });
