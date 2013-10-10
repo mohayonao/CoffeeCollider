@@ -682,7 +682,7 @@ define('cc/client/compiler', function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "UNARY":
+        case "[": case "(": case "{": case ",": case "?":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
@@ -722,11 +722,12 @@ define('cc/client/compiler', function(require, exports, module) {
           continue;
         }
       }
+      token = tokens[i - 1] || { 0:"TERMINATOR" };
       switch (token[TAG]) {
       case "INDENT": case "TERMINATOR": case "CALL_START":
       case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
       case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-      case "[": case "(": case "{": case ",": case "?": case "UNARY":
+      case "[": case "(": case "{": case ",": case "?":
         replaceable = false;
         break;
       default:

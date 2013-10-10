@@ -41,6 +41,12 @@ define(function(require, exports, module) {
       var actual = calc(expr);
       assert.equal(actual, expected);
     });
+    it("10 + [1, 2, 3]", function() {
+      var expr = "10 + [1, 2, 3]";
+      var expected = [ 11, 12, 13 ];
+      var actual = calc(expr);
+      assert.deepEqual(actual, expected);
+    });
   });
   
 });
