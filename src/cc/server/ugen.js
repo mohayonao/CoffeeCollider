@@ -7,7 +7,7 @@ define(function(require, exports, module) {
 
   var UGen = (function() {
     function UGen() {
-      this.audio  = "audio";
+      this.rate   = "AUDIO";
       this.inputs = [];
     }
 
