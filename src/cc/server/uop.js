@@ -24,7 +24,7 @@ define(function(require, exports, module) {
       return -this;
     };
     Boolean.prototype.neg = function() {
-      return !this;
+      return +(!this);
     };
     Array.prototype.neg = function() {
       return this.map(function(i) {
@@ -32,7 +32,7 @@ define(function(require, exports, module) {
       });
     };
     String.prototype.neg = function() {
-      return this;
+      return +(-this);
     };
     namespace.neg = function(that) {
       return that.neg();

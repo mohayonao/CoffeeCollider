@@ -15,8 +15,8 @@ define(function(require, exports, module) {
       assert.deepEqual(a, b);
     });
     it("neg", function() {
-      var a = [-1, 0, 1,true ,false,"str",""].neg();
-      var b = [ 1,-0,-1,false,true ,"str",""];
+      var a = [-1, 0, 1,true ,false,"str","2",""].neg();
+      var b = [ 1,-0,-1,0    ,1    ,NaN  ,-2 ,-0];
       assert.deepEqual(a, b);
     });
     it("not", function() {
