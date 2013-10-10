@@ -880,6 +880,7 @@ define('cc/server/installer', function(require, exports, module) {
     require("./server").install(namespace);
     require("./bop").install(namespace);
     require("./uop").install(namespace);
+    require("./array").install(namespace);
     delete namespace.register;
   };
 
@@ -1124,6 +1125,203 @@ define('cc/server/uop', function(require, exports, module) {
   module.exports = {
     install: install
   };
+
+});
+define('cc/server/array', function(require, exports, module) {
+
+  var fn = require("./fn");
+  var slice = [].slice;
+
+  var zip = function() {
+    var list = slice.call(arguments);
+    var maxSize = list.reduce(function(len, sublist) {
+      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
+    }, 0);
+    var a   = new Array(maxSize);
+    var len = list.length;
+    if (len === 0) {
+      a[0] = [];
+    } else {
+      for (var i = 0; i < maxSize; ++i) {
+        var sublist = a[i] = new Array(len);
+        for (var j = 0; j < len; ++j) {
+          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
+        }
+      }
+    }
+    return a;
+  };
+
+  var flatten = (function() {
+    var _flatten = function(that, level, list) {
+      for (var i = 0, imax = that.length; i < imax; ++i) {
+        if (level <= 0 || !Array.isArray(that[i])) {
+          list.push(that[i]);
+        } else {
+          list = _flatten(that[i], level - 1, list);
+        }
+      }
+      return list;
+    };
+    return fn(function(list, level) {
+      if (!Array.isArray(list)) {
+        return [list];
+      }
+      return _flatten(list, level, []);
+    }).defaults("list,level=Infinity").build();
+  })();
+
+  var clump = fn(function(list, groupSize) {
+    if (!Array.isArray(list)) {
+      return [list];
+    }
+    var result  = [];
+    var sublist = [];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      sublist.push(list[i]);
+      if (sublist.length >= groupSize) {
+        result.push(sublist);
+        sublist = [];
+      }
+    }
+    if (sublist.length > 0) {
+      result.push(sublist);
+    }
+    return result;
+  }).defaults("list,groupSize=2").build();
+  
+  var install = function(namespace) {
+    Array.prototype.zip = function() {
+      return zip.apply(null, this);
+    };
+    Array.prototype.flatten = fn(function(level) {
+      return flatten(this, level);
+    }).defaults("level=Infinity").build();
+    Array.prototype.clump = fn(function(groupSize) {
+      return clump(this, groupSize);
+    }).defaults("groupSize=2").build();
+    if (namespace) {
+      namespace.zip     = zip;
+      namespace.flatten = flatten;
+      namespace.clump   = clump;
+    }
+  };
+
+  module.exports = {
+    install: install,
+    zip    : zip,
+    flatten: flatten,
+    clump  : clump,
+  };
+
+});
+define('cc/server/fn', function(require, exports, module) {
+
+  var slice = [].slice;
+  
+  var fn = (function() {
+    function Fn(func) {
+      this.func = func;
+      this.def  = "";
+    }
+    Fn.prototype.defaults = function(def) {
+      this.def = def;
+      return this;
+    };
+    Fn.prototype.build = function() {
+      var func = this.func;
+      var keys = [];
+      var vals = [];
+      this.def.split(",").forEach(function(items) {
+        items = items.trim().split("=");
+        keys.push( items[0].trim());
+        vals.push(items.length > 1 ? +items[1].trim() : undefined);
+      });
+      var ret = func;
+      if (this.def !== "") {
+        ret = function() {
+          return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
+        };
+      }
+      return ret;
+    };
+    var resolve_args = function(keys, vals, given) {
+      var dict;
+      var args = vals.slice();
+      if (fn.isDictionary(given[given.length - 1])) {
+        dict = given.pop();
+        for (var key in dict) {
+          var index = keys.indexOf(key);
+          if (index !== -1) {
+            args[index] = dict[key];
+          }
+        }
+      }
+      for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
+        args[i] = given[i];
+      }
+      if (dict && args.length < keys.length - 1) {
+        args.push(dict);
+      }
+      return args;
+    };
+    return function(func) {
+      return new Fn(func);
+    };
+  })();
+
+  fn.extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+
+  fn.classmethod = (function() {
+    var _classmethod = function(Klass, func) {
+      return function() {
+        if (this instanceof Klass) {
+          return func.apply(this, arguments);
+        } else {
+          return func.apply(new Klass(), arguments);
+        }
+      };
+    };
+    return function(child) {
+      var classmethods = child.classmethods || {};
+      Object.keys(child.prototype).forEach(function(key) {
+        if (key.charAt(0) === "$" && typeof child.prototype[key] === "function") {
+          classmethods[key] = child.prototype[key];
+          delete child.prototype[key];
+        }
+      });
+      Object.keys(classmethods).forEach(function(key) {
+        var func = classmethods[key];
+        key = key.substr(1);
+        child[key] = _classmethod(child, func);
+        child.prototype[key] = func;
+      });
+      child.classmethods = classmethods;
+    };
+  })();
+  
+  fn.isDictionary = function(obj) {
+    return !!(obj && obj.constructor === Object);
+  };
+
+  module.exports = fn;
 
 });
 _require("cc/cc", "cc/loader");
