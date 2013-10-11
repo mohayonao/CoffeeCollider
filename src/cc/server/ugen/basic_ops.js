@@ -359,6 +359,15 @@ define(function(require, exports, module) {
     };
   })();
   
+  Number.prototype.madd = fn(function(mul, add) {
+    return MulAdd.new(this, mul, add);
+  });
+  Array.prototype.madd = fn(function(mul, add) {
+    return array.zip.apply(null, [this, mul, add]).map(function(items) {
+      var _in = items[0], mul = items[1], add = items[2];
+      return MulAdd.new(_in, mul, add);
+    });
+  }).defaults("mul=1,add=0").build();
   UGen.prototype.madd = fn(function(mul, add) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
