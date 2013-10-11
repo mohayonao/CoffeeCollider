@@ -53,11 +53,21 @@ define(function(require, exports, module) {
       return new Fn(func);
     };
   })();
-
+  
+  var copy = function(obj) {
+    var ret = {};
+    Object.keys(obj).forEach(function(key) { ret[key] = obj[key]; });
+    return ret;
+  };
+  
   fn.extend = function(child, parent) {
     for (var key in parent) {
       if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
+        if (key === "classmethods") {
+          child[key] = copy(parent[key]);
+        } else {
+          child[key] = parent[key];
+        }
       }
     }
     /*jshint validthis:true */
