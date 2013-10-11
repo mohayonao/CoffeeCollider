@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("./fn");
-  var impl = require("./array-impl");
+  var impl = require("./array.impl");
 
   var zip = impl.zip;
   
