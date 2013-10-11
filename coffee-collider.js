@@ -289,16 +289,16 @@ define('cc/client/client', function(require, exports, module) {
 
 });
 define('cc/client/sound_system', function(require, exports, module) {
-
-  var AudioAPI = require("./audio_api").AudioAPI;
+  
+  var AudioAPI;
   
   var SoundSystem = (function() {
     function SoundSystem() {
       this.sampleRate = 44100;
       this.channels   = 2;
-      this.driver = new AudioAPI(this);
-      this.sampleRate = this.driver.sampleRate;
-      this.channels   = this.driver.channels;
+      this.api = new AudioAPI(this);
+      this.sampleRate = this.api.sampleRate;
+      this.channels   = this.api.channels;
       this.colliders  = [];
       this.process    = process0;
       this.strmLength = 1024;
@@ -344,7 +344,7 @@ define('cc/client/sound_system', function(require, exports, module) {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.syncCount = 0;
-        this.driver.play();
+        this.api.play();
       }
     };
     SoundSystem.prototype.pause = function() {
@@ -354,7 +354,7 @@ define('cc/client/sound_system', function(require, exports, module) {
         });
         if (flag) {
           this.isPlaying = false;
-          this.driver.pause();
+          this.api.pause();
         }
       }
     };
@@ -394,14 +394,6 @@ define('cc/client/sound_system', function(require, exports, module) {
     return SoundSystem;
   })();
 
-  module.exports = {
-    SoundSystem: SoundSystem
-  };
-
-});
-define('cc/client/audio_api', function(require, exports, module) {
-
-  var AudioAPI;
   var AudioContext = global.AudioContext || global.webkitAudioContext;
   
   if (AudioContext) {
@@ -509,9 +501,9 @@ define('cc/client/audio_api', function(require, exports, module) {
       return NilAudioAPI;
     })();
   }
-
+  
   module.exports = {
-    AudioAPI: AudioAPI
+    SoundSystem: SoundSystem
   };
 
 });
