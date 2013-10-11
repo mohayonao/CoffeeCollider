@@ -1,10 +1,12 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
   var SynthClient = require("./client").SynthClient;
 
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
+      this.version    = cc.version;
       this.client = new SynthClient();
       this.sampleRate = this.client.sampleRate;
       this.channels   = this.client.channels;

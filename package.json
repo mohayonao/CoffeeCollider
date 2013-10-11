@@ -1,5 +1,6 @@
 {
   "name": "CoffeeCollider",
+  "version": "0",
   "devDependencies": {
     "coffee-script": "~1.6.3",
     "mocha": "~1.13.0",

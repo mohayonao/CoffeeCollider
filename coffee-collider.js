@@ -57,7 +57,9 @@ define('cc/loader', function(require, exports, module) {
 });
 define('cc/cc', function(require, exports, module) {
 
-  module.exports = {};
+  module.exports = {
+    version: "0",
+  };
 
 });
 define('cc/client/installer', function(require, exports, module) {
@@ -93,10 +95,12 @@ define('cc/client/installer', function(require, exports, module) {
 });
 define('cc/client/coffee_collider', function(require, exports, module) {
 
+  var cc = require("../cc");
   var SynthClient = require("./client").SynthClient;
 
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
+      this.version    = cc.version;
       this.client = new SynthClient();
       this.sampleRate = this.client.sampleRate;
       this.channels   = this.client.channels;

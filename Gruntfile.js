@@ -110,6 +110,7 @@ module.exports = function(grunt) {
       function(text) {
         text = text.replace(/^define\((['"].+?['"]), \[(.+?)\], function\(require, exports, module\) {$/gm, "define($1, function(require, exports, module) {");
         text = text.replace(/\s*['"]use strict['"];$/gm, "");
+        text = text.replace(/#{VERSION}/g, grunt.config.get("pkg.version"));
         return text + '_require("cc/cc", "' + main + '");\n';  
       }
     ];
