@@ -105,6 +105,15 @@ define(function(require, exports, module) {
     return !!(obj && obj.constructor === Object);
   };
 
+  var C = fn.constant = {};
+
+  C.SCALAR  = 0;
+  C.CONTROL = 1;
+  C.AUDIO   = 2;
+
+  C.UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
+  C.BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
+
   module.exports = fn;
 
 });

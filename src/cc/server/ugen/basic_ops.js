@@ -1,8 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var C  = require("../const");
   var fn = require("../fn");
+  var C  = fn.constant;
   var array = require("../array").impl;
   var UGen  = require("./ugen").UGen;
 
