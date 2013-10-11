@@ -67,21 +67,21 @@ define(function(require, exports, module) {
   
   var findOperandHead = function(tokens, index) {
     var bracket = 0;
-    index -= 1;
+    var indent  = 0;
     while (0 < index) {
       var token = tokens[index - 1];
       if (!token || token[TAG] !== ".") {
         token = tokens[index];
         switch (token[TAG]) {
-        case "INDENT":
-          return index + 1;
+        case "PARAM_START":
+          return index;
         case "(": case "[": case "{":
           bracket -= 1;
           /* falls through */
         case "IDENTIFIER":
         case "NUMBER": case "STRING": case "BOOL":
         case "REGEX": case "NULL": case "UNDEFINED":
-          if (bracket === 0) {
+          if (indent === 0 && bracket === 0) {
             token = tokens[index - 1];
             if (token) {
               if (token[TAG] === "UNARY") {
@@ -104,8 +104,14 @@ define(function(require, exports, module) {
             return index;
           }
           break;
-        case "}": case "]": case ")": case "CALL_END":
+        case "}": case "]": case ")": case "PARAM_END": case "CALL_END":
           bracket += 1;
+          break;
+        case "INDENT":
+          indent += token[VALUE]|0;
+          break;
+        case "OUTDENT":
+          indent -= token[VALUE]|0;
           break;
         }
       }
@@ -115,19 +121,33 @@ define(function(require, exports, module) {
   };
 
   var findOperandTail = function(tokens, index) {
-    var bracket = 0;
-    index += 1;
+    var bracket  = 0;
+    var indent   = 0;
+    var inParams = false;
     while (index < tokens.length) {
       var token = tokens[index];
+      if (inParams) {
+        inParams = token[TAG] !== "PARAM_END";
+        index += 1;
+        continue;
+      }
       switch (token[TAG]) {
-        case "}": case "]": case ")": case "CALL_END":
+      case "}": case "]": case ")": case "CALL_END":
         bracket -= 1;
+        break;
+      case "OUTDENT":
+        indent -= token[VALUE]|0;
+        break;
+      case "PARAM_START":
+        inParams = true;
+        index += 1;
+        continue;
       }
       token = tokens[index + 1];
       if (!token || token[TAG] !== ".") {
         token = tokens[index];
         switch (token[TAG]) {
-        case "TERMINATOR": case "OUTDENT":
+        case "TERMINATOR":
           return index - 1;
         case "IDENTIFIER":
           token = tokens[index + 1];
@@ -135,13 +155,13 @@ define(function(require, exports, module) {
             bracket += 1;
             break;
           }
-          if (bracket === 0) {
+          if (indent === 0 && bracket === 0) {
             return index;
           }
           break;
         case "NUMBER": case "STRING": case "BOOL":
         case "REGEX": case "NULL": case "UNDEFINED":
-          if (bracket === 0) {
+          if (indent === 0 && bracket === 0) {
             return index;
           }
           break;
@@ -149,7 +169,15 @@ define(function(require, exports, module) {
           bracket += 1;
           break;
         case "}": case "]": case ")": case "CALL_END":
-          if (bracket === 0) {
+          if (indent === 0 && bracket === 0) {
+            return index;
+          }
+          break;
+        case "INDENT":
+          indent += token[VALUE]|0;
+          break;
+        case "OUTDENT":
+          if (indent === 0 && bracket === 0) {
             return index;
           }
           break;
@@ -342,6 +370,49 @@ define(function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
+
+  var replaceSynthDef = (function() {
+    var getParams = function(tokens, index) {
+      var begin = -1, end = -1;
+      for (var i = index + 1; i < tokens.length; ++i) {
+        if (tokens[i][TAG] === "PARAM_START") {
+          begin = i;
+        } else if (tokens[i][TAG] === "PARAM_END") {
+          end = i;
+          break;
+        }
+      }
+      var replace = "";
+      if (begin !== -1) {
+        replace = tokens.slice(begin+1, end).map(function(t) {
+          return t[VALUE];
+        }).join("").replace(/"/g, "'");
+      }
+      replace = "\"" + replace + "\"";
+      return { begin:begin, end:end, replace:replace };
+    };
+    return function(tokens) {
+      var i = tokens.length - 1;
+      while (0 <= i) {
+        var token = tokens[i];
+        if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def") {
+          token = tokens[i + 1];
+          if (token[TAG] === "CALL_START") {
+            var a = findOperandTail(tokens, i + 2);
+            var params = getParams(tokens, i + 1);
+            tokens.splice(++a, 0, [","     , ","           , _]);
+            tokens.splice(++a, 0, ["STRING", params.replace, _]);
+            if (params.begin !== -1) {
+              tokens.splice(params.begin, params.end - params.begin + 1);
+            }
+          }
+        }
+        i -= 1;
+      }
+      // dumpTokens(tokens);
+      return tokens;
+    };
+  })();
   
   var Compiler = (function() {
     function Compiler() {
@@ -353,6 +424,7 @@ define(function(require, exports, module) {
       tokens = replacePrecedence(tokens);
       tokens = replaceBinaryOp(tokens);
       tokens = replaceCompoundAssign(tokens);
+      tokens = replaceSynthDef(tokens);
       tokens = cleanupParenthesis(tokens);
       return tokens;
     };
@@ -395,6 +467,7 @@ define(function(require, exports, module) {
     replaceBinaryOp      : replaceBinaryOp,
     replaceUnaryOp       : replaceUnaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
+    replaceSynthDef      : replaceSynthDef,
     cleanupParenthesis   : cleanupParenthesis,
   };
 
