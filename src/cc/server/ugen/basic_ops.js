@@ -80,6 +80,14 @@ define(function(require, exports, module) {
             return MulAdd.new1(null, a.inputs[0], a.inputs[1], b);
           }
         } else if (a instanceof MulAdd) {
+          if (typeof a.inputs[2] === "number" && typeof b === "number") {
+            if (a.inputs[2] + b === 0) {
+              return BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
+            } else {
+              a.inputs[2] += b;
+              return a;
+            }
+          }
           b = BinaryOpUGen.new1(null, "+", a.inputs[2], b);
           a = BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
           return BinaryOpUGen.new1(null, "+", a, b);
@@ -166,6 +174,9 @@ define(function(require, exports, module) {
       this.rate   = asRate(argArray);
       return this;
     };
+    MulAdd.prototype.toString = function() {
+      return "MulAdd";
+    };
 
     var validate = function(_in, mul, add) {
       _in = asRate(_in);
@@ -213,6 +224,10 @@ define(function(require, exports, module) {
     };
     fn.classmethod(Sum3);
 
+    Sum3.prototype.toString = function() {
+      return "Sum3";
+    };
+    
     return Sum3;
   })();
 
@@ -247,6 +262,10 @@ define(function(require, exports, module) {
     };
     fn.classmethod(Sum4);
 
+    Sum4.prototype.toString = function() {
+      return "Sum4";
+    };
+    
     return Sum4;
   })();
 
@@ -349,6 +368,10 @@ define(function(require, exports, module) {
       return work(list);
     };
   })();
+  
+  UGen.prototype.madd = fn(function(mul, add) {
+    return MulAdd.new(this, mul, add);
+  }).defaults("mul=1,add=0").build();
   
   module.exports = {
     UnaryOpUGen : UnaryOpUGen,

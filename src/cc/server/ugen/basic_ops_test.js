@@ -12,19 +12,7 @@ define(function(require, exports, module) {
 
   describe("basic_ops", function() {
     describe("BinaryOpUGen", function() {
-      it("1 + 2", function() {
-        var a = 1;
-        var b = 2;
-        var x = BinaryOpUGen.new1(null, "+", 1, 2);
-        assert.equal(x, 3);
-      });
-      it("1 * 2", function() {
-        var a = 1;
-        var b = 2;
-        var x = BinaryOpUGen.new1(null, "*", 1, 2);
-        assert.equal(x, 2);
-      });
-      it("UGen + UGen", function() {
+      it("create", function() {
         var a = UGen.new1(C.AUDIO);
         var b = UGen.new1(C.AUDIO);
         var x = BinaryOpUGen.new1(null, "+", a, b);
@@ -33,25 +21,25 @@ define(function(require, exports, module) {
         assert.equal(x.inputs[1], b);
         assert.equal(x.op, "+");
       });
-      it("UGen + 0", function() {
+      it("UGen + 0 -> UGen", function() {
         var a = UGen.new1(C.AUDIO);
         var b = 0;
         var x = BinaryOpUGen.new1(null, "+", a, b);
         assert.equal(x, a);
       });
-      it("UGen * 1", function() {
+      it("UGen * 1 -> UGen", function() {
         var a = UGen.new1(C.AUDIO);
         var b = 1;
         var x = BinaryOpUGen.new1(null, "*", a, b);
         assert.equal(x, a);
       });
-      it("UGen / 1", function() {
+      it("UGen / 1 -> UGen", function() {
         var a = UGen.new1(C.AUDIO);
         var b = 1;
         var x = BinaryOpUGen.new1(null, "/", a, b);
         assert.equal(x, a);
       });
-      it("UGen * 0", function() {
+      it("UGen * 0 -> 0", function() {
         var a = UGen.new1(C.AUDIO);
         var b = 0;
         var x = BinaryOpUGen.new1(null, "*", a, b);
@@ -67,6 +55,55 @@ define(function(require, exports, module) {
         assert.equal(y.inputs[0], a);
         assert.equal(y.inputs[1], b);
         assert.equal(y.inputs[2], c);
+      });
+      it("BinaryOpUGen(*) -> MulAdd", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = UGen.new1(C.AUDIO);
+        var x = BinaryOpUGen.new1(null, "*", a, b);
+        var y = BinaryOpUGen.new1(null, "+", x, c);
+        assert.instanceOf(y, MulAdd);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.inputs[2], c);
+      });
+    });
+    describe("MulAdd", function() {
+      it("create", function() {
+        var a = UGen.new1(C.AUDIO);
+        var x = a.madd(2, 3);
+        assert.instanceOf(x, MulAdd);
+        assert.equal(x.inputs[0], a);
+        assert.equal(x.inputs[1], 2);
+        assert.equal(x.inputs[2], 3);
+      });
+      it("MulAdd -> BinaryOpUGen(*)", function() {
+        var a = UGen.new1(C.AUDIO);
+        var x = a.madd(2);
+        assert.instanceOf(x, BinaryOpUGen);
+        assert.equal(x.inputs[0], a);
+        assert.equal(x.inputs[1], 2);
+        assert.equal(x.op, "*");
+      });
+      it("MulAdd -> BinaryOpUGen(+)", function() {
+        var a = UGen.new1(C.AUDIO);
+        var x = a.madd(1, 3);
+        assert.instanceOf(x, BinaryOpUGen);
+        assert.equal(x.inputs[0], a);
+        assert.equal(x.inputs[1], 3);
+        assert.equal(x.op, "+");
+      });
+      it("MulAdd + Number -> MulAdd", function() {
+        var a = UGen.new1(C.AUDIO).madd(2, 3);
+        var x = BinaryOpUGen.new1(null, "+", a, 2);
+        assert.equal(x, a);
+        assert.equal(x.inputs[2], 5);
+      });
+      it("MulAdd + Number -> BinaryOpUGen(*)", function() {
+        var a = UGen.new1(C.AUDIO).madd(2, 3);
+        var x = BinaryOpUGen.new1(null, "+", a, -3);
+        assert.instanceOf(x, BinaryOpUGen);
+        assert.equal(x.op, "*");
       });
     });
     describe("Sum3", function() {
@@ -98,19 +135,43 @@ define(function(require, exports, module) {
           var x = Sum3.new1(null, a, b, c);
           assert.include([a, b, c], x);
         });
-        it("Sum3 -> Sum4", function() {
-          var a = UGen.new1(C.AUDIO);
-          var b = UGen.new1(C.AUDIO);
-          var c = UGen.new1(C.AUDIO);
-          var d = UGen.new1(C.AUDIO);
-          var x = Sum3.new1(null, a, b, c);
-          var y = BinaryOpUGen.new1(null, x, d);
-          assert.instanceOf(y, Sum4);
-          assert.equal(y.inputs[0], a);
-          assert.equal(y.inputs[1], b);
-          assert.equal(y.inputs[2], c);
-          assert.equal(y.inputs[3], d);
-        });
+      });
+      it("Sum3 -> Sum4", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = UGen.new1(C.AUDIO);
+        var d = UGen.new1(C.AUDIO);
+        var x = Sum3.new1(null, a, b, c);
+        var y = BinaryOpUGen.new1(null, "+", x, d);
+        assert.instanceOf(y, Sum4);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.inputs[2], c);
+        assert.equal(y.inputs[3], d);
+      });
+      it("Sum3 + Number -> Sum3", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = 3;
+        var d = 7;
+        var x = Sum3.new1(null, a, b, c);
+        var y = BinaryOpUGen.new1(null, "+", x, d);
+        assert.instanceOf(y, Sum3);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.inputs[2], c + d);
+      });
+      it("Sum3 + Number -> BinaryOpUGen(+)", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = +3;
+        var d = -3;
+        var x = Sum3.new1(null, a, b, c);
+        var y = BinaryOpUGen.new1(null, "+", x, d);
+        assert.instanceOf(y, BinaryOpUGen);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.op, "+");
       });
     });
     describe("Sum4", function() {
@@ -156,6 +217,33 @@ define(function(require, exports, module) {
           var x = Sum4.new1(null, a, b, c, d);
           assert.include([a, b, c, d], x);
         });
+      });
+      it("Sum4 + Number -> Sum4", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = UGen.new1(C.AUDIO);
+        var d = 3;
+        var e = 7;
+        var x = Sum4.new1(null, a, b, c, d);
+        var y = BinaryOpUGen.new1(null, "+", x, e);
+        assert.instanceOf(y, Sum4);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.inputs[2], c);
+        assert.equal(y.inputs[3], d + e);
+      });
+      it("Sum4 + Number -> Sum3", function() {
+        var a = UGen.new1(C.AUDIO);
+        var b = UGen.new1(C.AUDIO);
+        var c = UGen.new1(C.AUDIO);
+        var d = +3;
+        var e = -3;
+        var x = Sum4.new1(null, a, b, c, d);
+        var y = BinaryOpUGen.new1(null, "+", x, e);
+        assert.instanceOf(y, Sum3);
+        assert.equal(y.inputs[0], a);
+        assert.equal(y.inputs[1], b);
+        assert.equal(y.inputs[2], c);
       });
     });
   });
