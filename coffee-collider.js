@@ -396,7 +396,7 @@ define('cc/client/sound_system', function(require, exports, module) {
   })();
 
   var getAPI = function() {
-    return require("./web_audio_api").getAPI();
+    return require("./audio_api").getAPI();
   };
 
   module.exports = {
@@ -404,7 +404,7 @@ define('cc/client/sound_system', function(require, exports, module) {
   };
 
 });
-define('cc/client/web_audio_api', function(require, exports, module) {
+define('cc/client/audio_api', function(require, exports, module) {
 
   var klass;
   module.exports = {

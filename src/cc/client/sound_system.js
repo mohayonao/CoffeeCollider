@@ -107,7 +107,7 @@ define(function(require, exports, module) {
   })();
 
   var getAPI = function() {
-    return require("./web_audio_api").getAPI();
+    return require("./audio_api").getAPI();
   };
 
   module.exports = {
