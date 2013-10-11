@@ -373,7 +373,7 @@ define(function(require, exports, module) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
   
-  var installer = function() {
+  var install = function() {
   };
   
   module.exports = {
@@ -382,7 +382,7 @@ define(function(require, exports, module) {
     MulAdd: MulAdd,
     Sum3: Sum3,
     Sum4: Sum4,
-    installer: installer,
+    install: install,
   };
 
 });

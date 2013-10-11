@@ -44,12 +44,12 @@ define(function(require, exports, module) {
     return UGen;
   })();
 
-  var installer = function() {
+  var install = function() {
   };
 
   module.exports = {
     UGen: UGen,
-    installer: installer,
+    install: install,
   };
 
 });
