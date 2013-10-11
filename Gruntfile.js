@@ -144,7 +144,7 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("test", function() {
-    require("./src/amd-loader");
+    require("amd-loader");
 
     var Mocha = require("mocha");
     var mocha = new Mocha();

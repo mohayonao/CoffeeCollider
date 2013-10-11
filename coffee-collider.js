@@ -62,7 +62,7 @@ define('cc/cc', function(require, exports, module) {
 });
 define('cc/client/installer', function(require, exports, module) {
 
-  var cc = require("cc/cc");
+  var cc = require("../cc");
   var CoffeeCollider = require("./coffee_collider").CoffeeCollider;
 
   if (typeof document !== "undefined") {
@@ -156,7 +156,7 @@ define('cc/client/coffee_collider', function(require, exports, module) {
 });
 define('cc/client/client', function(require, exports, module) {
 
-  var cc = require("cc/cc");
+  var cc = require("../cc");
   var SoundSystem = require("./sound_system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
 

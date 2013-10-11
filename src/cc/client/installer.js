@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("cc/cc");
+  var cc = require("../cc");
   var CoffeeCollider = require("./coffee_collider").CoffeeCollider;
 
   if (typeof document !== "undefined") {
