@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var fn = require("../fn");
   var C  = require("../const");
-  var array = require("../array");
+  var array = require("../array").impl;
   var slice = [].slice;
 
   var UGen = (function() {
