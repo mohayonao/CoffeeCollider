@@ -8,6 +8,7 @@ define(function(require, exports, module) {
 
   var UGen = (function() {
     function UGen() {
+      this.name = "UGen";
       this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
@@ -38,7 +39,7 @@ define(function(require, exports, module) {
     };
 
     UGen.prototype.toString = function() {
-      return "UGen";
+      return this.name;
     };
     
     return UGen;

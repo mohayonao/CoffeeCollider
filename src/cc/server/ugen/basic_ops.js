@@ -36,6 +36,7 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
+      this.name = "UnaryOpUGen(" + this.op + ")";
       return this;
     };
 
@@ -112,11 +113,8 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
+      this.name = "BinaryOpUGen(" + this.op + ")";
       return this;
-    };
-
-    BinaryOpUGen.prototype.toString = function() {
-      return "BinaryOpUGen(" + this.op + ")";
     };
     
     return BinaryOpUGen;
@@ -223,10 +221,6 @@ define(function(require, exports, module) {
       return UGen.new1.apply(this, [rate].concat(sortedArgs));
     };
     fn.classmethod(Sum3);
-
-    Sum3.prototype.toString = function() {
-      return "Sum3";
-    };
     
     return Sum3;
   })();
@@ -261,10 +255,6 @@ define(function(require, exports, module) {
       return UGen.new1.apply(this, [rate].concat(sortedArgs));
     };
     fn.classmethod(Sum4);
-
-    Sum4.prototype.toString = function() {
-      return "Sum4";
-    };
     
     return Sum4;
   })();

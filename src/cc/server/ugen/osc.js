@@ -8,6 +8,7 @@ define(function(require, exports, module) {
   var SinOsc = (function() {
     function SinOsc() {
       UGen.call(this);
+      this.name = "SinOsc";
     }
     fn.extend(SinOsc, UGen);
     
