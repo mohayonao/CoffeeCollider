@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var fn = require("./fn");
-  var C  = require("./const");
-  var array = require("./array");
+  var fn = require("../fn");
+  var C  = require("../const");
+  var array = require("../array");
   var slice = [].slice;
 
   var UGen = (function() {

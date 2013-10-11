@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var C = require("./const");
+  var C = require("../const");
   var UGen = require("./ugen").UGen;
 
   describe("ugen", function() {

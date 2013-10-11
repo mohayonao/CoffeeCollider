@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var C  = require("./const");
-  var fn = require("./fn");
-  var array = require("./array").impl;
+  var C  = require("../const");
+  var fn = require("../fn");
+  var array = require("../array").impl;
   var UGen  = require("./ugen").UGen;
 
   var asRate = function(obj) {
