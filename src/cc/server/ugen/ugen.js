@@ -8,6 +8,7 @@ define(function(require, exports, module) {
 
   var UGen = (function() {
     function UGen() {
+      this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
     }

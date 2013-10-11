@@ -29,6 +29,11 @@ define(function(require, exports, module) {
 
     UnaryOpUGen.prototype.initialize = function(op, a) {
       this.op = op;
+      var index = C.UNARY_OP_UGEN_MAP.indexOf(op);
+      if (index === -1) {
+        throw "Unknown operator: " + op;
+      }
+      this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
       return this;
@@ -92,6 +97,11 @@ define(function(require, exports, module) {
 
     BinaryOpUGen.prototype.initialize = function(op, a, b) {
       this.op = op;
+      var index = C.BINARY_OP_UGEN_MAP.indexOf(op);
+      if (index === -1) {
+        throw "Unknown operator: " + op;
+      }
+      this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
       return this;
