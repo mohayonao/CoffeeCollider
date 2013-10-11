@@ -10,8 +10,9 @@ define(function(require, exports, module) {
       var m;
       for (var i = 0; i < scripts.length; i++) {
         if (!cc.coffeeColliderPath) {
-          m = /^.*\/coffee-collider(?:-min)?\.js/.exec(scripts[i].src);
+          m = /^(.*\/)coffee-collider(?:-min)?\.js/.exec(scripts[i].src);
           if (m) {
+            cc.rootPath = m[1];
             cc.coffeeColliderPath = m[0];
             break;
           }

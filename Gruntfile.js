@@ -19,6 +19,10 @@ module.exports = function(grunt) {
         files: [ "src/cc/**/*.js", "!src/cc/**/*_test.js" ],
         tasks: [ "build" ],
       },
+      swf: {
+        files: [ "src/fallback.as" ],
+        tasks: [ "swf" ]
+      },
       test: {
         files: [ "src/cc/**/*_test.js" ],
         tasks: [ "test" ],
@@ -122,6 +126,21 @@ module.exports = function(grunt) {
       source: cc,
       dest  : dest + ".js"
     });
+  });
+
+  grunt.registerTask("swf", function() {
+    var done = this.async();
+    var child = grunt.util.spawn({
+      cmd : "mxmlc",
+      args: ["-o", "coffee-collider-fallback.swf", "./src/fallback.as"]
+    }, function(err, result) {
+      if (result.code !== 0) {
+        grunt.fail.fatal("Compile failed. See the above error message.");
+      }
+      done();
+    });
+    child.stdout.pipe(process.stdout);
+    child.stderr.pipe(process.stderr);
   });
 
   grunt.registerTask("test", function() {
