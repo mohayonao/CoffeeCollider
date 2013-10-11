@@ -792,8 +792,8 @@ define('cc/client/compiler', function(require, exports, module) {
     var i = tokens.length - 1;
     while (0 <= i) {
       var token = tokens[i];
-      var selector = replaceUnaryOpTable[token[VALUE]];
-      if (selector) {
+      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceUnaryOpTable[token[VALUE]];
         token = tokens[i - 1] || { 0:"TERMINATOR" };
         switch (token[TAG]) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
@@ -828,8 +828,8 @@ define('cc/client/compiler', function(require, exports, module) {
     while (i < tokens.length) {
       var token = tokens[i];
       if (replaceable) {
-        var selector = replaceBinaryOpTable[token[VALUE]];
-        if (selector) {
+        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
+          var selector = replaceBinaryOpTable[token[VALUE]];
           var b = findOperandTail(tokens, i) + 1;
           tokens.splice(i++, 1, ["."         , "."     , _]);
           tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
@@ -867,8 +867,8 @@ define('cc/client/compiler', function(require, exports, module) {
     var i = tokens.length - 1;
     while (0 <= i) {
       var token = tokens[i];
-      var selector = replaceCompoundAssignTable[token[VALUE]];
-      if (selector) {
+      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceCompoundAssignTable[token[VALUE]];
         var a = findOperandHead(tokens, i);
         var b = findOperandTail(tokens, i) + 1;
         tokens[i] = ["=", "=", _];
@@ -1110,67 +1110,22 @@ define('cc/server/server', function(require, exports, module) {
 define('cc/server/array', function(require, exports, module) {
 
   var fn = require("./fn");
-  var slice = [].slice;
+  var impl = require("./array.impl");
 
-  var zip = function() {
-    var list = slice.call(arguments);
-    var maxSize = list.reduce(function(len, sublist) {
-      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
-    }, 0);
-    var a   = new Array(maxSize);
-    var len = list.length;
-    if (len === 0) {
-      a[0] = [];
-    } else {
-      for (var i = 0; i < maxSize; ++i) {
-        var sublist = a[i] = new Array(len);
-        for (var j = 0; j < len; ++j) {
-          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
-        }
-      }
-    }
-    return a;
-  };
-
-  var _flatten = function(that, level, list) {
-    for (var i = 0, imax = that.length; i < imax; ++i) {
-      if (level <= 0 || !Array.isArray(that[i])) {
-        list.push(that[i]);
-      } else {
-        list = _flatten(that[i], level - 1, list);
-      }
-    }
-    return list;
-  };
+  var zip = impl.zip;
   
   var flatten = fn(function(list, level) {
     if (!Array.isArray(list)) {
       return [list];
     }
-    return _flatten(list, level, []);
+    return impl.flatten(list, level, []);
   }).defaults("list,level=Infinity").build();
-  
-  var _clump = function(list, groupSize) {
-    var result  = [];
-    var sublist = [];
-    for (var i = 0, imax = list.length; i < imax; ++i) {
-      sublist.push(list[i]);
-      if (sublist.length >= groupSize) {
-        result.push(sublist);
-        sublist = [];
-      }
-    }
-    if (sublist.length > 0) {
-      result.push(sublist);
-    }
-    return result;
-  };
   
   var clump = fn(function(list, groupSize) {
     if (!Array.isArray(list)) {
       return [list];
     }
-    return _clump(list, groupSize);
+    return impl.clump(list, groupSize);
   }).defaults("list,groupSize=2").build();
   
   var install = function(namespace) {
@@ -1178,11 +1133,18 @@ define('cc/server/array', function(require, exports, module) {
       return zip.apply(null, this);
     };
     Array.prototype.flatten = fn(function(level) {
-      return _flatten(this, level, []);
+      return impl.flatten(this, level, []);
     }).defaults("level=Infinity").build();
     Array.prototype.clump = fn(function(groupSize) {
-      return _clump(this, groupSize);
+      return impl.clump(this, groupSize);
     }).defaults("groupSize=2").build();
+
+    Array.prototype.toString = function() {
+      return "[ " + this.map(function(x) {
+        return x.toString();
+      }).join(", ") + " ]";
+    };
+    
     if (namespace) {
       namespace.zip     = zip;
       namespace.flatten = flatten;
@@ -1195,25 +1157,26 @@ define('cc/server/array', function(require, exports, module) {
     zip    : zip,
     flatten: flatten,
     clump  : clump,
-    impl: {
-      zip    : zip,
-      flatten: _flatten,
-      clump  : _clump,
-    }
   };
 
 });
 define('cc/server/fn', function(require, exports, module) {
 
+  var array = require("./array.impl");
   var slice = [].slice;
   
   var fn = (function() {
     function Fn(func) {
       this.func = func;
       this.def  = "";
+      this.multi = false;
     }
     Fn.prototype.defaults = function(def) {
       this.def = def;
+      return this;
+    };
+    Fn.prototype.multicall = function(flag) {
+      this.multi = flag === undefined ? true : !!flag;
       return this;
     };
     Fn.prototype.build = function() {
@@ -1226,12 +1189,42 @@ define('cc/server/fn', function(require, exports, module) {
         vals.push(items.length > 1 ? +items[1].trim() : undefined);
       });
       var ret = func;
-      if (this.def !== "") {
-        ret = function() {
-          return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
-        };
+      if (this.multi) {
+        if (this.def !== "") {
+          ret = function() {
+            var args = resolve_args(keys, vals, slice.call(arguments));
+            if (containsArray(args)) {
+              return array.zip.apply(null, args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+          };
+        } else {
+          ret = function() {
+            var args = slice.call(arguments);
+            if (containsArray(args)) {
+              return array.zip.apply(null, args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+          };
+        }
+      } else {
+        if (this.def !== "") {
+          ret = function() {
+            return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
+          };
+        }
       }
       return ret;
+    };
+    var containsArray = function(list) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          return true;
+        }
+      }
+      return false;
     };
     var resolve_args = function(keys, vals, given) {
       var dict;
@@ -1257,11 +1250,21 @@ define('cc/server/fn', function(require, exports, module) {
       return new Fn(func);
     };
   })();
-
+  
+  var copy = function(obj) {
+    var ret = {};
+    Object.keys(obj).forEach(function(key) { ret[key] = obj[key]; });
+    return ret;
+  };
+  
   fn.extend = function(child, parent) {
     for (var key in parent) {
       if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
+        if (key === "classmethods") {
+          child[key] = copy(parent[key]);
+        } else {
+          child[key] = parent[key];
+        }
       }
     }
     /*jshint validthis:true */
@@ -1319,6 +1322,64 @@ define('cc/server/fn', function(require, exports, module) {
   C.BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
 
   module.exports = fn;
+
+});
+define('cc/server/array.impl', function(require, exports, module) {
+
+  var slice = [].slice;
+
+  var zip = function() {
+    var list = slice.call(arguments);
+    var maxSize = list.reduce(function(len, sublist) {
+      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
+    }, 0);
+    var a   = new Array(maxSize);
+    var len = list.length;
+    if (len === 0) {
+      a[0] = [];
+    } else {
+      for (var i = 0; i < maxSize; ++i) {
+        var sublist = a[i] = new Array(len);
+        for (var j = 0; j < len; ++j) {
+          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
+        }
+      }
+    }
+    return a;
+  };
+
+  var flatten = function(that, level, list) {
+    for (var i = 0, imax = that.length; i < imax; ++i) {
+      if (level <= 0 || !Array.isArray(that[i])) {
+        list.push(that[i]);
+      } else {
+        list = flatten(that[i], level - 1, list);
+      }
+    }
+    return list;
+  };
+
+  var clump = function(list, groupSize) {
+    var result  = [];
+    var sublist = [];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      sublist.push(list[i]);
+      if (sublist.length >= groupSize) {
+        result.push(sublist);
+        sublist = [];
+      }
+    }
+    if (sublist.length > 0) {
+      result.push(sublist);
+    }
+    return result;
+  };
+  
+  module.exports = {
+    zip    : zip,
+    flatten: flatten,
+    clump  : clump,
+  };
 
 });
 define('cc/server/bop', function(require, exports, module) {
@@ -1429,11 +1490,12 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
 
   var fn = require("../fn");
   var C  = fn.constant;
-  var array = require("../array").impl;
+  var array = require("../array.impl");
   var slice = [].slice;
 
   var UGen = (function() {
     function UGen() {
+      this.name = "UGen";
       this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
@@ -1464,7 +1526,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     };
 
     UGen.prototype.toString = function() {
-      return "UGen";
+      return this.name;
     };
     
     return UGen;
@@ -1483,7 +1545,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
   var fn = require("../fn");
   var C  = fn.constant;
-  var array = require("../array").impl;
+  var array = require("../array.impl");
   var UGen  = require("./ugen").UGen;
 
   var asRate = function(obj) {
@@ -1516,6 +1578,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
+      this.name = "UnaryOpUGen(" + this.op + ")";
       return this;
     };
 
@@ -1592,11 +1655,8 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
+      this.name = "BinaryOpUGen(" + this.op + ")";
       return this;
-    };
-
-    BinaryOpUGen.prototype.toString = function() {
-      return "BinaryOpUGen(" + this.op + ")";
     };
     
     return BinaryOpUGen;
@@ -1703,10 +1763,6 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       return UGen.new1.apply(this, [rate].concat(sortedArgs));
     };
     fn.classmethod(Sum3);
-
-    Sum3.prototype.toString = function() {
-      return "Sum3";
-    };
     
     return Sum3;
   })();
@@ -1741,10 +1797,6 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       return UGen.new1.apply(this, [rate].concat(sortedArgs));
     };
     fn.classmethod(Sum4);
-
-    Sum4.prototype.toString = function() {
-      return "Sum4";
-    };
     
     return Sum4;
   })();
@@ -1849,6 +1901,15 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     };
   })();
   
+  Number.prototype.madd = fn(function(mul, add) {
+    return MulAdd.new(this, mul, add);
+  }).defaults("mul=1,add=0").build();
+  Array.prototype.madd = fn(function(mul, add) {
+    return array.zip.apply(null, [this, mul, add]).map(function(items) {
+      var _in = items[0], mul = items[1], add = items[2];
+      return MulAdd.new(_in, mul, add);
+    });
+  }).defaults("mul=1,add=0").build();
   UGen.prototype.madd = fn(function(mul, add) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
@@ -1933,6 +1994,7 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   var SinOsc = (function() {
     function SinOsc() {
       UGen.call(this);
+      this.name = "SinOsc";
     }
     fn.extend(SinOsc, UGen);
     
