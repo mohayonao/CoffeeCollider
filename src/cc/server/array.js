@@ -75,6 +75,13 @@ define(function(require, exports, module) {
     Array.prototype.clump = fn(function(groupSize) {
       return _clump(this, groupSize);
     }).defaults("groupSize=2").build();
+
+    Array.prototype.toString = function() {
+      return "[ " + this.map(function(x) {
+        return x.toString();
+      }).join(", ") + " ]";
+    };
+    
     if (namespace) {
       namespace.zip     = zip;
       namespace.flatten = flatten;
