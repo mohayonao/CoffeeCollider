@@ -19,9 +19,10 @@ define(function(require, exports, module) {
       }
     };
     require("./server").install(namespace);
+    require("./array").install(namespace);
     require("./bop").install(namespace);
     require("./uop").install(namespace);
-    require("./array").install(namespace);
+    require("./ugen/installer").install(namespace);
     delete namespace.register;
   };
 

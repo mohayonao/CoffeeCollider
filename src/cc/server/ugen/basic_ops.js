@@ -373,12 +373,16 @@ define(function(require, exports, module) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
   
+  var installer = function() {
+  };
+  
   module.exports = {
     UnaryOpUGen : UnaryOpUGen,
     BinaryOpUGen: BinaryOpUGen,
     MulAdd: MulAdd,
     Sum3: Sum3,
     Sum4: Sum4,
+    installer: installer,
   };
 
 });
