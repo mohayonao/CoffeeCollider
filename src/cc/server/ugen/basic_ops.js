@@ -36,7 +36,7 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
-      this.name = "UnaryOpUGen(" + this.op + ")";
+      this.name = "UnaryOpUGen";
       return this;
     };
 
@@ -113,7 +113,7 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
-      this.name = "BinaryOpUGen(" + this.op + ")";
+      this.name = "BinaryOpUGen";
       return this;
     };
     

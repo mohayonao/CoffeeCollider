@@ -98,6 +98,31 @@ define(function(require, exports, module) {
     return SynthClient;
   })();
 
+  var pp = (function() {
+    var _ = function(data) {
+      var $;
+      if (Array.isArray(data)) {
+        return data.map(function(data) {
+          return _(data);
+        });
+      } else if (data.toString() === "[object Object]") {
+        if (/^[_a-z$][_a-z0-9$]*$/i.test(data.name)) {
+          $ = eval.call(null, "new (function " + data.name + "(){})");
+        } else {
+          $ = {};
+        }
+        Object.keys(data).forEach(function(key) {
+          $[key] = _(data[key]);
+        });
+        data = $;
+      }
+      return data;
+    };
+    return function(data) {
+      return _(data);
+    };
+  })();
+
   commands["/connect"] = function() {
     this.isConnected = true;
     this.send([
@@ -110,7 +135,7 @@ define(function(require, exports, module) {
     var callback = this.execCallbacks[execId];
     if (callback) {
       if (result !== undefined) {
-        result = JSON.parse(result);
+        result = pp(result);
       }
       callback(result);
       delete this.execCallbacks[execId];

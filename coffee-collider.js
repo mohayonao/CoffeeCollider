@@ -257,6 +257,31 @@ define('cc/client/client', function(require, exports, module) {
     return SynthClient;
   })();
 
+  var pp = (function() {
+    var _ = function(data) {
+      var $;
+      if (Array.isArray(data)) {
+        return data.map(function(data) {
+          return _(data);
+        });
+      } else if (data.toString() === "[object Object]") {
+        if (/^[_a-z$][_a-z0-9$]*$/i.test(data.name)) {
+          $ = eval.call(null, "new (function " + data.name + "(){})");
+        } else {
+          $ = {};
+        }
+        Object.keys(data).forEach(function(key) {
+          $[key] = _(data[key]);
+        });
+        data = $;
+      }
+      return data;
+    };
+    return function(data) {
+      return _(data);
+    };
+  })();
+
   commands["/connect"] = function() {
     this.isConnected = true;
     this.send([
@@ -269,7 +294,7 @@ define('cc/client/client', function(require, exports, module) {
     var callback = this.execCallbacks[execId];
     if (callback) {
       if (result !== undefined) {
-        result = JSON.parse(result);
+        result = pp(JSON.parse(result));
       }
       callback(result);
       delete this.execCallbacks[execId];
@@ -1587,7 +1612,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
-      this.name = "UnaryOpUGen(" + this.op + ")";
+      this.name = "UnaryOpUGen";
       return this;
     };
 
@@ -1664,7 +1689,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
-      this.name = "BinaryOpUGen(" + this.op + ")";
+      this.name = "BinaryOpUGen";
       return this;
     };
     

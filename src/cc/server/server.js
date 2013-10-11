@@ -61,7 +61,7 @@ define(function(require, exports, module) {
     var execId = msg[1];
     var code   = msg[2];
     var result = eval.call(global, code);
-    this.send(["/exec", execId, JSON.stringify(result)]);
+    this.send(["/exec", execId, result]);
   };
   commands["/loadScript"] = function(msg) {
     importScripts(msg[1]);
