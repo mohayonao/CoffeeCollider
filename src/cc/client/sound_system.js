@@ -1,16 +1,15 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var AudioAPI = require("./audio_api").AudioAPI;
+  
   var SoundSystem = (function() {
     function SoundSystem() {
-      var SoundAPI    = getAPI();
       this.sampleRate = 44100;
       this.channels   = 2;
-      if (SoundAPI) {
-        this.driver = new SoundAPI(this);
-        this.sampleRate = this.driver.sampleRate;
-        this.channels   = this.driver.channels;
-      }
+      this.driver = new AudioAPI(this);
+      this.sampleRate = this.driver.sampleRate;
+      this.channels   = this.driver.channels;
       this.colliders  = [];
       this.process    = process0;
       this.strmLength = 1024;
@@ -105,10 +104,6 @@ define(function(require, exports, module) {
     
     return SoundSystem;
   })();
-
-  var getAPI = function() {
-    return require("./audio_api").getAPI();
-  };
 
   module.exports = {
     SoundSystem: SoundSystem
