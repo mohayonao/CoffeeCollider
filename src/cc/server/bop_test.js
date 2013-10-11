@@ -48,7 +48,7 @@ define(function(require, exports, module) {
       });
     });
     describe("*", function() {
-      it.only("(num * num)", function() {
+      it("(num * num)", function() {
         var actual = 1..__mul__(10);
         var expected = 1 * 10;
         assert.equal(actual, expected);

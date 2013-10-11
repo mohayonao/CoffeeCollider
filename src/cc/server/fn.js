@@ -1,15 +1,21 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var array = require("./array-impl");
   var slice = [].slice;
   
   var fn = (function() {
     function Fn(func) {
       this.func = func;
       this.def  = "";
+      this.multi = false;
     }
     Fn.prototype.defaults = function(def) {
       this.def = def;
+      return this;
+    };
+    Fn.prototype.multicall = function(flag) {
+      this.multi = flag === undefined ? true : !!flag;
       return this;
     };
     Fn.prototype.build = function() {
@@ -22,12 +28,42 @@ define(function(require, exports, module) {
         vals.push(items.length > 1 ? +items[1].trim() : undefined);
       });
       var ret = func;
-      if (this.def !== "") {
-        ret = function() {
-          return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
-        };
+      if (this.multi) {
+        if (this.def !== "") {
+          ret = function() {
+            var args = resolve_args(keys, vals, slice.call(arguments));
+            if (containsArray(args)) {
+              return array.zip.apply(null, args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+          };
+        } else {
+          ret = function() {
+            var args = slice.call(arguments);
+            if (containsArray(args)) {
+              return array.zip.apply(null, args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+          };
+        }
+      } else {
+        if (this.def !== "") {
+          ret = function() {
+            return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
+          };
+        }
       }
       return ret;
+    };
+    var containsArray = function(list) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          return true;
+        }
+      }
+      return false;
     };
     var resolve_args = function(keys, vals, given) {
       var dict;
