@@ -1524,10 +1524,6 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.inputs = slice.call(arguments);
       return this;
     };
-
-    UGen.prototype.toString = function() {
-      return this.name;
-    };
     
     return UGen;
   })();
