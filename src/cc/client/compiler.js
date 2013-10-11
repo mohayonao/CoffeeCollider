@@ -216,8 +216,8 @@ define(function(require, exports, module) {
     var i = tokens.length - 1;
     while (0 <= i) {
       var token = tokens[i];
-      var selector = replaceUnaryOpTable[token[VALUE]];
-      if (selector) {
+      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceUnaryOpTable[token[VALUE]];
         token = tokens[i - 1] || { 0:"TERMINATOR" };
         switch (token[TAG]) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
@@ -252,8 +252,8 @@ define(function(require, exports, module) {
     while (i < tokens.length) {
       var token = tokens[i];
       if (replaceable) {
-        var selector = replaceBinaryOpTable[token[VALUE]];
-        if (selector) {
+        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
+          var selector = replaceBinaryOpTable[token[VALUE]];
           var b = findOperandTail(tokens, i) + 1;
           tokens.splice(i++, 1, ["."         , "."     , _]);
           tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
@@ -291,8 +291,8 @@ define(function(require, exports, module) {
     var i = tokens.length - 1;
     while (0 <= i) {
       var token = tokens[i];
-      var selector = replaceCompoundAssignTable[token[VALUE]];
-      if (selector) {
+      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceCompoundAssignTable[token[VALUE]];
         var a = findOperandHead(tokens, i);
         var b = findOperandTail(tokens, i) + 1;
         tokens[i] = ["=", "=", _];
