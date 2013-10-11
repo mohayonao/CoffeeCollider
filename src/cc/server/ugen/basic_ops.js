@@ -371,6 +371,26 @@ define(function(require, exports, module) {
   UGen.prototype.madd = fn(function(mul, add) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
+
+  UGen.prototype.range = fn(function(lo, hi) {
+    var mul, add;
+    if (this.signalRange === C.BIPOLAR) {
+      mul = (hi - lo) * 0.5;
+      add = mul + lo;
+    } else {
+      mul = (hi - lo);
+      add = lo;
+    }
+    return MulAdd.new1(null, this, mul, add);
+  }).defaults("lo=0,hi=1").multicall().build();
+
+  UGen.prototype.unipolar = fn(function(mul) {
+    return this.range(0, mul);
+  }).defaults("mul=1").build();
+
+  UGen.prototype.bipolar = fn(function(mul) {
+    return this.range(mul.neg(), mul);
+  }).defaults("mul=1").build();
   
   var install = function() {
   };

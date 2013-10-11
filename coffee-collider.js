@@ -1171,8 +1171,8 @@ define('cc/server/fn', function(require, exports, module) {
   
   var fn = (function() {
     function Fn(func) {
-      this.func = func;
-      this.def  = "";
+      this.func  = func;
+      this.def   = null;
       this.multi = false;
     }
     Fn.prototype.defaults = function(def) {
@@ -1187,21 +1187,25 @@ define('cc/server/fn', function(require, exports, module) {
       var func = this.func;
       var keys = [];
       var vals = [];
-      this.def.split(",").forEach(function(items) {
-        items = items.trim().split("=");
-        keys.push( items[0].trim());
-        vals.push(items.length > 1 ? +items[1].trim() : undefined);
-      });
+      if (this.def) {
+        this.def.split(",").forEach(function(items) {
+          items = items.trim().split("=");
+          keys.push( items[0].trim());
+          vals.push(items.length > 1 ? +items[1].trim() : undefined);
+        });
+      }
       var ret = func;
       if (this.multi) {
-        if (this.def !== "") {
+        if (this.def) {
           ret = function() {
-            var args = resolve_args(keys, vals, slice.call(arguments));
+            var args = slice.call(arguments);
+            args = resolve_args(keys, vals, slice.call(arguments));
             if (containsArray(args)) {
               return array.zip.apply(null, args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }
+            return func.apply(this, args);
           };
         } else {
           ret = function() {
@@ -1211,14 +1215,15 @@ define('cc/server/fn', function(require, exports, module) {
                 return func.apply(this, items);
               }, this);
             }
+            return func.apply(this, args);
           };
         }
-      } else {
-        if (this.def !== "") {
-          ret = function() {
-            return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
-          };
-        }
+      } else if (this.def) {
+        ret = function() {
+          var args = slice.call(arguments);
+          args = resolve_args(keys, vals, slice.call(arguments));
+          return func.apply(this, args);
+        };
       }
       return ret;
     };
@@ -1321,6 +1326,9 @@ define('cc/server/fn', function(require, exports, module) {
   C.SCALAR  = 0;
   C.CONTROL = 1;
   C.AUDIO   = 2;
+
+  C.UNIPOLAR = 1;
+  C.BIPOLAR  = 2;
 
   C.UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
   C.BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
@@ -1500,6 +1508,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   var UGen = (function() {
     function UGen() {
       this.name = "UGen";
+      this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
@@ -1913,6 +1922,26 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   UGen.prototype.madd = fn(function(mul, add) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
+
+  UGen.prototype.range = fn(function(lo, hi) {
+    var mul, add;
+    if (this.signalRange === C.BIPOLAR) {
+      mul = (hi - lo) * 0.5;
+      add = mul + lo;
+    } else {
+      mul = (hi - lo);
+      add = lo;
+    }
+    return MulAdd.new1(null, this, mul, add);
+  }).defaults("lo=0,hi=1").multicall().build();
+
+  UGen.prototype.unipolar = fn(function(mul) {
+    return this.range(0, mul);
+  }).defaults("mul=1").build();
+
+  UGen.prototype.bipolar = fn(function(mul) {
+    return this.range(mul.neg(), mul);
+  }).defaults("mul=1").build();
   
   var install = function() {
   };

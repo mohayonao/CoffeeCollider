@@ -9,6 +9,7 @@ define(function(require, exports, module) {
   var UGen = (function() {
     function UGen() {
       this.name = "UGen";
+      this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
