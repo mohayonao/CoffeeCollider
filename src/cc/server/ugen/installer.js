@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var install = function(namespace) {
     require("./ugen").install(namespace);
     require("./basic_ops").install(namespace);
+    require("./osc").install(namespace);
   };
 
   module.exports = {

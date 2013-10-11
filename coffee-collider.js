@@ -1470,12 +1470,12 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     return UGen;
   })();
 
-  var installer = function() {
+  var install = function() {
   };
 
   module.exports = {
     UGen: UGen,
-    installer: installer,
+    install: install,
   };
 
 });
@@ -1853,7 +1853,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
   
-  var installer = function() {
+  var install = function() {
   };
   
   module.exports = {
@@ -1862,7 +1862,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     MulAdd: MulAdd,
     Sum3: Sum3,
     Sum4: Sum4,
-    installer: installer,
+    install: install,
   };
 
 });
@@ -1916,12 +1916,48 @@ define('cc/server/ugen/installer', function(require, exports, module) {
   var install = function(namespace) {
     require("./ugen").install(namespace);
     require("./basic_ops").install(namespace);
+    require("./osc").install(namespace);
   };
 
   module.exports = {
     install: install
   };
  
+});
+define('cc/server/ugen/osc', function(require, exports, module) {
+  
+  var fn = require("../fn");
+  var C  = fn.constant;
+  var UGen  = require("./ugen").UGen;
+
+  var SinOsc = (function() {
+    function SinOsc() {
+      UGen.call(this);
+    }
+    fn.extend(SinOsc, UGen);
+    
+    SinOsc.prototype.$ar = fn(function(freq, phase, mul, add) {
+      return this.multiNew(C.AUDIO, freq, phase).madd(mul, add);
+    }).defaults("freq=440,phase=0,mul=1,add=0").build();
+    
+    SinOsc.prototype.$kr = fn(function(freq, phase, mul, add) {
+      return this.multiNew(C.CONTROL, freq, phase).madd(mul, add);
+    }).defaults("freq=440,phase=0,mul=1,add=0").build();
+    
+    fn.classmethod(SinOsc);
+    
+    return SinOsc;
+  })();
+
+  var install = function(namespace) {
+    namespace.SinOsc = SinOsc;
+  };
+  
+  module.exports = {
+    SinOsc: SinOsc,
+    install: install
+  };
+
 });
 _require("cc/cc", "cc/loader");
 })(this.self||global);
