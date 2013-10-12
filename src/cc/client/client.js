@@ -106,7 +106,7 @@ define(function(require, exports, module) {
       if (stack.indexOf(data) !== -1) {
         return new Cyclic(data);
       }
-      if (data === null || data === undefined) {
+      if (data === null || data === undefined || typeof data === "string") {
         return data;
       } else if (Array.isArray(data)) {
         stack.push(data);
