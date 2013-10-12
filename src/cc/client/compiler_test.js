@@ -52,6 +52,8 @@ define(function(require, exports, module) {
           [ "->"         , "->" , _ ],
           [ "INDENT"     , "2"  , _ ],
           [ "IDENTIFIER" , "x"  , _ ],
+          [ "TERMINATOR" , "\n" , _ ],      
+          [ "IDENTIFIER" , "x"  , _ ],
           [ "OUTDENT"    , "2"  , _ ],
           [ ","          , ","  , _ ], // <-- from
           [ "NUMBER"     , "300", _ ],
@@ -59,7 +61,7 @@ define(function(require, exports, module) {
           [ "TERMINATOR" , "\n" , _ ],      
         ];
         var expected = 2;
-        var actual = compiler.findOperandHead(tokens, 11);
+        var actual = compiler.findOperandHead(tokens, 13);
         assert.equal(actual, expected);
       });
     });
@@ -123,13 +125,15 @@ define(function(require, exports, module) {
           [ "->"         , "->" , _ ],
           [ "INDENT"     , "2"  , _ ],
           [ "IDENTIFIER" , "x"  , _ ],
+          [ "TERMINATOR" , "\n" , _ ],      
+          [ "IDENTIFIER" , "x"  , _ ],
           [ "OUTDENT"    , "2"  , _ ], // <-- tail
           [ ","          , ","  , _ ],
           [ "NUMBER"     , "300", _ ],
           [ "CALL_END"   , ")"  , _ ],
           [ "TERMINATOR" , "\n" , _ ],      
         ];
-        var expected = 10;
+        var expected = 12;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
       });
@@ -161,7 +165,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceSynthDef(tokens);
         assert.deepEqual(actual, expected);
       });
-      it("x=100, y=200", function() {
+      it.only("x=100, y=200", function() {
         var tokens = [
           [ "IDENTIFIER" , "def", _ ],
           [ "CALL_START" , "("  , _ ],
@@ -182,16 +186,25 @@ define(function(require, exports, module) {
           [ "TERMINATOR" , "\n" , _ ],      
         ];
         var expected = [
-          [ "IDENTIFIER" , "def"           , _ ],
-          [ "CALL_START" , "("             , _ ],
-          [ "->"         , "->"            , _ ],
-          [ "INDENT"     , "2"             , _ ],
-          [ "IDENTIFIER" , "x"             , _ ],
-          [ "OUTDENT"    , "2"             , _ ],
-          [ ","          , ","             , _ ],
-          [ "STRING"     , '"x=100,y=200"' , _ ],
-          [ "CALL_END"   , ")"             , _ ],
-          [ "TERMINATOR" , "\n"            , _ ],      
+          [ "IDENTIFIER" , "def"          , _ ],
+          [ "CALL_START" , "("            , _ ],
+          [ "PARAM_START", "("            , _ ],
+          [ "IDENTIFIER" , "x"            , _ ],
+          [ "="          , "="            , _ ],
+          [ "NUMBER"     , "100"          , _ ],
+          [ ","          , ","            , _ ],
+          [ "IDENTIFIER" , "y"            , _ ],
+          [ "="          , "="            , _ ],
+          [ "NUMBER"     , "200"          , _ ],
+          [ "PARAM_END"  , ")"            , _ ],
+          [ "->"         , "->"           , _ ],
+          [ "INDENT"     , "2"            , _ ],
+          [ "IDENTIFIER" , "x"            , _ ],
+          [ "OUTDENT"    , "2"            , _ ],
+          [ ","          , ","            , _ ],
+          [ "STRING"     , '"x=100,y=200"', _ ],
+          [ "CALL_END"   , ")"            , _ ],
+          [ "TERMINATOR" , "\n"           , _ ],      
         ];
         var actual = compiler.replaceSynthDef(tokens);
         assert.deepEqual(actual, expected);
@@ -224,6 +237,15 @@ define(function(require, exports, module) {
           [ "IDENTIFIER" , "def"          , _ ],
           [ "CALL_START" , "("            , _ ],
           [ "("          , "("            , _ ],
+          [ "PARAM_START", "("            , _ ],
+          [ "IDENTIFIER" , "x"            , _ ],
+          [ "="          , "="            , _ ],
+          [ "NUMBER"     , "100"          , _ ],
+          [ ","          , ","            , _ ],
+          [ "IDENTIFIER" , "y"            , _ ],
+          [ "="          , "="            , _ ],
+          [ "NUMBER"     , "200"          , _ ],
+          [ "PARAM_END"  , ")"            , _ ],
           [ "->"         , "->"           , _ ],
           [ "INDENT"     , "2"            , _ ],
           [ "IDENTIFIER" , "x"            , _ ],

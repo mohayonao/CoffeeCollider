@@ -148,7 +148,10 @@ define(function(require, exports, module) {
         token = tokens[index];
         switch (token[TAG]) {
         case "TERMINATOR":
-          return index - 1;
+          if (indent === 0) {
+            return index - 1;
+          }
+          break;
         case "IDENTIFIER":
           token = tokens[index + 1];
           if (token && token[TAG] === "CALL_START") {
@@ -402,9 +405,6 @@ define(function(require, exports, module) {
             var params = getParams(tokens, i + 1);
             tokens.splice(++a, 0, [","     , ","           , _]);
             tokens.splice(++a, 0, ["STRING", params.replace, _]);
-            if (params.begin !== -1) {
-              tokens.splice(params.begin, params.end - params.begin + 1);
-            }
           }
         }
         i -= 1;
