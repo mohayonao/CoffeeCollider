@@ -101,7 +101,7 @@ define(function(require, exports, module) {
   var pp = (function() {
     var Cyclic = function() {
     };
-    var _ = function(data, stack) {
+    var _ = function(data, instances, stack) {
       var $, result;
       if (stack.indexOf(data) !== -1) {
         return new Cyclic(data);
@@ -111,19 +111,19 @@ define(function(require, exports, module) {
       } else if (Array.isArray(data)) {
         stack.push(data);
         result = data.map(function(data) {
-          return _(data, stack);
+          return _(data, instances, stack);
         });
         stack.pop();
       } else if (data.toString() === "[object Object]") {
         stack.push(data);
         if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
           $ = eval.call(null, "new (function " + data.klassName + "(){})");
-          delete data.klassName;
+          instances.push($);
         } else {
           $ = {};
         }
         Object.keys(data).forEach(function(key) {
-          $[key] = _(data[key], stack);
+          $[key] = _(data[key], instances, stack);
         });
         result = $;
         stack.pop();
@@ -133,7 +133,12 @@ define(function(require, exports, module) {
       return result;
     };
     return function(data) {
-      return _(data, []);
+      var instances = [];
+      var result = _(data, instances, []);
+      instances.forEach(function(instance) {
+        delete instance.klassName;
+      });
+      return result;
     };
   })();
 
