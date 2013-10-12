@@ -99,27 +99,40 @@ define(function(require, exports, module) {
   })();
 
   var pp = (function() {
-    var _ = function(data) {
-      var $;
-      if (Array.isArray(data)) {
-        return data.map(function(data) {
-          return _(data);
+    var Cyclic = function() {
+    };
+    var _ = function(data, stack) {
+      var $, result;
+      if (stack.indexOf(data) !== -1) {
+        return new Cyclic(data);
+      }
+      if (data === null || data === undefined) {
+        return data;
+      } else if (Array.isArray(data)) {
+        stack.push(data);
+        result = data.map(function(data) {
+          return _(data, stack);
         });
+        stack.pop();
       } else if (data.toString() === "[object Object]") {
+        stack.push(data);
         if (/^[_a-z$][_a-z0-9$]*$/i.test(data.name)) {
           $ = eval.call(null, "new (function " + data.name + "(){})");
         } else {
           $ = {};
         }
         Object.keys(data).forEach(function(key) {
-          $[key] = _(data[key]);
+          $[key] = _(data[key], stack);
         });
-        data = $;
+        result = $;
+        stack.pop();
+      } else {
+        result = data;
       }
-      return data;
+      return result;
     };
     return function(data) {
-      return _(data);
+      return _(data, []);
     };
   })();
 
@@ -142,16 +155,16 @@ define(function(require, exports, module) {
     }
   };
   commands["/console/log"] = function(msg) {
-    console.log.apply(console, msg[1]);
+    console.log.apply(console, pp(msg[1]));
   };
   commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, msg[1]);
+    console.debug.apply(console, pp(msg[1]));
   };
   commands["/console/info"] = function(msg) {
-    console.info.apply(console, msg[1]);
+    console.info.apply(console, pp(msg[1]));
   };
   commands["/console/error"] = function(msg) {
-    console.error.apply(console, msg[1]);
+    console.error.apply(console, pp(msg[1]));
   };
   
   module.exports = {
