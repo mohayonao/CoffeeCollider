@@ -47,7 +47,7 @@ module.exports = function(grunt) {
         },
         options: {
           sourceMap: "coffee-collider-min.map",
-          report: "gzip"
+          report: "min"
         }
       }
     }
