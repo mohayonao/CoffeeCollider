@@ -18,6 +18,7 @@ define(function(require, exports, module) {
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
       UGen.call(this);
+      this.klassName = "UnaryOpUGen";
     }
     fn.extend(UnaryOpUGen, UGen);
 
@@ -36,7 +37,6 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
-      this.name = "UnaryOpUGen";
       return this;
     };
 
@@ -46,6 +46,7 @@ define(function(require, exports, module) {
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
       UGen.call(this);
+      this.klassName = "BinaryOpUGen";
     }
     fn.extend(BinaryOpUGen, UGen);
 
@@ -113,7 +114,6 @@ define(function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
-      this.name = "BinaryOpUGen";
       return this;
     };
     
@@ -123,9 +123,10 @@ define(function(require, exports, module) {
   var MulAdd = (function() {
     function MulAdd() {
       UGen.call(this);
+      this.klassName = "MulAdd";
     }
     fn.extend(MulAdd, UGen);
-
+    
     MulAdd.prototype.$new = function(_in, mul, add) {
       return this.multiNew(null, _in, mul, add);
     };
@@ -165,17 +166,14 @@ define(function(require, exports, module) {
       return _in * mul + add;
     };
     fn.classmethod(MulAdd);
-
+    
     MulAdd.prototype.initialize = function(_in, mul, add) {
       var argArray = [_in, mul, add];
       this.inputs = argArray;
       this.rate   = asRate(argArray);
       return this;
     };
-    MulAdd.prototype.toString = function() {
-      return "MulAdd";
-    };
-
+    
     var validate = function(_in, mul, add) {
       _in = asRate(_in);
       mul = asRate(mul);
@@ -197,9 +195,10 @@ define(function(require, exports, module) {
   var Sum3 = (function() {
     function Sum3() {
       UGen.call(this);
+      this.klassName = "Sum3";
     }
     fn.extend(Sum3, UGen);
-
+    
     Sum3.prototype.$new = function(in0, in1, in2) {
       return this.multiNew(null, in0, in1, in2);
     };
@@ -228,6 +227,7 @@ define(function(require, exports, module) {
   var Sum4 = (function() {
     function Sum4() {
       UGen.call(this);
+      this.klassName = "Sum4";
     }
     fn.extend(Sum4, UGen);
     
@@ -258,7 +258,7 @@ define(function(require, exports, module) {
     
     return Sum4;
   })();
-
+  
   var optimizeSumObjects = (function() {
     var collect = function(obj) {
       if (typeof obj === "number") {

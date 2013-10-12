@@ -97,7 +97,9 @@ define(function(require, exports, module) {
   
   var copy = function(obj) {
     var ret = {};
-    Object.keys(obj).forEach(function(key) { ret[key] = obj[key]; });
+    Object.keys(obj).forEach(function(key) {
+      ret[key] = obj[key];
+    });
     return ret;
   };
   

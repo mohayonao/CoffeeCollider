@@ -258,27 +258,41 @@ define('cc/client/client', function(require, exports, module) {
   })();
 
   var pp = (function() {
-    var _ = function(data) {
-      var $;
-      if (Array.isArray(data)) {
-        return data.map(function(data) {
-          return _(data);
+    var Cyclic = function() {
+    };
+    var _ = function(data, stack) {
+      var $, result;
+      if (stack.indexOf(data) !== -1) {
+        return new Cyclic(data);
+      }
+      if (data === null || data === undefined) {
+        return data;
+      } else if (Array.isArray(data)) {
+        stack.push(data);
+        result = data.map(function(data) {
+          return _(data, stack);
         });
+        stack.pop();
       } else if (data.toString() === "[object Object]") {
-        if (/^[_a-z$][_a-z0-9$]*$/i.test(data.name)) {
-          $ = eval.call(null, "new (function " + data.name + "(){})");
+        stack.push(data);
+        if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+          $ = eval.call(null, "new (function " + data.klassName + "(){})");
+          delete data.klassName;
         } else {
           $ = {};
         }
         Object.keys(data).forEach(function(key) {
-          $[key] = _(data[key]);
+          $[key] = _(data[key], stack);
         });
-        data = $;
+        result = $;
+        stack.pop();
+      } else {
+        result = data;
       }
-      return data;
+      return result;
     };
     return function(data) {
-      return _(data);
+      return _(data, []);
     };
   })();
 
@@ -301,16 +315,16 @@ define('cc/client/client', function(require, exports, module) {
     }
   };
   commands["/console/log"] = function(msg) {
-    console.log.apply(console, msg[1]);
+    console.log.apply(console, pp(msg[1]));
   };
   commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, msg[1]);
+    console.debug.apply(console, pp(msg[1]));
   };
   commands["/console/info"] = function(msg) {
-    console.info.apply(console, msg[1]);
+    console.info.apply(console, pp(msg[1]));
   };
   commands["/console/error"] = function(msg) {
-    console.error.apply(console, msg[1]);
+    console.error.apply(console, pp(msg[1]));
   };
   
   module.exports = {
@@ -753,7 +767,10 @@ define('cc/client/compiler', function(require, exports, module) {
         token = tokens[index];
         switch (token[TAG]) {
         case "TERMINATOR":
-          return index - 1;
+          if (indent === 0) {
+            return index - 1;
+          }
+          break;
         case "IDENTIFIER":
           token = tokens[index + 1];
           if (token && token[TAG] === "CALL_START") {
@@ -1007,9 +1024,6 @@ define('cc/client/compiler', function(require, exports, module) {
             var params = getParams(tokens, i + 1);
             tokens.splice(++a, 0, [","     , ","           , _]);
             tokens.splice(++a, 0, ["STRING", params.replace, _]);
-            if (params.begin !== -1) {
-              tokens.splice(params.begin, params.end - params.begin + 1);
-            }
           }
         }
         i -= 1;
@@ -1360,7 +1374,9 @@ define('cc/server/fn', function(require, exports, module) {
   
   var copy = function(obj) {
     var ret = {};
-    Object.keys(obj).forEach(function(key) { ret[key] = obj[key]; });
+    Object.keys(obj).forEach(function(key) {
+      ret[key] = obj[key];
+    });
     return ret;
   };
   
@@ -1603,18 +1619,26 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   var array = require("../array.impl");
   var slice = [].slice;
 
+  var addToSynthDef = null;
+
   var UGen = (function() {
     function UGen() {
-      this.name = "UGen";
+      this.klassName = "UGen";
       this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
       this.rate   = C.AUDIO;
       this.inputs = [];
+      this.numOfInputs  = 0;
+      this.numOfOutputs = 1;
     }
 
     UGen.prototype.$new1 = function(rate) {
       var args = slice.call(arguments, 1);
       this.rate = rate;
+      if (addToSynthDef) {
+        addToSynthDef(this);
+      }
+      this.numOfInputs = this.inputs.length;
       return this.initialize.apply(this, args);
     };
     UGen.prototype.$multiNew = function() {
@@ -1639,11 +1663,112 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     return UGen;
   })();
 
-  var install = function() {
+  var MultiOutUGen = (function() {
+    function MultiOutUGen() {
+      UGen.call(this);
+      this.klassName = "MultiOutUGen";
+      this.channels = null;
+    }
+    fn.extend(MultiOutUGen, UGen);
+    fn.classmethod(MultiOutUGen);
+    
+    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
+      var channels = new Array(numChannels);
+      for (var i = 0; i < numChannels; ++i) {
+        channels[i] = OutputProxy.new(rate, this, i);
+      }
+      this.channels = channels;
+      this.numOfOutputs = channels.length;
+      this.inputs = this.inputs.map(function(ugen) {
+        return (ugen instanceof UGen) ? ugen : ugen.valueOf();
+      });
+      this.numOfInputs = this.inputs.length;
+      return (numChannels === 1) ? channels[0] : channels;
+    };
+    
+    return MultiOutUGen;
+  })();
+
+  var OutputProxy = (function() {
+    function OutputProxy() {
+      UGen.call(this);
+      this.klassName = "OutputProxy";
+    }
+    fn.extend(OutputProxy, UGen);
+
+    OutputProxy.prototype.$new = function(rate, source, index) {
+      return this.new1(rate, source, index);
+    };
+    fn.classmethod(OutputProxy);
+
+    OutputProxy.prototype.initialize = function(source, index) {
+      this.inputs = [ source ];
+      this.numOfInputs = 1;
+      this.outputIndex = index;
+      return this;
+    };
+    
+    return OutputProxy;
+  })();
+
+  var Control = (function() {
+    function Control() {
+      MultiOutUGen.call(this);
+      this.klassName = "Control";
+      this.values = [];
+    }
+    fn.extend(Control, MultiOutUGen);
+
+    Control.prototype.$kr = function(values) {
+      return this.multiNewList([C.CONTROL].concat(values));
+    };
+    fn.classmethod(Control);
+
+    Control.prototype.initialize = function() {
+      this.values = slice.call(arguments);
+      return this.initOutputs(this.values.length, this.rate);
+    };
+
+    return Control;
+  })();
+
+  var Out = (function() {
+    function Out() {
+      UGen.call(this);
+      this.klassName = "Out";
+      this.numOutputs = 0;
+    }
+    fn.extend(Out, UGen);
+
+    Out.prototype.$ar = fn(function(bus, channelsArray) {
+      this.multiNewList([C.AUDIO, bus].concat(channelsArray));
+      return 0; // Out has no output
+    }).defaults("bus=0,channelsArray=0").build();
+    Out.prototype.$kr = fn(function(bus, channelsArray) {
+      this.multiNewList([C.CONTROL, bus].concat(channelsArray));
+      return 0; // Out has no output
+    }).defaults("bus=0,channelsArray=0").build();
+    
+    fn.classmethod(Out);
+    
+    return Out;
+  })();
+
+  var setSynthDef = function(func) {
+    addToSynthDef = func;
+  };
+
+  var install = function(namespace) {
+    namespace.Out = Out;
   };
 
   module.exports = {
     UGen: UGen,
+    MultiOutUGen: MultiOutUGen,
+    OutputProxy : OutputProxy,
+    Control     : Control,
+    Out         : Out,
+    setSynthDef : setSynthDef,
     install: install,
   };
 
@@ -1667,6 +1792,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
       UGen.call(this);
+      this.klassName = "UnaryOpUGen";
     }
     fn.extend(UnaryOpUGen, UGen);
 
@@ -1685,7 +1811,6 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
-      this.name = "UnaryOpUGen";
       return this;
     };
 
@@ -1695,6 +1820,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
       UGen.call(this);
+      this.klassName = "BinaryOpUGen";
     }
     fn.extend(BinaryOpUGen, UGen);
 
@@ -1762,7 +1888,6 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       this.specialIndex = index;
       this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
-      this.name = "BinaryOpUGen";
       return this;
     };
     
@@ -1772,9 +1897,10 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   var MulAdd = (function() {
     function MulAdd() {
       UGen.call(this);
+      this.klassName = "MulAdd";
     }
     fn.extend(MulAdd, UGen);
-
+    
     MulAdd.prototype.$new = function(_in, mul, add) {
       return this.multiNew(null, _in, mul, add);
     };
@@ -1814,17 +1940,14 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       return _in * mul + add;
     };
     fn.classmethod(MulAdd);
-
+    
     MulAdd.prototype.initialize = function(_in, mul, add) {
       var argArray = [_in, mul, add];
       this.inputs = argArray;
       this.rate   = asRate(argArray);
       return this;
     };
-    MulAdd.prototype.toString = function() {
-      return "MulAdd";
-    };
-
+    
     var validate = function(_in, mul, add) {
       _in = asRate(_in);
       mul = asRate(mul);
@@ -1846,9 +1969,10 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   var Sum3 = (function() {
     function Sum3() {
       UGen.call(this);
+      this.klassName = "Sum3";
     }
     fn.extend(Sum3, UGen);
-
+    
     Sum3.prototype.$new = function(in0, in1, in2) {
       return this.multiNew(null, in0, in1, in2);
     };
@@ -1877,6 +2001,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   var Sum4 = (function() {
     function Sum4() {
       UGen.call(this);
+      this.klassName = "Sum4";
     }
     fn.extend(Sum4, UGen);
     
@@ -1907,7 +2032,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     
     return Sum4;
   })();
-
+  
   var optimizeSumObjects = (function() {
     var collect = function(obj) {
       if (typeof obj === "number") {
@@ -2105,6 +2230,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     require("./ugen").install(namespace);
     require("./basic_ops").install(namespace);
     require("./osc").install(namespace);
+    require("./def").install(namespace);
   };
 
   module.exports = {
@@ -2121,7 +2247,7 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   var SinOsc = (function() {
     function SinOsc() {
       UGen.call(this);
-      this.name = "SinOsc";
+      this.klassName = "SinOsc";
     }
     fn.extend(SinOsc, UGen);
     
@@ -2144,6 +2270,229 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   
   module.exports = {
     SinOsc: SinOsc,
+    install: install
+  };
+
+});
+define('cc/server/ugen/def', function(require, exports, module) {
+
+  var fn   = require("../fn");
+  var ugen = require("./ugen");
+  
+  var SynthDef = (function() {
+    function SynthDef() {
+      this.klassName = "SynthDef";
+    }
+    SynthDef.prototype.initialize = function(func, args) {
+      args = unpackArguments(args);
+      
+      var isVaridArgs = args.vals.every(function(item) {
+        if (typeof item === "number") {
+          return true;
+        } else if (Array.isArray(item)) {
+          return item.every(function(item) {
+            return typeof item === "number";
+          });
+        }
+        if (item === undefined || item === null) {
+          return true;
+        }
+        return false;
+      });
+      if (!isVaridArgs) {
+        throw "UgenGraphFunc's arguments should be a number or an array that contains a number.";
+      }
+      
+      var params  = { names:[], indices:[], length:[], values:[] };
+      var flatten = [];
+      var i, imax, length;
+      for (i = 0, imax = args.vals.length; i < imax; ++i) {
+        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
+        params.names  .push(args.keys[i]);
+        params.indices.push(flatten.length);
+        params.length .push(length);
+        params.values = params.values.concat(args.vals[i]);
+        flatten = flatten.concat(args.vals[i]);
+      }
+      var reshaped = [];
+      var controls = ugen.Control.kr(flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      for (i = 0; i < imax; ++i) {
+        if (Array.isArray(args.vals[i])) {
+          reshaped.push(controls.slice(0, args.vals[i].length));
+        } else {
+          reshaped.push(controls.shift());
+        }
+      }
+      
+      var children = [];
+      ugen.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
+      try {
+        func.apply(null, reshaped);
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        ugen.setSynthDef(null);
+      }
+
+      var consts = [];
+      children.forEach(function(x) {
+        if (x.inputs) {
+          x.inputs.forEach(function(_in) {
+            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
+              consts.push(_in);
+            }
+          });
+        }
+      });
+      consts.sort();
+      var ugenlist = topoSort(children).filter(function(x) {
+        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+      });
+      var defs = ugenlist.map(function(x) {
+        var inputs = [];
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
+            inputs.push(index, subindex);
+          });
+        }
+        var outputs;
+        if (x instanceof ugen.MultiOutUGen) {
+          outputs = x.channels.map(function(x) {
+            return x.rate;
+          });
+        } else if (x.numOfOutputs === 1) {
+          outputs = [ x.rate ];
+        } else {
+          outputs = [];
+        }
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
+      });
+      var specs = {
+        consts: consts,
+        defs  : defs,
+        params: params,
+      };
+      this.specs = specs;
+    };
+
+    SynthDef.prototype.play = fn(function(target, args, addAction) {
+      console.log(addAction);
+    }).defaults("target=0,args=0,addAction=0").multicall().build();
+
+    var topoSort = (function() {
+      var _topoSort = function(x, list) {
+        var index = list.indexOf(x);
+        if (index !== -1) {
+          list.splice(index, 1);
+        }
+        list.unshift(x);
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            _topoSort(x, list);
+          });
+        }
+      };
+      return function(list) {
+        list.forEach(function(x) {
+          if (x instanceof ugen.Out) {
+            x.inputs.forEach(function(x) {
+              _topoSort(x, list);
+            });
+          }
+        });
+        return list;
+      };
+    })();
+    
+    return SynthDef;
+  })();
+
+  var splitArguments = function(args) {
+    var result  = [];
+    var begin   = 0;
+    var bracket = 0;
+    var inStr   = null;
+    for (var i = 0, imax = args.length; i < imax; ++i) {
+      var c = args.charAt(i);
+      if (args.charAt(i-1) === "\\") {
+        if (args.charAt(i-2) !== "\\") {
+          continue;
+        }
+      }
+      if (c === "\"" || c === "'") {
+        if (inStr === null) {
+          inStr = c;
+        } else if (inStr === c) {
+          inStr = null;
+        }
+      }
+      if (inStr) {
+        continue;
+      }
+      switch (c) {
+      case ",":
+        if (bracket === 0) {
+          result.push(args.slice(begin, i).trim());
+          begin = i + 1;
+        }
+        break;
+      case "[":
+        bracket += 1;
+        break;
+      case "]":
+        bracket -= 1;
+        break;
+      }
+    }
+    if (begin !== i) {
+      result.push(args.slice(begin, i).trim());
+    }
+    return result;
+  };
+
+  var unpackArguments = function(args) {
+    var keys = [];
+    var vals = [];
+    if (args) {
+      splitArguments(args).forEach(function(items) {
+        var i = items.indexOf("=");
+        var k, v;
+        if (i === -1) {
+          k = items;
+          v = undefined;
+        } else {
+          k = items.substr(0, i).trim();
+          v = eval.call(null, items.substr(i + 1));
+        }
+        keys.push(k);
+        vals.push(v);
+      });
+    }
+    return { keys:keys, vals:vals };
+  };
+
+  var install = function(namespace) {
+    namespace.def = function(func) {
+      if (typeof func === "function") {
+        var instance = new SynthDef();
+        instance.initialize.apply(instance, arguments);
+        return instance;
+      }
+      throw "def() requires a function.";
+    };
+  };
+
+  module.exports = {
+    splitArguments : splitArguments ,
+    unpackArguments: unpackArguments,
     install: install
   };
 

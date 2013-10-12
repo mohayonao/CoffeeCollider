@@ -116,8 +116,9 @@ define(function(require, exports, module) {
         stack.pop();
       } else if (data.toString() === "[object Object]") {
         stack.push(data);
-        if (/^[_a-z$][_a-z0-9$]*$/i.test(data.name)) {
-          $ = eval.call(null, "new (function " + data.name + "(){})");
+        if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+          $ = eval.call(null, "new (function " + data.klassName + "(){})");
+          delete data.klassName;
         } else {
           $ = {};
         }
