@@ -232,10 +232,22 @@ define('cc/client/client', function(require, exports, module) {
         this.strm.set(strm);
       }
     };
-    SynthClient.prototype.execute = function(code, callback) {
+    SynthClient.prototype.execute = function(code) {
+      var append, callback;
+      var i = 1;
+
+      if (typeof arguments[i] === "boolean") {
+        append = arguments[i++];
+      } else {
+        append = false;
+      }
+      if (typeof arguments[i] === "function") {
+        callback = arguments[i++];
+      }
+      
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code]);
+        this.send(["/execute", this.execId, code, append]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
         }
@@ -1173,6 +1185,12 @@ define('cc/server/server', function(require, exports, module) {
         func.call(this, msg);
       }
     };
+    SynthServer.prototype.reset = function() {
+      this.rootNode.prev = null;
+      this.rootNode.next = null;
+      this.rootNode.head = null;
+      this.rootNode.tail = null;
+    };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[1];
     };
@@ -1237,14 +1255,15 @@ define('cc/server/server', function(require, exports, module) {
     }
   };
   commands["/reset"] = function() {
-    this.rootNode.prev = null;
-    this.rootNode.next = null;
-    this.rootNode.head = null;
-    this.rootNode.tail = null;
+    this.reset();
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
     var code   = msg[2];
+    var append = msg[3];
+    if (!append) {
+      this.reset();
+    }
     var result  = pack(eval.call(global, code));
     this.send(["/execute", execId, result]);
   };

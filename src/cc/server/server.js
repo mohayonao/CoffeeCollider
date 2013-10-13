@@ -28,6 +28,12 @@ define(function(require, exports, module) {
         func.call(this, msg);
       }
     };
+    SynthServer.prototype.reset = function() {
+      this.rootNode.prev = null;
+      this.rootNode.next = null;
+      this.rootNode.head = null;
+      this.rootNode.tail = null;
+    };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[C.CONTROL];
     };
@@ -92,14 +98,15 @@ define(function(require, exports, module) {
     }
   };
   commands["/reset"] = function() {
-    this.rootNode.prev = null;
-    this.rootNode.next = null;
-    this.rootNode.head = null;
-    this.rootNode.tail = null;
+    this.reset();
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
     var code   = msg[2];
+    var append = msg[3];
+    if (!append) {
+      this.reset();
+    }
     var result  = pack(eval.call(global, code));
     this.send(["/execute", execId, result]);
   };
