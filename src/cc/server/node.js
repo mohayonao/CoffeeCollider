@@ -3,8 +3,8 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var FixNum = require("./unit/fixnum").FixNum;
   var Unit   = require("./unit/unit").Unit;
+  var FixNum = require("./unit/unit").FixNum;
 
   var Node = (function() {
     function Node() {

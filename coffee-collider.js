@@ -1306,8 +1306,8 @@ define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var FixNum = require("./unit/fixnum").FixNum;
   var Unit   = require("./unit/unit").Unit;
+  var FixNum = require("./unit/unit").FixNum;
 
   var Node = (function() {
     function Node() {
@@ -1711,30 +1711,6 @@ define('cc/server/array.impl', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/fixnum', function(require, exports, module) {
-
-  var map = {};
-
-  var FixNum = (function() {
-    function FixNum(value) {
-      if (map[value]) {
-        return map[value];
-      }
-      this.klassName = "FixNum";
-      this.outs = [ new Float32Array([value]) ];
-      map[value] = this;
-    }
-    FixNum.reset = function() {
-      map = {};
-    };
-    return FixNum;
-  })();
-
-  module.exports = {
-    FixNum: FixNum
-  };
-
-});
 define('cc/server/unit/unit', function(require, exports, module) {
 
   var units = {};
@@ -1773,16 +1749,98 @@ define('cc/server/unit/unit', function(require, exports, module) {
     };
     return Unit;
   })();
+  
+  var FixNum = (function() {
+    var map = {};
+    function FixNum(value) {
+      if (map[value]) {
+        return map[value];
+      }
+      this.klassName = "FixNum";
+      this.outs = [ new Float32Array([value]) ];
+      map[value] = this;
+    }
+    FixNum.reset = function() {
+      map = {};
+    };
+    return FixNum;
+  })();
 
+  var Control = function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      this.outs[0][0] = this.parent.controls[this.specialIndex];
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outs = this.outs;
+      var specialIndex = this.specialIndex;
+      for (var i = 0, imax = outs.length; i < imax; ++i) {
+        outs[i][0] = controls[i + specialIndex];
+      }
+    };
+    return ctor;
+  };
+  
+  var Out = function() {
+    var ctor = function() {
+      this._busBuffer = this.parent.server.busBuffer;
+      this._bufLength = this.parent.server.bufLength;
+      if (this.calcRate === 2) {
+        this.process = next_a;
+        this._busOffset = 0;
+      } else {
+        this.process = next_k;
+        this._busOffset = this._bufLength * 128;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var bufLength = this._bufLength;
+      var offset, _in;
+      var fbusChannel = (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        offset = (fbusChannel + i) * bufLength;
+        _in = inputs[i];
+        for (var j = 0; j < inNumSamples; j++) {
+          busBuffer[offset + j] += _in[j];
+        }
+      }
+    };
+    var next_k = function() {
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var offset    = this._busOffset + (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        busBuffer[offset + i] += inputs[i][0];
+      }
+    };
+    return ctor;
+  };
+
+  
   var register = function(name, payload) {
     units[name] = payload();
   };
 
   var install = function() {
+    register("Control", Control);
+    register("Out"    , Out    );
   };
   
   module.exports = {
-    Unit: Unit,
+    Unit    : Unit,
+    FixNum  : FixNum,
+    Control : Control,
     register: register,
     install : install
   };
@@ -2909,10 +2967,8 @@ define('cc/server/ugen/def', function(require, exports, module) {
 define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
-    require("./out").install();
-    require("./bop").install();
-    require("./control").install();
-    require("./sinosc").install();
+    require("./basic_ops").install();
+    require("./osc").install();
   };
   
   module.exports = {
@@ -2920,56 +2976,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/out', function(require, exports, module) {
-
-  var unit = require("./unit");
-
-  var Out = function() {
-    var ctor = function() {
-      this._busBuffer = this.parent.server.busBuffer;
-      this._bufLength = this.parent.server.bufLength;
-      if (this.calcRate === 2) {
-        this.process = next_a;
-        this._busOffset = 0;
-      } else {
-        this.process = next_k;
-        this._busOffset = this._bufLength * 128;
-      }
-    };
-    var next_a = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
-      var bufLength = this._bufLength;
-      var offset, _in;
-      var fbusChannel = (inputs[0][0]|0) - 1;
-      for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        offset = (fbusChannel + i) * bufLength;
-        _in = inputs[i];
-        for (var j = 0; j < inNumSamples; j++) {
-          busBuffer[offset + j] += _in[j];
-        }
-      }
-    };
-    var next_k = function() {
-      var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
-      var offset    = this._busOffset + (inputs[0][0]|0) - 1;
-      for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        busBuffer[offset + i] += inputs[i][0];
-      }
-    };
-    return ctor;
-  };
-
-  module.exports = {
-    install: function() {
-      unit.register("Out", Out);
-    }
-  };
-
-});
-define('cc/server/unit/bop', function(require, exports, module) {
+define('cc/server/unit/basic_ops', function(require, exports, module) {
 
   var unit = require("./unit");
   var BINARY_OP_UGEN_MAP = require("../ugen/basic_ops").BINARY_OP_UGEN_MAP;
@@ -3400,41 +3407,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/control', function(require, exports, module) {
-
-  var unit = require("./unit");
-
-  var Control = function() {
-    var ctor = function() {
-      if (this.numOfOutputs === 1) {
-        this.process = next_1;
-      } else {
-        this.process = next_k;
-      }
-      this.process(1);
-    };
-    var next_1 = function() {
-      this.outs[0][0] = this.parent.controls[this.specialIndex];
-    };
-    var next_k = function() {
-      var controls = this.parent.controls;
-      var outs = this.outs;
-      var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i][0] = controls[i + specialIndex];
-      }
-    };
-    return ctor;
-  };
-  
-  module.exports = {
-    install: function() {
-      unit.register("Control", Control);
-    }
-  };
-
-});
-define('cc/server/unit/sinosc', function(require, exports, module) {
+define('cc/server/unit/osc', function(require, exports, module) {
 
   var unit = require("./unit");
   

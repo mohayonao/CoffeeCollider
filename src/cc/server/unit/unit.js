@@ -37,16 +37,98 @@ define(function(require, exports, module) {
     };
     return Unit;
   })();
+  
+  var FixNum = (function() {
+    var map = {};
+    function FixNum(value) {
+      if (map[value]) {
+        return map[value];
+      }
+      this.klassName = "FixNum";
+      this.outs = [ new Float32Array([value]) ];
+      map[value] = this;
+    }
+    FixNum.reset = function() {
+      map = {};
+    };
+    return FixNum;
+  })();
 
+  var Control = function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      this.outs[0][0] = this.parent.controls[this.specialIndex];
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outs = this.outs;
+      var specialIndex = this.specialIndex;
+      for (var i = 0, imax = outs.length; i < imax; ++i) {
+        outs[i][0] = controls[i + specialIndex];
+      }
+    };
+    return ctor;
+  };
+  
+  var Out = function() {
+    var ctor = function() {
+      this._busBuffer = this.parent.server.busBuffer;
+      this._bufLength = this.parent.server.bufLength;
+      if (this.calcRate === C.AUDIO) {
+        this.process = next_a;
+        this._busOffset = 0;
+      } else {
+        this.process = next_k;
+        this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var bufLength = this._bufLength;
+      var offset, _in;
+      var fbusChannel = (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        offset = (fbusChannel + i) * bufLength;
+        _in = inputs[i];
+        for (var j = 0; j < inNumSamples; j++) {
+          busBuffer[offset + j] += _in[j];
+        }
+      }
+    };
+    var next_k = function() {
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var offset    = this._busOffset + (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        busBuffer[offset + i] += inputs[i][0];
+      }
+    };
+    return ctor;
+  };
+
+  
   var register = function(name, payload) {
     units[name] = payload();
   };
 
   var install = function() {
+    register("Control", Control);
+    register("Out"    , Out    );
   };
   
   module.exports = {
-    Unit: Unit,
+    Unit    : Unit,
+    FixNum  : FixNum,
+    Control : Control,
     register: register,
     install : install
   };
