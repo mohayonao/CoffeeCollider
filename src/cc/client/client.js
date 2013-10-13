@@ -98,47 +98,45 @@ define(function(require, exports, module) {
     return SynthClient;
   })();
 
-  var pp = (function() {
-    var Cyclic = function() {
-    };
-    var _ = function(data, instances, stack) {
-      var $, result;
-      if (stack.indexOf(data) !== -1) {
-        return new Cyclic(data);
-      }
-      if (data === null || data === undefined || typeof data === "string") {
+  var unpack = (function() {
+    var func = function() {};
+    var _ = function(data) {
+      if (!data) {
         return data;
-      } else if (Array.isArray(data)) {
-        stack.push(data);
-        result = data.map(function(data) {
-          return _(data, instances, stack);
-        });
-        stack.pop();
-      } else if (data.toString() === "[object Object]") {
-        stack.push(data);
-        if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
-          $ = eval.call(null, "new (function " + data.klassName + "(){})");
-          instances.push($);
-        } else {
-          $ = {};
+      }
+      if (typeof data === "string") {
+        if (data === "[Function]") {
+          return func;
         }
-        Object.keys(data).forEach(function(key) {
-          $[key] = _(data[key], instances, stack);
-        });
-        result = $;
-        stack.pop();
+        return data;
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data);
+          });
+        } else {
+          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+            result = eval.call(null, "new (function " + data.klassName + "(){})");
+            delete data.klassName;
+          } else {
+            result = {};
+          }
+          Object.keys(data).forEach(function(key) {
+            result[key] = _(data[key]);
+          });
+        }
       } else {
         result = data;
       }
       return result;
     };
     return function(data) {
-      var instances = [];
-      var result = _(data, instances, []);
-      instances.forEach(function(instance) {
-        delete instance.klassName;
-      });
-      return result;
+      return _(data);
     };
   })();
 
@@ -154,23 +152,26 @@ define(function(require, exports, module) {
     var callback = this.execCallbacks[execId];
     if (callback) {
       if (result !== undefined) {
-        result = pp(result);
+        result = unpack(result);
       }
       callback(result);
       delete this.execCallbacks[execId];
     }
   };
   commands["/console/log"] = function(msg) {
-    console.log.apply(console, pp(msg[1]));
+    console.log.apply(console, unpack(msg[1]));
   };
   commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, pp(msg[1]));
+    console.debug.apply(console, unpack(msg[1]));
   };
   commands["/console/info"] = function(msg) {
-    console.info.apply(console, pp(msg[1]));
+    console.info.apply(console, unpack(msg[1]));
+  };
+  commands["/console/warn"] = function(msg) {
+    console.warn.apply(console, unpack(msg[1]));
   };
   commands["/console/error"] = function(msg) {
-    console.error.apply(console, pp(msg[1]));
+    console.error.apply(console, unpack(msg[1]));
   };
   
   module.exports = {

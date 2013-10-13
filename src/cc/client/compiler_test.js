@@ -165,7 +165,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceSynthDef(tokens);
         assert.deepEqual(actual, expected);
       });
-      it.only("x=100, y=200", function() {
+      it("x=100, y=200", function() {
         var tokens = [
           [ "IDENTIFIER" , "def", _ ],
           [ "CALL_START" , "("  , _ ],

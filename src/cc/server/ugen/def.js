@@ -1,8 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var fn   = require("../fn");
-  var ugen = require("./ugen");
+  var cc    = require("../../cc");
+  var fn    = require("../fn");
+  var ugen  = require("./ugen");
+  var Node  = require("../ctrl/node").Node;
+  var Synth = require("../ctrl/node").Synth;
   
   var SynthDef = (function() {
     function SynthDef() {
@@ -108,9 +111,30 @@ define(function(require, exports, module) {
       this.specs = specs;
     };
 
-    SynthDef.prototype.play = fn(function(target, args, addAction) {
-      console.log(addAction);
-    }).defaults("target=0,args=0,addAction=0").multicall().build();
+    SynthDef.prototype.play = fn(function() {
+      var target, args, addAction;
+      var i = 0;
+      target = args;
+      if (arguments[i] instanceof Node) {
+        target = arguments[i++];
+      } else {
+        target = cc.server.rootNode;
+      }
+      if (fn.isDictionary(arguments[i])) {
+        args = arguments[i++];
+      }
+      switch (arguments[i]) {
+      case "addToHead":
+      case "addToTail":
+      case "addBefore":
+      case "addAfter" :
+        addAction = arguments[i++];
+        break;
+      default:
+        addAction = "addToHead";
+      }
+      return new Synth(JSON.stringify(this.specs), target, args, addAction);
+    }).defaults("target,args,addAction='addToHead'").multicall().build();
 
     var topoSort = (function() {
       var _topoSort = function(x, list) {

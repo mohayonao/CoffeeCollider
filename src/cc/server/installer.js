@@ -23,6 +23,8 @@ define(function(require, exports, module) {
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./ugen/installer").install(namespace);
+    require("./ctrl/installer").install(namespace);
+    require("./synth/installer").install(namespace);
     delete namespace.register;
   };
 

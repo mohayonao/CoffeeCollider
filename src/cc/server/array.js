@@ -33,6 +33,9 @@ define(function(require, exports, module) {
 
     Array.prototype.toString = function() {
       return "[ " + this.map(function(x) {
+        if (!x) {
+          return x + "";
+        }
         return x.toString();
       }).join(", ") + " ]";
     };

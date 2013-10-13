@@ -170,6 +170,9 @@ define(function(require, exports, module) {
   C.UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
   C.BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
 
+  C.AUDIO_BUS_LEN   = 128;
+  C.CONTROL_BUS_LEN = 4096;
+
   module.exports = fn;
 
 });

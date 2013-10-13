@@ -11,12 +11,13 @@ define(function(require, exports, module) {
   var UGen = (function() {
     function UGen() {
       this.klassName = "UGen";
+      this.rate = C.AUDIO;
       this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
-      this.rate   = C.AUDIO;
-      this.inputs = [];
+      this.outputIndex  = 0;
       this.numOfInputs  = 0;
       this.numOfOutputs = 1;
+      this.inputs = [];
     }
 
     UGen.prototype.$new1 = function(rate) {
