@@ -123,18 +123,29 @@ define(function(require, exports, module) {
       if (fn.isDictionary(arguments[i])) {
         args = arguments[i++];
       }
-      switch (arguments[i]) {
-      case "addToHead":
-      case "addToTail":
-      case "addBefore":
-      case "addAfter" :
-        addAction = arguments[i++];
+      if (typeof arguments[i] === "string") {
+        addAction = arguments[i];
+      }
+      
+      if (args && arguments.length === 1) {
+        if (args.target instanceof Node) {
+          target = args.target;
+          delete args.target;
+        }
+        if (typeof args.addAction === "string") {
+          addAction = args.addAction;
+          delete args.addAction;
+        }
+      }
+      
+      switch (addAction) {
+      case "addToHead": case "addToTail": case "addBefore": case "addAfter":
         break;
       default:
         addAction = "addToHead";
       }
       return new Synth(JSON.stringify(this.specs), target, args, addAction);
-    }).defaults("target,args,addAction='addToHead'").multicall().build();
+    }).multicall().build();
 
     var topoSort = (function() {
       var _topoSort = function(x, list) {

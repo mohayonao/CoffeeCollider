@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
+  var slice = [].slice;
 
   var Node = (function() {
     function Node() {
@@ -135,7 +136,8 @@ define(function(require, exports, module) {
       var unitList = specs.defs.map(function(spec) {
         return new Unit(this, spec);
       }, this);
-      this.controls = new Float32Array(specs.params.values);
+      this.params   = specs.params;
+      this.controls = new Float32Array(this.params.values);
       this.set(args);
       this.unitList = unitList.filter(function(unit) {
         var inputs  = unit.inputs;
@@ -156,8 +158,47 @@ define(function(require, exports, module) {
       });
     };
     Synth.prototype.set = function(args) {
-      if (!args) {
+      if (args === undefined) {
         return this;
+      }
+      var params = this.params;
+      if (fn.isDictionary(args)) {
+        Object.keys(args).forEach(function(key) {
+          var value  = args[key];
+          var index  = params.names.indexOf(key);
+          if (index === -1) {
+            return;
+          }
+          index = params.indices[index];
+          var length = params.length[index];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  this.controls[index + i] = value;
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            this.controls[index] = value;
+          }
+        }, this);
+      } else {
+        slice.call(arguments).forEach(function(value, i) {
+          var index = params.indices[i];
+          var length = params.length[i];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  this.controls[index + i] = value;
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            this.controls[index] = value;
+          }
+        }, this);
       }
       return this;
     };
