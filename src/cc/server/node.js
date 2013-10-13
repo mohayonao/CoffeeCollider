@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var fn = require("./fn");
   var FixNum = require("./synth/fixnum").FixNum;
   var Unit   = require("./synth/unit").Unit;

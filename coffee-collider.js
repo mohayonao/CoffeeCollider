@@ -1132,7 +1132,7 @@ define('cc/server/installer', function(require, exports, module) {
 });
 define('cc/server/server', function(require, exports, module) {
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var Group = require("./ctrl/node").Group;
   
   var commands = {};
@@ -1323,6 +1323,11 @@ define('cc/server/server', function(require, exports, module) {
     Rate: Rate,
     install: install
   };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  module.exports = require("../cc");
 
 });
 define('cc/server/array', function(require, exports, module) {
@@ -2324,7 +2329,7 @@ define('cc/server/uop', function(require, exports, module) {
 });
 define('cc/server/node', function(require, exports, module) {
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var fn = require("./fn");
   var FixNum = require("./synth/fixnum").FixNum;
   var Unit   = require("./synth/unit").Unit;
