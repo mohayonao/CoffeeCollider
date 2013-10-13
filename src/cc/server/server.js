@@ -93,11 +93,11 @@ define(function(require, exports, module) {
   };
   commands["/reset"] = function() {
   };
-  commands["/exec"] = function(msg) {
+  commands["/execute"] = function(msg) {
     var execId = msg[1];
     var code   = msg[2];
     var result  = pack(eval.call(global, code));
-    this.send(["/exec", execId, result]);
+    this.send(["/execute", execId, result]);
   };
   commands["/loadScript"] = function(msg) {
     importScripts(msg[1]);

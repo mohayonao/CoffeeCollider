@@ -133,9 +133,9 @@ define('cc/client/coffee_collider', function(require, exports, module) {
       }
       return this;
     };
-    CoffeeCollider.prototype.exec = function(code, callback) {
+    CoffeeCollider.prototype.execute = function() {
       if (this.client) {
-        this.client.exec(code, callback);
+        this.client.execute.apply(this.client, arguments);
       }
       return this;
     };
@@ -227,10 +227,10 @@ define('cc/client/client', function(require, exports, module) {
         this.strm.set(strm);
       }
     };
-    SynthClient.prototype.exec = function(code, callback) {
+    SynthClient.prototype.execute = function(code, callback) {
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/exec", this.execId, code]);
+        this.send(["/execute", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
         }
@@ -264,7 +264,7 @@ define('cc/client/client', function(require, exports, module) {
       "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.sys.syncCount
     ]);
   };
-  commands["/exec"] = function(msg) {
+  commands["/execute"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
     var callback = this.execCallbacks[execId];
@@ -1233,11 +1233,11 @@ define('cc/server/server', function(require, exports, module) {
   };
   commands["/reset"] = function() {
   };
-  commands["/exec"] = function(msg) {
+  commands["/execute"] = function(msg) {
     var execId = msg[1];
     var code   = msg[2];
     var result  = pack(eval.call(global, code));
-    this.send(["/exec", execId, result]);
+    this.send(["/execute", execId, result]);
   };
   commands["/loadScript"] = function(msg) {
     importScripts(msg[1]);
@@ -1308,6 +1308,7 @@ define('cc/server/node', function(require, exports, module) {
   var fn = require("./fn");
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
+  var slice = [].slice;
 
   var Node = (function() {
     function Node() {
@@ -1438,7 +1439,8 @@ define('cc/server/node', function(require, exports, module) {
       var unitList = specs.defs.map(function(spec) {
         return new Unit(this, spec);
       }, this);
-      this.controls = new Float32Array(specs.params.values);
+      this.params   = specs.params;
+      this.controls = new Float32Array(this.params.values);
       this.set(args);
       this.unitList = unitList.filter(function(unit) {
         var inputs  = unit.inputs;
@@ -1459,8 +1461,47 @@ define('cc/server/node', function(require, exports, module) {
       });
     };
     Synth.prototype.set = function(args) {
-      if (!args) {
+      if (args === undefined) {
         return this;
+      }
+      var params = this.params;
+      if (fn.isDictionary(args)) {
+        Object.keys(args).forEach(function(key) {
+          var value  = args[key];
+          var index  = params.names.indexOf(key);
+          if (index === -1) {
+            return;
+          }
+          index = params.indices[index];
+          var length = params.length[index];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  this.controls[index + i] = value;
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            this.controls[index] = value;
+          }
+        }, this);
+      } else {
+        slice.call(arguments).forEach(function(value, i) {
+          var index = params.indices[i];
+          var length = params.length[i];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  this.controls[index + i] = value;
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            this.controls[index] = value;
+          }
+        }, this);
       }
       return this;
     };
@@ -2841,18 +2882,29 @@ define('cc/server/ugen/def', function(require, exports, module) {
       if (fn.isDictionary(arguments[i])) {
         args = arguments[i++];
       }
-      switch (arguments[i]) {
-      case "addToHead":
-      case "addToTail":
-      case "addBefore":
-      case "addAfter" :
-        addAction = arguments[i++];
+      if (typeof arguments[i] === "string") {
+        addAction = arguments[i];
+      }
+      
+      if (args && arguments.length === 1) {
+        if (args.target instanceof Node) {
+          target = args.target;
+          delete args.target;
+        }
+        if (typeof args.addAction === "string") {
+          addAction = args.addAction;
+          delete args.addAction;
+        }
+      }
+      
+      switch (addAction) {
+      case "addToHead": case "addToTail": case "addBefore": case "addAfter":
         break;
       default:
         addAction = "addToHead";
       }
       return new Synth(JSON.stringify(this.specs), target, args, addAction);
-    }).defaults("target,args,addAction='addToHead'").multicall().build();
+    }).multicall().build();
 
     var topoSort = (function() {
       var _topoSort = function(x, list) {

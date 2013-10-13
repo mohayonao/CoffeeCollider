@@ -68,10 +68,10 @@ define(function(require, exports, module) {
         this.strm.set(strm);
       }
     };
-    SynthClient.prototype.exec = function(code, callback) {
+    SynthClient.prototype.execute = function(code, callback) {
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/exec", this.execId, code]);
+        this.send(["/execute", this.execId, code]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
         }
@@ -105,7 +105,7 @@ define(function(require, exports, module) {
       "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.sys.syncCount
     ]);
   };
-  commands["/exec"] = function(msg) {
+  commands["/execute"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
     var callback = this.execCallbacks[execId];

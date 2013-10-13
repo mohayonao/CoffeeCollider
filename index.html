@@ -99,7 +99,7 @@
           if (e.shiftKey) {
             console.log(cc.compiler.toString(code));
           } else {
-            cc.exec(code, function(res) {
+            cc.execute(code, function(res) {
               if (res !== undefined) {
                 console.log(res);
               }

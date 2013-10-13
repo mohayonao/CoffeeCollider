@@ -39,9 +39,9 @@ define(function(require, exports, module) {
       }
       return this;
     };
-    CoffeeCollider.prototype.exec = function(code, callback) {
+    CoffeeCollider.prototype.execute = function() {
       if (this.client) {
-        this.client.exec(code, callback);
+        this.client.execute.apply(this.client, arguments);
       }
       return this;
     };
