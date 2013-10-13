@@ -4,8 +4,8 @@ define(function(require, exports, module) {
   var cc    = require("../../cc");
   var fn    = require("../fn");
   var ugen  = require("./ugen");
-  var Node  = require("../ctrl/node").Node;
-  var Synth = require("../ctrl/node").Synth;
+  var Node  = require("../node").Node;
+  var Synth = require("../node").Synth;
   
   var SynthDef = (function() {
     function SynthDef() {
