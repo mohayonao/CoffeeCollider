@@ -334,8 +334,21 @@ define('cc/client/sound_system', function(require, exports, module) {
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
       this.syncCount = 0;
-      this.syncItems = new Float32Array(6); // syncCount, currentTime
+      // syncCount, currentTime, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
+      this.syncItems = new Float32Array(6);
       this.isPlaying = false;
+
+      var syncItems = this.syncItems;
+      window.addEventListener("mousemove", function(e) {
+        syncItems[3] = e.pageX / window.innerWidth;
+        syncItems[4] = e.pageY / window.innerHeight;
+      }, false);
+      window.addEventListener("mousedown", function() {
+        syncItems[2] = 1;
+      }, false);
+      window.addEventListener("mouseup", function() {
+        syncItems[2] = 0;
+      }, false);
     }
     var instance = null;
     SoundSystem.getInstance = function() {
@@ -2743,6 +2756,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     require("./ugen").install(namespace);
     require("./basic_ops").install(namespace);
     require("./osc").install(namespace);
+    require("./ui").install(namespace);
     require("./def").install(namespace);
   };
 
@@ -2754,7 +2768,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
 define('cc/server/ugen/osc', function(require, exports, module) {
   
   var fn = require("../fn");
-  var UGen  = require("./ugen").UGen;
+  var UGen = require("./ugen").UGen;
 
   var SinOsc = (function() {
     function SinOsc() {
@@ -2782,6 +2796,80 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   
   module.exports = {
     SinOsc: SinOsc,
+    install: install
+  };
+
+});
+define('cc/server/ugen/ui', function(require, exports, module) {
+
+  var fn = require("../fn");
+  var UGen = require("./ugen").UGen;
+
+  var MouseX = (function() {
+    function MouseX() {
+      UGen.call(this);
+      this.klassName = "MouseX";
+    }
+    fn.extend(MouseX, UGen);
+
+    MouseX.prototype.$kr = fn(function(minval, maxval, warp, lag) {
+      if (warp === "exponential") {
+        warp = 1;
+      } else if (typeof warp !== "number") {
+        warp = 0;
+      }
+      return this.multiNew(1, minval, maxval, warp, lag);
+    }).defaults("minval=0,maxval=1,warp=0,lag=0.2").build();
+    
+    fn.classmethod(MouseX);
+    
+    return MouseX;
+  })();
+  
+  var MouseY = (function() {
+    function MouseY() {
+      UGen.call(this);
+      this.klassName = "MouseY";
+    }
+    fn.extend(MouseY, UGen);
+
+    MouseY.prototype.$kr = fn(function(minval, maxval, warp, lag) {
+      if (warp === "exponential") {
+        warp = 1;
+      } else if (typeof warp !== "number") {
+        warp = 0;
+      }
+      return this.multiNew(1, minval, maxval, warp, lag);
+    }).defaults("minval=0,maxval=1,warp=0,lag=0.2").build();
+    
+    fn.classmethod(MouseY);
+    
+    return MouseY;
+  })();
+  
+  var MouseButton = (function() {
+    function MouseButton() {
+      UGen.call(this);
+      this.klassName = "MouseButton";
+    }
+    fn.extend(MouseButton, UGen);
+
+    MouseButton.prototype.$kr = fn(function(minval, maxval, lag) {
+      return this.multiNew(1, minval, maxval, lag);
+    }).defaults("minval=0,maxval=1,lag=0.2").build();
+    
+    fn.classmethod(MouseButton);
+    
+    return MouseButton;
+  })();
+  
+  var install = function(namespace) {
+    namespace.MouseX = MouseX;
+    namespace.MouseY = MouseY;
+    namespace.MouseButton = MouseButton;
+  };
+
+  module.exports = {
     install: install
   };
 
@@ -3050,6 +3138,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
     require("./unit").install();
     require("./basic_ops").install();
     require("./osc").install();
+    require("./ui").install();
   };
   
   module.exports = {
@@ -4441,6 +4530,111 @@ define('cc/server/unit/osc', function(require, exports, module) {
   module.exports = {
     install: function() {
       unit.register("SinOsc", SinOsc);
+    }
+  };
+
+});
+define('cc/server/unit/ui', function(require, exports, module) {
+
+  var unit = require("./unit");
+  
+  var log001 = Math.log(0.001);
+  
+  var MouseX = function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1  = 0;
+      this._b1  = 0;
+      this._lag = 0;
+      this._mouse = this.parent.server.syncItems;
+      this.process(1);
+    };
+    var next = function() {
+      var minval = this.inputs[0][0] || 0.01;
+      var maxval = this.inputs[1][0];
+      var warp   = this.inputs[2][0];
+      var lag    = this.inputs[3][0];
+      var y1 = this._y1;
+      var b1 = this._b1;
+      if (lag !== this._lag) {
+        this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        this._lag = lag;
+      }
+      var y0 = this._mouse[3];
+      if (warp === 0) {
+        y0 = (maxval - minval) * y0 + minval;
+      } else {
+        y0 = Math.pow(maxval / minval, y0) * minval;
+      }
+      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this._y1 = y1;
+    };
+    return ctor;
+  };
+
+  var MouseY = function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1  = 0;
+      this._b1  = 0;
+      this._lag = 0;
+      this._mouse = this.parent.server.syncItems;
+      this.process(1);
+    };
+    var next = function() {
+      var minval = this.inputs[0][0] || 0.01;
+      var maxval = this.inputs[1][0];
+      var warp   = this.inputs[2][0];
+      var lag    = this.inputs[3][0];
+      var y1 = this._y1;
+      var b1 = this._b1;
+      if (lag !== this._lag) {
+        this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        this._lag = lag;
+      }
+      var y0 = this._mouse[4];
+      if (warp === 0) {
+        y0 = (maxval - minval) * y0 + minval;
+      } else {
+        y0 = Math.pow(maxval / minval, y0) * minval;
+      }
+      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this._y1 = y1;
+    };
+    return ctor;
+  };
+
+  var MouseButton = function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1  = 0;
+      this._b1  = 0;
+      this._lag = 0;
+      this._mouse = this.parent.server.syncItems;
+      this.process(1);
+    };
+    var next = function() {
+      var minval = this.inputs[0][0];
+      var maxval = this.inputs[1][0];
+      var lag    = this.inputs[2][0];
+      var y1 = this._y1;
+      var b1 = this._b1;
+      if (lag !== this._lag) {
+        this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        this._lag = lag;
+      }
+      var y0 = this._mouse[2] ? maxval : minval;
+      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this._y1 = y1;
+    };
+    return ctor;
+  };
+  
+  module.exports = {
+    install: function() {
+      unit.register("MouseX", MouseX);
+      unit.register("MouseY", MouseY);
+      unit.register("MouseButton", MouseButton);
     }
   };
 

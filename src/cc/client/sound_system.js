@@ -19,8 +19,21 @@ define(function(require, exports, module) {
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
       this.syncCount = 0;
-      this.syncItems = new Float32Array(6); // syncCount, currentTime
+      // syncCount, currentTime, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
+      this.syncItems = new Float32Array(6);
       this.isPlaying = false;
+
+      var syncItems = this.syncItems;
+      window.addEventListener("mousemove", function(e) {
+        syncItems[C.POS_X] = e.pageX / window.innerWidth;
+        syncItems[C.POS_Y] = e.pageY / window.innerHeight;
+      }, false);
+      window.addEventListener("mousedown", function() {
+        syncItems[C.BUTTON] = 1;
+      }, false);
+      window.addEventListener("mouseup", function() {
+        syncItems[C.BUTTON] = 0;
+      }, false);
     }
     var instance = null;
     SoundSystem.getInstance = function() {

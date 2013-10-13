@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
   
   var fn = require("../fn");
-  var UGen  = require("./ugen").UGen;
+  var UGen = require("./ugen").UGen;
 
   var SinOsc = (function() {
     function SinOsc() {

@@ -5,5 +5,9 @@
   "UNIPOLAR": 1,
   "BIPOLAR" : 2,
   "AUDIO_BUS_LEN"  : 128,
-  "CONTROL_BUS_LEN": 4096
+  "CONTROL_BUS_LEN": 4096,
+  "BUTTON": 2,
+  "POS_X": 3,
+  "POS_Y": 4,
+  "KEYCODE": 5
 }
