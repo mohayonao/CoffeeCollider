@@ -2967,6 +2967,7 @@ define('cc/server/ugen/def', function(require, exports, module) {
 define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
+    require("./unit").install();
     require("./basic_ops").install();
     require("./osc").install();
   };
