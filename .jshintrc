@@ -13,5 +13,5 @@
   "browser" : true,
   "worker"  : true,
   "node"    : true,
-  "predef"  : [ "define" ]
+  "predef"  : [ "define", "C" ]
 }

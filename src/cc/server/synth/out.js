@@ -1,7 +1,6 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var C = require("../fn").constant;
   var unit = require("./unit");
 
   var Out = function() {

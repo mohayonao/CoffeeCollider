@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("../fn");
-  var C  = fn.constant;
   var array = require("../array.impl");
   var UGen  = require("./ugen").UGen;
 
@@ -15,6 +14,8 @@ define(function(require, exports, module) {
     return (obj && obj.rate) || 0;
   };
 
+  var UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
+  
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
       UGen.call(this);
@@ -30,7 +31,7 @@ define(function(require, exports, module) {
 
     UnaryOpUGen.prototype.initialize = function(op, a) {
       this.op = op;
-      var index = C.UNARY_OP_UGEN_MAP.indexOf(op);
+      var index = UNARY_OP_UGEN_MAP.indexOf(op);
       if (index === -1) {
         throw "Unknown operator: " + op;
       }
@@ -42,6 +43,8 @@ define(function(require, exports, module) {
 
     return UnaryOpUGen;
   })();
+
+  var BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
 
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
@@ -107,7 +110,7 @@ define(function(require, exports, module) {
 
     BinaryOpUGen.prototype.initialize = function(op, a, b) {
       this.op = op;
-      var index = C.BINARY_OP_UGEN_MAP.indexOf(op);
+      var index = BINARY_OP_UGEN_MAP.indexOf(op);
       if (index === -1) {
         throw "Unknown operator: " + op;
       }
@@ -401,6 +404,8 @@ define(function(require, exports, module) {
     MulAdd: MulAdd,
     Sum3: Sum3,
     Sum4: Sum4,
+    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
+    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
     install: install,
   };
 

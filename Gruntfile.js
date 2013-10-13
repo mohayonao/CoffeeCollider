@@ -108,6 +108,14 @@ module.exports = function(grunt) {
     filter = [
       copy.filter.moduleDefines,
       function(text) {
+        var constants = grunt.file.readJSON("src/const.json");
+        Object.keys(constants).forEach(function(key) {
+          var re = new RegExp("C\." + key + "(?![A-Z0-9_])", "g");
+          text = text.replace(re, constants[key]);
+        });
+        return text;
+      },
+      function(text) {
         text = text.replace(/^define\((['"].+?['"]), \[(.+?)\], function\(require, exports, module\) {$/gm, "define($1, function(require, exports, module) {");
         text = text.replace(/\s*['"]use strict['"];$/gm, "");
         text = text.replace(/#{VERSION}/g, grunt.config.get("pkg.version"));
@@ -150,7 +158,7 @@ module.exports = function(grunt) {
     var Mocha = require("mocha");
     var mocha = new Mocha();
 
-    global.cc = {};
+    global.C = grunt.file.readJSON("src/const.json");
 
     var reporter = "dot";
     var args = arguments[0], files = [];

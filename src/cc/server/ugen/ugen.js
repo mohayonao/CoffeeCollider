@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("../fn");
-  var C  = fn.constant;
   var array = require("../array.impl");
   var slice = [].slice;
 

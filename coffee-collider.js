@@ -1098,7 +1098,7 @@ define('cc/client/compiler', function(require, exports, module) {
 
 });
 define('cc/server/installer', function(require, exports, module) {
-
+  
   var install = function(namespace) {
     namespace = namespace || {};
     namespace.register = function(name) {
@@ -1134,7 +1134,6 @@ define('cc/server/installer', function(require, exports, module) {
 define('cc/server/server', function(require, exports, module) {
 
   var cc = require("../cc");
-  var C = require("./fn").constant;
   var Group = require("./ctrl/node").Group;
   
   var commands = {};
@@ -1161,7 +1160,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.getRate = function(rate) {
-      return this.rates[rate] || this.rates[C.CONTROL];
+      return this.rates[rate] || this.rates[1];
     };
     SynthServer.prototype.onaudioprocess = function() {
       if (this.syncCount - this.sysSyncCount >= 4) {
@@ -1198,10 +1197,10 @@ define('cc/server/server', function(require, exports, module) {
     this.syncCount  = msg[5];
     this.strm = new Float32Array(this.strmLength * this.channels);
     this.rates = {};
-    this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
-    this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
+    this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
+    this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
     this.rootNode = new Group();
-    var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+    var busLength  = this.bufLength * 128 + 4096;
     var busBuffer  = new Float32Array(busLength);
     var bufLength  = this.bufLength;
     var bufLength4 = this.bufLength << 2;
@@ -1324,6 +1323,195 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer: SynthServer,
     Rate: Rate,
     install: install
+  };
+
+});
+define('cc/server/ctrl/node', function(require, exports, module) {
+
+  var cc = require("../../cc");
+  var fn = require("../fn");
+  var FixNum = require("../synth/fixnum").FixNum;
+  var Unit   = require("../synth/unit").Unit;
+
+  var Node = (function() {
+    function Node() {
+      this.klassName = "Node";
+      this.next    = null;
+      this.prev    = null;
+      this.parent  = null;
+      this.running = true;
+    }
+    
+    var appendFunc = {};
+    appendFunc.addToHead = function(node) {
+      var prev;
+      if (this.head === null) {
+        this.head = this.tail = node;
+      } else {
+        prev = this.head.prev;
+        if (prev) { prev.next = node; }
+        node.next = this.head;
+        this.head.prev = node;
+        this.head = node;
+      }
+      node.parent = this;
+    };
+    appendFunc.addToTail = function(node) {
+      var next;
+      if (this.tail === null) {
+        this.head = this.tail = node;
+      } else {
+        next = this.tail.next;
+        if (next) { next.prev = node; }
+        node.prev = this.tail;
+        this.tail.next = node;
+        this.tail = node;
+      }
+      node.parent = this;
+    };
+    appendFunc.addBefore = function(node) {
+      var prev = this.prev;
+      this.prev = node;
+      node.prev = prev;
+      if (prev) { prev.next = node; }
+      node.next = this;
+      if (this.parent && this.parent.head === this) {
+        this.parent.head = node;
+      }
+      node.parent = this.parent;
+    };
+    appendFunc.addAfter = function(node) {
+      var next = this.next;
+      this.next = node;
+      node.next = next;
+      if (next) { next.prev = node; }
+      node.prev = this;
+      if (this.parent && this.parent.tail === this) {
+        this.parent.tail = node;
+      }
+      node.parent = this.parent;
+    };
+    
+    Node.prototype.append = function(node, addAction) {
+      if (appendFunc[addAction]) {
+        appendFunc[addAction].call(this, node);
+      }
+      return this;
+    };
+
+    Node.prototype.remove = function() {
+      if (this.parent) {
+        if (this.parent.head === this) {
+          this.parent.head = this.next;
+        }
+        if (this.parent.tail === this) {
+          this.parent.tail = this.prev;
+        }
+      }
+      if (this.prev) {
+        this.prev.next = this.next;
+      }
+      if (this.next) {
+        this.next.prev = this.prev;
+      }
+      this.prev = null;
+      this.next = null;
+      this.parent = null;
+      return this;
+    };
+    
+    return Node;
+  })();
+
+  var Group = (function() {
+    function Group() {
+      Node.call(this);
+      this.klassName = "Group";
+      this.head = null;
+      this.tail = null;
+    }
+    fn.extend(Group, Node);
+    
+    Group.prototype.process = function(inNumSamples) {
+      if (this.head && this.running) {
+        this.head.process(inNumSamples);
+      }
+      if (this.next) {
+        this.next.process(inNumSamples);
+      }
+    };
+    
+    return Group;
+  })();
+
+  var Synth = (function() {
+    function Synth(specs, target, args, addAction) {
+      Node.call(this);
+      this.klassName = "Synth";
+      this.specs = JSON.parse(specs);
+      target.append(this, addAction);
+      build.call(this, this.specs, args);
+    }
+    fn.extend(Synth, Node);
+
+    var build = function(specs, args) {
+      this.server = cc.server;
+      var fixNumList = specs.consts.map(function(value) {
+        return new FixNum(value);
+      });
+      var unitList = specs.defs.map(function(spec) {
+        return new Unit(this, spec);
+      }, this);
+      this.controls = new Float32Array(specs.params.values);
+      this.set(args);
+      this.unitList = unitList.filter(function(unit) {
+        var inputs  = unit.inputs;
+        var inRates = unit.inRates;
+        var inSpec  = unit.specs[3];
+        for (var i = 0, imax = inputs.length; i < imax; ++i) {
+          var i2 = i << 1;
+          if (inSpec[i2] === -1) {
+            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
+            inRates[i] = 0;
+          } else {
+            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
+            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+          }
+        }
+        unit.init();
+        return !!unit.process;
+      });
+    };
+    Synth.prototype.set = function(args) {
+      if (!args) {
+        return this;
+      }
+      return this;
+    };
+    Synth.prototype.process = function(inNumSamples) {
+      if (this.running) {
+        var unitList = this.unitList;
+        for (var i = 0, imax = unitList.length; i < imax; ++i) {
+          var unit = unitList[i];
+          unit.process(unit.rate.bufLength);
+        }
+      }
+      if (this.next) {
+        this.next.process(inNumSamples);
+      }
+    };
+    
+    return Synth;
+  })();
+
+  var install = function() {
+  };
+  
+  module.exports = {
+    Node : Node,
+    Group: Group,
+    Synth: Synth,
+    install: install,
   };
 
 });
@@ -1486,21 +1674,6 @@ define('cc/server/fn', function(require, exports, module) {
     return !!(obj && obj.constructor === Object);
   };
 
-  var C = fn.constant = {};
-
-  C.SCALAR  = 0;
-  C.CONTROL = 1;
-  C.AUDIO   = 2;
-
-  C.UNIPOLAR = 1;
-  C.BIPOLAR  = 2;
-
-  C.UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
-  C.BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
-
-  C.AUDIO_BUS_LEN   = 128;
-  C.CONTROL_BUS_LEN = 4096;
-
   module.exports = fn;
 
 });
@@ -1559,196 +1732,6 @@ define('cc/server/array.impl', function(require, exports, module) {
     zip    : zip,
     flatten: flatten,
     clump  : clump,
-  };
-
-});
-define('cc/server/ctrl/node', function(require, exports, module) {
-
-  var cc = require("../../cc");
-  var fn = require("../fn");
-  var C  = fn.constant;
-  var FixNum = require("../synth/fixnum").FixNum;
-  var Unit   = require("../synth/unit").Unit;
-
-  var Node = (function() {
-    function Node() {
-      this.klassName = "Node";
-      this.next    = null;
-      this.prev    = null;
-      this.parent  = null;
-      this.running = true;
-    }
-    
-    var appendFunc = {};
-    appendFunc.addToHead = function(node) {
-      var prev;
-      if (this.head === null) {
-        this.head = this.tail = node;
-      } else {
-        prev = this.head.prev;
-        if (prev) { prev.next = node; }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addToTail = function(node) {
-      var next;
-      if (this.tail === null) {
-        this.head = this.tail = node;
-      } else {
-        next = this.tail.next;
-        if (next) { next.prev = node; }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addBefore = function(node) {
-      var prev = this.prev;
-      this.prev = node;
-      node.prev = prev;
-      if (prev) { prev.next = node; }
-      node.next = this;
-      if (this.parent && this.parent.head === this) {
-        this.parent.head = node;
-      }
-      node.parent = this.parent;
-    };
-    appendFunc.addAfter = function(node) {
-      var next = this.next;
-      this.next = node;
-      node.next = next;
-      if (next) { next.prev = node; }
-      node.prev = this;
-      if (this.parent && this.parent.tail === this) {
-        this.parent.tail = node;
-      }
-      node.parent = this.parent;
-    };
-    
-    Node.prototype.append = function(node, addAction) {
-      if (appendFunc[addAction]) {
-        appendFunc[addAction].call(this, node);
-      }
-      return this;
-    };
-
-    Node.prototype.remove = function() {
-      if (this.parent) {
-        if (this.parent.head === this) {
-          this.parent.head = this.next;
-        }
-        if (this.parent.tail === this) {
-          this.parent.tail = this.prev;
-        }
-      }
-      if (this.prev) {
-        this.prev.next = this.next;
-      }
-      if (this.next) {
-        this.next.prev = this.prev;
-      }
-      this.prev = null;
-      this.next = null;
-      this.parent = null;
-      return this;
-    };
-    
-    return Node;
-  })();
-
-  var Group = (function() {
-    function Group() {
-      Node.call(this);
-      this.klassName = "Group";
-      this.head = null;
-      this.tail = null;
-    }
-    fn.extend(Group, Node);
-    
-    Group.prototype.process = function(inNumSamples) {
-      if (this.head && this.running) {
-        this.head.process(inNumSamples);
-      }
-      if (this.next) {
-        this.next.process(inNumSamples);
-      }
-    };
-    
-    return Group;
-  })();
-
-  var Synth = (function() {
-    function Synth(specs, target, args, addAction) {
-      Node.call(this);
-      this.klassName = "Synth";
-      this.specs = JSON.parse(specs);
-      target.append(this, addAction);
-      build.call(this, this.specs, args);
-    }
-    fn.extend(Synth, Node);
-
-    var build = function(specs, args) {
-      this.server = cc.server;
-      var fixNumList = specs.consts.map(function(value) {
-        return new FixNum(value);
-      });
-      var unitList = specs.defs.map(function(spec) {
-        return new Unit(this, spec);
-      }, this);
-      this.controls = new Float32Array(specs.params.values);
-      this.set(args);
-      this.unitList = unitList.filter(function(unit) {
-        var inputs  = unit.inputs;
-        var inRates = unit.inRates;
-        var inSpec  = unit.specs[3];
-        for (var i = 0, imax = inputs.length; i < imax; ++i) {
-          var i2 = i << 1;
-          if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
-            inRates[i] = C.SCALAR;
-          } else {
-            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
-            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
-          }
-        }
-        unit.init();
-        return !!unit.process;
-      });
-    };
-    Synth.prototype.set = function(args) {
-      if (!args) {
-        return this;
-      }
-      return this;
-    };
-    Synth.prototype.process = function(inNumSamples) {
-      if (this.running) {
-        var unitList = this.unitList;
-        for (var i = 0, imax = unitList.length; i < imax; ++i) {
-          var unit = unitList[i];
-          unit.process(unit.rate.bufLength);
-        }
-      }
-      if (this.next) {
-        this.next.process(inNumSamples);
-      }
-    };
-    
-    return Synth;
-  })();
-
-  var install = function() {
-  };
-  
-  module.exports = {
-    Node : Node,
-    Group: Group,
-    Synth: Synth,
-    install: install,
   };
 
 });
@@ -1992,7 +1975,6 @@ define('cc/server/bop', function(require, exports, module) {
 define('cc/server/ugen/ugen', function(require, exports, module) {
 
   var fn = require("../fn");
-  var C  = fn.constant;
   var array = require("../array.impl");
   var slice = [].slice;
 
@@ -2001,8 +1983,8 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   var UGen = (function() {
     function UGen() {
       this.klassName = "UGen";
-      this.rate = C.AUDIO;
-      this.signalRange = C.BIPOLAR;
+      this.rate = 2;
+      this.signalRange = 2;
       this.specialIndex = 0;
       this.outputIndex  = 0;
       this.numOfInputs  = 0;
@@ -2098,7 +2080,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     fn.extend(Control, MultiOutUGen);
 
     Control.prototype.$kr = function(values) {
-      return this.multiNewList([C.CONTROL].concat(values));
+      return this.multiNewList([1].concat(values));
     };
     fn.classmethod(Control);
 
@@ -2119,11 +2101,11 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     fn.extend(Out, UGen);
 
     Out.prototype.$ar = fn(function(bus, channelsArray) {
-      this.multiNewList([C.AUDIO, bus].concat(channelsArray));
+      this.multiNewList([2, bus].concat(channelsArray));
       return 0; // Out has no output
     }).defaults("bus=0,channelsArray=0").build();
     Out.prototype.$kr = fn(function(bus, channelsArray) {
-      this.multiNewList([C.CONTROL, bus].concat(channelsArray));
+      this.multiNewList([1, bus].concat(channelsArray));
       return 0; // Out has no output
     }).defaults("bus=0,channelsArray=0").build();
     
@@ -2154,7 +2136,6 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
 define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
   var fn = require("../fn");
-  var C  = fn.constant;
   var array = require("../array.impl");
   var UGen  = require("./ugen").UGen;
 
@@ -2167,6 +2148,8 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     return (obj && obj.rate) || 0;
   };
 
+  var UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
+  
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
       UGen.call(this);
@@ -2175,25 +2158,27 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     fn.extend(UnaryOpUGen, UGen);
 
     UnaryOpUGen.prototype.$new = function(selector, a) {
-      return this.multiNew(C.AUDIO, selector, a);
+      return this.multiNew(2, selector, a);
     };
 
     fn.classmethod(UnaryOpUGen);
 
     UnaryOpUGen.prototype.initialize = function(op, a) {
       this.op = op;
-      var index = C.UNARY_OP_UGEN_MAP.indexOf(op);
+      var index = UNARY_OP_UGEN_MAP.indexOf(op);
       if (index === -1) {
         throw "Unknown operator: " + op;
       }
       this.specialIndex = index;
-      this.rate   = a.rate|C.SCALAR;
+      this.rate   = a.rate|0;
       this.inputs = [a];
       return this;
     };
 
     return UnaryOpUGen;
   })();
+
+  var BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
 
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
@@ -2253,18 +2238,18 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       } else if (selector === "*!") {
         selector = "*";
       }
-      return UGen.new1.apply(this, [C.AUDIO].concat(selector, a, b));
+      return UGen.new1.apply(this, [2].concat(selector, a, b));
     };
     fn.classmethod(BinaryOpUGen);
 
     BinaryOpUGen.prototype.initialize = function(op, a, b) {
       this.op = op;
-      var index = C.BINARY_OP_UGEN_MAP.indexOf(op);
+      var index = BINARY_OP_UGEN_MAP.indexOf(op);
       if (index === -1) {
         throw "Unknown operator: " + op;
       }
       this.specialIndex = index;
-      this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
+      this.rate = Math.max(a.rate|0, b.rate|0);
       this.inputs = [a, b];
       return this;
     };
@@ -2310,10 +2295,10 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
         return BinaryOpUGen.new1(null, "+", _in, add);
       }
       if (validate(_in, mul, add)) {
-        return UGen.new1.apply(this, [C.AUDIO].concat(_in, mul, add));
+        return UGen.new1.apply(this, [2].concat(_in, mul, add));
       }
       if (validate(mul, _in, add)) {
-        return UGen.new1.apply(this, [C.AUDIO].concat(mul, _in, add));
+        return UGen.new1.apply(this, [2].concat(mul, _in, add));
       }
       return _in * mul + add;
     };
@@ -2330,12 +2315,12 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       _in = asRate(_in);
       mul = asRate(mul);
       add = asRate(add);
-      if (_in === C.AUDIO) {
+      if (_in === 2) {
         return true;
       }
-      if (_in === C.CONTROL &&
-          (mul === C.CONTROL || mul === C.SCALAR) &&
-          (add === C.CONTROL || add === C.SCALAR)) {
+      if (_in === 1 &&
+          (mul === 1 || mul === 0) &&
+          (add === 1 || add === 0)) {
         return true;
       }
       return false;
@@ -2526,7 +2511,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
   UGen.prototype.range = fn(function(lo, hi) {
     var mul, add;
-    if (this.signalRange === C.BIPOLAR) {
+    if (this.signalRange === 2) {
       mul = (hi - lo) * 0.5;
       add = mul + lo;
     } else {
@@ -2553,6 +2538,8 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     MulAdd: MulAdd,
     Sum3: Sum3,
     Sum4: Sum4,
+    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
+    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
     install: install,
   };
 
@@ -2619,7 +2606,6 @@ define('cc/server/ugen/installer', function(require, exports, module) {
 define('cc/server/ugen/osc', function(require, exports, module) {
   
   var fn = require("../fn");
-  var C  = fn.constant;
   var UGen  = require("./ugen").UGen;
 
   var SinOsc = (function() {
@@ -2630,11 +2616,11 @@ define('cc/server/ugen/osc', function(require, exports, module) {
     fn.extend(SinOsc, UGen);
     
     SinOsc.prototype.$ar = fn(function(freq, phase, mul, add) {
-      return this.multiNew(C.AUDIO, freq, phase).madd(mul, add);
+      return this.multiNew(2, freq, phase).madd(mul, add);
     }).defaults("freq=440,phase=0,mul=1,add=0").build();
     
     SinOsc.prototype.$kr = fn(function(freq, phase, mul, add) {
-      return this.multiNew(C.CONTROL, freq, phase).madd(mul, add);
+      return this.multiNew(1, freq, phase).madd(mul, add);
     }).defaults("freq=440,phase=0,mul=1,add=0").build();
     
     fn.classmethod(SinOsc);
@@ -2926,19 +2912,18 @@ define('cc/server/synth/installer', function(require, exports, module) {
 });
 define('cc/server/synth/out', function(require, exports, module) {
 
-  var C = require("../fn").constant;
   var unit = require("./unit");
 
   var Out = function() {
     var ctor = function() {
       this._busBuffer = this.parent.server.busBuffer;
       this._bufLength = this.parent.server.bufLength;
-      if (this.calcRate === C.AUDIO) {
+      if (this.calcRate === 2) {
         this.process = next_a;
         this._busOffset = 0;
       } else {
         this.process = next_k;
-        this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
+        this._busOffset = this._bufLength * 128;
       }
     };
     var next_a = function(inNumSamples) {
@@ -2976,24 +2961,24 @@ define('cc/server/synth/out', function(require, exports, module) {
 });
 define('cc/server/synth/bop', function(require, exports, module) {
 
-  var C = require("../fn").constant;
   var unit = require("./unit");
+  var BINARY_OP_UGEN_MAP = require("../ugen/basic_ops").BINARY_OP_UGEN_MAP;
 
-  var AA = C.AUDIO   * 10 + C.AUDIO;
-  var AK = C.AUDIO   * 10 + C.CONTROL;
-  var AI = C.AUDIO   * 10 + C.SCALAR;
-  var KA = C.CONTROL * 10 + C.AUDIO;
-  var KK = C.CONTROL * 10 + C.CONTROL;
-  var KI = C.CONTROL * 10 + C.SCALAR;
-  var IA = C.SCALAR  * 10 + C.AUDIO;
-  var IK = C.SCALAR  * 10 + C.CONTROL;
-  var II = C.SCALAR  * 10 + C.SCALAR;
+  var AA = 2   * 10 + 2;
+  var AK = 2   * 10 + 1;
+  var AI = 2   * 10 + 0;
+  var KA = 1 * 10 + 2;
+  var KK = 1 * 10 + 1;
+  var KI = 1 * 10 + 0;
+  var IA = 0  * 10 + 2;
+  var IK = 0  * 10 + 1;
+  var II = 0  * 10 + 0;
 
   var calcFunc = {};
   
   var BinaryOpUGen = function() {
     var ctor = function() {
-      var func = calcFunc[C.BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
       var process;
       if (func) {
         switch (this.inRates[0] * 10 + this.inRates[1]) {
@@ -3441,7 +3426,6 @@ define('cc/server/synth/control', function(require, exports, module) {
 });
 define('cc/server/synth/sinosc', function(require, exports, module) {
 
-  var C = require("../fn").constant;
   var unit = require("./unit");
   
   var twopi     = 2 * Math.PI;
@@ -3490,17 +3474,17 @@ define('cc/server/synth/sinosc', function(require, exports, module) {
       this._cpstoinc = kSineSize * this.rate.sampleDur;
       this._mask  = kSineMask;
       this._table = gSineWavetable;
-      if (this.inRates[0] === C.AUDIO) {
-        if (this.inRates[1] === C.AUDIO) {
+      if (this.inRates[0] === 2) {
+        if (this.inRates[1] === 2) {
           this.process = aa;
-        } else if (this.inRates[1] === C.CONTROL) {
+        } else if (this.inRates[1] === 1) {
           this.process = ak;
         } else {
           this.process = ai;
         }
         this._x = 0;
       } else {
-        if (this.inRates[1] === C.AUDIO) {
+        if (this.inRates[1] === 2) {
           this.process = ka;
           this._x = 0;
         } else {

@@ -3,7 +3,6 @@ define(function(require, exports, module) {
 
   var cc = require("../../cc");
   var fn = require("../fn");
-  var C  = fn.constant;
   var FixNum = require("../synth/fixnum").FixNum;
   var Unit   = require("../synth/unit").Unit;
 

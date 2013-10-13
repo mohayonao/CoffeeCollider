@@ -1,0 +1,9 @@
+{
+  "SCALAR" : 0,
+  "CONTROL": 1,
+  "AUDIO"  : 2,
+  "UNIPOLAR": 1,
+  "BIPOLAR" : 2,
+  "AUDIO_BUS_LEN"  : 128,
+  "CONTROL_BUS_LEN": 4096
+}

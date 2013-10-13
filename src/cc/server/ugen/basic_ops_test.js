@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var C = require("../fn").constant;
   var UGen = require("./ugen").UGen;
   var basic_ops = require("./basic_ops");
   var BinaryOpUGen = basic_ops.BinaryOpUGen;

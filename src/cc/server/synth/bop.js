@@ -1,8 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var C = require("../fn").constant;
   var unit = require("./unit");
+  var BINARY_OP_UGEN_MAP = require("../ugen/basic_ops").BINARY_OP_UGEN_MAP;
 
   var AA = C.AUDIO   * 10 + C.AUDIO;
   var AK = C.AUDIO   * 10 + C.CONTROL;
@@ -18,7 +18,7 @@ define(function(require, exports, module) {
   
   var BinaryOpUGen = function() {
     var ctor = function() {
-      var func = calcFunc[C.BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
       var process;
       if (func) {
         switch (this.inRates[0] * 10 + this.inRates[1]) {
