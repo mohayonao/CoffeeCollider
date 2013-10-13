@@ -145,12 +145,13 @@
             if (t - prevt > 60) {
               var strm = cc.getStream();
               var len  = strm.length * 0.5;
-              var dy   = canvas.height / len;
+              var imax = 256;
+              var dy   = canvas.height / imax;
               var step = 8;
               context.fillRect(0, 0, canvas.width, canvas.height);
               context.beginPath();
               context.moveTo(calcX((strm[0]+strm[len])*0.5), 0);
-              for (var i = step; i < len; i += step) {
+              for (var i = 0; i < imax; i++) {
                 context.lineTo(calcX((strm[i]+strm[i+len])*0.5), i * dy);
               }
               context.lineTo(calcX((strm[len-1]+strm[strm.length-1])*0.5), canvas.height);
