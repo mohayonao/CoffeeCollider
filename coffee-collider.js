@@ -196,9 +196,6 @@ define('cc/client/client', function(require, exports, module) {
       
       this.isPlaying = false;
       this.strm = new Float32Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
     }
     SynthClient.prototype.destroy = function() {
       this.sys.remove(this);
@@ -207,11 +204,19 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList = new Array(8);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
         this.sys.play();
         this.send(["/play", this.sys.syncCount]);
       }
     };
     SynthClient.prototype.reset = function() {
+      this.send(["/reset"]);
     };
     SynthClient.prototype.pause = function() {
       if (this.isPlaying) {
@@ -1232,6 +1237,10 @@ define('cc/server/server', function(require, exports, module) {
     }
   };
   commands["/reset"] = function() {
+    this.rootNode.prev = null;
+    this.rootNode.next = null;
+    this.rootNode.head = null;
+    this.rootNode.tail = null;
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];

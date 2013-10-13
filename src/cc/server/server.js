@@ -92,6 +92,10 @@ define(function(require, exports, module) {
     }
   };
   commands["/reset"] = function() {
+    this.rootNode.prev = null;
+    this.rootNode.next = null;
+    this.rootNode.head = null;
+    this.rootNode.tail = null;
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
