@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var Group = require("./ctrl/node").Group;
+  var Group = require("./node").Group;
   var pack = require("./utils").pack;
   
   var commands = {};

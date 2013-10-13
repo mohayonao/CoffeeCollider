@@ -1132,6 +1132,7 @@ define('cc/server/installer', function(require, exports, module) {
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./node").install(namespace);
+    require("./ugen/installer").install(namespace);
     require("./synth/installer").install(namespace);
     delete namespace.register;
   };
@@ -1144,7 +1145,7 @@ define('cc/server/installer', function(require, exports, module) {
 define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
-  var Group = require("./ctrl/node").Group;
+  var Group = require("./node").Group;
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -1304,104 +1305,192 @@ define('cc/server/cc', function(require, exports, module) {
   module.exports = require("../cc");
 
 });
-define('cc/server/utils', function(require, exports, module) {
-  
-  var pack = (function() {
-    var _ = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            result[key] = _(data[key], stack);
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data, []);
-    };
-  })();
-  
-  module.exports = {
-    pack: pack
-  };
+define('cc/server/node', function(require, exports, module) {
 
-});
-define('cc/server/array', function(require, exports, module) {
-
+  var cc = require("./cc");
   var fn = require("./fn");
-  var impl = require("./array.impl");
+  var FixNum = require("./synth/fixnum").FixNum;
+  var Unit   = require("./synth/unit").Unit;
 
-  var zip = impl.zip;
-  
-  var flatten = fn(function(list, level) {
-    if (!Array.isArray(list)) {
-      return [list];
+  var Node = (function() {
+    function Node() {
+      this.klassName = "Node";
+      this.next    = null;
+      this.prev    = null;
+      this.parent  = null;
+      this.running = true;
     }
-    return impl.flatten(list, level, []);
-  }).defaults("list,level=Infinity").build();
-  
-  var clump = fn(function(list, groupSize) {
-    if (!Array.isArray(list)) {
-      return [list];
-    }
-    return impl.clump(list, groupSize);
-  }).defaults("list,groupSize=2").build();
-  
-  var install = function(namespace) {
-    Array.prototype.zip = function() {
-      return zip.apply(null, this);
+    
+    var appendFunc = {};
+    appendFunc.addToHead = function(node) {
+      var prev;
+      if (this.head === null) {
+        this.head = this.tail = node;
+      } else {
+        prev = this.head.prev;
+        if (prev) { prev.next = node; }
+        node.next = this.head;
+        this.head.prev = node;
+        this.head = node;
+      }
+      node.parent = this;
     };
-    Array.prototype.flatten = fn(function(level) {
-      return impl.flatten(this, level, []);
-    }).defaults("level=Infinity").build();
-    Array.prototype.clump = fn(function(groupSize) {
-      return impl.clump(this, groupSize);
-    }).defaults("groupSize=2").build();
-
-    Array.prototype.toString = function() {
-      return "[ " + this.map(function(x) {
-        if (!x) {
-          return x + "";
-        }
-        return x.toString();
-      }).join(", ") + " ]";
+    appendFunc.addToTail = function(node) {
+      var next;
+      if (this.tail === null) {
+        this.head = this.tail = node;
+      } else {
+        next = this.tail.next;
+        if (next) { next.prev = node; }
+        node.prev = this.tail;
+        this.tail.next = node;
+        this.tail = node;
+      }
+      node.parent = this;
+    };
+    appendFunc.addBefore = function(node) {
+      var prev = this.prev;
+      this.prev = node;
+      node.prev = prev;
+      if (prev) { prev.next = node; }
+      node.next = this;
+      if (this.parent && this.parent.head === this) {
+        this.parent.head = node;
+      }
+      node.parent = this.parent;
+    };
+    appendFunc.addAfter = function(node) {
+      var next = this.next;
+      this.next = node;
+      node.next = next;
+      if (next) { next.prev = node; }
+      node.prev = this;
+      if (this.parent && this.parent.tail === this) {
+        this.parent.tail = node;
+      }
+      node.parent = this.parent;
     };
     
-    if (namespace) {
-      namespace.zip     = zip;
-      namespace.flatten = flatten;
-      namespace.clump   = clump;
-    }
-  };
+    Node.prototype.append = function(node, addAction) {
+      if (appendFunc[addAction]) {
+        appendFunc[addAction].call(this, node);
+      }
+      return this;
+    };
 
+    Node.prototype.remove = function() {
+      if (this.parent) {
+        if (this.parent.head === this) {
+          this.parent.head = this.next;
+        }
+        if (this.parent.tail === this) {
+          this.parent.tail = this.prev;
+        }
+      }
+      if (this.prev) {
+        this.prev.next = this.next;
+      }
+      if (this.next) {
+        this.next.prev = this.prev;
+      }
+      this.prev = null;
+      this.next = null;
+      this.parent = null;
+      return this;
+    };
+    
+    return Node;
+  })();
+
+  var Group = (function() {
+    function Group() {
+      Node.call(this);
+      this.klassName = "Group";
+      this.head = null;
+      this.tail = null;
+    }
+    fn.extend(Group, Node);
+    
+    Group.prototype.process = function(inNumSamples) {
+      if (this.head && this.running) {
+        this.head.process(inNumSamples);
+      }
+      if (this.next) {
+        this.next.process(inNumSamples);
+      }
+    };
+    
+    return Group;
+  })();
+
+  var Synth = (function() {
+    function Synth(specs, target, args, addAction) {
+      Node.call(this);
+      this.klassName = "Synth";
+      this.specs = JSON.parse(specs);
+      target.append(this, addAction);
+      build.call(this, this.specs, args);
+    }
+    fn.extend(Synth, Node);
+
+    var build = function(specs, args) {
+      this.server = cc.server;
+      var fixNumList = specs.consts.map(function(value) {
+        return new FixNum(value);
+      });
+      var unitList = specs.defs.map(function(spec) {
+        return new Unit(this, spec);
+      }, this);
+      this.controls = new Float32Array(specs.params.values);
+      this.set(args);
+      this.unitList = unitList.filter(function(unit) {
+        var inputs  = unit.inputs;
+        var inRates = unit.inRates;
+        var inSpec  = unit.specs[3];
+        for (var i = 0, imax = inputs.length; i < imax; ++i) {
+          var i2 = i << 1;
+          if (inSpec[i2] === -1) {
+            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
+            inRates[i] = 0;
+          } else {
+            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
+            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+          }
+        }
+        unit.init();
+        return !!unit.process;
+      });
+    };
+    Synth.prototype.set = function(args) {
+      if (!args) {
+        return this;
+      }
+      return this;
+    };
+    Synth.prototype.process = function(inNumSamples) {
+      if (this.running) {
+        var unitList = this.unitList;
+        for (var i = 0, imax = unitList.length; i < imax; ++i) {
+          var unit = unitList[i];
+          unit.process(unit.rate.bufLength);
+        }
+      }
+      if (this.next) {
+        this.next.process(inNumSamples);
+      }
+    };
+    
+    return Synth;
+  })();
+
+  var install = function() {
+  };
+  
   module.exports = {
+    Node : Node,
+    Group: Group,
+    Synth: Synth,
     install: install,
-    zip    : zip,
-    flatten: flatten,
-    clump  : clump,
   };
 
 });
@@ -1619,6 +1708,184 @@ define('cc/server/array.impl', function(require, exports, module) {
   };
   
   module.exports = {
+    zip    : zip,
+    flatten: flatten,
+    clump  : clump,
+  };
+
+});
+define('cc/server/synth/fixnum', function(require, exports, module) {
+
+  var map = {};
+
+  var FixNum = (function() {
+    function FixNum(value) {
+      if (map[value]) {
+        return map[value];
+      }
+      this.klassName = "FixNum";
+      this.outs = [ new Float32Array([value]) ];
+      map[value] = this;
+    }
+    FixNum.reset = function() {
+      map = {};
+    };
+    return FixNum;
+  })();
+
+  module.exports = {
+    FixNum: FixNum
+  };
+
+});
+define('cc/server/synth/unit', function(require, exports, module) {
+
+  var units = {};
+  
+  var Unit = (function() {
+    function Unit(parent, specs) {
+      this.klassName = "Unit";
+      this.parent = parent;
+      this.specs  = specs;
+      this.name         = specs[0];
+      this.calcRate     = specs[1];
+      this.specialIndex = specs[2];
+      this.numOfInputs  = specs[3].length >> 1;
+      this.numOfOutputs = specs[4].length;
+      this.inputs   = new Array(this.numOfInputs);
+      this.inRates  = new Array(this.numOfInputs);
+      this.outRates = specs[4];
+      this.rate = parent.server.getRate(this.calcRate);
+      var bufLength = this.rate.bufLength;
+      var outs = new Array(this.numOfOutputs);
+      for (var i = 0, imax = outs.length; i < imax; ++i) {
+        outs[i] = new Float32Array(bufLength);
+      }
+      this.outs      = outs;
+      this.bufLength = bufLength;
+      this.done      = false;
+    }
+    Unit.prototype.init = function() {
+      var ctor = units[this.name];
+      if (ctor) {
+        ctor.call(this);
+      } else {
+        console.warn(this.name + "'s ctor is not found.");
+      }
+      return this;
+    };
+    return Unit;
+  })();
+
+  var register = function(name, payload) {
+    units[name] = payload();
+  };
+
+  var install = function() {
+  };
+  
+  module.exports = {
+    Unit: Unit,
+    register: register,
+    install : install
+  };
+
+});
+define('cc/server/utils', function(require, exports, module) {
+  
+  var pack = (function() {
+    var _ = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            result[key] = _(data[key], stack);
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _(data, []);
+    };
+  })();
+  
+  module.exports = {
+    pack: pack
+  };
+
+});
+define('cc/server/array', function(require, exports, module) {
+
+  var fn = require("./fn");
+  var impl = require("./array.impl");
+
+  var zip = impl.zip;
+  
+  var flatten = fn(function(list, level) {
+    if (!Array.isArray(list)) {
+      return [list];
+    }
+    return impl.flatten(list, level, []);
+  }).defaults("list,level=Infinity").build();
+  
+  var clump = fn(function(list, groupSize) {
+    if (!Array.isArray(list)) {
+      return [list];
+    }
+    return impl.clump(list, groupSize);
+  }).defaults("list,groupSize=2").build();
+  
+  var install = function(namespace) {
+    Array.prototype.zip = function() {
+      return zip.apply(null, this);
+    };
+    Array.prototype.flatten = fn(function(level) {
+      return impl.flatten(this, level, []);
+    }).defaults("level=Infinity").build();
+    Array.prototype.clump = fn(function(groupSize) {
+      return impl.clump(this, groupSize);
+    }).defaults("groupSize=2").build();
+
+    Array.prototype.toString = function() {
+      return "[ " + this.map(function(x) {
+        if (!x) {
+          return x + "";
+        }
+        return x.toString();
+      }).join(", ") + " ]";
+    };
+    
+    if (namespace) {
+      namespace.zip     = zip;
+      namespace.flatten = flatten;
+      namespace.clump   = clump;
+    }
+  };
+
+  module.exports = {
+    install: install,
     zip    : zip,
     flatten: flatten,
     clump  : clump,
@@ -2346,269 +2613,299 @@ define('cc/server/uop', function(require, exports, module) {
   };
 
 });
-define('cc/server/node', function(require, exports, module) {
+define('cc/server/ugen/installer', function(require, exports, module) {
 
-  var cc = require("./cc");
-  var fn = require("./fn");
-  var FixNum = require("./synth/fixnum").FixNum;
-  var Unit   = require("./synth/unit").Unit;
+  var install = function(namespace) {
+    require("./ugen").install(namespace);
+    require("./basic_ops").install(namespace);
+    require("./osc").install(namespace);
+    require("./def").install(namespace);
+  };
 
-  var Node = (function() {
-    function Node() {
-      this.klassName = "Node";
-      this.next    = null;
-      this.prev    = null;
-      this.parent  = null;
-      this.running = true;
+  module.exports = {
+    install: install
+  };
+ 
+});
+define('cc/server/ugen/osc', function(require, exports, module) {
+  
+  var fn = require("../fn");
+  var UGen  = require("./ugen").UGen;
+
+  var SinOsc = (function() {
+    function SinOsc() {
+      UGen.call(this);
+      this.klassName = "SinOsc";
     }
+    fn.extend(SinOsc, UGen);
     
-    var appendFunc = {};
-    appendFunc.addToHead = function(node) {
-      var prev;
-      if (this.head === null) {
-        this.head = this.tail = node;
-      } else {
-        prev = this.head.prev;
-        if (prev) { prev.next = node; }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addToTail = function(node) {
-      var next;
-      if (this.tail === null) {
-        this.head = this.tail = node;
-      } else {
-        next = this.tail.next;
-        if (next) { next.prev = node; }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addBefore = function(node) {
-      var prev = this.prev;
-      this.prev = node;
-      node.prev = prev;
-      if (prev) { prev.next = node; }
-      node.next = this;
-      if (this.parent && this.parent.head === this) {
-        this.parent.head = node;
-      }
-      node.parent = this.parent;
-    };
-    appendFunc.addAfter = function(node) {
-      var next = this.next;
-      this.next = node;
-      node.next = next;
-      if (next) { next.prev = node; }
-      node.prev = this;
-      if (this.parent && this.parent.tail === this) {
-        this.parent.tail = node;
-      }
-      node.parent = this.parent;
-    };
+    SinOsc.prototype.$ar = fn(function(freq, phase, mul, add) {
+      return this.multiNew(2, freq, phase).madd(mul, add);
+    }).defaults("freq=440,phase=0,mul=1,add=0").build();
     
-    Node.prototype.append = function(node, addAction) {
-      if (appendFunc[addAction]) {
-        appendFunc[addAction].call(this, node);
-      }
-      return this;
-    };
-
-    Node.prototype.remove = function() {
-      if (this.parent) {
-        if (this.parent.head === this) {
-          this.parent.head = this.next;
-        }
-        if (this.parent.tail === this) {
-          this.parent.tail = this.prev;
-        }
-      }
-      if (this.prev) {
-        this.prev.next = this.next;
-      }
-      if (this.next) {
-        this.next.prev = this.prev;
-      }
-      this.prev = null;
-      this.next = null;
-      this.parent = null;
-      return this;
-    };
+    SinOsc.prototype.$kr = fn(function(freq, phase, mul, add) {
+      return this.multiNew(1, freq, phase).madd(mul, add);
+    }).defaults("freq=440,phase=0,mul=1,add=0").build();
     
-    return Node;
+    fn.classmethod(SinOsc);
+    
+    return SinOsc;
   })();
 
-  var Group = (function() {
-    function Group() {
-      Node.call(this);
-      this.klassName = "Group";
-      this.head = null;
-      this.tail = null;
-    }
-    fn.extend(Group, Node);
-    
-    Group.prototype.process = function(inNumSamples) {
-      if (this.head && this.running) {
-        this.head.process(inNumSamples);
-      }
-      if (this.next) {
-        this.next.process(inNumSamples);
-      }
-    };
-    
-    return Group;
-  })();
+  var install = function(namespace) {
+    namespace.SinOsc = SinOsc;
+  };
+  
+  module.exports = {
+    SinOsc: SinOsc,
+    install: install
+  };
 
-  var Synth = (function() {
-    function Synth(specs, target, args, addAction) {
-      Node.call(this);
-      this.klassName = "Synth";
-      this.specs = JSON.parse(specs);
-      target.append(this, addAction);
-      build.call(this, this.specs, args);
-    }
-    fn.extend(Synth, Node);
+});
+define('cc/server/ugen/def', function(require, exports, module) {
 
-    var build = function(specs, args) {
-      this.server = cc.server;
-      var fixNumList = specs.consts.map(function(value) {
-        return new FixNum(value);
+  var cc    = require("../cc");
+  var fn    = require("../fn");
+  var ugen  = require("./ugen");
+  var Node  = require("../node").Node;
+  var Synth = require("../node").Synth;
+  
+  var SynthDef = (function() {
+    function SynthDef() {
+      this.klassName = "SynthDef";
+    }
+    SynthDef.prototype.initialize = function(func, args) {
+      args = unpackArguments(args);
+      
+      var isVaridArgs = args.vals.every(function(item) {
+        if (typeof item === "number") {
+          return true;
+        } else if (Array.isArray(item)) {
+          return item.every(function(item) {
+            return typeof item === "number";
+          });
+        }
+        if (item === undefined || item === null) {
+          return true;
+        }
+        return false;
       });
-      var unitList = specs.defs.map(function(spec) {
-        return new Unit(this, spec);
-      }, this);
-      this.controls = new Float32Array(specs.params.values);
-      this.set(args);
-      this.unitList = unitList.filter(function(unit) {
-        var inputs  = unit.inputs;
-        var inRates = unit.inRates;
-        var inSpec  = unit.specs[3];
-        for (var i = 0, imax = inputs.length; i < imax; ++i) {
-          var i2 = i << 1;
-          if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
-            inRates[i] = 0;
-          } else {
-            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
-            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+      if (!isVaridArgs) {
+        throw "UgenGraphFunc's arguments should be a number or an array that contains a number.";
+      }
+      
+      var params  = { names:[], indices:[], length:[], values:[] };
+      var flatten = [];
+      var i, imax, length;
+      for (i = 0, imax = args.vals.length; i < imax; ++i) {
+        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
+        params.names  .push(args.keys[i]);
+        params.indices.push(flatten.length);
+        params.length .push(length);
+        params.values = params.values.concat(args.vals[i]);
+        flatten = flatten.concat(args.vals[i]);
+      }
+      var reshaped = [];
+      var controls = ugen.Control.kr(flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      for (i = 0; i < imax; ++i) {
+        if (Array.isArray(args.vals[i])) {
+          reshaped.push(controls.slice(0, args.vals[i].length));
+        } else {
+          reshaped.push(controls.shift());
+        }
+      }
+      
+      var children = [];
+      ugen.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
+      try {
+        func.apply(null, reshaped);
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        ugen.setSynthDef(null);
+      }
+
+      var consts = [];
+      children.forEach(function(x) {
+        if (x.inputs) {
+          x.inputs.forEach(function(_in) {
+            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
+              consts.push(_in);
+            }
+          });
+        }
+      });
+      consts.sort();
+      var ugenlist = topoSort(children).filter(function(x) {
+        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+      });
+      var defs = ugenlist.map(function(x) {
+        var inputs = [];
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
+            inputs.push(index, subindex);
+          });
+        }
+        var outputs;
+        if (x instanceof ugen.MultiOutUGen) {
+          outputs = x.channels.map(function(x) {
+            return x.rate;
+          });
+        } else if (x.numOfOutputs === 1) {
+          outputs = [ x.rate ];
+        } else {
+          outputs = [];
+        }
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
+      });
+      var specs = {
+        consts: consts,
+        defs  : defs,
+        params: params,
+      };
+      this.specs = specs;
+    };
+
+    SynthDef.prototype.play = fn(function() {
+      var target, args, addAction;
+      var i = 0;
+      target = args;
+      if (arguments[i] instanceof Node) {
+        target = arguments[i++];
+      } else {
+        target = cc.server.rootNode;
+      }
+      if (fn.isDictionary(arguments[i])) {
+        args = arguments[i++];
+      }
+      switch (arguments[i]) {
+      case "addToHead":
+      case "addToTail":
+      case "addBefore":
+      case "addAfter" :
+        addAction = arguments[i++];
+        break;
+      default:
+        addAction = "addToHead";
+      }
+      return new Synth(JSON.stringify(this.specs), target, args, addAction);
+    }).defaults("target,args,addAction='addToHead'").multicall().build();
+
+    var topoSort = (function() {
+      var _topoSort = function(x, list) {
+        var index = list.indexOf(x);
+        if (index !== -1) {
+          list.splice(index, 1);
+        }
+        list.unshift(x);
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            _topoSort(x, list);
+          });
+        }
+      };
+      return function(list) {
+        list.forEach(function(x) {
+          if (x instanceof ugen.Out) {
+            x.inputs.forEach(function(x) {
+              _topoSort(x, list);
+            });
           }
-        }
-        unit.init();
-        return !!unit.process;
-      });
-    };
-    Synth.prototype.set = function(args) {
-      if (!args) {
-        return this;
-      }
-      return this;
-    };
-    Synth.prototype.process = function(inNumSamples) {
-      if (this.running) {
-        var unitList = this.unitList;
-        for (var i = 0, imax = unitList.length; i < imax; ++i) {
-          var unit = unitList[i];
-          unit.process(unit.rate.bufLength);
-        }
-      }
-      if (this.next) {
-        this.next.process(inNumSamples);
-      }
-    };
+        });
+        return list;
+      };
+    })();
     
-    return Synth;
+    return SynthDef;
   })();
 
-  var install = function() {
-  };
-  
-  module.exports = {
-    Node : Node,
-    Group: Group,
-    Synth: Synth,
-    install: install,
-  };
-
-});
-define('cc/server/synth/fixnum', function(require, exports, module) {
-
-  var map = {};
-
-  var FixNum = (function() {
-    function FixNum(value) {
-      if (map[value]) {
-        return map[value];
+  var splitArguments = function(args) {
+    var result  = [];
+    var begin   = 0;
+    var bracket = 0;
+    var inStr   = null;
+    for (var i = 0, imax = args.length; i < imax; ++i) {
+      var c = args.charAt(i);
+      if (args.charAt(i-1) === "\\") {
+        if (args.charAt(i-2) !== "\\") {
+          continue;
+        }
       }
-      this.klassName = "FixNum";
-      this.outs = [ new Float32Array([value]) ];
-      map[value] = this;
+      if (c === "\"" || c === "'") {
+        if (inStr === null) {
+          inStr = c;
+        } else if (inStr === c) {
+          inStr = null;
+        }
+      }
+      if (inStr) {
+        continue;
+      }
+      switch (c) {
+      case ",":
+        if (bracket === 0) {
+          result.push(args.slice(begin, i).trim());
+          begin = i + 1;
+        }
+        break;
+      case "[":
+        bracket += 1;
+        break;
+      case "]":
+        bracket -= 1;
+        break;
+      }
     }
-    FixNum.reset = function() {
-      map = {};
-    };
-    return FixNum;
-  })();
-
-  module.exports = {
-    FixNum: FixNum
-  };
-
-});
-define('cc/server/synth/unit', function(require, exports, module) {
-
-  var units = {};
-  
-  var Unit = (function() {
-    function Unit(parent, specs) {
-      this.klassName = "Unit";
-      this.parent = parent;
-      this.specs  = specs;
-      this.name         = specs[0];
-      this.calcRate     = specs[1];
-      this.specialIndex = specs[2];
-      this.numOfInputs  = specs[3].length >> 1;
-      this.numOfOutputs = specs[4].length;
-      this.inputs   = new Array(this.numOfInputs);
-      this.inRates  = new Array(this.numOfInputs);
-      this.outRates = specs[4];
-      this.rate = parent.server.getRate(this.calcRate);
-      var bufLength = this.rate.bufLength;
-      var outs = new Array(this.numOfOutputs);
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i] = new Float32Array(bufLength);
-      }
-      this.outs      = outs;
-      this.bufLength = bufLength;
-      this.done      = false;
+    if (begin !== i) {
+      result.push(args.slice(begin, i).trim());
     }
-    Unit.prototype.init = function() {
-      var ctor = units[this.name];
-      if (ctor) {
-        ctor.call(this);
-      } else {
-        console.warn(this.name + "'s ctor is not found.");
+    return result;
+  };
+
+  var unpackArguments = function(args) {
+    var keys = [];
+    var vals = [];
+    if (args) {
+      splitArguments(args).forEach(function(items) {
+        var i = items.indexOf("=");
+        var k, v;
+        if (i === -1) {
+          k = items;
+          v = undefined;
+        } else {
+          k = items.substr(0, i).trim();
+          v = eval.call(null, items.substr(i + 1));
+        }
+        keys.push(k);
+        vals.push(v);
+      });
+    }
+    return { keys:keys, vals:vals };
+  };
+
+  var install = function(namespace) {
+    namespace.def = function(func) {
+      if (typeof func === "function") {
+        var instance = new SynthDef();
+        instance.initialize.apply(instance, arguments);
+        return instance;
       }
-      return this;
+      throw "def() requires a function.";
     };
-    return Unit;
-  })();
-
-  var register = function(name, payload) {
-    units[name] = payload();
   };
 
-  var install = function() {
-  };
-  
   module.exports = {
-    Unit: Unit,
-    register: register,
-    install : install
+    splitArguments : splitArguments ,
+    unpackArguments: unpackArguments,
+    install: install
   };
 
 });
