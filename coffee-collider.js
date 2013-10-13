@@ -18,9 +18,6 @@ var _require = function(parentId, moduleName) {
     var req = function(module) {
       return _require(moduleName, module);
     };
-    if (typeof module !== "function") {
-      throw (moduleName);
-    }
     var ret = module(req, exports, mod);
     exports = ret || mod.exports;
     _define.modules[moduleName] = exports;
@@ -1133,7 +1130,7 @@ define('cc/server/installer', function(require, exports, module) {
     require("./uop").install(namespace);
     require("./node").install(namespace);
     require("./ugen/installer").install(namespace);
-    require("./synth/installer").install(namespace);
+    require("./unit/installer").install(namespace);
     delete namespace.register;
   };
 
@@ -1309,8 +1306,8 @@ define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var FixNum = require("./synth/fixnum").FixNum;
-  var Unit   = require("./synth/unit").Unit;
+  var FixNum = require("./unit/fixnum").FixNum;
+  var Unit   = require("./unit/unit").Unit;
 
   var Node = (function() {
     function Node() {
@@ -1714,7 +1711,7 @@ define('cc/server/array.impl', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/fixnum', function(require, exports, module) {
+define('cc/server/unit/fixnum', function(require, exports, module) {
 
   var map = {};
 
@@ -1738,7 +1735,7 @@ define('cc/server/synth/fixnum', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/unit', function(require, exports, module) {
+define('cc/server/unit/unit', function(require, exports, module) {
 
   var units = {};
   
@@ -2909,7 +2906,7 @@ define('cc/server/ugen/def', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/installer', function(require, exports, module) {
+define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
     require("./out").install();
@@ -2923,7 +2920,7 @@ define('cc/server/synth/installer', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/out', function(require, exports, module) {
+define('cc/server/unit/out', function(require, exports, module) {
 
   var unit = require("./unit");
 
@@ -2972,7 +2969,7 @@ define('cc/server/synth/out', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/bop', function(require, exports, module) {
+define('cc/server/unit/bop', function(require, exports, module) {
 
   var unit = require("./unit");
   var BINARY_OP_UGEN_MAP = require("../ugen/basic_ops").BINARY_OP_UGEN_MAP;
@@ -3403,7 +3400,7 @@ define('cc/server/synth/bop', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/control', function(require, exports, module) {
+define('cc/server/unit/control', function(require, exports, module) {
 
   var unit = require("./unit");
 
@@ -3437,7 +3434,7 @@ define('cc/server/synth/control', function(require, exports, module) {
   };
 
 });
-define('cc/server/synth/sinosc', function(require, exports, module) {
+define('cc/server/unit/sinosc', function(require, exports, module) {
 
   var unit = require("./unit");
   
