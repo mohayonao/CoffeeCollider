@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var Group = require("./ctrl/node").Group;
+  var pack = require("./utils").pack;
   
   var commands = {};
   var twopi = 2 * Math.PI;
@@ -121,44 +122,6 @@ define(function(require, exports, module) {
       }
     }
     return Rate;
-  })();
-
-  var pack = (function() {
-    var _ = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            result[key] = _(data[key], stack);
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data, []);
-    };
   })();
   
   var install = function() {

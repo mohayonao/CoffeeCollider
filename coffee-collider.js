@@ -18,6 +18,9 @@ var _require = function(parentId, moduleName) {
     var req = function(module) {
       return _require(moduleName, module);
     };
+    if (typeof module !== "function") {
+      throw (moduleName);
+    }
     var ret = module(req, exports, mod);
     exports = ret || mod.exports;
     _define.modules[moduleName] = exports;
@@ -163,6 +166,7 @@ define('cc/client/client', function(require, exports, module) {
   var cc = require("../cc");
   var SoundSystem = require("./sound_system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
+  var unpack = require("./utils").unpack;
 
   var commands = {};
   
@@ -256,49 +260,7 @@ define('cc/client/client', function(require, exports, module) {
     };
     return SynthClient;
   })();
-
-  var unpack = (function() {
-    var func = function() {};
-    var _ = function(data) {
-      if (!data) {
-        return data;
-      }
-      if (typeof data === "string") {
-        if (data === "[Function]") {
-          return func;
-        }
-        return data;
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data);
-          });
-        } else {
-          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
-            result = eval.call(null, "new (function " + data.klassName + "(){})");
-            delete data.klassName;
-          } else {
-            result = {};
-          }
-          Object.keys(data).forEach(function(key) {
-            result[key] = _(data[key]);
-          });
-        }
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data);
-    };
-  })();
-
+  
   commands["/connect"] = function() {
     this.isConnected = true;
     this.send([
@@ -1097,6 +1059,55 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
 });
+define('cc/client/utils', function(require, exports, module) {
+
+  var unpack = (function() {
+    var func = function() {};
+    var _ = function(data) {
+      if (!data) {
+        return data;
+      }
+      if (typeof data === "string") {
+        if (data === "[Function]") {
+          return func;
+        }
+        return data;
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data);
+          });
+        } else {
+          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+            result = eval.call(null, "new (function " + data.klassName + "(){})");
+            delete data.klassName;
+          } else {
+            result = {};
+          }
+          Object.keys(data).forEach(function(key) {
+            result[key] = _(data[key]);
+          });
+        }
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _(data);
+    };
+  })();
+  
+  module.exports = {
+    unpack: unpack
+  };
+
+});
 define('cc/server/installer', function(require, exports, module) {
   
   var install = function(namespace) {
@@ -1134,6 +1145,7 @@ define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
   var Group = require("./ctrl/node").Group;
+  var pack = require("./utils").pack;
   
   var commands = {};
   var twopi = 2 * Math.PI;
@@ -1253,7 +1265,47 @@ define('cc/server/server', function(require, exports, module) {
     }
     return Rate;
   })();
+  
+  var install = function() {
+    var server = cc.server = new SynthServer();
+    addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        server.sysSyncCount   = msg[0]|0;
+        server.sysCurrentTime = msg[1]|0;
+        server.syncItems.set(msg);
+      } else {
+        server.recv(msg);
+      }
+    });
+    server.send(["/connect"]);
+    if (typeof global.console === "undefined") {
+      global.console = (function() {
+        var console = {};
+        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+          console[method] = function() {
+            server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+          };
+        });
+        return console;
+      })();
+    }
+  };
+  
+  module.exports = {
+    SynthServer: SynthServer,
+    Rate: Rate,
+    install: install
+  };
 
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  module.exports = require("../cc");
+
+});
+define('cc/server/utils', function(require, exports, module) {
+  
   var pack = (function() {
     var _ = function(data, stack) {
       if (!data) {
@@ -1292,42 +1344,9 @@ define('cc/server/server', function(require, exports, module) {
     };
   })();
   
-  var install = function() {
-    var server = cc.server = new SynthServer();
-    addEventListener("message", function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        server.sysSyncCount   = msg[0]|0;
-        server.sysCurrentTime = msg[1]|0;
-        server.syncItems.set(msg);
-      } else {
-        server.recv(msg);
-      }
-    });
-    server.send(["/connect"]);
-    if (typeof global.console === "undefined") {
-      global.console = (function() {
-        var console = {};
-        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-          console[method] = function() {
-            server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
-          };
-        });
-        return console;
-      })();
-    }
-  };
-  
   module.exports = {
-    SynthServer: SynthServer,
-    Rate: Rate,
-    install: install
+    pack: pack
   };
-
-});
-define('cc/server/cc', function(require, exports, module) {
-
-  module.exports = require("../cc");
 
 });
 define('cc/server/array', function(require, exports, module) {
