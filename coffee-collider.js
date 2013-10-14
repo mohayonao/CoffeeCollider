@@ -689,6 +689,9 @@ define('cc/client/compiler', function(require, exports, module) {
         switch (token[TAG]) {
         case "PARAM_START":
           return index;
+        case "CALL_START":
+          bracket -= 1;
+          break;
         case "(": case "[": case "{":
           bracket -= 1;
           /* falls through */

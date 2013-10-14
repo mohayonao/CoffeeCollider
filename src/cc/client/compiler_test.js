@@ -23,6 +23,26 @@ define(function(require, exports, module) {
         var actual = compiler.findOperandHead(tokens, 5);
         assert.equal(actual, expected);
       });
+      it("with an assign ", function() {
+        var tokens = [
+          [ "("         , "("   , _ ],
+          [ "IDENTIFIER", "a"   , _ ],
+          [ "="         , "="   , _ ],
+          [ "IDENTIFIER", "Math", _ ], // <-- head
+          [ "."         , "."   , _ ],
+          [ "IDENTIFIER", "sin" , _ ],
+          [ "CALL_START" , "("  , _ ],
+          [ "NUMBER"    , 10    , _ ],
+          [ "CALL_END"   , ")"  , _ ],
+          [ "MATH"      , "*"   , _ ], // <-- from
+          [ "NUMBER"    , 10    , _ ],
+          [ ")"         , ")"   , _ ],
+          [ "TERMINATOR", "\n"  , _ ],
+        ];
+        var expected = 3;
+        var actual = compiler.findOperandHead(tokens, 9);
+        assert.equal(actual, expected);
+      });
       it("with a parenthesis", function() {
         var tokens = [
           [ "["         , "["   , _ ],
