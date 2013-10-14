@@ -88,8 +88,8 @@ define(function(require, exports, module) {
       
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code, append, this.compiler.data]);
-        if (typeof callback === "function") {
+        this.send(["/execute", this.execId, code, append, this.compiler.data, !!callback]);
+        if (callback) {
           this.execCallbacks[this.execId] = callback;
         }
         this.execId += 1;

@@ -165,6 +165,7 @@ define(function(require, exports, module) {
         unit.init();
         return !!unit.process;
       });
+      return this;
     };
     fn.classmethod(Synth);
     

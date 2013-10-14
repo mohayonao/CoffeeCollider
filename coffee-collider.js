@@ -247,8 +247,8 @@ define('cc/client/client', function(require, exports, module) {
       
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code, append, this.compiler.data]);
-        if (typeof callback === "function") {
+        this.send(["/execute", this.execId, code, append, this.compiler.data, !!callback]);
+        if (callback) {
           this.execCallbacks[this.execId] = callback;
         }
         this.execId += 1;
@@ -1312,16 +1312,19 @@ define('cc/server/server', function(require, exports, module) {
     this.reset();
   };
   commands["/execute"] = function(msg) {
-    var execId = msg[1];
-    var code   = msg[2];
-    var append = msg[3];
-    var data   = msg[4];
+    var execId   = msg[1];
+    var code     = msg[2];
+    var append   = msg[3];
+    var data     = msg[4];
+    var callback = msg[5];
     if (!append) {
       this.reset();
     }
     global.DATA = data;
-    var result  = pack(eval.call(global, code));
-    this.send(["/execute", execId, result]);
+    var result = eval.call(global, code);
+    if (callback) {
+      this.send(["/execute", execId, pack(result)]);
+    }
   };
   commands["/loadScript"] = function(msg) {
     importScripts(msg[1]);
@@ -1552,6 +1555,7 @@ define('cc/server/node', function(require, exports, module) {
         unit.init();
         return !!unit.process;
       });
+      return this;
     };
     fn.classmethod(Synth);
     

@@ -101,16 +101,19 @@ define(function(require, exports, module) {
     this.reset();
   };
   commands["/execute"] = function(msg) {
-    var execId = msg[1];
-    var code   = msg[2];
-    var append = msg[3];
-    var data   = msg[4];
+    var execId   = msg[1];
+    var code     = msg[2];
+    var append   = msg[3];
+    var data     = msg[4];
+    var callback = msg[5];
     if (!append) {
       this.reset();
     }
     global.DATA = data;
-    var result  = pack(eval.call(global, code));
-    this.send(["/execute", execId, result]);
+    var result = eval.call(global, code);
+    if (callback) {
+      this.send(["/execute", execId, pack(result)]);
+    }
   };
   commands["/loadScript"] = function(msg) {
     importScripts(msg[1]);
