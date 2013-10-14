@@ -18,9 +18,7 @@ define(function(require, exports, module) {
       String.prototype[key] = function() {
         return func(+this);
       };
-      if (namespace && namespace.register) {
-        namespace.register(key);
-      }
+      namespace.register(key);
     });
   };
 

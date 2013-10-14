@@ -146,7 +146,7 @@ define(function(require, exports, module) {
   };
 
   var install = function(namespace) {
-    namespace.Out = Out;
+    namespace.register("Out", Out);
   };
 
   module.exports = {

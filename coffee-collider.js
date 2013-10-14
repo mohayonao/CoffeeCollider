@@ -1142,8 +1142,37 @@ define('cc/server/installer', function(require, exports, module) {
   
   var install = function(namespace) {
     namespace = namespace || {};
-    namespace.register = function(name) {
-      if (!/^__.*__$/.test(name)) {
+    namespace.register = register(namespace);
+    require("./server").install(namespace);
+    require("./array").install(namespace);
+    require("./bop").install(namespace);
+    require("./uop").install(namespace);
+    require("./node").install(namespace);
+    require("./ugen/installer").install(namespace);
+    require("./unit/installer").install(namespace);
+    delete namespace.register;
+  };
+
+  var register = function(namespace) {
+    return function(name, func) {
+      if (func) {
+        if (/^[A-Z]/.test(name)) {
+          var Klass = func;
+          var base = namespace[name] = function() {
+            return new Klass();
+          };
+          if (Klass.classmethods) {
+            Object.keys(Klass.classmethods).forEach(function(key) {
+              key = key.substr(1);
+              if (Klass[key]) {
+                base[key] = Klass[key];
+              }
+            });
+          }
+        } else {
+          namespace[name] = func;
+        }
+      } else if (!/^__.*__$/.test(name)) {
         namespace[name] = function(recv) {
           if (recv !== null && recv !== undefined) {
             var func = recv[name];
@@ -1157,14 +1186,6 @@ define('cc/server/installer', function(require, exports, module) {
         };
       }
     };
-    require("./server").install(namespace);
-    require("./array").install(namespace);
-    require("./bop").install(namespace);
-    require("./uop").install(namespace);
-    require("./node").install(namespace);
-    require("./ugen/installer").install(namespace);
-    require("./unit/installer").install(namespace);
-    delete namespace.register;
   };
 
   module.exports = {
@@ -2017,11 +2038,9 @@ define('cc/server/array', function(require, exports, module) {
       }).join(", ") + " ]";
     };
     
-    if (namespace) {
-      namespace.zip     = zip;
-      namespace.flatten = flatten;
-      namespace.clump   = clump;
-    }
+    namespace.register("zip");
+    namespace.register("flatten");
+    namespace.register("clump");
   };
 
   module.exports = {
@@ -2283,7 +2302,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   };
 
   var install = function(namespace) {
-    namespace.Out = Out;
+    namespace.register("Out", Out);
   };
 
   module.exports = {
@@ -2794,7 +2813,7 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   })();
 
   var install = function(namespace) {
-    namespace.SinOsc = SinOsc;
+    namespace.register("SinOsc", SinOsc);
   };
   
   module.exports = {
@@ -2867,9 +2886,9 @@ define('cc/server/ugen/ui', function(require, exports, module) {
   })();
   
   var install = function(namespace) {
-    namespace.MouseX = MouseX;
-    namespace.MouseY = MouseY;
-    namespace.MouseButton = MouseButton;
+    namespace.register("MouseX", MouseX);
+    namespace.register("MouseY", MouseY);
+    namespace.register("MouseButton", MouseButton);
   };
 
   module.exports = {
@@ -3118,14 +3137,14 @@ define('cc/server/ugen/def', function(require, exports, module) {
   };
 
   var install = function(namespace) {
-    namespace.def = function(func) {
+    namespace.register("def", function(func) {
       if (typeof func === "function") {
         var instance = new SynthDef();
         instance.initialize.apply(instance, arguments);
         return instance;
       }
       throw "def() requires a function.";
-    };
+    });
   };
 
   module.exports = {

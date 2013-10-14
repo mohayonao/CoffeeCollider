@@ -240,14 +240,14 @@ define(function(require, exports, module) {
   };
 
   var install = function(namespace) {
-    namespace.def = function(func) {
+    namespace.register("def", function(func) {
       if (typeof func === "function") {
         var instance = new SynthDef();
         instance.initialize.apply(instance, arguments);
         return instance;
       }
       throw "def() requires a function.";
-    };
+    });
   };
 
   module.exports = {

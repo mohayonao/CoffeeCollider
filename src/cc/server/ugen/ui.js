@@ -63,9 +63,9 @@ define(function(require, exports, module) {
   })();
   
   var install = function(namespace) {
-    namespace.MouseX = MouseX;
-    namespace.MouseY = MouseY;
-    namespace.MouseButton = MouseButton;
+    namespace.register("MouseX", MouseX);
+    namespace.register("MouseY", MouseY);
+    namespace.register("MouseButton", MouseButton);
   };
 
   module.exports = {

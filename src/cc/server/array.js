@@ -40,11 +40,9 @@ define(function(require, exports, module) {
       }).join(", ") + " ]";
     };
     
-    if (namespace) {
-      namespace.zip     = zip;
-      namespace.flatten = flatten;
-      namespace.clump   = clump;
-    }
+    namespace.register("zip");
+    namespace.register("flatten");
+    namespace.register("clump");
   };
 
   module.exports = {
