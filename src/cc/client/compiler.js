@@ -64,6 +64,17 @@ define(function(require, exports, module) {
     }
     return t;
   };
+
+  var splitCodeAndData = function(text) {
+    var re = /^(\s*)__END__(\s*)$/gm;
+    var m = re.exec(text);
+    if (m === null) {
+      return [ text, "" ];
+    }
+    var code = text.substr(0, m.index - 1);
+    var data = text.substr(m.index + m[0].length + 1);
+    return [ code, data ];
+  };
   
   var findOperandHead = function(tokens, index) {
     var bracket = 0;
@@ -420,7 +431,10 @@ define(function(require, exports, module) {
   var Compiler = (function() {
     function Compiler() {
     }
-    Compiler.prototype.tokens = function(code) {
+    Compiler.prototype.tokens = function(text) {
+      var items = splitCodeAndData(text);
+      var code  = items[0];
+      var data  = items[1];
       var tokens = CoffeeScript.tokens(code);
       tokens = replacePi(tokens);
       tokens = replaceUnaryOp(tokens);
@@ -429,6 +443,8 @@ define(function(require, exports, module) {
       tokens = replaceCompoundAssign(tokens);
       tokens = replaceSynthDef(tokens);
       tokens = cleanupParenthesis(tokens);
+      this.code = code;
+      this.data = data;
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
@@ -463,8 +479,9 @@ define(function(require, exports, module) {
   module.exports = {
     Compiler  : Compiler,
     dumpTokens: dumpTokens,
-    findOperandHead: findOperandHead,
-    findOperandTail: findOperandTail,
+    splitCodeAndData: splitCodeAndData,
+    findOperandHead : findOperandHead,
+    findOperandTail : findOperandTail,
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
     replaceBinaryOp      : replaceBinaryOp,

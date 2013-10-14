@@ -1,6 +1,6 @@
 define(function(require, exports, module) {
   "use strict";
-  
+
   var install = function(namespace) {
     namespace = namespace || {};
     namespace.register = register(namespace);

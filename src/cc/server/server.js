@@ -104,9 +104,11 @@ define(function(require, exports, module) {
     var execId = msg[1];
     var code   = msg[2];
     var append = msg[3];
+    var data   = msg[4];
     if (!append) {
       this.reset();
     }
+    global.DATA = data;
     var result  = pack(eval.call(global, code));
     this.send(["/execute", execId, result]);
   };

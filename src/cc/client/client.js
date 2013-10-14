@@ -88,7 +88,7 @@ define(function(require, exports, module) {
       
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code, append]);
+        this.send(["/execute", this.execId, code, append, this.compiler.data]);
         if (typeof callback === "function") {
           this.execCallbacks[this.execId] = callback;
         }

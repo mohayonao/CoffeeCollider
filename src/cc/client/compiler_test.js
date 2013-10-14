@@ -6,6 +6,46 @@ define(function(require, exports, module) {
 
   describe("compiler.", function() {
     var _ = {};
+    describe("splitCodeAndData", function() {
+      it("case 1", function() {
+        var code = [
+          "this is code"
+        ].join("\n");
+        var expected = [
+          "this is code",
+          ""
+        ];
+        var actual = compiler.splitCodeAndData(code);
+        assert.deepEqual(actual, expected);
+      });
+      it("case 2", function() {
+        var code = [
+          "this is code",
+          "__END__"
+        ].join("\n");
+        var expected = [
+          "this is code",
+          ""
+        ];
+        var actual = compiler.splitCodeAndData(code);
+        assert.deepEqual(actual, expected);
+      });
+      it("case 3", function() {
+        var code = [
+          "this is code",
+          "this is too",
+          "__END__",
+          "this is data",
+          "this is too",
+        ].join("\n");
+        var expected = [
+          "this is code\nthis is too",
+          "this is data\nthis is too"
+        ];
+        var actual = compiler.splitCodeAndData(code);
+        assert.deepEqual(actual, expected);
+      });
+    });
     describe("findOperandHead:", function() {
       it("with an unaryOperator", function() {
         var tokens = [
