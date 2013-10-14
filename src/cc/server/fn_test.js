@@ -47,10 +47,10 @@ define(function(require, exports, module) {
         assert.equal(20, madd(10, 2));
         assert.equal(30, madd(10, {add:20}));
       });
-      it("multicall", function() {
+      it("multiCall", function() {
         var madd = fn(function(val, mul, add) {
           return val * mul + add;
-        }).multicall().defaults("val=0,mul=1,add=0").build();
+        }).multiCall().defaults("val=0,mul=1,add=0").build();
         assert.deepEqual([10, 20], madd(10, [1, 2]));
       });
     });

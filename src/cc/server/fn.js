@@ -14,7 +14,7 @@ define(function(require, exports, module) {
       this.def = def;
       return this;
     };
-    Fn.prototype.multicall = function(flag) {
+    Fn.prototype.multiCall = function(flag) {
       this.multi = flag === undefined ? true : !!flag;
       return this;
     };

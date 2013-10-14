@@ -385,7 +385,7 @@ define(function(require, exports, module) {
       add = lo;
     }
     return MulAdd.new1(null, this, mul, add);
-  }).defaults("lo=0,hi=1").multicall().build();
+  }).defaults("lo=0,hi=1").multiCall().build();
 
   UGen.prototype.unipolar = fn(function(mul) {
     return this.range(0, mul);

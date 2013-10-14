@@ -1755,7 +1755,7 @@ define('cc/server/node', function(require, exports, module) {
         addAction = "addToHead";
       }
       return Synth.new1(JSON.stringify(this.specs), target, args, addAction);
-    }).multicall().build();
+    }).multiCall().build();
 
     var topoSort = (function() {
       var _topoSort = function(x, list) {
@@ -1876,7 +1876,7 @@ define('cc/server/fn', function(require, exports, module) {
       this.def = def;
       return this;
     };
-    Fn.prototype.multicall = function(flag) {
+    Fn.prototype.multiCall = function(flag) {
       this.multi = flag === undefined ? true : !!flag;
       return this;
     };
@@ -2906,7 +2906,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       add = lo;
     }
     return MulAdd.new1(null, this, mul, add);
-  }).defaults("lo=0,hi=1").multicall().build();
+  }).defaults("lo=0,hi=1").multiCall().build();
 
   UGen.prototype.unipolar = fn(function(mul) {
     return this.range(0, mul);

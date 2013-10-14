@@ -368,7 +368,7 @@ define(function(require, exports, module) {
         addAction = "addToHead";
       }
       return Synth.new1(JSON.stringify(this.specs), target, args, addAction);
-    }).multicall().build();
+    }).multiCall().build();
 
     var topoSort = (function() {
       var _topoSort = function(x, list) {
