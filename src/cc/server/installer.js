@@ -1,6 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
-
+  
+  var cc = require("./cc");
+  
   var install = function(namespace) {
     namespace = namespace || {};
     namespace.register = register(namespace);
@@ -13,12 +15,14 @@ define(function(require, exports, module) {
     delete namespace.register;
   };
 
+  var installed = cc.installed = {};
+
   var register = function(namespace) {
     return function(name, func) {
       if (func) {
         if (/^[A-Z]/.test(name)) {
           var Klass = func;
-          var base = namespace[name] = function() {
+          var base = namespace[name] = installed[name] = function() {
             return new Klass();
           };
           if (Klass.classmethods) {
@@ -30,27 +34,15 @@ define(function(require, exports, module) {
             });
           }
         } else {
-          namespace[name] = func;
+          namespace[name] = installed[name] = func;
         }
-      } else if (!/^__.*__$/.test(name)) {
-        namespace[name] = function(recv) {
-          if (recv !== null && recv !== undefined) {
-            var func = recv[name];
-            if (typeof func === "function") {
-              return func.apply(recv, Array.prototype.slice.call(arguments, 1));
-            } else {
-              return func;
-            }
-          }
-          return 0;
-        };
       }
     };
   };
-
+  
   module.exports = {
     install : install,
     register: register
-  };
+    };
 
 });

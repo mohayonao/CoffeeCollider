@@ -1026,14 +1026,18 @@ define('cc/client/compiler', function(require, exports, module) {
     return function(tokens) {
       var i = tokens.length - 1;
       while (0 <= i) {
-        var token = tokens[i];
-        if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def") {
-          token = tokens[i + 1];
-          if (token[TAG] === "CALL_START") {
-            var a = findOperandTail(tokens, i + 2);
-            var params = getParams(tokens, i + 1);
-            tokens.splice(++a, 0, [","     , ","           , _]);
-            tokens.splice(++a, 0, ["STRING", params.replace, _]);
+        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
+          if (tokens[i - 1][TAG] === ".") {
+            var token = tokens[i];
+            if (token[VALUE] === "def") {
+              token = tokens[i + 1];
+              if (token[TAG] === "CALL_START") {
+                var a = findOperandTail(tokens, i + 2);
+                var params = getParams(tokens, i + 1);
+                tokens.splice(++a, 0, [","     , ","           , _]);
+                tokens.splice(++a, 0, ["STRING", params.replace, _]);
+              }
+            }
           }
         }
         i -= 1;
@@ -1157,7 +1161,9 @@ define('cc/client/utils', function(require, exports, module) {
 
 });
 define('cc/server/installer', function(require, exports, module) {
-
+  
+  var cc = require("./cc");
+  
   var install = function(namespace) {
     namespace = namespace || {};
     namespace.register = register(namespace);
@@ -1170,12 +1176,14 @@ define('cc/server/installer', function(require, exports, module) {
     delete namespace.register;
   };
 
+  var installed = cc.installed = {};
+
   var register = function(namespace) {
     return function(name, func) {
       if (func) {
         if (/^[A-Z]/.test(name)) {
           var Klass = func;
-          var base = namespace[name] = function() {
+          var base = namespace[name] = installed[name] = function() {
             return new Klass();
           };
           if (Klass.classmethods) {
@@ -1187,28 +1195,21 @@ define('cc/server/installer', function(require, exports, module) {
             });
           }
         } else {
-          namespace[name] = func;
+          namespace[name] = installed[name] = func;
         }
-      } else if (!/^__.*__$/.test(name)) {
-        namespace[name] = function(recv) {
-          if (recv !== null && recv !== undefined) {
-            var func = recv[name];
-            if (typeof func === "function") {
-              return func.apply(recv, Array.prototype.slice.call(arguments, 1));
-            } else {
-              return func;
-            }
-          }
-          return 0;
-        };
       }
     };
   };
-
+  
   module.exports = {
     install : install,
     register: register
-  };
+    };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  module.exports = require("../cc");
 
 });
 define('cc/server/server', function(require, exports, module) {
@@ -1241,6 +1242,11 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      if (cc.installed) {
+        Object.keys(cc.installed).forEach(function(name) {
+          global[name] = cc.installed[name];
+        });
+      }
       this.rootNode.prev = null;
       this.rootNode.next = null;
       this.rootNode.head = null;
@@ -1383,11 +1389,6 @@ define('cc/server/server', function(require, exports, module) {
     Rate: Rate,
     install: install
   };
-
-});
-define('cc/server/cc', function(require, exports, module) {
-
-  module.exports = require("../cc");
 
 });
 define('cc/server/node', function(require, exports, module) {
@@ -2945,7 +2946,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 });
 define('cc/server/uop', function(require, exports, module) {
 
-  var install = function(namespace) {
+  var install = function() {
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
       Number.prototype[key] = function() {
@@ -2962,7 +2963,6 @@ define('cc/server/uop', function(require, exports, module) {
       String.prototype[key] = function() {
         return func(+this);
       };
-      namespace.register(key);
     });
   };
 

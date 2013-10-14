@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function(namespace) {
+  var install = function() {
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
       Number.prototype[key] = function() {
@@ -18,7 +18,6 @@ define(function(require, exports, module) {
       String.prototype[key] = function() {
         return func(+this);
       };
-      namespace.register(key);
     });
   };
 

@@ -29,6 +29,11 @@ define(function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      if (cc.installed) {
+        Object.keys(cc.installed).forEach(function(name) {
+          global[name] = cc.installed[name];
+        });
+      }
       this.rootNode.prev = null;
       this.rootNode.next = null;
       this.rootNode.head = null;
