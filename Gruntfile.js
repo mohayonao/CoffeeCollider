@@ -56,17 +56,30 @@ module.exports = function(grunt) {
   grunt.registerTask("typo", function() {
     var check = 0;
     var typo  = 0;
-    var re = /^define\(function\(require, exports, module\) {$/;
+    var constants = grunt.file.readJSON("src/const.json");
+    var re1 = /^define\(function\(require, exports, module\) {$/;
+    var re2 = /[^a-zA-Z0-9_$]C\.([A-Z0-9_]+)/g;
     var files = grunt.file.expand("src/cc/**/*.js").filter(function(file) {
       return !/_test\.js$/.test(file);
     });
     files.forEach(function(file) {
-      var code = grunt.file.read(file).split("\n")[0];
-      if (!re.test(code)) {
+      var code = grunt.file.read(file);
+      var head = code.split("\n")[0];
+      if (!re1.test(head)) {
         grunt.verbose.or.write("Typong " + file + "...");
         grunt.log.error();
-        grunt.log.writeln("  " + code);
+        grunt.log.writeln("  " + head);
         typo += 1;
+      }
+      var m;
+      re2.lastIndex = 0;
+      while ((m = re2.exec(code)) !== null) {
+        if (!constants.hasOwnProperty(m[1])) {
+          grunt.verbose.or.write("Typong " + file + "...");
+          grunt.log.error();
+          grunt.log.writeln("  C." + m[1]);
+          typo += 1;
+        }
       }
       check += 1;
     });
@@ -191,7 +204,7 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
-  grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
+  grunt.registerTask("build"  , ["check", "dryice"]);
   grunt.registerTask("default", ["build", "connect", "watch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
