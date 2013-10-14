@@ -1,11 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
-
+  
   var assert = require("chai").assert;
-  var array = require("./array");
+  var utils = require("./utils");
 
-  describe("array", function() {
-    it("zip", function() {
+  describe("utils", function() {
+    it("flop", function() {
       var list = [
         [ "moe", "larry", "curly" ],
         [    30,      40,      50 ],
@@ -16,27 +16,21 @@ define(function(require, exports, module) {
         [ "larry", 40, true ],
         [ "curly", 50, true ],
       ];
-      var actual = array.zip.apply(null, list);
+      var actual = utils.flop(list);
       assert.deepEqual(actual, expected);
     });
     it("flatten", function() {
-      var list = [1, [2], [3, [[4]]]];
-      var expected = [ 1, 2, 3, 4 ];
-      var actual = array.flatten(list);
-      assert.deepEqual(actual, expected);
-    });
-    it("flatten with level", function() {
-      var list = [1, [2], [3, [[4]]]];
-      var expected = [ 1, 2, 3, [4] ];
-      var actual = array.flatten(list, 2);
+      var list = [ 1, [2, [3]], [4, [5, [6]]] ];
+      var expected = [ 1, 2, 3, 4, 5, 6 ];
+      var actual   = utils.flatten(list);
       assert.deepEqual(actual, expected);
     });
     it("clump", function() {
       var list = [ 1, 2, 3, 4, 5, 6, 7, 8 ];
       var expected = [ [ 1, 2, 3 ], [ 4, 5, 6 ], [ 7, 8 ] ];
-      var actual = array.clump(list, 3);
+      var actual = utils.clump(list, 3);
       assert.deepEqual(actual, expected);
     });
   });
-  
+
 });

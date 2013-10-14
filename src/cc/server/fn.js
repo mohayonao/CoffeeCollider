@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var array = require("./array.impl");
+  var utils = require("./utils");
   var slice = [].slice;
   
   var fn = (function() {
@@ -36,7 +36,7 @@ define(function(require, exports, module) {
             var args = slice.call(arguments);
             args = resolve_args(keys, vals, slice.call(arguments));
             if (containsArray(args)) {
-              return array.zip.apply(null, args).map(function(items) {
+              return utils.flop(args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }
@@ -46,7 +46,7 @@ define(function(require, exports, module) {
           ret = function() {
             var args = slice.call(arguments);
             if (containsArray(args)) {
-              return array.zip.apply(null, args).map(function(items) {
+              return utils.apply(args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }

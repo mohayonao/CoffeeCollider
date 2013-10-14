@@ -1161,7 +1161,6 @@ define('cc/server/installer', function(require, exports, module) {
     namespace = namespace || {};
     namespace.register = register(namespace);
     require("./server").install(namespace);
-    require("./array").install(namespace);
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./node").install(namespace);
@@ -1619,7 +1618,7 @@ define('cc/server/node', function(require, exports, module) {
 });
 define('cc/server/fn', function(require, exports, module) {
 
-  var array = require("./array.impl");
+  var utils = require("./utils");
   var slice = [].slice;
   
   var fn = (function() {
@@ -1654,7 +1653,7 @@ define('cc/server/fn', function(require, exports, module) {
             var args = slice.call(arguments);
             args = resolve_args(keys, vals, slice.call(arguments));
             if (containsArray(args)) {
-              return array.zip.apply(null, args).map(function(items) {
+              return utils.flop(args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }
@@ -1664,7 +1663,7 @@ define('cc/server/fn', function(require, exports, module) {
           ret = function() {
             var args = slice.call(arguments);
             if (containsArray(args)) {
-              return array.zip.apply(null, args).map(function(items) {
+              return utils.apply(args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }
@@ -1779,40 +1778,40 @@ define('cc/server/fn', function(require, exports, module) {
   module.exports = fn;
 
 });
-define('cc/server/array.impl', function(require, exports, module) {
+define('cc/server/utils', function(require, exports, module) {
 
-  var slice = [].slice;
-
-  var zip = function() {
-    var list = slice.call(arguments);
+  var flop = function(list) {
     var maxSize = list.reduce(function(len, sublist) {
       return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
     }, 0);
-    var a   = new Array(maxSize);
-    var len = list.length;
-    if (len === 0) {
-      a[0] = [];
-    } else {
+    var result = new Array(maxSize);
+    var length = list.length;
+    if (length) {
       for (var i = 0; i < maxSize; ++i) {
-        var sublist = a[i] = new Array(len);
-        for (var j = 0; j < len; ++j) {
+        var sublist = result[i] = new Array(length);
+        for (var j = 0; j < length; ++j) {
           sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
         }
       }
     }
-    return a;
+    return result;
   };
 
-  var flatten = function(that, level, list) {
-    for (var i = 0, imax = that.length; i < imax; ++i) {
-      if (level <= 0 || !Array.isArray(that[i])) {
-        list.push(that[i]);
-      } else {
-        list = flatten(that[i], level - 1, list);
+  var flatten = (function() {
+    var _flatten = function(list, result) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          result = _flatten(list[i], result);
+        } else {
+          result.push(list[i]);
+        }
       }
-    }
-    return list;
-  };
+      return result;
+    };
+    return function(list) {
+      return _flatten(list, []);
+    };
+  })();
 
   var clump = function(list, groupSize) {
     var result  = [];
@@ -1824,16 +1823,55 @@ define('cc/server/array.impl', function(require, exports, module) {
         sublist = [];
       }
     }
-    if (sublist.length > 0) {
+    if (sublist.length) {
       result.push(sublist);
     }
     return result;
   };
   
+  var pack = (function() {
+    var _ = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            result[key] = _(data[key], stack);
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _(data, []);
+    };
+  })();
+  
   module.exports = {
-    zip    : zip,
+    flop   : flop,
     flatten: flatten,
     clump  : clump,
+    pack   : pack
   };
 
 });
@@ -1972,105 +2010,6 @@ define('cc/server/unit/unit', function(require, exports, module) {
   };
 
 });
-define('cc/server/utils', function(require, exports, module) {
-  
-  var pack = (function() {
-    var _ = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            result[key] = _(data[key], stack);
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data, []);
-    };
-  })();
-  
-  module.exports = {
-    pack: pack
-  };
-
-});
-define('cc/server/array', function(require, exports, module) {
-
-  var fn = require("./fn");
-  var impl = require("./array.impl");
-
-  var zip = impl.zip;
-  
-  var flatten = fn(function(list, level) {
-    if (!Array.isArray(list)) {
-      return [list];
-    }
-    return impl.flatten(list, level, []);
-  }).defaults("list,level=Infinity").build();
-  
-  var clump = fn(function(list, groupSize) {
-    if (!Array.isArray(list)) {
-      return [list];
-    }
-    return impl.clump(list, groupSize);
-  }).defaults("list,groupSize=2").build();
-  
-  var install = function(namespace) {
-    Array.prototype.zip = function() {
-      return zip.apply(null, this);
-    };
-    Array.prototype.flatten = fn(function(level) {
-      return impl.flatten(this, level, []);
-    }).defaults("level=Infinity").build();
-    Array.prototype.clump = fn(function(groupSize) {
-      return impl.clump(this, groupSize);
-    }).defaults("groupSize=2").build();
-
-    Array.prototype.toString = function() {
-      return "[ " + this.map(function(x) {
-        if (!x) {
-          return x + "";
-        }
-        return x.toString();
-      }).join(", ") + " ]";
-    };
-    
-    namespace.register("zip");
-    namespace.register("flatten");
-    namespace.register("clump");
-  };
-
-  module.exports = {
-    install: install,
-    zip    : zip,
-    flatten: flatten,
-    clump  : clump,
-  };
-
-});
 define('cc/server/bop', function(require, exports, module) {
 
   var UGen = require("./ugen/ugen").UGen;
@@ -2178,7 +2117,7 @@ define('cc/server/bop', function(require, exports, module) {
 define('cc/server/ugen/ugen', function(require, exports, module) {
 
   var fn = require("../fn");
-  var array = require("../array.impl");
+  var utils = require("../utils");
   var slice = [].slice;
 
   var addToSynthDef = null;
@@ -2208,7 +2147,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       return this.multiNewList(slice.call(arguments));
     };
     UGen.prototype.$multiNewList = function(list) {
-      var zipped = array.zip.apply(null, list);
+      var zipped = utils.flop(list);
       if (zipped.length === 1) {
         return this.new1.apply(this, list);
       }
@@ -2339,7 +2278,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
 define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
   var fn = require("../fn");
-  var array = require("../array.impl");
+  var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
 
   var asRate = function(obj) {
@@ -2628,11 +2567,11 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       case 3: return Sum3.new1(null, a[0], a[1], a[2]);
       case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
       case 1: return a[0];
-      default: return work(array.clump(a, 4));
+      default: return work(utils.clump(a, 4));
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
       var fixnum = 0;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {
@@ -2644,7 +2583,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       if (fixnum !== 0) {
         list.push(fixnum);
       }
-      list = array.clump(list, 4);
+      list = utils.clump(list, 4);
       if (list.length === 1 && list[0].length === 2) {
         return BinaryOpUGen.new1(null, "+!", list[0][0], list[0][1]);
       }
@@ -2675,11 +2614,11 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       case 1:
         return a[0];
       default:
-        return work(array.clump(a, 2));
+        return work(utils.clump(a, 2));
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
       var fixnum = 1;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {
@@ -2691,7 +2630,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       if (fixnum !== 1) {
         list.push(fixnum);
       }
-      list = array.clump(list, 2);
+      list = utils.clump(list, 2);
       if (list.length === 1 && list[0].length === 2) {
         return BinaryOpUGen.new1(null, "*!", list[0][0], list[0][1]);
       }
@@ -2703,7 +2642,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
   Array.prototype.madd = fn(function(mul, add) {
-    return array.zip.apply(null, [this, mul, add]).map(function(items) {
+    return utils.flop([this, mul, add]).map(function(items) {
       var _in = items[0], mul = items[1], add = items[2];
       return MulAdd.new(_in, mul, add);
     });

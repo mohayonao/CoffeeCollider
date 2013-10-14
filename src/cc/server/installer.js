@@ -5,7 +5,6 @@ define(function(require, exports, module) {
     namespace = namespace || {};
     namespace.register = register(namespace);
     require("./server").install(namespace);
-    require("./array").install(namespace);
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./node").install(namespace);

@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("../fn");
-  var array = require("../array.impl");
+  var utils = require("../utils");
   var slice = [].slice;
 
   var addToSynthDef = null;
@@ -32,7 +32,7 @@ define(function(require, exports, module) {
       return this.multiNewList(slice.call(arguments));
     };
     UGen.prototype.$multiNewList = function(list) {
-      var zipped = array.zip.apply(null, list);
+      var zipped = utils.flop(list);
       if (zipped.length === 1) {
         return this.new1.apply(this, list);
       }

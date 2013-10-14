@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("../fn");
-  var array = require("../array.impl");
+  var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
 
   var asRate = function(obj) {
@@ -291,11 +291,11 @@ define(function(require, exports, module) {
       case 3: return Sum3.new1(null, a[0], a[1], a[2]);
       case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
       case 1: return a[0];
-      default: return work(array.clump(a, 4));
+      default: return work(utils.clump(a, 4));
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
       var fixnum = 0;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {
@@ -307,7 +307,7 @@ define(function(require, exports, module) {
       if (fixnum !== 0) {
         list.push(fixnum);
       }
-      list = array.clump(list, 4);
+      list = utils.clump(list, 4);
       if (list.length === 1 && list[0].length === 2) {
         return BinaryOpUGen.new1(null, "+!", list[0][0], list[0][1]);
       }
@@ -338,11 +338,11 @@ define(function(require, exports, module) {
       case 1:
         return a[0];
       default:
-        return work(array.clump(a, 2));
+        return work(utils.clump(a, 2));
       }
     };
     return function(in1, in2) {
-      var list = array.flatten([ collect(in1), collect(in2) ], Infinity, []);
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
       var fixnum = 1;
       list = list.filter(function(ugen) {
         if (typeof ugen === "number") {
@@ -354,7 +354,7 @@ define(function(require, exports, module) {
       if (fixnum !== 1) {
         list.push(fixnum);
       }
-      list = array.clump(list, 2);
+      list = utils.clump(list, 2);
       if (list.length === 1 && list[0].length === 2) {
         return BinaryOpUGen.new1(null, "*!", list[0][0], list[0][1]);
       }
@@ -366,7 +366,7 @@ define(function(require, exports, module) {
     return MulAdd.new(this, mul, add);
   }).defaults("mul=1,add=0").build();
   Array.prototype.madd = fn(function(mul, add) {
-    return array.zip.apply(null, [this, mul, add]).map(function(items) {
+    return utils.flop([this, mul, add]).map(function(items) {
       var _in = items[0], mul = items[1], add = items[2];
       return MulAdd.new(_in, mul, add);
     });
