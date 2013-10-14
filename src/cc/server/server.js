@@ -115,7 +115,7 @@ define(function(require, exports, module) {
       this.send(["/execute", execId, pack(result)]);
     }
   };
-  commands["/loadScript"] = function(msg) {
+  commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
 

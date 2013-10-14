@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var SynthClient = require("./client").SynthClient;
+  var slice = [].slice;
 
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
@@ -50,9 +51,9 @@ define(function(require, exports, module) {
         return this.client.strm;
       }
     };
-    CoffeeCollider.prototype.loadScript = function(path) {
+    CoffeeCollider.prototype.importScripts = function() {
       if (this.client) {
-        this.client.loadScript(path);
+        this.client.importScripts(slice.call(arguments));
       }
       return this;
     };

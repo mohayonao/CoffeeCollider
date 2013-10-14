@@ -97,6 +97,7 @@ define('cc/client/coffee_collider', function(require, exports, module) {
 
   var cc = require("../cc");
   var SynthClient = require("./client").SynthClient;
+  var slice = [].slice;
 
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
@@ -144,9 +145,9 @@ define('cc/client/coffee_collider', function(require, exports, module) {
         return this.client.strm;
       }
     };
-    CoffeeCollider.prototype.loadScript = function(path) {
+    CoffeeCollider.prototype.importScripts = function() {
       if (this.client) {
-        this.client.loadScript(path);
+        this.client.importScripts(slice.call(arguments));
       }
       return this;
     };
@@ -254,8 +255,8 @@ define('cc/client/client', function(require, exports, module) {
         this.execId += 1;
       }
     };
-    SynthClient.prototype.loadScript = function(path) {
-      this.send(["/loadScript", path]);
+    SynthClient.prototype.importScripts = function(list) {
+      this.send(["/importScripts", list]);
     };
     SynthClient.prototype.send = function(msg) {
       this.worker.postMessage(msg);
@@ -1326,7 +1327,7 @@ define('cc/server/server', function(require, exports, module) {
       this.send(["/execute", execId, pack(result)]);
     }
   };
-  commands["/loadScript"] = function(msg) {
+  commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
 

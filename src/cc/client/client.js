@@ -95,8 +95,8 @@ define(function(require, exports, module) {
         this.execId += 1;
       }
     };
-    SynthClient.prototype.loadScript = function(path) {
-      this.send(["/loadScript", path]);
+    SynthClient.prototype.importScripts = function(list) {
+      this.send(["/importScripts", list]);
     };
     SynthClient.prototype.send = function(msg) {
       this.worker.postMessage(msg);
