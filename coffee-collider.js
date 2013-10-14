@@ -1508,23 +1508,16 @@ define('cc/server/node', function(require, exports, module) {
     
     return Group;
   })();
-
+  
   var Synth = (function() {
-    function Synth() {
+    function Synth(specs, target, args, addAction) {
       Node.call(this);
       this.klassName = "Synth";
+      build.call(this, specs, target, args, addAction);
     }
     fn.extend(Synth, Node);
 
-    Synth.prototype.$def = function(func) {
-      if (typeof func === "function") {
-        var instance = new SynthDef();
-        instance.initialize.apply(instance, arguments);
-        return instance;
-      }
-      throw "Synth.def() requires a function.";
-    };
-    Synth.prototype.$new1 = function(specs, target, args, addAction) {
+    var build = function(specs, target, args, addAction) {
       this.specs = specs = JSON.parse(specs);
       target.append(this, addAction);
 
@@ -1557,7 +1550,6 @@ define('cc/server/node', function(require, exports, module) {
       });
       return this;
     };
-    fn.classmethod(Synth);
     
     Synth.prototype.set = function(args) {
       if (args === undefined) {
@@ -1619,7 +1611,22 @@ define('cc/server/node', function(require, exports, module) {
     
     return Synth;
   })();
-
+  
+  var SynthDefInterface = (function() {
+    function SynthDefInterface() {
+    }
+    SynthDefInterface.prototype.$def = function(func) {
+      if (typeof func === "function") {
+        var instance = new SynthDef();
+        instance.initialize.apply(instance, arguments);
+        return instance;
+      }
+      throw "Synth.def() requires a function.";
+    };
+    fn.classmethod(SynthDefInterface);
+    return SynthDefInterface;
+  })();
+  
   var SynthDef = (function() {
     function SynthDef() {
       this.klassName = "SynthDef";
@@ -1758,7 +1765,7 @@ define('cc/server/node', function(require, exports, module) {
       default:
         addAction = "addToHead";
       }
-      return Synth.new1(JSON.stringify(this.specs), target, args, addAction);
+      return new Synth(JSON.stringify(this.specs), target, args, addAction);
     }).multiCall().build();
 
     var topoSort = (function() {
@@ -1854,7 +1861,7 @@ define('cc/server/node', function(require, exports, module) {
   })();
   
   var install = function(namespace) {
-    namespace.register("Synth", Synth);
+    namespace.register("Synth", SynthDefInterface);
   };
   
   module.exports = {
