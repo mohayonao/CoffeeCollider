@@ -411,14 +411,18 @@ define(function(require, exports, module) {
     return function(tokens) {
       var i = tokens.length - 1;
       while (0 <= i) {
-        var token = tokens[i];
-        if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def") {
-          token = tokens[i + 1];
-          if (token[TAG] === "CALL_START") {
-            var a = findOperandTail(tokens, i + 2);
-            var params = getParams(tokens, i + 1);
-            tokens.splice(++a, 0, [","     , ","           , _]);
-            tokens.splice(++a, 0, ["STRING", params.replace, _]);
+        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
+          if (tokens[i - 1][TAG] === ".") {
+            var token = tokens[i];
+            if (token[VALUE] === "def") {
+              token = tokens[i + 1];
+              if (token[TAG] === "CALL_START") {
+                var a = findOperandTail(tokens, i + 2);
+                var params = getParams(tokens, i + 1);
+                tokens.splice(++a, 0, [","     , ","           , _]);
+                tokens.splice(++a, 0, ["STRING", params.replace, _]);
+              }
+            }
           }
         }
         i -= 1;
