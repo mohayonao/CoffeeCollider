@@ -1390,6 +1390,7 @@ define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ugen   = require("./ugen/ugen");
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
   var slice = [].slice;
@@ -1506,16 +1507,24 @@ define('cc/server/node', function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(specs, target, args, addAction) {
+    function Synth() {
       Node.call(this);
       this.klassName = "Synth";
-      this.specs = JSON.parse(specs);
-      target.append(this, addAction);
-      build.call(this, this.specs, args);
     }
     fn.extend(Synth, Node);
 
-    var build = function(specs, args) {
+    Synth.prototype.$def = function(func) {
+      if (typeof func === "function") {
+        var instance = new SynthDef();
+        instance.initialize.apply(instance, arguments);
+        return instance;
+      }
+      throw "Synth.def() requires a function.";
+    };
+    Synth.prototype.$new1 = function(specs, target, args, addAction) {
+      this.specs = specs = JSON.parse(specs);
+      target.append(this, addAction);
+
       this.server = cc.server;
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -1544,6 +1553,8 @@ define('cc/server/node', function(require, exports, module) {
         return !!unit.process;
       });
     };
+    fn.classmethod(Synth);
+    
     Synth.prototype.set = function(args) {
       if (args === undefined) {
         return this;
@@ -1605,7 +1616,241 @@ define('cc/server/node', function(require, exports, module) {
     return Synth;
   })();
 
-  var install = function() {
+  var SynthDef = (function() {
+    function SynthDef() {
+      this.klassName = "SynthDef";
+    }
+    SynthDef.prototype.initialize = function(func, args) {
+      args = unpackArguments(args);
+      
+      var isVaridArgs = args.vals.every(function(item) {
+        if (typeof item === "number") {
+          return true;
+        } else if (Array.isArray(item)) {
+          return item.every(function(item) {
+            return typeof item === "number";
+          });
+        }
+        if (item === undefined || item === null) {
+          return true;
+        }
+        return false;
+      });
+      if (!isVaridArgs) {
+        throw "UgenGraphFunc's arguments should be a number or an array that contains a number.";
+      }
+      
+      var params  = { names:[], indices:[], length:[], values:[] };
+      var flatten = [];
+      var i, imax, length;
+      for (i = 0, imax = args.vals.length; i < imax; ++i) {
+        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
+        params.names  .push(args.keys[i]);
+        params.indices.push(flatten.length);
+        params.length .push(length);
+        params.values = params.values.concat(args.vals[i]);
+        flatten = flatten.concat(args.vals[i]);
+      }
+      var reshaped = [];
+      var controls = ugen.Control.kr(flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      for (i = 0; i < imax; ++i) {
+        if (Array.isArray(args.vals[i])) {
+          reshaped.push(controls.slice(0, args.vals[i].length));
+        } else {
+          reshaped.push(controls.shift());
+        }
+      }
+      
+      var children = [];
+      ugen.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
+      try {
+        func.apply(null, reshaped);
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        ugen.setSynthDef(null);
+      }
+
+      var consts = [];
+      children.forEach(function(x) {
+        if (x.inputs) {
+          x.inputs.forEach(function(_in) {
+            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
+              consts.push(_in);
+            }
+          });
+        }
+      });
+      consts.sort();
+      var ugenlist = topoSort(children).filter(function(x) {
+        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+      });
+      var defs = ugenlist.map(function(x) {
+        var inputs = [];
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
+            inputs.push(index, subindex);
+          });
+        }
+        var outputs;
+        if (x instanceof ugen.MultiOutUGen) {
+          outputs = x.channels.map(function(x) {
+            return x.rate;
+          });
+        } else if (x.numOfOutputs === 1) {
+          outputs = [ x.rate ];
+        } else {
+          outputs = [];
+        }
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
+      });
+      var specs = {
+        consts: consts,
+        defs  : defs,
+        params: params,
+      };
+      this.specs = specs;
+      return this;
+    };
+    
+    SynthDef.prototype.play = fn(function() {
+      var target, args, addAction;
+      var i = 0;
+      target = args;
+      if (arguments[i] instanceof Node) {
+        target = arguments[i++];
+      } else {
+        target = cc.server.rootNode;
+      }
+      if (fn.isDictionary(arguments[i])) {
+        args = arguments[i++];
+      }
+      if (typeof arguments[i] === "string") {
+        addAction = arguments[i];
+      }
+      
+      if (args && arguments.length === 1) {
+        if (args.target instanceof Node) {
+          target = args.target;
+          delete args.target;
+        }
+        if (typeof args.addAction === "string") {
+          addAction = args.addAction;
+          delete args.addAction;
+        }
+      }
+      
+      switch (addAction) {
+      case "addToHead": case "addToTail": case "addBefore": case "addAfter":
+        break;
+      default:
+        addAction = "addToHead";
+      }
+      return Synth.new1(JSON.stringify(this.specs), target, args, addAction);
+    }).multicall().build();
+
+    var topoSort = (function() {
+      var _topoSort = function(x, list) {
+        var index = list.indexOf(x);
+        if (index !== -1) {
+          list.splice(index, 1);
+        }
+        list.unshift(x);
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            _topoSort(x, list);
+          });
+        }
+      };
+      return function(list) {
+        list.forEach(function(x) {
+          if (x instanceof ugen.Out) {
+            x.inputs.forEach(function(x) {
+              _topoSort(x, list);
+            });
+          }
+        });
+        return list;
+      };
+    })();
+    
+    var splitArguments = function(args) {
+      var result  = [];
+      var begin   = 0;
+      var bracket = 0;
+      var inStr   = null;
+      for (var i = 0, imax = args.length; i < imax; ++i) {
+        var c = args.charAt(i);
+        if (args.charAt(i-1) === "\\") {
+          if (args.charAt(i-2) !== "\\") {
+            continue;
+          }
+        }
+        if (c === "\"" || c === "'") {
+          if (inStr === null) {
+            inStr = c;
+          } else if (inStr === c) {
+            inStr = null;
+          }
+        }
+        if (inStr) {
+          continue;
+        }
+        switch (c) {
+        case ",":
+          if (bracket === 0) {
+            result.push(args.slice(begin, i).trim());
+            begin = i + 1;
+          }
+          break;
+        case "[":
+          bracket += 1;
+          break;
+        case "]":
+          bracket -= 1;
+          break;
+        }
+      }
+      if (begin !== i) {
+        result.push(args.slice(begin, i).trim());
+      }
+      return result;
+    };
+    
+    var unpackArguments = function(args) {
+      var keys = [];
+      var vals = [];
+      if (args) {
+        splitArguments(args).forEach(function(items) {
+          var i = items.indexOf("=");
+          var k, v;
+          if (i === -1) {
+            k = items;
+            v = undefined;
+          } else {
+            k = items.substr(0, i).trim();
+            v = eval.call(null, items.substr(i + 1));
+          }
+          keys.push(k);
+          vals.push(v);
+        });
+      }
+      return { keys:keys, vals:vals };
+    };
+    
+    return SynthDef;
+  })();
+  
+  var install = function(namespace) {
+    namespace.register("Synth", Synth);
   };
   
   module.exports = {
@@ -1875,6 +2120,167 @@ define('cc/server/utils', function(require, exports, module) {
   };
 
 });
+define('cc/server/ugen/ugen', function(require, exports, module) {
+
+  var fn = require("../fn");
+  var utils = require("../utils");
+  var slice = [].slice;
+
+  var addToSynthDef = null;
+
+  var UGen = (function() {
+    function UGen() {
+      this.klassName = "UGen";
+      this.rate = 2;
+      this.signalRange = 2;
+      this.specialIndex = 0;
+      this.outputIndex  = 0;
+      this.numOfInputs  = 0;
+      this.numOfOutputs = 1;
+      this.inputs = [];
+    }
+
+    UGen.prototype.$new1 = function(rate) {
+      var args = slice.call(arguments, 1);
+      this.rate = rate;
+      if (addToSynthDef) {
+        addToSynthDef(this);
+      }
+      this.numOfInputs = this.inputs.length;
+      return this.initialize.apply(this, args);
+    };
+    UGen.prototype.$multiNew = function() {
+      return this.multiNewList(slice.call(arguments));
+    };
+    UGen.prototype.$multiNewList = function(list) {
+      var zipped = utils.flop(list);
+      if (zipped.length === 1) {
+        return this.new1.apply(this, list);
+      }
+      return zipped.map(function(list) {
+        return this.constructor.multiNewList(list);
+      }, this);
+    };
+    fn.classmethod(UGen);
+
+    UGen.prototype.initialize = function() {
+      this.inputs = slice.call(arguments);
+      return this;
+    };
+    
+    return UGen;
+  })();
+
+  var MultiOutUGen = (function() {
+    function MultiOutUGen() {
+      UGen.call(this);
+      this.klassName = "MultiOutUGen";
+      this.channels = null;
+    }
+    fn.extend(MultiOutUGen, UGen);
+    fn.classmethod(MultiOutUGen);
+    
+    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
+      var channels = new Array(numChannels);
+      for (var i = 0; i < numChannels; ++i) {
+        channels[i] = OutputProxy.new(rate, this, i);
+      }
+      this.channels = channels;
+      this.numOfOutputs = channels.length;
+      this.inputs = this.inputs.map(function(ugen) {
+        return (ugen instanceof UGen) ? ugen : ugen.valueOf();
+      });
+      this.numOfInputs = this.inputs.length;
+      return (numChannels === 1) ? channels[0] : channels;
+    };
+    
+    return MultiOutUGen;
+  })();
+
+  var OutputProxy = (function() {
+    function OutputProxy() {
+      UGen.call(this);
+      this.klassName = "OutputProxy";
+    }
+    fn.extend(OutputProxy, UGen);
+
+    OutputProxy.prototype.$new = function(rate, source, index) {
+      return this.new1(rate, source, index);
+    };
+    fn.classmethod(OutputProxy);
+
+    OutputProxy.prototype.initialize = function(source, index) {
+      this.inputs = [ source ];
+      this.numOfInputs = 1;
+      this.outputIndex = index;
+      return this;
+    };
+    
+    return OutputProxy;
+  })();
+
+  var Control = (function() {
+    function Control() {
+      MultiOutUGen.call(this);
+      this.klassName = "Control";
+      this.values = [];
+    }
+    fn.extend(Control, MultiOutUGen);
+
+    Control.prototype.$kr = function(values) {
+      return this.multiNewList([1].concat(values));
+    };
+    fn.classmethod(Control);
+
+    Control.prototype.initialize = function() {
+      this.values = slice.call(arguments);
+      return this.initOutputs(this.values.length, this.rate);
+    };
+
+    return Control;
+  })();
+
+  var Out = (function() {
+    function Out() {
+      UGen.call(this);
+      this.klassName = "Out";
+      this.numOutputs = 0;
+    }
+    fn.extend(Out, UGen);
+
+    Out.prototype.$ar = fn(function(bus, channelsArray) {
+      this.multiNewList([2, bus].concat(channelsArray));
+      return 0; // Out has no output
+    }).defaults("bus=0,channelsArray=0").build();
+    Out.prototype.$kr = fn(function(bus, channelsArray) {
+      this.multiNewList([1, bus].concat(channelsArray));
+      return 0; // Out has no output
+    }).defaults("bus=0,channelsArray=0").build();
+    
+    fn.classmethod(Out);
+    
+    return Out;
+  })();
+
+  var setSynthDef = function(func) {
+    addToSynthDef = func;
+  };
+
+  var install = function(namespace) {
+    namespace.register("Out", Out);
+  };
+
+  module.exports = {
+    UGen: UGen,
+    MultiOutUGen: MultiOutUGen,
+    OutputProxy : OutputProxy,
+    Control     : Control,
+    Out         : Out,
+    setSynthDef : setSynthDef,
+    install: install,
+  };
+
+});
 define('cc/server/unit/unit', function(require, exports, module) {
 
   var units = {};
@@ -2110,167 +2516,6 @@ define('cc/server/bop', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install,
-  };
-
-});
-define('cc/server/ugen/ugen', function(require, exports, module) {
-
-  var fn = require("../fn");
-  var utils = require("../utils");
-  var slice = [].slice;
-
-  var addToSynthDef = null;
-
-  var UGen = (function() {
-    function UGen() {
-      this.klassName = "UGen";
-      this.rate = 2;
-      this.signalRange = 2;
-      this.specialIndex = 0;
-      this.outputIndex  = 0;
-      this.numOfInputs  = 0;
-      this.numOfOutputs = 1;
-      this.inputs = [];
-    }
-
-    UGen.prototype.$new1 = function(rate) {
-      var args = slice.call(arguments, 1);
-      this.rate = rate;
-      if (addToSynthDef) {
-        addToSynthDef(this);
-      }
-      this.numOfInputs = this.inputs.length;
-      return this.initialize.apply(this, args);
-    };
-    UGen.prototype.$multiNew = function() {
-      return this.multiNewList(slice.call(arguments));
-    };
-    UGen.prototype.$multiNewList = function(list) {
-      var zipped = utils.flop(list);
-      if (zipped.length === 1) {
-        return this.new1.apply(this, list);
-      }
-      return zipped.map(function(list) {
-        return this.constructor.multiNewList(list);
-      }, this);
-    };
-    fn.classmethod(UGen);
-
-    UGen.prototype.initialize = function() {
-      this.inputs = slice.call(arguments);
-      return this;
-    };
-    
-    return UGen;
-  })();
-
-  var MultiOutUGen = (function() {
-    function MultiOutUGen() {
-      UGen.call(this);
-      this.klassName = "MultiOutUGen";
-      this.channels = null;
-    }
-    fn.extend(MultiOutUGen, UGen);
-    fn.classmethod(MultiOutUGen);
-    
-    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
-      var channels = new Array(numChannels);
-      for (var i = 0; i < numChannels; ++i) {
-        channels[i] = OutputProxy.new(rate, this, i);
-      }
-      this.channels = channels;
-      this.numOfOutputs = channels.length;
-      this.inputs = this.inputs.map(function(ugen) {
-        return (ugen instanceof UGen) ? ugen : ugen.valueOf();
-      });
-      this.numOfInputs = this.inputs.length;
-      return (numChannels === 1) ? channels[0] : channels;
-    };
-    
-    return MultiOutUGen;
-  })();
-
-  var OutputProxy = (function() {
-    function OutputProxy() {
-      UGen.call(this);
-      this.klassName = "OutputProxy";
-    }
-    fn.extend(OutputProxy, UGen);
-
-    OutputProxy.prototype.$new = function(rate, source, index) {
-      return this.new1(rate, source, index);
-    };
-    fn.classmethod(OutputProxy);
-
-    OutputProxy.prototype.initialize = function(source, index) {
-      this.inputs = [ source ];
-      this.numOfInputs = 1;
-      this.outputIndex = index;
-      return this;
-    };
-    
-    return OutputProxy;
-  })();
-
-  var Control = (function() {
-    function Control() {
-      MultiOutUGen.call(this);
-      this.klassName = "Control";
-      this.values = [];
-    }
-    fn.extend(Control, MultiOutUGen);
-
-    Control.prototype.$kr = function(values) {
-      return this.multiNewList([1].concat(values));
-    };
-    fn.classmethod(Control);
-
-    Control.prototype.initialize = function() {
-      this.values = slice.call(arguments);
-      return this.initOutputs(this.values.length, this.rate);
-    };
-
-    return Control;
-  })();
-
-  var Out = (function() {
-    function Out() {
-      UGen.call(this);
-      this.klassName = "Out";
-      this.numOutputs = 0;
-    }
-    fn.extend(Out, UGen);
-
-    Out.prototype.$ar = fn(function(bus, channelsArray) {
-      this.multiNewList([2, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    Out.prototype.$kr = fn(function(bus, channelsArray) {
-      this.multiNewList([1, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    
-    fn.classmethod(Out);
-    
-    return Out;
-  })();
-
-  var setSynthDef = function(func) {
-    addToSynthDef = func;
-  };
-
-  var install = function(namespace) {
-    namespace.register("Out", Out);
-  };
-
-  module.exports = {
-    UGen: UGen,
-    MultiOutUGen: MultiOutUGen,
-    OutputProxy : OutputProxy,
-    Control     : Control,
-    Out         : Out,
-    setSynthDef : setSynthDef,
     install: install,
   };
 
@@ -2736,7 +2981,6 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     require("./basic_ops").install(namespace);
     require("./osc").install(namespace);
     require("./ui").install(namespace);
-    require("./def").install(namespace);
   };
 
   module.exports = {
@@ -2849,264 +3093,6 @@ define('cc/server/ugen/ui', function(require, exports, module) {
   };
 
   module.exports = {
-    install: install
-  };
-
-});
-define('cc/server/ugen/def', function(require, exports, module) {
-
-  var cc    = require("../cc");
-  var fn    = require("../fn");
-  var ugen  = require("./ugen");
-  var Node  = require("../node").Node;
-  var Synth = require("../node").Synth;
-  
-  var SynthDef = (function() {
-    function SynthDef() {
-      this.klassName = "SynthDef";
-    }
-    SynthDef.prototype.initialize = function(func, args) {
-      args = unpackArguments(args);
-      
-      var isVaridArgs = args.vals.every(function(item) {
-        if (typeof item === "number") {
-          return true;
-        } else if (Array.isArray(item)) {
-          return item.every(function(item) {
-            return typeof item === "number";
-          });
-        }
-        if (item === undefined || item === null) {
-          return true;
-        }
-        return false;
-      });
-      if (!isVaridArgs) {
-        throw "UgenGraphFunc's arguments should be a number or an array that contains a number.";
-      }
-      
-      var params  = { names:[], indices:[], length:[], values:[] };
-      var flatten = [];
-      var i, imax, length;
-      for (i = 0, imax = args.vals.length; i < imax; ++i) {
-        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
-        params.names  .push(args.keys[i]);
-        params.indices.push(flatten.length);
-        params.length .push(length);
-        params.values = params.values.concat(args.vals[i]);
-        flatten = flatten.concat(args.vals[i]);
-      }
-      var reshaped = [];
-      var controls = ugen.Control.kr(flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      for (i = 0; i < imax; ++i) {
-        if (Array.isArray(args.vals[i])) {
-          reshaped.push(controls.slice(0, args.vals[i].length));
-        } else {
-          reshaped.push(controls.shift());
-        }
-      }
-      
-      var children = [];
-      ugen.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      try {
-        func.apply(null, reshaped);
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        ugen.setSynthDef(null);
-      }
-
-      var consts = [];
-      children.forEach(function(x) {
-        if (x.inputs) {
-          x.inputs.forEach(function(_in) {
-            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
-              consts.push(_in);
-            }
-          });
-        }
-      });
-      consts.sort();
-      var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
-      });
-      var defs = ugenlist.map(function(x) {
-        var inputs = [];
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
-            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
-            inputs.push(index, subindex);
-          });
-        }
-        var outputs;
-        if (x instanceof ugen.MultiOutUGen) {
-          outputs = x.channels.map(function(x) {
-            return x.rate;
-          });
-        } else if (x.numOfOutputs === 1) {
-          outputs = [ x.rate ];
-        } else {
-          outputs = [];
-        }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
-      });
-      var specs = {
-        consts: consts,
-        defs  : defs,
-        params: params,
-      };
-      this.specs = specs;
-    };
-
-    SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      target = args;
-      if (arguments[i] instanceof Node) {
-        target = arguments[i++];
-      } else {
-        target = cc.server.rootNode;
-      }
-      if (fn.isDictionary(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      }
-      
-      if (args && arguments.length === 1) {
-        if (args.target instanceof Node) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
-      
-      switch (addAction) {
-      case "addToHead": case "addToTail": case "addBefore": case "addAfter":
-        break;
-      default:
-        addAction = "addToHead";
-      }
-      return new Synth(JSON.stringify(this.specs), target, args, addAction);
-    }).multicall().build();
-
-    var topoSort = (function() {
-      var _topoSort = function(x, list) {
-        var index = list.indexOf(x);
-        if (index !== -1) {
-          list.splice(index, 1);
-        }
-        list.unshift(x);
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            _topoSort(x, list);
-          });
-        }
-      };
-      return function(list) {
-        list.forEach(function(x) {
-          if (x instanceof ugen.Out) {
-            x.inputs.forEach(function(x) {
-              _topoSort(x, list);
-            });
-          }
-        });
-        return list;
-      };
-    })();
-    
-    return SynthDef;
-  })();
-
-  var splitArguments = function(args) {
-    var result  = [];
-    var begin   = 0;
-    var bracket = 0;
-    var inStr   = null;
-    for (var i = 0, imax = args.length; i < imax; ++i) {
-      var c = args.charAt(i);
-      if (args.charAt(i-1) === "\\") {
-        if (args.charAt(i-2) !== "\\") {
-          continue;
-        }
-      }
-      if (c === "\"" || c === "'") {
-        if (inStr === null) {
-          inStr = c;
-        } else if (inStr === c) {
-          inStr = null;
-        }
-      }
-      if (inStr) {
-        continue;
-      }
-      switch (c) {
-      case ",":
-        if (bracket === 0) {
-          result.push(args.slice(begin, i).trim());
-          begin = i + 1;
-        }
-        break;
-      case "[":
-        bracket += 1;
-        break;
-      case "]":
-        bracket -= 1;
-        break;
-      }
-    }
-    if (begin !== i) {
-      result.push(args.slice(begin, i).trim());
-    }
-    return result;
-  };
-
-  var unpackArguments = function(args) {
-    var keys = [];
-    var vals = [];
-    if (args) {
-      splitArguments(args).forEach(function(items) {
-        var i = items.indexOf("=");
-        var k, v;
-        if (i === -1) {
-          k = items;
-          v = undefined;
-        } else {
-          k = items.substr(0, i).trim();
-          v = eval.call(null, items.substr(i + 1));
-        }
-        keys.push(k);
-        vals.push(v);
-      });
-    }
-    return { keys:keys, vals:vals };
-  };
-
-  var install = function(namespace) {
-    namespace.register("def", function(func) {
-      if (typeof func === "function") {
-        var instance = new SynthDef();
-        instance.initialize.apply(instance, arguments);
-        return instance;
-      }
-      throw "def() requires a function.";
-    });
-  };
-
-  module.exports = {
-    splitArguments : splitArguments ,
-    unpackArguments: unpackArguments,
     install: install
   };
 

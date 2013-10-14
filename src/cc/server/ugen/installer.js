@@ -6,7 +6,6 @@ define(function(require, exports, module) {
     require("./basic_ops").install(namespace);
     require("./osc").install(namespace);
     require("./ui").install(namespace);
-    require("./def").install(namespace);
   };
 
   module.exports = {
