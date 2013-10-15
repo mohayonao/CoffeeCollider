@@ -1,6 +1,10 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var isDict = function(obj) {
+    return !!(obj && obj.constructor === Object);
+  };
+  
   var flop = function(list) {
     var maxSize = list.reduce(function(len, sublist) {
       return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
@@ -89,6 +93,7 @@ define(function(require, exports, module) {
   })();
   
   module.exports = {
+    isDict : isDict,
     flop   : flop,
     flatten: flatten,
     clump  : clump,

@@ -5,6 +5,13 @@ define(function(require, exports, module) {
   var utils = require("./utils");
 
   describe("utils", function() {
+    it("isDict", function() {
+      var __ = new (function() {})();
+      assert.equal(true , utils.isDict({}));
+      assert.equal(false, utils.isDict([]));
+      assert.equal(false, utils.isDict(__));
+      assert.equal(false, utils.isDict(null));
+    });
     it("flop", function() {
       var list = [
         [ "moe", "larry", "curly" ],

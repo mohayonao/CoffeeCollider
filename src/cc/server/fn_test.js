@@ -72,13 +72,6 @@ define(function(require, exports, module) {
         assert.equal(b.name , "Bar");
       });
     });
-    it("isDictionary", function() {
-      var __ = new (function() {})();
-      assert.equal(true , fn.isDictionary({}));
-      assert.equal(false, fn.isDictionary([]));
-      assert.equal(false, fn.isDictionary(__));
-      assert.equal(false, fn.isDictionary(null));
-    });
   });
   
 });

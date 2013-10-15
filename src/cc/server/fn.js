@@ -73,7 +73,7 @@ define(function(require, exports, module) {
     var resolve_args = function(keys, vals, given) {
       var dict;
       var args = vals.slice();
-      if (fn.isDictionary(given[given.length - 1])) {
+      if (utils.isDict(given[given.length - 1])) {
         dict = given.pop();
         for (var key in dict) {
           var index = keys.indexOf(key);
@@ -153,10 +153,6 @@ define(function(require, exports, module) {
       child.classmethods = classmethods;
     };
   })();
-  
-  fn.isDictionary = function(obj) {
-    return !!(obj && obj.constructor === Object);
-  };
 
   module.exports = fn;
 

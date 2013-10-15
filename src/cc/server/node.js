@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var utils  = require("./utils");
   var ugen   = require("./ugen/ugen");
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
@@ -166,7 +167,7 @@ define(function(require, exports, module) {
         return this;
       }
       var params = this.params;
-      if (fn.isDictionary(args)) {
+      if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
           var value  = args[key];
           var index  = params.names.indexOf(key);
@@ -351,7 +352,7 @@ define(function(require, exports, module) {
       } else {
         target = cc.server.rootNode;
       }
-      if (fn.isDictionary(arguments[i])) {
+      if (utils.isDict(arguments[i])) {
         args = arguments[i++];
       }
       if (typeof arguments[i] === "string") {
