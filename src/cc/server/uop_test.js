@@ -5,11 +5,9 @@ define(function(require, exports, module) {
   var register = require("./installer").register;
   var uop = require("./uop");
 
-  describe("uop:", function() {
-    var cc = {};
+  describe("uop.js", function() {
     before(function() {
-      cc.register = register(cc);
-      uop.install(cc);
+      uop.install();
     });
     it("num", function() {
       var actual   = [-1, 0, 1,true ,false,"str","2",""].num();
@@ -23,7 +21,7 @@ define(function(require, exports, module) {
     });
     it("not", function() {
       var actual   = [-1   ,0   , 1   ,true ,false,"str",""  ].not();
-      var expected = [false,true,false,false,true ,true ,true];
+      var expected = [false,true,false,false,true ,false,true];
       assert.deepEqual(actual, expected);
     });
     it("tilde", function() {

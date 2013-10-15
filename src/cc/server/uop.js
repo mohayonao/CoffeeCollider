@@ -1,39 +1,55 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var UGen = require("./ugen/ugen").UGen;
+  var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
+  
+  var setupFunction = function(func) {
+    return function() {
+      return func(this);
+    };
+  };
+  var setupArrayFunction = function(selector) {
+    return function() {
+      return this.map(function(x) {
+        return x[selector]();
+      });
+    };
+  };
+  var setupUGenFunction = function(selector) {
+    return function() {
+      return UnaryOpUGen.new(selector, this);
+    };
+  };
+
+  var setup = function(selector, func, others) {
+    func = setupFunction(func);
+    Number.prototype[selector] = func;
+    Array.prototype[selector]  = setupArrayFunction(selector);
+    UGen.prototype[selector]   = setupUGenFunction(selector);
+    if (others) {
+      String.prototype[selector]   = func;
+      Boolean.prototype[selector]  = func;
+      Function.prototype[selector] = func;
+    }
+  };
+  
   var install = function() {
-    Object.keys(calcFunc).forEach(function(key) {
-      var func = calcFunc[key];
-      Number.prototype[key] = function() {
-        return func(this);
-      };
-      Array.prototype[key] = function() {
-        return this.map(function(i) {
-          return i[key]();
-        });
-      };
-      Boolean.prototype[key] = function() {
-        return func(+this);
-      };
-      String.prototype[key] = function() {
-        return func(+this);
-      };
-    });
-  };
+    setup("num", function(a) {
+      return +a;
+    }, true);
+    
+    setup("neg", function(a) {
+      return -a;
+    }, true);
 
-  var calcFunc = {};
-
-  calcFunc.num = function(a) {
-    return +a;
-  };
-  calcFunc.neg = function(a) {
-    return -a;
-  };
-  calcFunc.not = function(a) {
-    return !a;
-  };
-  calcFunc.tilde = function(a) {
-    return ~a;
+    setup("not", function(a) {
+      return !a;
+    }, true);
+    
+    setup("tilde", function(a) {
+      return ~a;
+    }, true);
   };
 
   module.exports = {
