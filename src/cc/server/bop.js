@@ -1,7 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var UGen = require("./ugen/ugen").UGen;
+  var utils = require("./utils");
+  var UGen  = require("./ugen/ugen").UGen;
   var BinaryOpUGen = require("./ugen/basic_ops").BinaryOpUGen;
 
   var setupNumberFunction = function(func, selector, ugenSelector) {
@@ -61,6 +62,9 @@ define(function(require, exports, module) {
     String.prototype.__add__ = function(b) {
       return this + b;
     };
+    Function.prototype.__add__ = function(b) {
+      return this + b;
+    };
 
     setup("__sub__", function(a, b) {
       return a - b;
@@ -76,17 +80,54 @@ define(function(require, exports, module) {
           result[i] = this;
         }
         return result.join("");
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mul__(b);
+        }, this);
+      }
+      return this; // throw TypeError?
+    };
+    Function.prototype.__mul__ = function(b) {
+      if (typeof b === "function") {
+        var f = this, g = b;
+        return function() {
+          return f.call(null, g.apply(null, arguments));
+        };
       }
       return this;
     };
-
+    
     setup("__div__", function(a, b) {
       return a / b;
     }, "/");
+    String.prototype.__div__ = function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__div__(b);
+        }, this);
+      }
+      return this; // throw TypeError?
+    };
 
     setup("__mod__", function(a, b) {
       return a % b;
     }, "%");
+    String.prototype.__mod__ = function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), b|0).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mod__(b);
+        }, this);
+      }
+      return this; // throw TypeError?
+    };
   };
   
   module.exports = {
