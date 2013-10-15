@@ -129,10 +129,15 @@ define(function(require, exports, module) {
     fn.extend(Synth, Node);
 
     var build = function(specs, target, args, addAction) {
+      var that = this;
       this.specs = specs = JSON.parse(specs);
-      target.append(this, addAction);
-
       this.server = cc.server;
+
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        target.append(that, addAction);
+      });
+      
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
       });
@@ -161,11 +166,8 @@ define(function(require, exports, module) {
       });
       return this;
     };
-    
-    Synth.prototype.set = function(args) {
-      if (args === undefined) {
-        return this;
-      }
+
+    var _set = function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -205,6 +207,18 @@ define(function(require, exports, module) {
           }
         }, this);
       }
+      
+    };
+    
+    Synth.prototype.set = function(args) {
+      if (args === undefined) {
+        return this;
+      }
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        _set.call(that, args);
+      });
       return this;
     };
     Synth.prototype.process = function(inNumSamples) {

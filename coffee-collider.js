@@ -1527,10 +1527,15 @@ define('cc/server/node', function(require, exports, module) {
     fn.extend(Synth, Node);
 
     var build = function(specs, target, args, addAction) {
+      var that = this;
       this.specs = specs = JSON.parse(specs);
-      target.append(this, addAction);
-
       this.server = cc.server;
+
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        target.append(that, addAction);
+      });
+      
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
       });
@@ -1559,11 +1564,8 @@ define('cc/server/node', function(require, exports, module) {
       });
       return this;
     };
-    
-    Synth.prototype.set = function(args) {
-      if (args === undefined) {
-        return this;
-      }
+
+    var _set = function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -1603,6 +1605,18 @@ define('cc/server/node', function(require, exports, module) {
           }
         }, this);
       }
+      
+    };
+    
+    Synth.prototype.set = function(args) {
+      if (args === undefined) {
+        return this;
+      }
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        _set.call(that, args);
+      });
       return this;
     };
     Synth.prototype.process = function(inNumSamples) {
@@ -2464,6 +2478,11 @@ define('cc/server/sched', function(require, exports, module) {
     };
     Timeline.prototype.push = function(time, looper) {
       var list = this.list;
+
+      if (typeof arguments[0] === "function") {
+        looper = { execute: arguments[0] };
+        time   = this.currentTime;
+      }
       if (list.length) {
         if (time < list[list.length - 1][0]) {
           this.requireSort = true;
@@ -2493,7 +2512,7 @@ define('cc/server/sched', function(require, exports, module) {
       if (i) {
         list.splice(0, i);
       }
-      this.currentTime += this.currentTimeIncr;
+      this.currentTime = currentTime + this.currentTimeIncr;
     };
     return Timeline;
   })();
@@ -2502,7 +2521,7 @@ define('cc/server/sched', function(require, exports, module) {
     function Scheduler() {
       this.klassName = "Scheduler";
       this.server = cc.server;
-      this.payload = new SchedPayload();
+      this.payload = new SchedPayload(this.server.timeline);
       this.paused  = false;
     }
     Scheduler.prototype.execute = function() {
@@ -2514,17 +2533,18 @@ define('cc/server/sched', function(require, exports, module) {
   })();
 
   var SchedPayload = (function() {
-    function SchedPayload() {
-      this.currentTime = 0;
+    function SchedPayload(timeline) {
+      this.timeline = timeline;
+      this.isBreak  = false;
     }
     SchedPayload.prototype.wait = function(msec) {
       msec = +msec;
       if (!isNaN(msec)) {
-        this.currentTime += msec;
+        this.timeline.currentTime += msec;
       }
     };
     SchedPayload.prototype.break = function() {
-      this.currentTime = Infinity;
+      this.isBreak = true;
     };
     return SchedPayload;
   })();
@@ -2545,11 +2565,12 @@ define('cc/server/sched', function(require, exports, module) {
 
     Loop.prototype.execute = function(currentTime) {
       if (!this.paused) {
-        this.payload.currentTime = currentTime;
+        var timeline = this.server.timeline;
         this.func.call(this.payload);
-        if (this.payload.currentTime !== Infinity) {
-          this.server.timeline.push(this.payload.currentTime, this);
+        if (!this.payload.isBreak) {
+          timeline.push(timeline.currentTime, this);
         }
+        timeline.currentTime = currentTime;
       }
     };
     

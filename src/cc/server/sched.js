@@ -26,6 +26,11 @@ define(function(require, exports, module) {
     };
     Timeline.prototype.push = function(time, looper) {
       var list = this.list;
+
+      if (typeof arguments[0] === "function") {
+        looper = { execute: arguments[0] };
+        time   = this.currentTime;
+      }
       if (list.length) {
         if (time < list[list.length - 1][0]) {
           this.requireSort = true;
@@ -55,7 +60,7 @@ define(function(require, exports, module) {
       if (i) {
         list.splice(0, i);
       }
-      this.currentTime += this.currentTimeIncr;
+      this.currentTime = currentTime + this.currentTimeIncr;
     };
     return Timeline;
   })();
@@ -64,7 +69,7 @@ define(function(require, exports, module) {
     function Scheduler() {
       this.klassName = "Scheduler";
       this.server = cc.server;
-      this.payload = new SchedPayload();
+      this.payload = new SchedPayload(this.server.timeline);
       this.paused  = false;
     }
     Scheduler.prototype.execute = function() {
@@ -76,17 +81,18 @@ define(function(require, exports, module) {
   })();
 
   var SchedPayload = (function() {
-    function SchedPayload() {
-      this.currentTime = 0;
+    function SchedPayload(timeline) {
+      this.timeline = timeline;
+      this.isBreak  = false;
     }
     SchedPayload.prototype.wait = function(msec) {
       msec = +msec;
       if (!isNaN(msec)) {
-        this.currentTime += msec;
+        this.timeline.currentTime += msec;
       }
     };
     SchedPayload.prototype.break = function() {
-      this.currentTime = Infinity;
+      this.isBreak = true;
     };
     return SchedPayload;
   })();
@@ -107,11 +113,12 @@ define(function(require, exports, module) {
 
     Loop.prototype.execute = function(currentTime) {
       if (!this.paused) {
-        this.payload.currentTime = currentTime;
+        var timeline = this.server.timeline;
         this.func.call(this.payload);
-        if (this.payload.currentTime !== Infinity) {
-          this.server.timeline.push(this.payload.currentTime, this);
+        if (!this.payload.isBreak) {
+          timeline.push(timeline.currentTime, this);
         }
+        timeline.currentTime = currentTime;
       }
     };
     
