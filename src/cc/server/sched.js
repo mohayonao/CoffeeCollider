@@ -30,6 +30,9 @@ define(function(require, exports, module) {
       if (typeof arguments[0] === "function") {
         looper = { execute: arguments[0] };
         time   = this.currentTime;
+      } else if (arguments.length === 1) {
+        looper = arguments[0];
+        time   = this.currentTime;
       }
       if (list.length) {
         if (time < list[list.length - 1][0]) {
@@ -72,7 +75,18 @@ define(function(require, exports, module) {
       this.payload = new SchedPayload(this.server.timeline);
       this.paused  = false;
     }
-    Scheduler.prototype.execute = function() {
+    Scheduler.prototype.execute = function(currentTime) {
+      if (!this.paused) {
+        this._execute();
+        this.server.timeline.currentTime = currentTime;
+      }
+    };
+    Scheduler.prototype.run = function() {
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        timeline.push(0, that);
+      });
     };
     Scheduler.prototype.pause = function() {
       this.paused = true;
@@ -96,42 +110,86 @@ define(function(require, exports, module) {
     };
     return SchedPayload;
   })();
-  
-  var Loop = (function() {
-    function Loop() {
+
+  var TaskDo = (function() {
+    function TaskLoop(func) {
       Scheduler.call(this);
-      this.klassName = "Loop";
-    }
-    fn.extend(Loop, Scheduler);
-
-    Loop.prototype.$do = function(func) {
       this.func = func;
-      this.server.timeline.push(0, this);
-      return this;
-    };
-    fn.classmethod(Loop);
+    }
+    fn.extend(TaskLoop, Scheduler);
 
-    Loop.prototype.execute = function(currentTime) {
-      if (!this.paused) {
-        var timeline = this.server.timeline;
-        this.func.call(this.payload);
-        if (!this.payload.isBreak) {
-          timeline.push(timeline.currentTime, this);
-        }
-        timeline.currentTime = currentTime;
+    TaskLoop.prototype._execute = function() {
+      this.func.call(this.payload);
+    };
+    
+    return TaskLoop;
+  })();
+  
+  var TaskLoop = (function() {
+    function TaskLoop(func) {
+      Scheduler.call(this);
+      this.func = func;
+    }
+    fn.extend(TaskLoop, Scheduler);
+
+    TaskLoop.prototype._execute = function() {
+      this.func.call(this.payload);
+      if (!this.payload.isBreak) {
+        this.server.timeline.push(this);
       }
     };
     
-    return Loop;
+    return TaskLoop;
+  })();
+
+  var TaskEach = (function() {
+    function TaskEach(list, func) {
+      Scheduler.call(this);
+      this.list  = list;
+      this.func  = func;
+      this.index = 0;
+    }
+    fn.extend(TaskEach, Scheduler);
+
+    TaskEach.prototype._execute = function() {
+      if (this.index < this.list.length) {
+        this.func.call(this.payload, this.list[this.index++]);
+        if (!this.payload.isBreak) {
+          this.server.timeline.push(this);
+        }
+      }
+    };
+    
+    return TaskEach;
+  })();
+
+  var Task = (function() {
+    function Task() {
+      this.klassName = "Task";
+    }
+
+    Task.prototype.$do = function(func) {
+      return new TaskDo(func);
+    };
+    Task.prototype.$loop = function(func) {
+      return new TaskLoop(func);
+    };
+    Task.prototype.$each = function(list, func) {
+      return new TaskEach(list, func);
+    };
+    fn.classmethod(Task);
+    
+    return Task;
   })();
 
   var install = function(namespace) {
-    namespace.register("Loop", Loop);
+    namespace.register("Task", Task);
   };
   
   module.exports = {
     Timeline: Timeline,
-    Loop    : Loop,
+    TaskLoop: TaskLoop,
+    Task    : Task,
     install : install
   };
 
