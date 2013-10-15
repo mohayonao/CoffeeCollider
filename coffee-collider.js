@@ -1227,6 +1227,8 @@ define('cc/server/server', function(require, exports, module) {
       this.sysSyncCount = 0;
       this.syncItems = new Float32Array(5);
       this.timerId = 0;
+      this.currentTime     = Infinity;
+      this.currentTimeIncr = 0;
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -1267,6 +1269,7 @@ define('cc/server/server', function(require, exports, module) {
       var busClear  = this.busClear;
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
+      var incr = this.currentTimeIncr;
       var n = strmLength / bufLength;
       while (n--) {
         busBuffer.set(busClear);
@@ -1274,6 +1277,7 @@ define('cc/server/server', function(require, exports, module) {
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
+        this.currentTime += incr;
       }
       this.send(strm);
       this.syncCount += 1;
@@ -1306,16 +1310,23 @@ define('cc/server/server', function(require, exports, module) {
       var onaudioprocess = this.onaudioprocess.bind(this);
       this.timerId = setInterval(onaudioprocess, 10);
       this.syncCount = msg[1];
+      this.currentTime     = 0;
+      this.currentTimeIncr = (this.bufLength / this.sampleRate) * 1000;
     }
   };
   commands["/pause"] = function() {
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = 0;
+      this.currentTime     = Infinity;
+      this.currentTimeIncr = 0;
     }
   };
   commands["/reset"] = function() {
     this.reset();
+    if (this.currentTime !== Infinity) {
+      this.currentTime = 0;
+    }
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
