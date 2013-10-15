@@ -1171,6 +1171,7 @@ define('cc/server/installer', function(require, exports, module) {
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./node").install(namespace);
+    require("./sched").install(namespace);
     require("./ugen/installer").install(namespace);
     require("./unit/installer").install(namespace);
     delete namespace.register;
@@ -1215,7 +1216,8 @@ define('cc/server/cc', function(require, exports, module) {
 define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
-  var Group = require("./node").Group;
+  var Group    = require("./node").Group;
+  var Timeline = require("./sched").Timeline;
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -1226,9 +1228,8 @@ define('cc/server/server', function(require, exports, module) {
       this.klassName = "SynthServer";
       this.sysSyncCount = 0;
       this.syncItems = new Float32Array(5);
+      this.timeline = new Timeline(this);
       this.timerId = 0;
-      this.currentTime     = Infinity;
-      this.currentTimeIncr = 0;
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -1243,6 +1244,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      this.timeline.reset();
       if (cc.installed) {
         Object.keys(cc.installed).forEach(function(name) {
           global[name] = cc.installed[name];
@@ -1267,17 +1269,17 @@ define('cc/server/server', function(require, exports, module) {
       var offset = 0;
       var busBuffer = this.busBuffer;
       var busClear  = this.busClear;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
-      var incr = this.currentTimeIncr;
+      var busOutL  = this.busOutL;
+      var busOutR  = this.busOutR;
+      var timeline = this.timeline;
       var n = strmLength / bufLength;
       while (n--) {
+        timeline.process();
         busBuffer.set(busClear);
         root.process(bufLength);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
-        this.currentTime += incr;
       }
       this.send(strm);
       this.syncCount += 1;
@@ -1310,23 +1312,18 @@ define('cc/server/server', function(require, exports, module) {
       var onaudioprocess = this.onaudioprocess.bind(this);
       this.timerId = setInterval(onaudioprocess, 10);
       this.syncCount = msg[1];
-      this.currentTime     = 0;
-      this.currentTimeIncr = (this.bufLength / this.sampleRate) * 1000;
+      this.timeline.play();
     }
   };
   commands["/pause"] = function() {
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = 0;
-      this.currentTime     = Infinity;
-      this.currentTimeIncr = 0;
+      this.timeline.pause();
     }
   };
   commands["/reset"] = function() {
     this.reset();
-    if (this.currentTime !== Infinity) {
-      this.currentTime = 0;
-    }
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -2436,6 +2433,136 @@ define('cc/server/unit/unit', function(require, exports, module) {
     FixNum  : FixNum,
     Control : Control,
     register: register,
+    install : install
+  };
+
+});
+define('cc/server/sched', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var fn = require("./fn");
+
+  var Timeline = (function() {
+    function Timeline(server) {
+      this.klassName = "Timeline";
+      this.server = server;
+      this.list = [];
+      this.requireSort = false;
+      this.currentTime = 0;
+      this.currentTimeIncr = 0;
+    }
+    Timeline.prototype.play = function() {
+      this.currentTimeIncr = (this.server.bufLength / this.server.sampleRate) * 1000;
+    };
+    Timeline.prototype.pause = function() {
+      this.currentTimeIncr = 0;
+    };
+    Timeline.prototype.reset = function() {
+      this.list = [];
+      this.requireSort = false;
+      this.currentTime = 0;
+    };
+    Timeline.prototype.push = function(time, looper) {
+      var list = this.list;
+      if (list.length) {
+        if (time < list[list.length - 1][0]) {
+          this.requireSort = true;
+        }
+      }
+      list.push([ time, looper ]);
+    };
+    var sortFunction = function(a, b) {
+      return a[0] - b[0];
+    };
+    Timeline.prototype.process = function() {
+      var currentTime = this.currentTime;
+      var list = this.list;
+      if (this.requireSort) {
+        list.sort(sortFunction);
+        this.requireSort = false;
+      }
+      var i = 0, imax = list.length;
+      while (i < imax) {
+        if (list[i][0] < currentTime) {
+          list[i][1].execute(currentTime);
+        } else {
+          break;
+        }
+        i += 1;
+      }
+      if (i) {
+        list.splice(0, i);
+      }
+      this.currentTime += this.currentTimeIncr;
+    };
+    return Timeline;
+  })();
+
+  var Scheduler = (function() {
+    function Scheduler() {
+      this.klassName = "Scheduler";
+      this.server = cc.server;
+      this.payload = new SchedPayload();
+      this.paused  = false;
+    }
+    Scheduler.prototype.execute = function() {
+    };
+    Scheduler.prototype.pause = function() {
+      this.paused = true;
+    };
+    return Scheduler;
+  })();
+
+  var SchedPayload = (function() {
+    function SchedPayload() {
+      this.currentTime = 0;
+    }
+    SchedPayload.prototype.wait = function(msec) {
+      msec = +msec;
+      if (!isNaN(msec)) {
+        this.currentTime += msec;
+      }
+    };
+    SchedPayload.prototype.break = function() {
+      this.currentTime = Infinity;
+    };
+    return SchedPayload;
+  })();
+  
+  var Loop = (function() {
+    function Loop() {
+      Scheduler.call(this);
+      this.klassName = "Loop";
+    }
+    fn.extend(Loop, Scheduler);
+
+    Loop.prototype.$do = function(func) {
+      this.func = func;
+      this.server.timeline.push(0, this);
+      return this;
+    };
+    fn.classmethod(Loop);
+
+    Loop.prototype.execute = function(currentTime) {
+      if (!this.paused) {
+        this.payload.currentTime = currentTime;
+        this.func.call(this.payload);
+        if (this.payload.currentTime !== Infinity) {
+          this.server.timeline.push(this.payload.currentTime, this);
+        }
+      }
+    };
+    
+    return Loop;
+  })();
+
+  var install = function(namespace) {
+    namespace.register("Loop", Loop);
+  };
+  
+  module.exports = {
+    Timeline: Timeline,
+    Loop    : Loop,
     install : install
   };
 

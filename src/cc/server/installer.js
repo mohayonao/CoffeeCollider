@@ -10,6 +10,7 @@ define(function(require, exports, module) {
     require("./bop").install(namespace);
     require("./uop").install(namespace);
     require("./node").install(namespace);
+    require("./sched").install(namespace);
     require("./ugen/installer").install(namespace);
     require("./unit/installer").install(namespace);
     delete namespace.register;

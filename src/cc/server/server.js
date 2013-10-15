@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var Group = require("./node").Group;
+  var Group    = require("./node").Group;
+  var Timeline = require("./sched").Timeline;
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -13,9 +14,8 @@ define(function(require, exports, module) {
       this.klassName = "SynthServer";
       this.sysSyncCount = 0;
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
+      this.timeline = new Timeline(this);
       this.timerId = 0;
-      this.currentTime     = Infinity;
-      this.currentTimeIncr = 0;
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -30,6 +30,7 @@ define(function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      this.timeline.reset();
       if (cc.installed) {
         Object.keys(cc.installed).forEach(function(name) {
           global[name] = cc.installed[name];
@@ -54,17 +55,17 @@ define(function(require, exports, module) {
       var offset = 0;
       var busBuffer = this.busBuffer;
       var busClear  = this.busClear;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
-      var incr = this.currentTimeIncr;
+      var busOutL  = this.busOutL;
+      var busOutR  = this.busOutR;
+      var timeline = this.timeline;
       var n = strmLength / bufLength;
       while (n--) {
+        timeline.process();
         busBuffer.set(busClear);
         root.process(bufLength);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
-        this.currentTime += incr;
       }
       this.send(strm);
       this.syncCount += 1;
@@ -97,23 +98,18 @@ define(function(require, exports, module) {
       var onaudioprocess = this.onaudioprocess.bind(this);
       this.timerId = setInterval(onaudioprocess, 10);
       this.syncCount = msg[1];
-      this.currentTime     = 0;
-      this.currentTimeIncr = (this.bufLength / this.sampleRate) * 1000;
+      this.timeline.play();
     }
   };
   commands["/pause"] = function() {
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = 0;
-      this.currentTime     = Infinity;
-      this.currentTimeIncr = 0;
+      this.timeline.pause();
     }
   };
   commands["/reset"] = function() {
     this.reset();
-    if (this.currentTime !== Infinity) {
-      this.currentTime = 0;
-    }
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
