@@ -1,35 +1,40 @@
 module.exports = function(grunt) {
   "use strict";
 
-  grunt.loadNpmTasks("grunt-contrib-watch");
   grunt.loadNpmTasks("grunt-contrib-connect");
   grunt.loadNpmTasks("grunt-contrib-jshint");
   grunt.loadNpmTasks("grunt-contrib-uglify");
+  grunt.loadNpmTasks("grunt-este-watch");
+
+  var testFailed = [];
 
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
-    watch: {
-      livereload: {
-        files: [ "index.html", "coffee-collider.js" ],
-        options: {
-          livereload: true
-        },
+    esteWatch: {
+      options: {
+        dirs: [ "./", "src/**/", "documents/**/" ],
       },
-      build: {
-        files: [ "src/cc/**/*.js", "!src/cc/**/*_test.js" ],
-        tasks: [ "build" ],
+      js: function(filepath) {
+        if (/documents\//.test(filepath)) {
+          return;
+        }
+        if (/src\//.test(filepath)) {
+          if (/_test\.js$/.test(filepath)) {
+            return "test:" + filepath;
+          }
+          grunt.config(["jshint", "files"], filepath);
+          return [ "typo", "jshint", "test:" + filepath, "dryice" ];
+        }
       },
-      swf: {
-        files: [ "src/fallback.as" ],
-        tasks: [ "swf" ]
+      json: function() {
+        return [ "dryice" ];
       },
-      test: {
-        files: [ "src/cc/**/*_test.js" ],
-        tasks: [ "test" ],
-      },
+      as: function() {
+        return [ "swf" ];
+      }
     },
     connect: {
-      livereload: {
+      server: {
         options: {
           port    : process.env.PORT || 3000,
           hostname: "*"
@@ -59,7 +64,9 @@ module.exports = function(grunt) {
     var constants = grunt.file.readJSON("src/const.json");
     var re1 = /^define\(function\(require, exports, module\) {$/;
     var re2 = /[^a-zA-Z0-9_$]C\.([A-Z0-9_]+)/g;
-    var files = grunt.file.expand("src/cc/**/*.js").filter(function(file) {
+
+    var files = grunt.file.expand(grunt.config(["jshint", "files"]));
+    files = files.filter(function(file) {
       return !/_test\.js$/.test(file);
     });
     files.forEach(function(file) {
@@ -175,6 +182,11 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("test", function() {
+    Object.keys(require.cache).forEach(function(filepath) {
+      if (!/\/node_modules\//.test(filepath)) {
+        delete require.cache[filepath];
+      }
+    });
     require("amd-loader");
 
     var Mocha = require("mocha");
@@ -186,12 +198,29 @@ module.exports = function(grunt) {
     var args = arguments[0], files = [];
     if (args === "travis") {
       reporter = "list";
-    } if (args && grunt.file.exists(args)) {
-      files = [ args ];
+    } if (args) {
+      if (grunt.file.exists(args)) {
+        files = [ args ];
+      }
+      var related = args.replace(/\.js$/, "_test.js");
+      console.log("related:", related);
+      if (grunt.file.exists(related)) {
+        files = [ related ];
+      }
     }
+
     if (!files.length) {
       files = grunt.file.expand("src/cc/**/*_test.js");
     }
+    files = files.concat(testFailed);
+    var map = {};
+    files = files.filter(function(file) {
+      if (!map[file] && /_test\.js$/.test(file)) {
+        map[file] = true;
+        return true;
+      }
+      return false;
+    });
     files.forEach(function(file) {
       mocha.addFile(file);
     });
@@ -199,6 +228,9 @@ module.exports = function(grunt) {
     mocha.reporter(reporter).run(function(failures) {
       if (failures) {
         grunt.fail.fatal("test failed.");
+        testFailed = files;
+      } else {
+        testFailed = [];
       }
       if (args === "travis") {
         files.forEach(function(file) {
@@ -214,7 +246,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice"]);
-  grunt.registerTask("default", ["build", "connect", "watch"]);
+  grunt.registerTask("default", ["build", "connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
 };
