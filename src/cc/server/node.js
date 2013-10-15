@@ -257,23 +257,27 @@ define(function(require, exports, module) {
       this.klassName = "SynthDef";
     }
     SynthDef.prototype.initialize = function(func, args) {
-      args = unpackArguments(args);
-      
-      var isVaridArgs = args.vals.every(function(item) {
-        if (typeof item === "number") {
-          return true;
-        } else if (Array.isArray(item)) {
-          return item.every(function(item) {
-            return typeof item === "number";
+      var isVaridArgs = false;
+      if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
+        args = unpackArguments(args);
+        if (args) {
+          isVaridArgs = args.vals.every(function(item) {
+            if (typeof item === "number") {
+              return true;
+            } else if (Array.isArray(item)) {
+              return item.every(function(item) {
+                return typeof item === "number";
+              });
+            }
+            if (item === undefined || item === null) {
+              return true;
+            }
+            return false;
           });
         }
-        if (item === undefined || item === null) {
-          return true;
-        }
-        return false;
-      });
+      }
       if (!isVaridArgs) {
-        throw "UgenGraphFunc's arguments should be a number or an array that contains a number.";
+        throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
       }
       
       var params  = { names:[], indices:[], length:[], values:[] };
@@ -465,19 +469,23 @@ define(function(require, exports, module) {
       var keys = [];
       var vals = [];
       if (args) {
-        splitArguments(args).forEach(function(items) {
-          var i = items.indexOf("=");
-          var k, v;
-          if (i === -1) {
-            k = items;
-            v = undefined;
-          } else {
-            k = items.substr(0, i).trim();
-            v = eval.call(null, items.substr(i + 1));
-          }
-          keys.push(k);
-          vals.push(v);
-        });
+        try {
+          splitArguments(args).forEach(function(items) {
+            var i = items.indexOf("=");
+            var k, v;
+            if (i === -1) {
+              k = items;
+              v = undefined;
+            } else {
+              k = items.substr(0, i).trim();
+              v = JSON.parse(items.substr(i + 1));
+            }
+            keys.push(k);
+            vals.push(v);
+          });
+        } catch (e) {
+          return;
+        }
       }
       return { keys:keys, vals:vals };
     };
