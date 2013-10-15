@@ -10,6 +10,7 @@ window.onload = function() {
 
   var cc = window.cc = new CoffeeCollider();
   var isPlaying = false;
+  var prevCode  = null;
   
   $exec.addEventListener("click", function(e) {
     var code = $code.value.trim();
@@ -21,6 +22,7 @@ window.onload = function() {
           console.log(res);
         }
       });
+      prevCode = code;
     }
   }, false);
 
@@ -32,6 +34,9 @@ window.onload = function() {
   $play.addEventListener("click", function() {
     isPlaying = !isPlaying;
     if (isPlaying) {
+      if (prevCode !== $code.value.trim()) {
+        $exec.click();
+      }
       cc.play();
       $play.className = "btn btn-danger";
       requestAnimationFrame(animate);
