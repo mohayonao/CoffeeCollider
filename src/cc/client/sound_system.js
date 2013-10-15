@@ -19,8 +19,8 @@ define(function(require, exports, module) {
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
       this.syncCount = 0;
-      // syncCount, currentTime, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
-      this.syncItems = new Float32Array(6);
+      // syncCount, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
+      this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
       this.isPlaying = false;
 
       var syncItems = this.syncItems;
@@ -90,7 +90,7 @@ define(function(require, exports, module) {
     };
     var process1 = function() {
       var cc = this.colliders[0];
-      this.syncItems[0] = this.syncCount;
+      this.syncItems[C.SYNC] = this.syncCount;
       cc.process();
       this.strm.set(cc.strm);
       cc.sync(this.syncItems);

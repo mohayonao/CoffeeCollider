@@ -335,20 +335,20 @@ define('cc/client/sound_system', function(require, exports, module) {
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
       this.syncCount = 0;
-      // syncCount, currentTime, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
-      this.syncItems = new Float32Array(6);
+      // syncCount, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
+      this.syncItems = new Float32Array(5);
       this.isPlaying = false;
 
       var syncItems = this.syncItems;
       window.addEventListener("mousemove", function(e) {
-        syncItems[3] = e.pageX / window.innerWidth;
-        syncItems[4] = e.pageY / window.innerHeight;
+        syncItems[2] = e.pageX / window.innerWidth;
+        syncItems[3] = e.pageY / window.innerHeight;
       }, false);
       window.addEventListener("mousedown", function() {
-        syncItems[2] = 1;
+        syncItems[1] = 1;
       }, false);
       window.addEventListener("mouseup", function() {
-        syncItems[2] = 0;
+        syncItems[1] = 0;
       }, false);
     }
     var instance = null;
@@ -1224,9 +1224,8 @@ define('cc/server/server', function(require, exports, module) {
   var SynthServer = (function() {
     function SynthServer() {
       this.klassName = "SynthServer";
-      this.sysSyncCount   = 0;
-      this.sysCurrentTime = 0;
-      this.syncItems = new Float32Array(6);
+      this.sysSyncCount = 0;
+      this.syncItems = new Float32Array(5);
       this.timerId = 0;
     }
     SynthServer.prototype.send = function(msg) {
@@ -1363,8 +1362,7 @@ define('cc/server/server', function(require, exports, module) {
     addEventListener("message", function(e) {
       var msg = e.data;
       if (msg instanceof Float32Array) {
-        server.sysSyncCount   = msg[0]|0;
-        server.sysCurrentTime = msg[1]|0;
+        server.sysSyncCount = msg[0]|0;
         server.syncItems.set(msg);
       } else {
         server.recv(msg);
@@ -4587,7 +4585,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[3];
+      var y0 = this._mouse[2];
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -4619,7 +4617,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[4];
+      var y0 = this._mouse[3];
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -4650,7 +4648,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[2] ? maxval : minval;
+      var y0 = this._mouse[1] ? maxval : minval;
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };

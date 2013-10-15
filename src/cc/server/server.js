@@ -11,9 +11,8 @@ define(function(require, exports, module) {
   var SynthServer = (function() {
     function SynthServer() {
       this.klassName = "SynthServer";
-      this.sysSyncCount   = 0;
-      this.sysCurrentTime = 0;
-      this.syncItems = new Float32Array(6);
+      this.sysSyncCount = 0;
+      this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
       this.timerId = 0;
     }
     SynthServer.prototype.send = function(msg) {
@@ -150,8 +149,7 @@ define(function(require, exports, module) {
     addEventListener("message", function(e) {
       var msg = e.data;
       if (msg instanceof Float32Array) {
-        server.sysSyncCount   = msg[0]|0;
-        server.sysCurrentTime = msg[1]|0;
+        server.sysSyncCount = msg[C.SYNC]|0;
         server.syncItems.set(msg);
       } else {
         server.recv(msg);
