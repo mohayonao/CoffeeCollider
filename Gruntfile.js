@@ -195,17 +195,19 @@ module.exports = function(grunt) {
     global.C = grunt.file.readJSON("src/const.json");
 
     var reporter = "dot";
-    var args = arguments[0], files = [];
-    if (args === "travis") {
-      reporter = "list";
-    } if (args) {
-      if (grunt.file.exists(args)) {
-        files = [ args ];
-      }
-      var related = args.replace(/\.js$/, "_test.js");
-      console.log("related:", related);
-      if (grunt.file.exists(related)) {
-        files = [ related ];
+    var args  = arguments[0];
+    var files = [];
+    if (args) {
+      if (args === "travis") {
+        reporter = "list";
+      } else {
+        if (grunt.file.exists(args)) {
+          files.push(args);
+        }
+        var related = args.replace(/\.js$/, "_test.js");
+        if (grunt.file.exists(related)) {
+          files.push(related);
+        }
       }
     }
 
@@ -213,10 +215,10 @@ module.exports = function(grunt) {
       files = grunt.file.expand("src/cc/**/*_test.js");
     }
     files = files.concat(testFailed);
-    var map = {};
+    var set = {};
     files = files.filter(function(file) {
-      if (!map[file] && /_test\.js$/.test(file)) {
-        map[file] = true;
+      if (!set[file] && /_test\.js$/.test(file)) {
+        set[file] = true;
         return true;
       }
       return false;
