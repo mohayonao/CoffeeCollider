@@ -112,7 +112,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    Node.prototype.free = function() {
+    Node.prototype.stop = function() {
       var that = this;
       this.server.timeline.push(function() {
         that.remove();
