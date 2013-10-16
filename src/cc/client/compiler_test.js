@@ -614,118 +614,25 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
-    describe("insertReturn", function() {
-      it("BOD", function() {
-        var tokens = [
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "0" ],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["RETURN"    , "return"], // <-- insert here
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "0"     ],
-          ["TERMINATOR", "\n"    ],
-        ];
-        var actual = compiler.insertReturn(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("case 2", function() {
-        var tokens = [
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "0" ],
-          ["TERMINATOR", "\n"],
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "1" ],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "0"     ],
-          ["TERMINATOR", "\n"    ],
-          ["RETURN"    , "return"], // <-- insert here
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "1"     ],
-          ["TERMINATOR", "\n"    ],
-        ];
-        var actual = compiler.insertReturn(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("With indent/outdent", function() {
-        var tokens = [
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "0" ],
-          ["TERMINATOR", "\n"],
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["->"        , "->"],
-          ["INDENT"    , 2   ],
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "1" ],
-          ["TERMINATOR", "\n"],
-          ["IDENTIFIER", "a" ],
-          ["="         , "=" ],
-          ["NUMBER"    , "2" ],
-          ["OUTDENT"   , 2   ],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "0"     ],
-          ["TERMINATOR", "\n"    ],
-          ["RETURN"    , "return"], // <-- insert here
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["->"        , "->"    ],
-          ["INDENT"    , 2       ],
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "1"     ],
-          ["TERMINATOR", "\n"    ],
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "2"     ],
-          ["OUTDENT"   , 2       ],
-          ["TERMINATOR", "\n"    ],
-        ];
-        var actual = compiler.insertReturn(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("RETURN exists already", function() {
-        var tokens = [
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "0"     ],
-          ["TERMINATOR", "\n"    ],
-          ["RETURN"    , "return"],
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "1"     ],
-          ["TERMINATOR", "\n"    ],
-        ];
-        var expected = [
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "0"     ],
-          ["TERMINATOR", "\n"    ],
-          ["RETURN"    , "return"], // <-- not insert
-          ["IDENTIFIER", "a"     ],
-          ["="         , "="     ],
-          ["NUMBER"    , "1"     ],
-          ["TERMINATOR", "\n"    ],
-        ];
-        var actual = compiler.insertReturn(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
+    it("insertReturn", function() {
+      var tokens = [
+        ["IDENTIFIER", "a" ],
+        ["="         , "=" ],
+        ["NUMBER"    , "0" ],
+        ["TERMINATOR", "\n"],
+      ];
+      var expected = [
+        ["UNARY"     , "do" ],
+        ["->"        , "->" ],
+        ["INDENT"    , 2    ],
+        ["IDENTIFIER", "a"  ],
+        ["="         , "="  ],
+        ["NUMBER"    , "0"  ],
+        ["OUTDENT"   , 2    ],
+        ["TERMINATOR", "\n" ],
+      ];
+      var actual = compiler.insertReturn(tokens).erode();
+      assert.deepEqual(actual, expected);
     });
   });
 

@@ -448,29 +448,10 @@ define(function(require, exports, module) {
   };
 
   var insertReturn = function(tokens) {
-    var i = tokens.length - 2; // skip last TERMINATOR
-    var indent  = 0;
-    LOOP:
-    while (i >= 0) {
-      var token = tokens[i];
-      switch (token[TAG]) {
-      case "TERMINATOR":
-        if (indent === 0) {
-          break LOOP;
-        }
-        break;
-      case "OUTDENT":
-        indent += 1;
-        break;
-      case "INDENT":
-        indent -= 1;
-        break;
-      }
-      i -= 1;
-    }
-    if (tokens[i + 1][TAG] !== "RETURN") {
-      tokens.splice(i + 1, 0, [ "RETURN", "return", _ ]);
-    }
+    tokens.splice(0, 0, ["UNARY" , "do", _]);
+    tokens.splice(1, 0, ["->"    , "->", _]);
+    tokens.splice(2, 0, ["INDENT", 2   , _]);
+    tokens.splice(tokens.length - 1, 0, ["OUTDENT", 2, _]);
     // dumpTokens(tokens);
     return tokens;
   };
@@ -497,7 +478,7 @@ define(function(require, exports, module) {
     };
     Compiler.prototype.compile = function(code) {
       var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile().trim();
+      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
     Compiler.prototype.toString = function(tokens) {
       var indent = 0;
