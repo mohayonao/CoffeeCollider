@@ -45,6 +45,7 @@ define(function(require, exports, module) {
   // SUPER
   // INDENT
   // OUTDENT
+  // RETURN
   // TERMINATOR
 
   var TAG   = 0;
@@ -354,40 +355,7 @@ define(function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
-
-  var cleanupParenthesis = function(tokens) {
-    var i = 0;
-    var bracket = 0;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (token[TAG] === "(") {
-        token = tokens[i + 1];
-        if (token && token[TAG] === "(") {
-          bracket = 2;
-          for (var j = i + 2; j < tokens.length; j++) {
-            token = tokens[j][TAG];
-            if (token === "(") {
-              bracket += 1;
-            } if (token === ")") {
-              bracket -= 1;
-              if (bracket === 0) {
-                if (tokens[j - 1][TAG] === ")") {
-                  tokens.splice(j, 1);
-                  tokens.splice(i, 1);
-                  i -= 1;
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
+  
   var replaceSynthDef = (function() {
     var getParams = function(tokens, index) {
       var begin = -1, end = -1;
@@ -431,6 +399,39 @@ define(function(require, exports, module) {
       return tokens;
     };
   })();
+  
+  var cleanupParenthesis = function(tokens) {
+    var i = 0;
+    var bracket = 0;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (token[TAG] === "(") {
+        token = tokens[i + 1];
+        if (token && token[TAG] === "(") {
+          bracket = 2;
+          for (var j = i + 2; j < tokens.length; j++) {
+            token = tokens[j][TAG];
+            if (token === "(") {
+              bracket += 1;
+            } if (token === ")") {
+              bracket -= 1;
+              if (bracket === 0) {
+                if (tokens[j - 1][TAG] === ")") {
+                  tokens.splice(j, 1);
+                  tokens.splice(i, 1);
+                  i -= 1;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
   
   var Compiler = (function() {
     function Compiler() {
@@ -488,8 +489,8 @@ define(function(require, exports, module) {
     findOperandTail : findOperandTail,
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
-    replaceBinaryOp      : replaceBinaryOp,
     replaceUnaryOp       : replaceUnaryOp,
+    replaceBinaryOp      : replaceBinaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
     replaceSynthDef      : replaceSynthDef,
     cleanupParenthesis   : cleanupParenthesis,
