@@ -331,6 +331,27 @@ define(function(require, exports, module) {
           ["IDENTIFIER", "neg"],
           ["CALL_START", "("  ],
           ["CALL_END"  , ")"  ],
+          ["+"         , "+"  ],
+          ["IDENTIFIER", "a"  ],
+          ["TERMINATOR", "\n" ],
+        ];
+        var actual = compiler.replaceUnaryOp(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("-a + a => a.neg() + a", function() {
+        var tokens = [
+          ["-"         , "-" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "a" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["IDENTIFIER", "a"  ],
+          ["."         , "."  ],
+          ["IDENTIFIER", "neg"],
+          ["CALL_START", "("  ],
+          ["CALL_END"  , ")"  ],
           ["+"         , "+" ],
           ["IDENTIFIER", "a" ],
           ["TERMINATOR", "\n" ],
