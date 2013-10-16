@@ -660,6 +660,7 @@ define('cc/client/compiler', function(require, exports, module) {
   // SUPER
   // INDENT
   // OUTDENT
+  // RETURN
   // TERMINATOR
 
   var TAG   = 0;
@@ -737,10 +738,10 @@ define('cc/client/compiler', function(require, exports, module) {
           bracket += 1;
           break;
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           break;
         case "OUTDENT":
-          indent -= token[VALUE]|0;
+          indent -= 1;
           break;
         }
       }
@@ -765,7 +766,7 @@ define('cc/client/compiler', function(require, exports, module) {
         bracket -= 1;
         break;
       case "OUTDENT":
-        indent -= token[VALUE]|0;
+        indent -= 1;
         break;
       case "PARAM_START":
         inParams = true;
@@ -806,7 +807,7 @@ define('cc/client/compiler', function(require, exports, module) {
           }
           break;
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           break;
         case "OUTDENT":
           if (indent === 0 && bracket === 0) {
@@ -866,10 +867,7 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "num",
-    "-": "neg",
-    "!": "not",
-    "~": "tilde",
+    "+": "num", "-": "neg"
   };
 
   var replaceUnaryOp = function(tokens) {
@@ -899,11 +897,7 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var replaceBinaryOpTable = {
-    "+": "__add__",
-    "-": "__sub__",
-    "*": "__mul__",
-    "/": "__div__",
-    "%": "__mod__",
+    "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
   };
   
   var replaceBinaryOp = function(tokens) {
@@ -969,40 +963,7 @@ define('cc/client/compiler', function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
-
-  var cleanupParenthesis = function(tokens) {
-    var i = 0;
-    var bracket = 0;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (token[TAG] === "(") {
-        token = tokens[i + 1];
-        if (token && token[TAG] === "(") {
-          bracket = 2;
-          for (var j = i + 2; j < tokens.length; j++) {
-            token = tokens[j][TAG];
-            if (token === "(") {
-              bracket += 1;
-            } if (token === ")") {
-              bracket -= 1;
-              if (bracket === 0) {
-                if (tokens[j - 1][TAG] === ")") {
-                  tokens.splice(j, 1);
-                  tokens.splice(i, 1);
-                  i -= 1;
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
+  
   var replaceSynthDef = (function() {
     var getParams = function(tokens, index) {
       var begin = -1, end = -1;
@@ -1046,6 +1007,88 @@ define('cc/client/compiler', function(require, exports, module) {
       return tokens;
     };
   })();
+
+  var replaceGlobal = function(tokens) {
+    var i = tokens.length - 2;
+    while (i >= 0) {
+      var token = tokens[i];
+      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
+        var name = token[VALUE].substr(1);
+        if (name !== "") {
+          token = tokens[i - 1];
+          if (!token || token[TAG] !== ".") {
+            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
+            tokens.splice(i+1, 0, ["."         , "."     , _]);
+            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+          }
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
+  var cleanupParenthesis = function(tokens) {
+    var i = 0;
+    var bracket = 0;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (token[TAG] === "(") {
+        token = tokens[i + 1];
+        if (token && token[TAG] === "(") {
+          bracket = 2;
+          for (var j = i + 2; j < tokens.length; j++) {
+            token = tokens[j][TAG];
+            if (token === "(") {
+              bracket += 1;
+            } if (token === ")") {
+              bracket -= 1;
+              if (bracket === 0) {
+                if (tokens[j - 1][TAG] === ")") {
+                  tokens.splice(j, 1);
+                  tokens.splice(i, 1);
+                  i -= 1;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var insertReturn = function(tokens) {
+    var i = tokens.length - 2; // skip last TERMINATOR
+    var indent  = 0;
+    LOOP:
+    while (i >= 0) {
+      var token = tokens[i];
+      switch (token[TAG]) {
+      case "TERMINATOR":
+        if (indent === 0) {
+          break LOOP;
+        }
+        break;
+      case "OUTDENT":
+        indent += 1;
+        break;
+      case "INDENT":
+        indent -= 1;
+        break;
+      }
+      i -= 1;
+    }
+    if (tokens[i + 1][TAG] !== "RETURN") {
+      tokens.splice(i + 1, 0, [ "RETURN", "return", _ ]);
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
   
   var Compiler = (function() {
     function Compiler() {
@@ -1062,13 +1105,14 @@ define('cc/client/compiler', function(require, exports, module) {
       tokens = replaceCompoundAssign(tokens);
       tokens = replaceSynthDef(tokens);
       tokens = cleanupParenthesis(tokens);
+      tokens = insertReturn(tokens);
       this.code = code;
       this.data = data;
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
       var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
+      return CoffeeScript.nodes(tokens).compile().trim();
     };
     Compiler.prototype.toString = function(tokens) {
       var indent = 0;
@@ -1078,15 +1122,23 @@ define('cc/client/compiler', function(require, exports, module) {
       return tokens.map(function(token) {
         switch (token[TAG]) {
         case "TERMINATOR":
-          return "\n";
+          return "\n" + tab(indent);
         case "INDENT":
           indent += token[VALUE]|0;
           return "\n" + tab(indent);
         case "OUTDENT":
           indent -= token[VALUE]|0;
           return "\n" + tab(indent);
+        case "RETURN":
+          return "return ";
+        case "{":
+          return "{";
         case ",":
           return token[VALUE] + " ";
+        case "=":
+          return " = ";
+        case "COMPOUND_ASSIGN":
+          return " " + token[VALUE] + " ";
         default:
           return token[VALUE];
         }
@@ -1103,11 +1155,13 @@ define('cc/client/compiler', function(require, exports, module) {
     findOperandTail : findOperandTail,
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
-    replaceBinaryOp      : replaceBinaryOp,
     replaceUnaryOp       : replaceUnaryOp,
+    replaceBinaryOp      : replaceBinaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
     replaceSynthDef      : replaceSynthDef,
+    replaceGlobal        : replaceGlobal,
     cleanupParenthesis   : cleanupParenthesis,
+    insertReturn         : insertReturn,
   };
 
 });
@@ -2576,23 +2630,30 @@ define('cc/server/sched', function(require, exports, module) {
       this.klassName = "Scheduler";
       this.server = cc.server;
       this.payload = new SchedPayload(this.server.timeline);
-      this.paused  = false;
+      this.running = false;
     }
     Scheduler.prototype.execute = function(currentTime) {
-      if (!this.paused) {
+      if (this.running) {
         this._execute();
         this.server.timeline.currentTime = currentTime;
       }
     };
-    Scheduler.prototype.run = function() {
+    Scheduler.prototype.play = function() {
       var that = this;
       var timeline = this.server.timeline;
       timeline.push(function() {
+        that.running = true;
         timeline.push(0, that);
       }, true);
+      return this;
     };
     Scheduler.prototype.pause = function() {
-      this.paused = true;
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        that.running = false;
+      }, true);
+      return this;
     };
     return Scheduler;
   })();
@@ -2674,7 +2735,7 @@ define('cc/server/sched', function(require, exports, module) {
     }
     fn.extend(TaskTimeout, Scheduler);
     
-    TaskTimeout.prototype.run = function() {
+    TaskTimeout.prototype.play = function() {
       var that = this;
       var timeline = this.server.timeline;
       timeline.push(timeline.currentTime + this.delay, function() {
