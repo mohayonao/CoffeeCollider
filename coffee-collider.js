@@ -2638,6 +2638,45 @@ define('cc/server/sched', function(require, exports, module) {
     return TaskEach;
   })();
 
+  var TaskTimeout = (function() {
+    function TaskTimeout(delay, func) {
+      Scheduler.call(this);
+      this.delay = delay;
+      this.func  = func;
+    }
+    fn.extend(TaskTimeout, Scheduler);
+    
+    TaskTimeout.prototype.run = function() {
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(timeline.currentTime + this.delay, function() {
+        timeline.push(0, that);
+      });
+    };
+    TaskTimeout.prototype._execute = function() {
+      this.func.call(this.payload);
+    };
+    
+    return TaskTimeout;
+  })();
+  
+  var TaskInterval = (function() {
+    function TaskInterval(delay, func) {
+      TaskTimeout.call(this, delay, func);
+    }
+    fn.extend(TaskInterval, TaskTimeout);
+
+    TaskInterval.prototype._execute = function() {
+      this.func.call(this.payload);
+      if (!this.payload.isBreak) {
+        var timeline = this.server.timeline;
+        timeline.push(timeline.currentTime + this.delay, this);
+      }
+    };
+    
+    return TaskInterval;
+  })();
+  
   var Task = (function() {
     function Task() {
       this.klassName = "Task";
@@ -2652,6 +2691,13 @@ define('cc/server/sched', function(require, exports, module) {
     Task.prototype.$each = function(list, func) {
       return new TaskEach(list, func);
     };
+    Task.prototype.$timeout = function(delay, func) {
+      return new TaskTimeout(delay, func);
+    };
+    Task.prototype.$interval = function(delay, func) {
+      return new TaskInterval(delay, func);
+    };
+    
     fn.classmethod(Task);
     
     return Task;
@@ -2664,6 +2710,9 @@ define('cc/server/sched', function(require, exports, module) {
   module.exports = {
     Timeline: Timeline,
     TaskLoop: TaskLoop,
+    TaskEach: TaskEach,
+    TaskTimeout : TaskTimeout,
+    TaskInterval: TaskInterval,
     Task    : Task,
     install : install
   };
