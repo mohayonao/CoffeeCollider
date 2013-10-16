@@ -37,7 +37,6 @@ define(function(require, exports, module) {
       }
       if (arguments[i] instanceof Scheduler) {
         looper = arguments[i++];
-        console.log("looper");
       } else if (typeof arguments[i] === "function") {
         looper = { execute: arguments[i++] };
       }
