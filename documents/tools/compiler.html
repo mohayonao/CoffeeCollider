@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head style="height:100%">
+    <meta charset="utf-8">
+    <title>Compiler Tester</title>
+    <style>
+     * {
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing   : border-box;
+        -ms-box-sizing    : border-box;
+        box-sizing        : border-box;
+      }
+      body { margin:0; padding:0; height:100% }
+      textarea { position:absolute; top:0;
+                 width:50%; height:100%; border:0;
+                 font-family: Monaco,Consolas,'Lucida Console',monospace; font-size: 14px; }
+      #src { left:0; color:#34495e; background:#ecf0f1; }
+      #dst { right:0; color:#ecf0f1; background:#2c3e50; }
+    </style>
+  </head>
+  <body>
+    <textarea id="src" spellcheck="false"></textarea><textarea id="dst" spellcheck="false" readonly="true"></textarea>
+    <script src="../vendor/coffee-script.js"></script>
+    <script src="../../coffee-collider.js"></script>
+    <script>
+    window.onload = function() {
+      var $src = document.getElementById("src");
+      var $dst = document.getElementById("dst");
+      var prev = "";
+      var cc = new CoffeeCollider();
+      $src.addEventListener("keyup", function() {
+        var code = $src.value.trim();
+        if (code !== prev) {
+          var result = "";
+          try {
+            $dst.value = cc.compiler.compile(code).trim();
+            prev = code;
+          } catch (e) {}
+        }
+      });
+    };
+    </script>
+  </body>
+</html>
