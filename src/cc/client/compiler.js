@@ -497,13 +497,18 @@ define(function(require, exports, module) {
           return "\n" + tab(indent);
         case "RETURN":
           return "return ";
+        case "UNARY":
+          if (token[VALUE].length > 1) {
+            return token[VALUE] + " ";
+          }
+          return token[VALUE];
         case "{":
           return "{";
-        case ",":
+        case ",": case "RELATION":
           return token[VALUE] + " ";
         case "=":
           return " = ";
-        case "COMPOUND_ASSIGN":
+        case "COMPOUND_ASSIGN": case "COMPARE": case "MATH": case "+": case "-":
           return " " + token[VALUE] + " ";
         default:
           return token[VALUE];
