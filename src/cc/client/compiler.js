@@ -123,10 +123,10 @@ define(function(require, exports, module) {
           bracket += 1;
           break;
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           break;
         case "OUTDENT":
-          indent -= token[VALUE]|0;
+          indent -= 1;
           break;
         }
       }
@@ -151,7 +151,7 @@ define(function(require, exports, module) {
         bracket -= 1;
         break;
       case "OUTDENT":
-        indent -= token[VALUE]|0;
+        indent -= 1;
         break;
       case "PARAM_START":
         inParams = true;
@@ -192,7 +192,7 @@ define(function(require, exports, module) {
           }
           break;
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           break;
         case "OUTDENT":
           if (indent === 0 && bracket === 0) {
@@ -432,6 +432,34 @@ define(function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
+
+  var insertReturn = function(tokens) {
+    var i = tokens.length - 2; // skip last TERMINATOR
+    var indent  = 0;
+    LOOP:
+    while (i >= 0) {
+      var token = tokens[i];
+      switch (token[TAG]) {
+      case "TERMINATOR":
+        if (indent === 0) {
+          break LOOP;
+        }
+        break;
+      case "OUTDENT":
+        indent += 1;
+        break;
+      case "INDENT":
+        indent -= 1;
+        break;
+      }
+      i -= 1;
+    }
+    if (tokens[i + 1][TAG] !== "RETURN") {
+      tokens.splice(i + 1, 0, [ "RETURN", "return", _ ]);
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
   
   var Compiler = (function() {
     function Compiler() {
@@ -448,13 +476,14 @@ define(function(require, exports, module) {
       tokens = replaceCompoundAssign(tokens);
       tokens = replaceSynthDef(tokens);
       tokens = cleanupParenthesis(tokens);
+      tokens = insertReturn(tokens);
       this.code = code;
       this.data = data;
       return tokens;
     };
     Compiler.prototype.compile = function(code) {
       var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
+      return CoffeeScript.nodes(tokens).compile().trim();
     };
     Compiler.prototype.toString = function(tokens) {
       var indent = 0;
@@ -464,15 +493,23 @@ define(function(require, exports, module) {
       return tokens.map(function(token) {
         switch (token[TAG]) {
         case "TERMINATOR":
-          return "\n";
+          return "\n" + tab(indent);
         case "INDENT":
           indent += token[VALUE]|0;
           return "\n" + tab(indent);
         case "OUTDENT":
           indent -= token[VALUE]|0;
           return "\n" + tab(indent);
+        case "RETURN":
+          return "return ";
+        case "{":
+          return "{";
         case ",":
           return token[VALUE] + " ";
+        case "=":
+          return " = ";
+        case "COMPOUND_ASSIGN":
+          return " " + token[VALUE] + " ";
         default:
           return token[VALUE];
         }
@@ -494,6 +531,7 @@ define(function(require, exports, module) {
     replaceCompoundAssign: replaceCompoundAssign,
     replaceSynthDef      : replaceSynthDef,
     cleanupParenthesis   : cleanupParenthesis,
+    insertReturn         : insertReturn,
   };
 
 });
