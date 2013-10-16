@@ -1494,7 +1494,7 @@ define('cc/server/node', function(require, exports, module) {
       return this;
     };
 
-    Node.prototype.run = function() {
+    Node.prototype.play = function() {
       var that = this;
       this.server.timeline.push(function() {
         that.running = true;
@@ -1782,7 +1782,7 @@ define('cc/server/node', function(require, exports, module) {
       return this;
     };
     
-    SynthDef.prototype.play = fn(function() {
+    SynthDef.prototype.play = fn(function(running) {
       var target, args, addAction;
       var i = 0;
       target = args;
@@ -1815,7 +1815,12 @@ define('cc/server/node', function(require, exports, module) {
       default:
         addAction = "addToHead";
       }
-      return new Synth(JSON.stringify(this.specs), target, args, addAction);
+      var synth = new Synth(JSON.stringify(this.specs), target, args, addAction);
+      if (running === undefined) {
+        running = true;
+      }
+      synth.running = !!running;
+      return synth;
     }).multiCall().build();
 
     var topoSort = (function() {
