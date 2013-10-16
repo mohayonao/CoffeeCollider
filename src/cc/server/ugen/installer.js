@@ -1,11 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function(namespace) {
-    require("./ugen").install(namespace);
-    require("./basic_ops").install(namespace);
-    require("./osc").install(namespace);
-    require("./ui").install(namespace);
+  var install = function(register) {
+    require("./ugen").install(register);
+    require("./basic_ops").install(register);
+    require("./osc").install(register);
+    require("./ui").install(register);
   };
 
   module.exports = {

@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var cc = require("./cc");
-  var installer = require("./installer");
+  var register  = require("./installer").register;
   var sched     = require("./sched");
   var Timeline  = sched.Timeline;
   var Task      = sched.Task;
@@ -21,8 +21,7 @@ define(function(require, exports, module) {
   describe("sched.js", function() {
     var timeline, sync, procN, procT;
     before(function() {
-      cc.register = installer.register(cc);
-      sched.install(cc);
+      sched.install(register);
     });
     beforeEach(function() {
       cc.server = new MockServer();
@@ -45,13 +44,13 @@ define(function(require, exports, module) {
     });
     describe("TaskDo", function() {
       it("create", function() {
-        var t = cc.Task.do(function() {
+        var t = Task.do(function() {
         });
         assert.instanceOf(t, TaskDo);
       });
       it("do", function() {
         var passed = 0;
-        var t = cc.Task.do(function() {
+        var t = Task.do(function() {
           passed += 1;
         }).play();
         procN(2);
@@ -59,7 +58,7 @@ define(function(require, exports, module) {
       });
       it("sync", function() {
         var passed = 0;
-        var t = cc.Task.do(function() {
+        var t = Task.do(function() {
           passed += 1;
           this.wait(1000);
           sync(function() {

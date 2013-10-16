@@ -145,8 +145,8 @@ define(function(require, exports, module) {
     addToSynthDef = func;
   };
 
-  var install = function(namespace) {
-    namespace.register("Out", Out);
+  var install = function(register) {
+    register("Out", Out);
   };
 
   module.exports = {

@@ -45,10 +45,10 @@ define('cc/loader', function(require, exports, module) {
 
   if (typeof document !== "undefined") {
     cc.context = "client";
-    require("./client/installer").install(global);
+    require("./client/installer").install();
   } else if (typeof WorkerLocation !== "undefined") {
     cc.context = "server";
-    require("./server/installer").install(global);
+    require("./server/installer").install();
   }
   
   module.exports = {
@@ -84,7 +84,7 @@ define('cc/client/installer', function(require, exports, module) {
     }
   }
   
-  var install = function(global) {
+  var install = function() {
     global.CoffeeCollider = CoffeeCollider;
   };
 
@@ -1202,55 +1202,41 @@ define('cc/client/utils', function(require, exports, module) {
 });
 define('cc/server/installer', function(require, exports, module) {
   
-  var cc = require("./cc");
-  
-  var install = function(namespace) {
-    namespace = namespace || {};
-    namespace.register = register(namespace);
-    require("./server").install(namespace);
-    require("./bop").install(namespace);
-    require("./uop").install(namespace);
-    require("./node").install(namespace);
-    require("./sched").install(namespace);
-    require("./ugen/installer").install(namespace);
-    require("./unit/installer").install(namespace);
-    delete namespace.register;
+  var install = function() {
+    require("./server").install(register);
+    require("./bop").install(register);
+    require("./uop").install(register);
+    require("./node").install(register);
+    require("./sched").install(register);
+    require("./ugen/installer").install(register);
+    require("./unit/installer").install(register);
   };
 
-  var installed = cc.installed = {};
-
-  var register = function(namespace) {
-    return function(name, func) {
-      if (func) {
-        if (/^[A-Z]/.test(name)) {
-          var Klass = func;
-          var base = namespace[name] = installed[name] = function() {
-            return new Klass();
-          };
-          if (Klass.classmethods) {
-            Object.keys(Klass.classmethods).forEach(function(key) {
-              key = key.substr(1);
-              if (Klass[key]) {
-                base[key] = Klass[key];
-              }
-            });
-          }
-        } else {
-          namespace[name] = installed[name] = func;
+  var register = function(name, func) {
+    if (func) {
+      if (/^[A-Z]/.test(name)) {
+        var Klass = func;
+        var base = global[name] = function() {
+          return new Klass();
+        };
+        if (Klass.classmethods) {
+          Object.keys(Klass.classmethods).forEach(function(key) {
+            key = key.substr(1);
+            if (Klass[key]) {
+              base[key] = Klass[key];
+            }
+          });
         }
+      } else {
+        global[name] = func;
       }
-    };
+    }
   };
   
   module.exports = {
     install : install,
     register: register
     };
-
-});
-define('cc/server/cc', function(require, exports, module) {
-
-  module.exports = require("../cc");
 
 });
 define('cc/server/server', function(require, exports, module) {
@@ -1285,11 +1271,6 @@ define('cc/server/server', function(require, exports, module) {
     };
     SynthServer.prototype.reset = function() {
       this.timeline.reset();
-      if (cc.installed) {
-        Object.keys(cc.installed).forEach(function(name) {
-          global[name] = cc.installed[name];
-        });
-      }
       this.rootNode.prev = null;
       this.rootNode.next = null;
       this.rootNode.head = null;
@@ -1438,6 +1419,11 @@ define('cc/server/server', function(require, exports, module) {
     Rate: Rate,
     install: install
   };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  module.exports = require("../cc");
 
 });
 define('cc/server/node', function(require, exports, module) {
@@ -1963,8 +1949,8 @@ define('cc/server/node', function(require, exports, module) {
     return SynthDef;
   })();
   
-  var install = function(namespace) {
-    namespace.register("Synth", SynthDefInterface);
+  var install = function(register) {
+    register("Synth", SynthDefInterface);
   };
   
   module.exports = {
@@ -2381,8 +2367,8 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     addToSynthDef = func;
   };
 
-  var install = function(namespace) {
-    namespace.register("Out", Out);
+  var install = function(register) {
+    register("Out", Out);
   };
 
   module.exports = {
@@ -2835,8 +2821,8 @@ define('cc/server/sched', function(require, exports, module) {
     return Task;
   })();
 
-  var install = function(namespace) {
-    namespace.register("Task", Task);
+  var install = function(register) {
+    register("Task", Task);
   };
   
   module.exports = {
@@ -3458,11 +3444,11 @@ define('cc/server/uop', function(require, exports, module) {
 });
 define('cc/server/ugen/installer', function(require, exports, module) {
 
-  var install = function(namespace) {
-    require("./ugen").install(namespace);
-    require("./basic_ops").install(namespace);
-    require("./osc").install(namespace);
-    require("./ui").install(namespace);
+  var install = function(register) {
+    require("./ugen").install(register);
+    require("./basic_ops").install(register);
+    require("./osc").install(register);
+    require("./ui").install(register);
   };
 
   module.exports = {
@@ -3495,8 +3481,8 @@ define('cc/server/ugen/osc', function(require, exports, module) {
     return SinOsc;
   })();
 
-  var install = function(namespace) {
-    namespace.register("SinOsc", SinOsc);
+  var install = function(register) {
+    register("SinOsc", SinOsc);
   };
   
   module.exports = {
@@ -3568,10 +3554,10 @@ define('cc/server/ugen/ui', function(require, exports, module) {
     return MouseButton;
   })();
   
-  var install = function(namespace) {
-    namespace.register("MouseX", MouseX);
-    namespace.register("MouseY", MouseY);
-    namespace.register("MouseButton", MouseButton);
+  var install = function(register) {
+    register("MouseX", MouseX);
+    register("MouseY", MouseY);
+    register("MouseButton", MouseButton);
   };
 
   module.exports = {

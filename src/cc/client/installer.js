@@ -21,7 +21,7 @@ define(function(require, exports, module) {
     }
   }
   
-  var install = function(global) {
+  var install = function() {
     global.CoffeeCollider = CoffeeCollider;
   };
 

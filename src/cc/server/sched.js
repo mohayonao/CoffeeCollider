@@ -303,8 +303,8 @@ define(function(require, exports, module) {
     return Task;
   })();
 
-  var install = function(namespace) {
-    namespace.register("Task", Task);
+  var install = function(register) {
+    register("Task", Task);
   };
   
   module.exports = {

@@ -522,8 +522,8 @@ define(function(require, exports, module) {
     return SynthDef;
   })();
   
-  var install = function(namespace) {
-    namespace.register("Synth", SynthDefInterface);
+  var install = function(register) {
+    register("Synth", SynthDefInterface);
   };
   
   module.exports = {

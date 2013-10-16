@@ -24,8 +24,8 @@ define(function(require, exports, module) {
     return SinOsc;
   })();
 
-  var install = function(namespace) {
-    namespace.register("SinOsc", SinOsc);
+  var install = function(register) {
+    register("SinOsc", SinOsc);
   };
   
   module.exports = {
