@@ -88,10 +88,10 @@ define(function(require, exports, module) {
       this.klassName = "Scheduler";
       this.server = cc.server;
       this.payload = new SchedPayload(this.server.timeline);
-      this.paused  = false;
+      this.running = false;
     }
     Scheduler.prototype.execute = function(currentTime) {
-      if (!this.paused) {
+      if (this.running) {
         this._execute();
         this.server.timeline.currentTime = currentTime;
       }
@@ -100,11 +100,18 @@ define(function(require, exports, module) {
       var that = this;
       var timeline = this.server.timeline;
       timeline.push(function() {
+        that.running = true;
         timeline.push(0, that);
       }, true);
+      return this;
     };
     Scheduler.prototype.pause = function() {
-      this.paused = true;
+      var that = this;
+      var timeline = this.server.timeline;
+      timeline.push(function() {
+        that.running = false;
+      }, true);
+      return this;
     };
     return Scheduler;
   })();
