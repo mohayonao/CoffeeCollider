@@ -2600,7 +2600,7 @@ define('cc/server/sched', function(require, exports, module) {
       }
       var i = 0, imax = list.length;
       while (i < imax) {
-        if (list[i][0] < currentTime) {
+        if (list[i][0] <= currentTime) {
           list[i][1].execute(currentTime);
         } else {
           break;
@@ -2841,6 +2841,7 @@ define('cc/server/sched', function(require, exports, module) {
   
   module.exports = {
     Timeline: Timeline,
+    TaskDo  : TaskDo,
     TaskLoop: TaskLoop,
     TaskEach: TaskEach,
     TaskTimeout : TaskTimeout,
