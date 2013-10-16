@@ -536,6 +536,50 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
+    describe("replaceGlobal", function() {
+      it("$a => global.a", function() {
+        var tokens = [
+          ["IDENTIFIER", "$a"],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["IDENTIFIER", "global"],
+          ["."         , "."     ],
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "10"    ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("$ => $", function() {
+        var tokens = [
+          ["IDENTIFIER", "$" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = tokens;
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("a.$b => a.$b", function() {
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["."         , "." ],
+          ["IDENTIFIER", "$b"],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = tokens;
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+    });
     describe("cleanupParenthesis", function() {
       it("((a + b)) => (a + b)", function() {
         var tokens = [

@@ -399,6 +399,27 @@ define(function(require, exports, module) {
       return tokens;
     };
   })();
+
+  var replaceGlobal = function(tokens) {
+    var i = tokens.length - 2;
+    while (i >= 0) {
+      var token = tokens[i];
+      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
+        var name = token[VALUE].substr(1);
+        if (name !== "") {
+          token = tokens[i - 1];
+          if (!token || token[TAG] !== ".") {
+            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
+            tokens.splice(i+1, 0, ["."         , "."     , _]);
+            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+          }
+        }
+      }
+      i -= 1;
+    }
+    dumpTokens(tokens);
+    return tokens;
+  };
   
   var cleanupParenthesis = function(tokens) {
     var i = 0;
@@ -530,6 +551,7 @@ define(function(require, exports, module) {
     replaceBinaryOp      : replaceBinaryOp,
     replaceCompoundAssign: replaceCompoundAssign,
     replaceSynthDef      : replaceSynthDef,
+    replaceGlobal        : replaceGlobal,
     cleanupParenthesis   : cleanupParenthesis,
     insertReturn         : insertReturn,
   };
