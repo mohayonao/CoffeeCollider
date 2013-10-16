@@ -190,7 +190,7 @@ define(function(require, exports, module) {
     function TaskEach(list, func) {
       Scheduler.call(this);
       this.list  = list;
-      if (this.func) {
+      if (typeof func === "function") {
         this.func  = func;
       }
       this.index = 0;
@@ -201,6 +201,8 @@ define(function(require, exports, module) {
       if (this.index < this.list.length) {
         if (this.func) {
           this.func.call(this.payload, this.list[this.index++]);
+        } else {
+          this.index += 1;
         }
         if (!this.payload.isBreak) {
           this.server.timeline.push(this);
