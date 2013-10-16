@@ -24,15 +24,26 @@ define(function(require, exports, module) {
       this.requireSort = false;
       this.currentTime = 0;
     };
-    Timeline.prototype.push = function(time, looper) {
+    Timeline.prototype.push = function() {
       var list = this.list;
 
-      if (typeof arguments[0] === "function") {
-        looper = { execute: arguments[0] };
-        time   = this.currentTime;
-      } else if (arguments.length === 1) {
-        looper = arguments[0];
-        time   = this.currentTime;
+      var i = 0;
+      var time, looper, immediately;
+
+      if (typeof arguments[i] === "number") {
+        time = arguments[i++];
+      } else {
+        time = this.currentTime;
+      }
+      if (arguments[i] instanceof Scheduler) {
+        looper = arguments[i++];
+      } else if (typeof arguments[i] === "function") {
+        looper = { execute: arguments[i++] };
+      }
+      if (typeof arguments[i] === "boolean") {
+        immediately = arguments[i++];
+      } else {
+        immediately = false;
       }
       if (list.length) {
         if (time < list[list.length - 1][0]) {
@@ -40,6 +51,10 @@ define(function(require, exports, module) {
         }
       }
       list.push([ time, looper ]);
+      if (immediately && this.requireSort) {
+        list.sort(sortFunction);
+        this.requireSort = false;
+      }
     };
     var sortFunction = function(a, b) {
       return a[0] - b[0];
@@ -86,7 +101,7 @@ define(function(require, exports, module) {
       var timeline = this.server.timeline;
       timeline.push(function() {
         timeline.push(0, that);
-      });
+      }, true);
     };
     Scheduler.prototype.pause = function() {
       this.paused = true;
