@@ -4,10 +4,15 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var compiler = require("./compiler");
 
-  describe("compiler.", function() {
-    var _ = {};
+  Array.prototype.erode = function() {
+    return this.map(function(token) {
+      return token.slice(0, 2);
+    });
+  };
+  
+  describe("compiler.js", function() {
     describe("splitCodeAndData", function() {
-      it("case 1", function() {
+      it("Without __END__", function() {
         var code = [
           "this is code"
         ].join("\n");
@@ -18,19 +23,7 @@ define(function(require, exports, module) {
         var actual = compiler.splitCodeAndData(code);
         assert.deepEqual(actual, expected);
       });
-      it("case 2", function() {
-        var code = [
-          "this is code",
-          "__END__"
-        ].join("\n");
-        var expected = [
-          "this is code",
-          ""
-        ];
-        var actual = compiler.splitCodeAndData(code);
-        assert.deepEqual(actual, expected);
-      });
-      it("case 3", function() {
+      it("With __END__", function() {
         var code = [
           "this is code",
           "this is too",
@@ -46,522 +39,673 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
-    describe("findOperandHead:", function() {
-      it("with an unaryOperator", function() {
+    describe("findOperandHead", function() {
+      it("Unary operator", function() {
+        /*
+          ( +Math.PI * 2 )
+         */
         var tokens = [
-          [ "("         , "("   , _ ],
-          [ "+"         , "+"   , _ ], // <-- head
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
-          [ "NUMBER"    , 10    , _ ],
-          [ ")"         , ")"   , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["("         , "("   ],
+          ["+"         , "+"   ], // <-- head
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          ["MATH"      , "*"   ], // <-- from
+          ["NUMBER"    , "10"  ],
+          [")"         , ")"   ],
+          ["TERMINATOR", "\n"  ],
         ];
         var expected = 1;
         var actual = compiler.findOperandHead(tokens, 5);
         assert.equal(actual, expected);
       });
-      it("with an assign ", function() {
+      it("Assign", function() {
+        /*
+          ( a = Math.sin(10) * 10 )
+         */
         var tokens = [
-          [ "("         , "("   , _ ],
-          [ "IDENTIFIER", "a"   , _ ],
-          [ "="         , "="   , _ ],
-          [ "IDENTIFIER", "Math", _ ], // <-- head
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "sin" , _ ],
-          [ "CALL_START" , "("  , _ ],
-          [ "NUMBER"    , 10    , _ ],
-          [ "CALL_END"   , ")"  , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
-          [ "NUMBER"    , 10    , _ ],
-          [ ")"         , ")"   , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["IDENTIFIER", "a"   ],
+          ["="         , "="   ],
+          ["IDENTIFIER", "Math"], // <-- head
+          ["."         , "."   ],
+          ["IDENTIFIER", "sin" ],
+          ["CALL_START" , "("  ],
+          ["NUMBER"    , "10"  ],
+          ["CALL_END"   , ")"  ],
+          ["MATH"      , "*"   ], // <-- from
+          ["NUMBER"    , "10"  ],
+          ["TERMINATOR", "\n"  ],
         ];
-        var expected = 3;
-        var actual = compiler.findOperandHead(tokens, 9);
+        var expected = 2;
+        var actual = compiler.findOperandHead(tokens, 8);
         assert.equal(actual, expected);
       });
-      it("with a parenthesis", function() {
+      it("Begin of parenthesis", function() {
+        /*
+          [ (Math.PI + 10) * 10 ]
+         */
         var tokens = [
-          [ "["         , "["   , _ ],
-          [ "("         , "("   , _ ], // <-- head
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ],
-          [ ")"         , ")"   , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
-          [ "NUMBER"    , 10    , _ ],
-          [ "]"         , "]"   , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["["         , "["   ],
+          ["("         , "("   ], // <-- head
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          ["+"         , "+"   ],
+          ["NUMBER"    , "10"  ],
+          [")"         , ")"   ],
+          ["MATH"      , "*"   ], // <-- from
+          ["NUMBER"    , "10"  ],
+          ["]"         , "]"   ],
+          ["TERMINATOR", "\n"  ],
         ];
         var expected = 1;
-        var actual = compiler.findOperandHead(tokens, 6);
+        var actual = compiler.findOperandHead(tokens, 8);
         assert.equal(actual, expected);
       });
-      it("with a function", function() {
+      it("Begin of a function", function() {
         var tokens = [
-          [ "IDENTIFIER" , "def", _ ],
-          [ "CALL_START" , "("  , _ ],
-          [ "PARAM_START", "("  , _ ], // <-- head
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "="          , "="  , _ ],
-          [ "NUMBER"     , "100", _ ],
-          [ "PARAM_END"  , ")"  , _ ],
-          [ "->"         , "->" , _ ],
-          [ "INDENT"     , "2"  , _ ],
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "TERMINATOR" , "\n" , _ ],      
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "OUTDENT"    , "2"  , _ ],
-          [ ","          , ","  , _ ], // <-- from
-          [ "NUMBER"     , "300", _ ],
-          [ "CALL_END"   , ")"  , _ ],
-          [ "TERMINATOR" , "\n" , _ ],      
+          ["IDENTIFIER" , "def"],
+          ["CALL_START" , "("  ],
+          ["PARAM_START", "("  ], // <-- head
+          ["IDENTIFIER" , "x"  ],
+          ["="          , "="  ],
+          ["NUMBER"     , "100"],
+          ["PARAM_END"  , ")"  ],
+          ["->"         , "->" ],
+          ["INDENT"     , 2    ],
+          ["IDENTIFIER" , "x"  ],
+          ["TERMINATOR" , "\n" ],      
+          ["IDENTIFIER" , "x"  ],
+          ["OUTDENT"    , 2    ],
+          [","          , ","  ], // <-- from
+          ["NUMBER"     , "300"],
+          ["CALL_END"   , ")"  ],
+          ["TERMINATOR" , "\n" ],
         ];
         var expected = 2;
         var actual = compiler.findOperandHead(tokens, 13);
         assert.equal(actual, expected);
       });
     });
-    describe("findOperandTail:", function() {
+    describe("findOperandTail", function() {
+      /*
+        10 * Math.PI
+       */
       it("", function() {
         var tokens = [
-          [ "NUMBER"    , 10    , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ], // <-- tail
-          [ "TERMINATOR", "\n"  , _ ],
+          ["NUMBER"    , "10"  ],
+          ["MATH"      , "*"   ], // <-- from
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ], // <-- tail
+          ["TERMINATOR", "\n"  ],
         ];
         var expected = 4;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
       });
-      it("with a parenthesis", function() {
+      it("End of parenthesis", function() {
+        /*
+          10 * (Math.PI * 10)
+         */
         var tokens = [
-          [ "NUMBER"    , 10    , _ ],
-          [ "MATH"      , "*"   , _ ], // <-- from
-          [ "("         , "("   , _ ],
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ],
-          [ "MATH"      , "*"   , _ ],
-          [ "NUMBER"    , 10    , _ ],
-          [ ")"         , ")"   , _ ], // <-- tail
-          [ "TERMINATOR", "\n"  , _ ],
+          ["NUMBER"    , "10"  ],
+          ["MATH"      , "*"   ], // <-- from
+          ["("         , "("   ],
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          ["MATH"      , "*"   ],
+          ["NUMBER"    , "10"  ],
+          [")"         , ")"   ], // <-- tail
+          ["TERMINATOR", "\n"  ],
         ];
         var expected = 8;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
       });
-      it("with a function calling", function() {
+      it("End of a function calling", function() {
+        /*
+          ( ~[].func() )
+         */
         var tokens = [
-          [ "("         , "("   , _ ],
-          [ "UNARY"     , "~"   , _ ], // <-- from
-          [ "["         , "["   , _ ],
-          [ "]"         , "]"   , _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "func", _ ],
-          [ "CALL_START", "("   , _ ],
-          [ "CALL_END"  , ")"   , _ ], // <-- tail
-          [ ")"         , ")"   , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["("         , "("   ],
+          ["UNARY"     , "~"   ], // <-- from
+          ["["         , "["   ],
+          ["]"         , "]"   ],
+          ["."         , "."   ],
+          ["IDENTIFIER", "func"],
+          ["CALL_START", "("   ],
+          ["CALL_END"  , ")"   ], // <-- tail
+          [")"         , ")"   ],
+          ["TERMINATOR", "\n"  ],
         ];
         var expected = 7;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
       });
-      it("with a function", function() {
+      it("End of a function", function() {
+        /*
+          x = (x=100)->
+            x
+          x()
+         */
         var tokens = [
-          [ "IDENTIFIER" , "def", _ ],
-          [ "CALL_START" , "("  , _ ], // <-- from
-          [ "PARAM_START", "("  , _ ],
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "="          , "="  , _ ],
-          [ "NUMBER"     , "100", _ ],
-          [ "PARAM_END"  , ")"  , _ ],
-          [ "->"         , "->" , _ ],
-          [ "INDENT"     , "2"  , _ ],
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "TERMINATOR" , "\n" , _ ],      
-          [ "IDENTIFIER" , "x"  , _ ],
-          [ "OUTDENT"    , "2"  , _ ], // <-- tail
-          [ ","          , ","  , _ ],
-          [ "NUMBER"     , "300", _ ],
-          [ "CALL_END"   , ")"  , _ ],
-          [ "TERMINATOR" , "\n" , _ ],      
+          ["IDENTIFIER" , "x"  ],
+          ["="          , "="  ], // <-- from
+          ["PARAM_START", "("  ],
+          ["IDENTIFIER" , "x"  ],
+          ["="          , "="  ],
+          ["NUMBER"     , "100"],
+          ["PARAM_END"  , ")"  ],
+          ["->"         , "->" ],
+          ["INDENT"     , 2    ],
+          ["IDENTIFIER" , "x"  ],
+          ["OUTDENT"    , 2    ],
+          ["TERMINATOR" , "\n" ], // <-- here
+          ["IDENTIFIER" , "x"  ],
+          ["CALL_START" , ")"  ],
+          ["CALL_END"   , ")"  ],
+          ["TERMINATOR" , "\n" ],      
         ];
-        var expected = 12;
+        var expected = 10;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
       });
     });
-    describe("replaceSynthDef:", function() {
-      it("none args", function() {
-        var tokens = [
-          [ "IDENTIFIER", "Synth", _ ],
-          [ "."         , "."    , _ ],
-          [ "IDENTIFIER", "def"  , _ ],
-          [ "CALL_START", "("    , _ ],
-          [ "->"        , "->"   , _ ],
-          [ "INDENT"    , "2"    , _ ],
-          [ "IDENTIFIER", "x"    , _ ],
-          [ "OUTDENT"   , "2"    , _ ],
-          [ "CALL_END"  , ")"    , _ ],
-          [ "TERMINATOR", "\n"   , _ ],      
-        ];
-        var expected = [
-          [ "IDENTIFIER", "Synth", _ ],
-          [ "."         , "."    , _ ],
-          [ "IDENTIFIER", "def"  , _ ],
-          [ "CALL_START", "("    , _ ],
-          [ "->"        , "->"   , _ ],
-          [ "INDENT"    , "2"    , _ ],
-          [ "IDENTIFIER", "x"    , _ ],
-          [ "OUTDENT"   , "2"    , _ ],
-          [ ","         , ","    , _ ],
-          [ "STRING"    , '""'   , _ ],
-          [ "CALL_END"  , ")"    , _ ],
-          [ "TERMINATOR", "\n"   , _ ],      
-        ];
-        var actual = compiler.replaceSynthDef(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("x=100, y=200", function() {
-        var tokens = [
-          [ "IDENTIFIER" , "Synth", _ ],
-          [ "."          , "."    , _ ],
-          [ "IDENTIFIER" , "def"  , _ ],
-          [ "CALL_START" , "("    , _ ],
-          [ "PARAM_START", "("    , _ ],
-          [ "IDENTIFIER" , "x"    , _ ],
-          [ "="          , "="    , _ ],
-          [ "NUMBER"     , "100"  , _ ],
-          [ ","          , ","    , _ ],
-          [ "IDENTIFIER" , "y"    , _ ],
-          [ "="          , "="    , _ ],
-          [ "NUMBER"     , "200"  , _ ],
-          [ "PARAM_END"  , ")"    , _ ],
-          [ "->"         , "->"   , _ ],
-          [ "INDENT"     , "2"    , _ ],
-          [ "IDENTIFIER" , "x"    , _ ],
-          [ "OUTDENT"    , "2"    , _ ],
-          [ "CALL_END"   , ")"    , _ ],
-          [ "TERMINATOR" , "\n"   , _ ],      
-        ];
-        var expected = [
-          [ "IDENTIFIER" , "Synth"        , _ ],
-          [ "."          , "."            , _ ],
-          [ "IDENTIFIER" , "def"          , _ ],
-          [ "CALL_START" , "("            , _ ],
-          [ "PARAM_START", "("            , _ ],
-          [ "IDENTIFIER" , "x"            , _ ],
-          [ "="          , "="            , _ ],
-          [ "NUMBER"     , "100"          , _ ],
-          [ ","          , ","            , _ ],
-          [ "IDENTIFIER" , "y"            , _ ],
-          [ "="          , "="            , _ ],
-          [ "NUMBER"     , "200"          , _ ],
-          [ "PARAM_END"  , ")"            , _ ],
-          [ "->"         , "->"           , _ ],
-          [ "INDENT"     , "2"            , _ ],
-          [ "IDENTIFIER" , "x"            , _ ],
-          [ "OUTDENT"    , "2"            , _ ],
-          [ ","          , ","            , _ ],
-          [ "STRING"     , '"x=100,y=200"', _ ],
-          [ "CALL_END"   , ")"            , _ ],
-          [ "TERMINATOR" , "\n"           , _ ],      
-        ];
-        var actual = compiler.replaceSynthDef(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("with other args", function() {
-        var tokens = [
-          [ "IDENTIFIER" , "Synth", _ ],
-          [ "."          , "."    , _ ],
-          [ "IDENTIFIER" , "def"  , _ ],
-          [ "CALL_START" , "("    , _ ],
-          [ "("          , "("    , _ ],
-          [ "PARAM_START", "("    , _ ],
-          [ "IDENTIFIER" , "x"    , _ ],
-          [ "="          , "="    , _ ],
-          [ "NUMBER"     , "100"  , _ ],
-          [ ","          , ","    , _ ],
-          [ "IDENTIFIER" , "y"    , _ ],
-          [ "="          , "="    , _ ],
-          [ "NUMBER"     , "200"  , _ ],
-          [ "PARAM_END"  , ")"    , _ ],
-          [ "->"         , "->"   , _ ],
-          [ "INDENT"     , "2"    , _ ],
-          [ "IDENTIFIER" , "x"    , _ ],
-          [ "OUTDENT"    , "2"    , _ ],
-          [ ")"          , ")"    , _ ],
-          [ ","          , ","    , _ ],
-          [ "NUMBER"     , "300"  , _ ],
-          [ "CALL_END"   , ")"    , _ ],
-          [ "TERMINATOR" , "\n"   , _ ],      
-        ];
-        var expected = [
-          [ "IDENTIFIER" , "Synth"        , _ ],
-          [ "."          , "."            , _ ],
-          [ "IDENTIFIER" , "def"          , _ ],
-          [ "CALL_START" , "("            , _ ],
-          [ "("          , "("            , _ ],
-          [ "PARAM_START", "("            , _ ],
-          [ "IDENTIFIER" , "x"            , _ ],
-          [ "="          , "="            , _ ],
-          [ "NUMBER"     , "100"          , _ ],
-          [ ","          , ","            , _ ],
-          [ "IDENTIFIER" , "y"            , _ ],
-          [ "="          , "="            , _ ],
-          [ "NUMBER"     , "200"          , _ ],
-          [ "PARAM_END"  , ")"            , _ ],
-          [ "->"         , "->"           , _ ],
-          [ "INDENT"     , "2"            , _ ],
-          [ "IDENTIFIER" , "x"            , _ ],
-          [ "OUTDENT"    , "2"            , _ ],
-          [ ")"          , ")"            , _ ],
-          [ ","          , ","            , _ ],
-          [ "STRING"     , '"x=100,y=200"', _ ],
-          [ ","          , ","            , _ ],
-          [ "NUMBER"     , "300"          , _ ],
-          [ "CALL_END"   , ")"            , _ ],
-          [ "TERMINATOR" , "\n"           , _ ],      
-        ];
-        var actual = compiler.replaceSynthDef(tokens);
-        assert.deepEqual(actual, expected);
-      });
-    });
-    describe("replacePi:", function() {
+    describe("replacePi", function() {
       it("pi => Math.PI", function() {
         var tokens = [
-          [ "IDENTIFIER", "pi", _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["IDENTIFIER", "pi"],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          ["TERMINATOR", "\n"  ],
         ];
-        var actual = compiler.replacePi(tokens);
+        var actual = compiler.replacePi(tokens).erode();
         assert.deepEqual(actual, expected);
       });
       it("-10pi => (-10 * Math.PI)", function() {
         var tokens = [
-          [ "-"         , "-" , _ ],
-          [ "NUMBER"    , 10  , _ ],
-          [ "IDENTIFIER", "pi", _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["-"         , "-" ],
+          ["NUMBER"    , "10"],
+          ["IDENTIFIER", "pi"],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "("         , "("   , _ ],
-          [ "-"         , "-"   , _ ],
-          [ "NUMBER"    , 10    , _ ],
-          [ "MATH"      , "*"   , _ ],
-          [ "IDENTIFIER", "Math", _ ],
-          [ "."         , "."   , _ ],
-          [ "IDENTIFIER", "PI"  , _ ],
-          [ ")"         , ")"   , _ ],
-          [ "TERMINATOR", "\n"  , _ ],
+          ["("         , "("   ],
+          ["-"         , "-"   ],
+          ["NUMBER"    , "10"  ],
+          ["MATH"      , "*"   ],
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          [")"         , ")"   ],
+          ["TERMINATOR", "\n"  ],
         ];
-        var actual = compiler.replacePi(tokens);
+        var actual = compiler.replacePi(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    describe("replacePrecedence:", function() {
+    describe("replacePrecedence", function() {
       it("a * b + c => (a * b) + c", function() {
         var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "MATH"      , "*" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "c" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["IDENTIFIER", "a" ],
+          ["MATH"      , "*" ],
+          ["IDENTIFIER", "b" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "c" ],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "("         , "(" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "MATH"      , "*" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "c" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["("         , "(" ],
+          ["IDENTIFIER", "a" ],
+          ["MATH"      , "*" ],
+          ["IDENTIFIER", "b" ],
+          [")"         , ")" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "c" ],
+          ["TERMINATOR", "\n"],
         ];
-        var actual = compiler.replacePrecedence(tokens);
+        var actual = compiler.replacePrecedence(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    describe("replaceBinaryOp:", function() {
+    describe("replaceBinaryOp", function() {
       it("a + b => a.__add__(b)", function() {
         var tokens = [
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "b" ],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__add__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
+          ["IDENTIFIER", "a"      ],
+          ["."         , "."      ],
+          ["IDENTIFIER", "__add__"],
+          ["CALL_START", "("      ],
+          ["IDENTIFIER", "b"      ],
+          ["CALL_END"  , ")"      ],
+          ["TERMINATOR", "\n"     ],
         ];
-        var actual = compiler.replaceBinaryOp(tokens);
+        var actual = compiler.replaceBinaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    describe("replaceUnaryOp:", function() {
+    describe("replaceUnaryOp", function() {
       it("+a + a => a.num() + a", function() {
         var tokens = [
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "a" ],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "IDENTIFIER", "a"  , _ ],
-          [ "."         , "."  , _ ],
-          [ "IDENTIFIER", "num", _ ],
-          [ "CALL_START", "("  , _ ],
-          [ "CALL_END"  , ")"  , _ ],
-          [ "+"         , "+"  , _ ],
-          [ "IDENTIFIER", "a"  , _ ],
-          [ "TERMINATOR", "\n" , _ ],
+          ["IDENTIFIER", "a"  ],
+          ["."         , "."  ],
+          ["IDENTIFIER", "num"],
+          ["CALL_START", "("  ],
+          ["CALL_END"  , ")"  ],
+          ["+"         , "+"  ],
+          ["IDENTIFIER", "a"  ],
+          ["TERMINATOR", "\n" ],
         ];
-        var actual = compiler.replaceUnaryOp(tokens);
+        var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
       it("-a + a => a.neg() + a", function() {
         var tokens = [
-          [ "-"         , "-" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["-"         , "-" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "a" ],
+          ["TERMINATOR", "\n"],
         ];
         var expected = [
-          [ "IDENTIFIER", "a"  , _ ],
-          [ "."         , "."  , _ ],
-          [ "IDENTIFIER", "neg", _ ],
-          [ "CALL_START", "("  , _ ],
-          [ "CALL_END"  , ")"  , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "TERMINATOR", "\n" , _ ],
+          ["IDENTIFIER", "a"  ],
+          ["."         , "."  ],
+          ["IDENTIFIER", "neg"],
+          ["CALL_START", "("  ],
+          ["CALL_END"  , ")"  ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "a" ],
+          ["TERMINATOR", "\n" ],
         ];
-        var actual = compiler.replaceUnaryOp(tokens);
-        assert.deepEqual(actual, expected);
-      });
-      it("(~-[]) => ([].neg().tilde())", function() {
-        var tokens = [
-          [ "("         , "(" , _ ],
-          [ "UNARY"     , "~" , _ ],
-          [ "UNARY"     , "-" , _ ],
-          [ "["         , "[" , _ ],
-          [ "]"         , "]" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "TERMINATOR", "\n", _ ],
-        ];
-        var expected = [
-          [ "("         , "("    , _ ],
-          [ "["         , "["    , _ ],
-          [ "]"         , "]"    , _ ],
-          [ "."         , "."    , _ ],
-          [ "IDENTIFIER", "neg"  , _ ],
-          [ "CALL_START", "("    , _ ],
-          [ "CALL_END"  , ")"    , _ ],
-          [ "."         , "."    , _ ],
-          [ "IDENTIFIER", "tilde", _ ],
-          [ "CALL_START", "("    , _ ],
-          [ "CALL_END"  , ")"    , _ ],
-          [ ")"         , ")"    , _ ],
-          [ "TERMINATOR", "\n"   , _ ],
-        ];
-        var actual = compiler.replaceUnaryOp(tokens);
+        var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    describe("replaceCompoundAssign:", function() {
+    describe("replaceCompoundAssign", function() {
       it("a.a += b.b => a.a = a.a.__add__(b.b)", function() {
         var tokens = [
-          [ "IDENTIFIER"     , "a" , _ ],
-          [ "."              , "." , _ ],
-          [ "IDENTIFIER"     , "a" , _ ],
-          [ "COMPOUND_ASSIGN", "+=", _ ],
-          [ "IDENTIFIER"     , "b" , _ ],
-          [ "."              , "." , _ ],
-          [ "IDENTIFIER"     , "b" , _ ],
-          [ "TERMINATOR"     , "\n", _ ],
+          ["IDENTIFIER"     , "a" ],
+          ["."              , "." ],
+          ["IDENTIFIER"     , "a" ],
+          ["COMPOUND_ASSIGN", "+="],
+          ["IDENTIFIER"     , "b" ],
+          ["."              , "." ],
+          ["IDENTIFIER"     , "b" ],
+          ["TERMINATOR"     , "\n"],
         ];
         var expected = [
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "="         , "="      , _ ],
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "a"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "__add__", _ ],
-          [ "CALL_START", "("      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "."         , "."      , _ ],
-          [ "IDENTIFIER", "b"      , _ ],
-          [ "CALL_END"  , ")"      , _ ],
-          [ "TERMINATOR", "\n"     , _ ],
+          ["IDENTIFIER", "a"      ],
+          ["."         , "."      ],
+          ["IDENTIFIER", "a"      ],
+          ["="         , "="      ],
+          ["IDENTIFIER", "a"      ],
+          ["."         , "."      ],
+          ["IDENTIFIER", "a"      ],
+          ["."         , "."      ],
+          ["IDENTIFIER", "__add__"],
+          ["CALL_START", "("      ],
+          ["IDENTIFIER", "b"      ],
+          ["."         , "."      ],
+          ["IDENTIFIER", "b"      ],
+          ["CALL_END"  , ")"      ],
+          ["TERMINATOR", "\n"     ],
         ];
-        var actual = compiler.replaceCompoundAssign(tokens);
+        var actual = compiler.replaceCompoundAssign(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    describe("cleanupParenthesis:", function() {
-      it("((a + b)) => (a + b)", function() {
+    describe("replaceSynthDef", function() {
+      it("None args", function() {
         var tokens = [
-          [ "("         , "(" , _ ],
-          [ "("         , "(" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ ")"         , ")" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["IDENTIFIER", "Synth"],
+          ["."         , "."    ],
+          ["IDENTIFIER", "def"  ],
+          ["CALL_START", "("    ],
+          ["->"        , "->"   ],
+          ["INDENT"    , 2      ],
+          ["IDENTIFIER", "x"    ],
+          ["OUTDENT"   , 2      ],
+          ["CALL_END"  , ")"    ],
+          ["TERMINATOR", "\n"   ],      
         ];
         var expected = [
-          [ "("         , "(" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["IDENTIFIER", "Synth"],
+          ["."         , "."    ],
+          ["IDENTIFIER", "def"  ],
+          ["CALL_START", "("    ],
+          ["->"        , "->"   ],
+          ["INDENT"    , 2      ],
+          ["IDENTIFIER", "x"    ],
+          ["OUTDENT"   , 2      ],
+          [","         , ","    ],
+          ["STRING"    , '""'   ],
+          ["CALL_END"  , ")"    ],
+          ["TERMINATOR", "\n"   ],      
         ];
-        var actual = compiler.cleanupParenthesis(tokens);
+        var actual = compiler.replaceSynthDef(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("x=100, y=200", function() {
+        var tokens = [
+          ["IDENTIFIER" , "Synth"],
+          ["."          , "."    ],
+          ["IDENTIFIER" , "def"  ],
+          ["CALL_START" , "("    ],
+          ["PARAM_START", "("    ],
+          ["IDENTIFIER" , "x"    ],
+          ["="          , "="    ],
+          ["NUMBER"     , "100"  ],
+          [","          , ","    ],
+          ["IDENTIFIER" , "y"    ],
+          ["="          , "="    ],
+          ["NUMBER"     , "200"  ],
+          ["PARAM_END"  , ")"    ],
+          ["->"         , "->"   ],
+          ["INDENT"     , 2      ],
+          ["IDENTIFIER" , "x"    ],
+          ["OUTDENT"    , 2      ],
+          ["CALL_END"   , ")"    ],
+          ["TERMINATOR" , "\n"   ],      
+        ];
+        var expected = [
+          ["IDENTIFIER" , "Synth"        ],
+          ["."          , "."            ],
+          ["IDENTIFIER" , "def"          ],
+          ["CALL_START" , "("            ],
+          ["PARAM_START", "("            ],
+          ["IDENTIFIER" , "x"            ],
+          ["="          , "="            ],
+          ["NUMBER"     , "100"          ],
+          [","          , ","            ],
+          ["IDENTIFIER" , "y"            ],
+          ["="          , "="            ],
+          ["NUMBER"     , "200"          ],
+          ["PARAM_END"  , ")"            ],
+          ["->"         , "->"           ],
+          ["INDENT"     , 2              ],
+          ["IDENTIFIER" , "x"            ],
+          ["OUTDENT"    , 2              ],
+          [","          , ","            ],
+          ["STRING"     , '"x=100,y=200"'],
+          ["CALL_END"   , ")"            ],
+          ["TERMINATOR" , "\n"           ],      
+        ];
+        var actual = compiler.replaceSynthDef(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("With other args", function() {
+        var tokens = [
+          ["IDENTIFIER" , "Synth"],
+          ["."          , "."    ],
+          ["IDENTIFIER" , "def"  ],
+          ["CALL_START" , "("    ],
+          ["("          , "("    ],
+          ["PARAM_START", "("    ],
+          ["IDENTIFIER" , "x"    ],
+          ["="          , "="    ],
+          ["NUMBER"     , "100"  ],
+          [","          , ","    ],
+          ["IDENTIFIER" , "y"    ],
+          ["="          , "="    ],
+          ["NUMBER"     , "200"  ],
+          ["PARAM_END"  , ")"    ],
+          ["->"         , "->"   ],
+          ["INDENT"     , 2      ],
+          ["IDENTIFIER" , "x"    ],
+          ["OUTDENT"    , 2      ],
+          [")"          , ")"    ],
+          [","          , ","    ],
+          ["NUMBER"     , "300"  ],
+          ["CALL_END"   , ")"    ],
+          ["TERMINATOR" , "\n"   ],      
+        ];
+        var expected = [
+          ["IDENTIFIER" , "Synth"        ],
+          ["."          , "."            ],
+          ["IDENTIFIER" , "def"          ],
+          ["CALL_START" , "("            ],
+          ["("          , "("            ],
+          ["PARAM_START", "("            ],
+          ["IDENTIFIER" , "x"            ],
+          ["="          , "="            ],
+          ["NUMBER"     , "100"          ],
+          [","          , ","            ],
+          ["IDENTIFIER" , "y"            ],
+          ["="          , "="            ],
+          ["NUMBER"     , "200"          ],
+          ["PARAM_END"  , ")"            ],
+          ["->"         , "->"           ],
+          ["INDENT"     , 2              ],
+          ["IDENTIFIER" , "x"            ],
+          ["OUTDENT"    , 2              ],
+          [")"          , ")"            ],
+          [","          , ","            ],
+          ["STRING"     , '"x=100,y=200"'],
+          [","          , ","            ],
+          ["NUMBER"     , "300"          ],
+          ["CALL_END"   , ")"            ],
+          ["TERMINATOR" , "\n"           ],      
+        ];
+        var actual = compiler.replaceSynthDef(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+    });
+    describe("replaceGlobal", function() {
+      it("$a => global.a", function() {
+        var tokens = [
+          ["IDENTIFIER", "$a"],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["IDENTIFIER", "global"],
+          ["."         , "."     ],
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "10"    ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("$ => $", function() {
+        var tokens = [
+          ["IDENTIFIER", "$" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = tokens;
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("a.$b => a.$b", function() {
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["."         , "." ],
+          ["IDENTIFIER", "$b"],
+          ["="         , "=" ],
+          ["NUMBER"    , "10"],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = tokens;
+        var actual = compiler.replaceGlobal(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+    });
+    describe("cleanupParenthesis", function() {
+      it("((a + b)) => (a + b)", function() {
+        var tokens = [
+          ["("         , "(" ],
+          ["("         , "(" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "b" ],
+          [")"         , ")" ],
+          [")"         , ")" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["("         , "(" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "b" ],
+          [")"         , ")" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var actual = compiler.cleanupParenthesis(tokens).erode();
         assert.deepEqual(actual, expected);
       });
       it("((a + b) + c) => ((a + b) + c)", function() {
         var tokens = [
-          [ "("         , "(" , _ ],
-          [ "("         , "(" , _ ],
-          [ "IDENTIFIER", "a" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "b" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "+"         , "+" , _ ],
-          [ "IDENTIFIER", "c" , _ ],
-          [ ")"         , ")" , _ ],
-          [ "TERMINATOR", "\n", _ ],
+          ["("         , "(" ],
+          ["("         , "(" ],
+          ["IDENTIFIER", "a" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "b" ],
+          [")"         , ")" ],
+          ["+"         , "+" ],
+          ["IDENTIFIER", "c" ],
+          [")"         , ")" ],
+          ["TERMINATOR", "\n"],
         ];
         var expected = tokens;
-        var actual = compiler.cleanupParenthesis(tokens);
+        var actual = compiler.cleanupParenthesis(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-    });    
+    });
+    describe("insertReturn", function() {
+      it("BOD", function() {
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "0" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["RETURN"    , "return"], // <-- insert here
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "0"     ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.insertReturn(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("case 2", function() {
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "0" ],
+          ["TERMINATOR", "\n"],
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "1" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "0"     ],
+          ["TERMINATOR", "\n"    ],
+          ["RETURN"    , "return"], // <-- insert here
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "1"     ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.insertReturn(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("With indent/outdent", function() {
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "0" ],
+          ["TERMINATOR", "\n"],
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["->"        , "->"],
+          ["INDENT"    , 2   ],
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "1" ],
+          ["TERMINATOR", "\n"],
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "2" ],
+          ["OUTDENT"   , 2   ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "0"     ],
+          ["TERMINATOR", "\n"    ],
+          ["RETURN"    , "return"], // <-- insert here
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["->"        , "->"    ],
+          ["INDENT"    , 2       ],
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "1"     ],
+          ["TERMINATOR", "\n"    ],
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "2"     ],
+          ["OUTDENT"   , 2       ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.insertReturn(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("RETURN exists already", function() {
+        var tokens = [
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "0"     ],
+          ["TERMINATOR", "\n"    ],
+          ["RETURN"    , "return"],
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "1"     ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var expected = [
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "0"     ],
+          ["TERMINATOR", "\n"    ],
+          ["RETURN"    , "return"], // <-- not insert
+          ["IDENTIFIER", "a"     ],
+          ["="         , "="     ],
+          ["NUMBER"    , "1"     ],
+          ["TERMINATOR", "\n"    ],
+        ];
+        var actual = compiler.insertReturn(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+    });
   });
 
 });
