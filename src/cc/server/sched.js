@@ -37,6 +37,7 @@ define(function(require, exports, module) {
       }
       if (arguments[i] instanceof Scheduler) {
         looper = arguments[i++];
+        console.log("looper");
       } else if (typeof arguments[i] === "function") {
         looper = { execute: arguments[i++] };
       }
@@ -96,20 +97,33 @@ define(function(require, exports, module) {
         this.server.timeline.currentTime = currentTime;
       }
     };
-    Scheduler.prototype.run = function() {
+    Scheduler.prototype.play = function() {
       var that = this;
-      var timeline = this.server.timeline;
-      timeline.push(function() {
-        that.running = true;
-        timeline.push(0, that);
-      }, true);
+      if (this.payload) {
+        var timeline = this.server.timeline;
+        timeline.push(function() {
+          that.running = true;
+          timeline.push(0, that);
+        }, true);
+      }
       return this;
     };
     Scheduler.prototype.pause = function() {
       var that = this;
+      if (this.payload) {
+        var timeline = this.server.timeline;
+        timeline.push(function() {
+          that.running = false;
+        }, true);
+      }
+      return this;
+    };
+    Scheduler.prototype.stop = function() {
+      var that = this;
       var timeline = this.server.timeline;
       timeline.push(function() {
         that.running = false;
+        that.payload = null;
       }, true);
       return this;
     };
@@ -136,12 +150,17 @@ define(function(require, exports, module) {
   var TaskDo = (function() {
     function TaskLoop(func) {
       Scheduler.call(this);
-      this.func = func;
+      if (typeof func === "function") {
+        this.func = func;
+      }
     }
     fn.extend(TaskLoop, Scheduler);
 
     TaskLoop.prototype._execute = function() {
-      this.func.call(this.payload);
+      if (this.func) {
+        this.func.call(this.payload);
+      }
+      this.payload = null;
     };
     
     return TaskLoop;
@@ -150,12 +169,16 @@ define(function(require, exports, module) {
   var TaskLoop = (function() {
     function TaskLoop(func) {
       Scheduler.call(this);
-      this.func = func;
+      if (typeof func === "function") {
+        this.func = func;
+      }
     }
     fn.extend(TaskLoop, Scheduler);
 
     TaskLoop.prototype._execute = function() {
-      this.func.call(this.payload);
+      if (this.func) {
+        this.func.call(this.payload);
+      }
       if (!this.payload.isBreak) {
         this.server.timeline.push(this);
       }
@@ -168,16 +191,22 @@ define(function(require, exports, module) {
     function TaskEach(list, func) {
       Scheduler.call(this);
       this.list  = list;
-      this.func  = func;
+      if (this.func) {
+        this.func  = func;
+      }
       this.index = 0;
     }
     fn.extend(TaskEach, Scheduler);
 
     TaskEach.prototype._execute = function() {
       if (this.index < this.list.length) {
-        this.func.call(this.payload, this.list[this.index++]);
+        if (this.func) {
+          this.func.call(this.payload, this.list[this.index++]);
+        }
         if (!this.payload.isBreak) {
           this.server.timeline.push(this);
+        } else {
+          this.payload = null;
         }
       }
     };
@@ -186,22 +215,45 @@ define(function(require, exports, module) {
   })();
 
   var TaskTimeout = (function() {
-    function TaskTimeout(delay, func) {
+    function TaskTimeout() {
       Scheduler.call(this);
-      this.delay = delay;
+
+      var delay = 0;
+      var func  = null;
+      
+      var i = 0;
+      if (typeof arguments[i] === "number") {
+        delay = Math.min(0, arguments[i++]);
+        if (isNaN(delay)) {
+          delay = null;
+        }
+      } else {
+        delay = null;
+      }
+      if (typeof arguments[i] === "function") {
+        func = arguments[i++];
+      }
+      this.delay = delay || 0;
       this.func  = func;
     }
     fn.extend(TaskTimeout, Scheduler);
     
-    TaskTimeout.prototype.run = function() {
+    TaskTimeout.prototype.play = function() {
       var that = this;
-      var timeline = this.server.timeline;
-      timeline.push(timeline.currentTime + this.delay, function() {
-        timeline.push(0, that);
-      });
+      if (this.payload) {
+        var timeline = this.server.timeline;
+        timeline.push(timeline.currentTime + this.delay, function() {
+          that.running = true;
+          timeline.push(0, that);
+        });
+      }
+      return this;
     };
     TaskTimeout.prototype._execute = function() {
-      this.func.call(this.payload);
+      if (this.func) {
+        this.func.call(this.payload);
+      }
+      this.payload = null;
     };
     
     return TaskTimeout;
