@@ -95,6 +95,30 @@ define(function(require, exports, module) {
       this.parent = null;
       return this;
     };
+
+    Node.prototype.run = function() {
+      var that = this;
+      this.server.timeline.push(function() {
+        that.running = true;
+      });
+      return this;
+    };
+    
+    Node.prototype.pause = function() {
+      var that = this;
+      this.server.timeline.push(function() {
+        that.running = false;
+      });
+      return this;
+    };
+    
+    Node.prototype.free = function() {
+      var that = this;
+      this.server.timeline.push(function() {
+        that.remove();
+      });
+      return this;
+    };
     
     return Node;
   })();
@@ -215,8 +239,7 @@ define(function(require, exports, module) {
         return this;
       }
       var that = this;
-      var timeline = this.server.timeline;
-      timeline.push(function() {
+      this.server.timeline.push(function() {
         _set.call(that, args);
       });
       return this;
