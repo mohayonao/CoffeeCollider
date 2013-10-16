@@ -319,11 +319,12 @@ define(function(require, exports, module) {
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
+      var saved = controls.slice();
       for (i = 0; i < imax; ++i) {
         if (Array.isArray(args.vals[i])) {
-          reshaped.push(controls.slice(0, args.vals[i].length));
+          reshaped.push(saved.splice(0, args.vals[i].length));
         } else {
-          reshaped.push(controls.shift());
+          reshaped.push(saved.shift());
         }
       }
       

@@ -168,7 +168,10 @@ define(function(require, exports, module) {
         var console = {};
         ["log", "debug", "info", "warn", "error"].forEach(function(method) {
           console[method] = function() {
-            server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            server.send(["/console/" + method, args]);
           };
         });
         return console;

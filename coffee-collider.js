@@ -1436,7 +1436,10 @@ define('cc/server/server', function(require, exports, module) {
         var console = {};
         ["log", "debug", "info", "warn", "error"].forEach(function(method) {
           console[method] = function() {
-            server.send(["/console/" + method, Array.prototype.slice.call(arguments)]);
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            server.send(["/console/" + method, args]);
           };
         });
         return console;
@@ -1771,11 +1774,12 @@ define('cc/server/node', function(require, exports, module) {
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
+      var saved = controls.slice();
       for (i = 0; i < imax; ++i) {
         if (Array.isArray(args.vals[i])) {
-          reshaped.push(controls.slice(0, args.vals[i].length));
+          reshaped.push(saved.splice(0, args.vals[i].length));
         } else {
-          reshaped.push(controls.shift());
+          reshaped.push(saved.shift());
         }
       }
       
