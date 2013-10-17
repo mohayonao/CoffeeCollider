@@ -37,9 +37,9 @@ define(function(require, exports, module) {
         sched.push(syncable, slice.call(arguments, 1));
       } else {
         if (syncable instanceof Syncable) {
-          var methodName = "_sync_" + arguments[1];
-          if (syncable[methodName]) {
-            syncable[methodName].apply(syncable, slice.call(arguments, 2));
+          var method = arguments[1];
+          if (syncable[method] && syncable[method].impl) {
+            syncable[method].impl.apply(syncable, slice.call(arguments, 2));
           }
         } else {
           syncable();
@@ -78,7 +78,7 @@ define(function(require, exports, module) {
       }
       return this;
     };
-    Task.prototype._sync_play = function() {
+    Task.prototype.play.impl = function() {
       if (this.timeline) {
         this.timeline.append(this);
       }
@@ -93,7 +93,7 @@ define(function(require, exports, module) {
       }
       return this;
     };
-    Task.prototype._sync_pause = function() {
+    Task.prototype.pause.impl = function() {
       if (this.timeline) {
         this.timeline.remove(this);
       }
@@ -106,7 +106,7 @@ define(function(require, exports, module) {
       }
       return this;
     };
-    Task.prototype._sync_stop = function() {
+    Task.prototype.stop.impl = function() {
       this.pause();
       this.timeline = null;
     };
@@ -114,9 +114,9 @@ define(function(require, exports, module) {
       if (typeof syncable === "function") {
         this.events.push(syncable);
       } else if (syncable instanceof Syncable) {
-        var methodName = "_sync_" + args.shift();
-        if (syncable[methodName]) {
-          this.events.push([syncable, methodName, args]);
+        var method = args.shift();
+        if (syncable[method] && syncable[method].impl) {
+          this.events.push([syncable[method].impl, syncable, args]);
         }
       }
     };
@@ -147,7 +147,7 @@ define(function(require, exports, module) {
             break;
           default:
             if (Array.isArray(e)) {
-              e[0][e[1]].apply(e[0], e[2]);
+              e[0].apply(e[1], e[2]);
             } else if (e instanceof Task) {
               if (e.timeline !== null) {
                 break LOOP;

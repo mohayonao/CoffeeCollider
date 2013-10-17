@@ -1432,6 +1432,7 @@ define('cc/server/node', function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var ugen   = require("./ugen/ugen");
+  var Syncable = require("./sched").Syncable;
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
   var slice = [].slice;
@@ -1444,6 +1445,13 @@ define('cc/server/node', function(require, exports, module) {
       this.parent  = null;
       this.running = true;
     }
+    fn.extend(Node, Syncable);
+
+    Node.prototype.new_append = function() {
+    };
+    Node.prototype.new_append.impl = function(target, addAction) {
+      target.append(this, addAction);
+    };
     
     var appendFunc = {};
     appendFunc.addToHead = function(node) {
@@ -1522,29 +1530,29 @@ define('cc/server/node', function(require, exports, module) {
       this.parent = null;
       return this;
     };
-
+    // SyncMethod
     Node.prototype.play = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.running = true;
-      });
+      cc.server.timeline.push(this, "play");
       return this;
     };
-    
+    Node.prototype.play.impl = function() {
+      this.running = true;
+    };
+    // SyncMethod
     Node.prototype.pause = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.running = false;
-      });
+      cc.server.timeline.push(this, "pause");
       return this;
     };
-    
+    Node.prototype.pause.impl = function() {
+      this.running = false;
+    };
+    // SyncMethod
     Node.prototype.stop = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.remove();
-      });
+      cc.server.timeline.push(this, "stop");
       return this;
+    };
+    Node.prototype.stop.impl = function() {
+      this.remove();
     };
     
     return Node;
@@ -1580,14 +1588,10 @@ define('cc/server/node', function(require, exports, module) {
     fn.extend(Synth, Node);
 
     var build = function(specs, target, args, addAction) {
-      var that = this;
       this.specs = specs = JSON.parse(specs);
-      this.server = cc.server;
 
-      var timeline = this.server.timeline;
-      timeline.push(function() {
-        target.append(that, addAction);
-      });
+      var timeline = cc.server.timeline;
+      timeline.push(this, "new_append", target, addAction);
       
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -1617,8 +1621,16 @@ define('cc/server/node', function(require, exports, module) {
       });
       return this;
     };
-
-    var _set = function(args) {
+    
+    // SyncMethod
+    Synth.prototype.set = function(args) {
+      if (args) {
+        cc.server.timeline.push(this, "set", args);
+      }
+      return this;
+    };
+    
+    Synth.prototype.set.impl = function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -1658,19 +1670,8 @@ define('cc/server/node', function(require, exports, module) {
           }
         }, this);
       }
-      
     };
     
-    Synth.prototype.set = function(args) {
-      if (args === undefined) {
-        return this;
-      }
-      var that = this;
-      this.server.timeline.push(function() {
-        _set.call(that, args);
-      });
-      return this;
-    };
     Synth.prototype.process = function(inNumSamples) {
       if (this.running) {
         var unitList = this.unitList;
@@ -2382,8 +2383,351 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   };
 
 });
+define('cc/server/sched', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var fn = require("./fn");
+  var slice = [].slice;
+
+  var Timeline = (function() {
+    function Timeline() {
+      this.klassName = "Timeline";
+      this.list  = [];
+      this.stack = [];
+    }
+    Timeline.prototype.play = function() {
+      this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
+    };
+    Timeline.prototype.pause = function() {
+    };
+    Timeline.prototype.reset = function() {
+      this.list = [];
+    };
+    Timeline.prototype.append = function(sched) {
+      var index = this.list.indexOf(sched);
+      if (index === -1) {
+        this.list.push(sched);
+      }
+    };
+    Timeline.prototype.remove = function(sched) {
+      var index = this.list.indexOf(sched);
+      if (index !== -1) {
+        this.list.splice(index, 1);
+      }
+    };
+    Timeline.prototype.push = function(syncable) {
+      var sched = this.stack[this.stack.length - 1];
+      if (sched) {
+        sched.push(syncable, slice.call(arguments, 1));
+      } else {
+        if (syncable instanceof Syncable) {
+          var method = arguments[1];
+          if (syncable[method] && syncable[method].impl) {
+            syncable[method].impl.apply(syncable, slice.call(arguments, 2));
+          }
+        } else {
+          syncable();
+        }
+      }
+    };
+    Timeline.prototype.process = function() {
+      var list = this.list;
+      var counterIncr = this.counterIncr;
+      for (var i = 0; i < list.length; ++i) {
+        list[i].process(counterIncr);
+      }
+    };
+    return Timeline;
+  })();
+
+  var Syncable = (function() {
+    function Syncable() {}
+    return Syncable;
+  })();
+
+  var Task = (function() {
+    function Task() {
+      this.klassName = "Task";
+      this.timeline = cc.server.timeline;
+      this.payload = new TaskPayload(this);
+      this.events = [];
+      this.bang = false;
+      this.counter = 0;
+    }
+    fn.extend(Task, Syncable);
+    // SyncMethod
+    Task.prototype.play = function() {
+      if (this.timeline) {
+        this.timeline.push(this, "play");
+      }
+      return this;
+    };
+    Task.prototype.play.impl = function() {
+      if (this.timeline) {
+        this.timeline.append(this);
+      }
+      if (this.events.length === 0) {
+        this.bang = true;
+      }
+    };
+    // SyncMethod
+    Task.prototype.pause = function() {
+      if (this.timeline) {
+        this.timeline.push(this, "pause");
+      }
+      return this;
+    };
+    Task.prototype.pause.impl = function() {
+      if (this.timeline) {
+        this.timeline.remove(this);
+      }
+      this.bang = false;
+    };
+    // SyncMethod
+    Task.prototype.stop = function() {
+      if (this.timeline) {
+        this.timeline.push(this, "stop");
+      }
+      return this;
+    };
+    Task.prototype.stop.impl = function() {
+      this.pause();
+      this.timeline = null;
+    };
+    Task.prototype.push = function(syncable, args) {
+      if (typeof syncable === "function") {
+        this.events.push(syncable);
+      } else if (syncable instanceof Syncable) {
+        var method = args.shift();
+        if (syncable[method] && syncable[method].impl) {
+          this.events.push([syncable[method].impl, syncable, args]);
+        }
+      }
+    };
+    Task.prototype.process = function(counterIncr) {
+      var timeline = this.timeline;
+      var events   = this.events;
+      var continuance = false;
+      do {
+        if (this.bang) {
+          timeline.stack.push(this);
+          this._execute();
+          timeline.stack.pop();
+          this.bang = false;
+        }
+        var i = 0;
+        LOOP:
+        while (i < events.length) {
+          var e = events[i];
+          switch (typeof e) {
+          case "number":
+            events[i] -= counterIncr;
+            if (events[i] > 0) {
+              break LOOP;
+            }
+            break;
+          case "function":
+            e();
+            break;
+          default:
+            if (Array.isArray(e)) {
+              e[0].apply(e[1], e[2]);
+            } else if (e instanceof Task) {
+              if (e.timeline !== null) {
+                break LOOP;
+              }
+            }
+          }
+          i += 1;
+        }
+        continuance = false;
+        if (i) {
+          events.splice(0, i);
+          if (events.length === 0) {
+            continuance = this._done();
+          }
+        }
+      } while (continuance);
+    };
+    return Task;
+  })();
+  
+  var TaskPayload = (function() {
+    function TaskPayload(task) {
+      this.task = task;
+    }
+    TaskPayload.prototype.wait = function(sync) {
+      this.task.events.push(sync); // End of Task
+    };
+    TaskPayload.prototype.pause = function() {
+      this.task.pause();
+    };
+    TaskPayload.prototype.stop = function() {
+      this.task.stop();
+    };
+    return TaskPayload;
+  })();
+
+  var TaskDo = (function() {
+    function TaskLoop(func) {
+      Task.call(this);
+      this.func = func;
+    }
+    fn.extend(TaskLoop, Task);
+
+    TaskLoop.prototype._execute = function() {
+      this.func.call(this.payload);
+    };
+    TaskLoop.prototype._done = function() {
+      this.stop();
+    };
+    
+    return TaskLoop;
+  })();
+  
+  var TaskLoop = (function() {
+    function TaskLoop(func) {
+      TaskDo.call(this, func);
+    }
+    fn.extend(TaskLoop, TaskDo);
+
+    TaskLoop.prototype._done = function() {
+      this.bang = true;
+    };
+    
+    return TaskLoop;
+  })();
+
+  var TaskEach = (function() {
+    function TaskEach(list, func) {
+      Task.call(this);
+      this.list = list;
+      this.func = func;
+      this.index = 0;
+    }
+    fn.extend(TaskEach, Task);
+
+    TaskEach.prototype._execute = function() {
+      if (this.index < this.list.length) {
+        this.func.call(this.payload, this.list[this.index++]);
+      }
+    };
+    TaskEach.prototype._done = function() {
+      if (this.index < this.list.length) {
+        this.bang = true;
+      } else {
+        this.stop();
+      }
+    };
+    
+    return TaskEach;
+  })();
+
+  var TaskTimeout = (function() {
+    function TaskTimeout(delay, func) {
+      Task.call(this);
+      delay = Math.max(0, delay);
+      if (isNaN(delay)) {
+        delay = 0;
+      }
+      this.func = func;
+      this.events.push(delay);
+      this.once = true;
+    }
+    fn.extend(TaskTimeout, Task);
+    
+    TaskTimeout.prototype._execute = function() {
+      this.func.call(this.payload);
+    };
+    TaskTimeout.prototype._done = function() {
+      if (this.once) {
+        this.bang = true;
+        this.once = false;
+        return true;
+      }
+      this.stop();
+    };
+    
+    return TaskTimeout;
+  })();
+  
+  var TaskInterval = (function() {
+    function TaskInterval(delay, func) {
+      TaskTimeout.call(this, delay, func);
+    }
+    fn.extend(TaskInterval, TaskTimeout);
+
+    TaskInterval.prototype._done = function() {
+      this.bang = true;
+      return true;
+    };
+    
+    return TaskInterval;
+  })();
+  
+  var TaskInterface = (function() {
+    function TaskInterface() {
+      this.klassName = "Task";
+    }
+
+    TaskInterface.prototype.$do = function(func) {
+      if (typeof func === "function") {
+        return new TaskDo(func);
+      }
+      throw new TypeError();
+    };
+    TaskInterface.prototype.$loop = function(func) {
+      if (typeof func === "function") {
+        return new TaskLoop(func);
+      }
+      throw new TypeError();
+    };
+    TaskInterface.prototype.$each = function(list, func) {
+      if (Array.isArray(list) && typeof func === "function") {
+        return new TaskEach(list, func);
+      }
+      throw new TypeError();
+    };
+    TaskInterface.prototype.$timeout = function(delay, func) {
+      if (typeof delay === "number" && typeof func === "function") {
+        return new TaskTimeout(delay, func);
+      }
+      throw new TypeError();
+    };
+    TaskInterface.prototype.$interval = function(delay, func) {
+      if (typeof delay === "number" && typeof func === "function") {
+        return new TaskInterval(delay, func);
+      }
+      throw new TypeError();
+    };
+    
+    fn.classmethod(TaskInterface);
+    
+    return TaskInterface;
+  })();
+
+  var install = function(register) {
+    register("Task", TaskInterface);
+  };
+  
+  module.exports = {
+    Timeline: Timeline,
+    Syncable: Syncable,
+    Task    : Task,
+    TaskDo  : TaskDo,
+    TaskLoop: TaskLoop,
+    TaskEach: TaskEach,
+    TaskTimeout : TaskTimeout,
+    TaskInterval: TaskInterval,
+    TaskInterface: TaskInterface,
+    install: install
+  };
+
+});
 define('cc/server/unit/unit', function(require, exports, module) {
 
+  var cc = require("../cc");
+    
   var units = {};
   
   var Unit = (function() {
@@ -2399,7 +2743,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.inputs   = new Array(this.numOfInputs);
       this.inRates  = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate = parent.server.getRate(this.calcRate);
+      this.rate = cc.server.getRate(this.calcRate);
       var bufLength = this.rate.bufLength;
       var outs = new Array(this.numOfOutputs);
       for (var i = 0, imax = outs.length; i < imax; ++i) {
@@ -2462,8 +2806,8 @@ define('cc/server/unit/unit', function(require, exports, module) {
   
   var Out = function() {
     var ctor = function() {
-      this._busBuffer = this.parent.server.busBuffer;
-      this._bufLength = this.parent.server.bufLength;
+      this._busBuffer = cc.server.busBuffer;
+      this._bufLength = cc.server.bufLength;
       if (this.calcRate === 2) {
         this.process = next_a;
         this._busOffset = 0;
@@ -2513,326 +2857,6 @@ define('cc/server/unit/unit', function(require, exports, module) {
     FixNum  : FixNum,
     Control : Control,
     register: register,
-    install : install
-  };
-
-});
-define('cc/server/sched', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var fn = require("./fn");
-
-  var Timeline = (function() {
-    function Timeline(server) {
-      this.klassName = "Timeline";
-      this.server = server;
-      this.list = [];
-      this.requireSort = false;
-      this.currentTime = 0;
-      this.currentTimeIncr = 0;
-    }
-    Timeline.prototype.play = function() {
-      this.currentTimeIncr = (this.server.bufLength / this.server.sampleRate) * 1000;
-    };
-    Timeline.prototype.pause = function() {
-      this.currentTimeIncr = 0;
-    };
-    Timeline.prototype.reset = function() {
-      this.list = [];
-      this.requireSort = false;
-      this.currentTime = 0;
-    };
-    Timeline.prototype.push = function() {
-      var list = this.list;
-
-      var i = 0;
-      var time, looper, immediately;
-
-      if (typeof arguments[i] === "number") {
-        time = arguments[i++];
-      } else {
-        time = this.currentTime;
-      }
-      if (arguments[i] instanceof Scheduler) {
-        looper = arguments[i++];
-      } else if (typeof arguments[i] === "function") {
-        looper = { execute: arguments[i++] };
-      }
-      if (typeof arguments[i] === "boolean") {
-        immediately = arguments[i++];
-      } else {
-        immediately = false;
-      }
-      if (list.length) {
-        if (time < list[list.length - 1][0]) {
-          this.requireSort = true;
-        }
-      }
-      list.push([ time, looper ]);
-      if (immediately && this.requireSort) {
-        list.sort(sortFunction);
-        this.requireSort = false;
-      }
-    };
-    var sortFunction = function(a, b) {
-      return a[0] - b[0];
-    };
-    Timeline.prototype.process = function() {
-      var currentTime = this.currentTime;
-      var list = this.list;
-      if (this.requireSort) {
-        list.sort(sortFunction);
-        this.requireSort = false;
-      }
-      var i = 0, imax = list.length;
-      while (i < imax) {
-        if (list[i][0] <= currentTime) {
-          list[i][1].execute(currentTime);
-        } else {
-          break;
-        }
-        i += 1;
-      }
-      if (i) {
-        list.splice(0, i);
-      }
-      this.currentTime = currentTime + this.currentTimeIncr;
-    };
-    return Timeline;
-  })();
-
-  var Scheduler = (function() {
-    function Scheduler() {
-      this.klassName = "Scheduler";
-      this.server = cc.server;
-      this.payload = new SchedPayload(this.server.timeline);
-      this.running = false;
-    }
-    Scheduler.prototype.execute = function(currentTime) {
-      if (this.running) {
-        this._execute();
-        this.server.timeline.currentTime = currentTime;
-      }
-    };
-    Scheduler.prototype.play = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(function() {
-          that.running = true;
-          timeline.push(0, that);
-        }, true);
-      }
-      return this;
-    };
-    Scheduler.prototype.pause = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(function() {
-          that.running = false;
-        }, true);
-      }
-      return this;
-    };
-    Scheduler.prototype.stop = function() {
-      var that = this;
-      var timeline = this.server.timeline;
-      timeline.push(function() {
-        that.running = false;
-        that.payload = null;
-      }, true);
-      return this;
-    };
-    return Scheduler;
-  })();
-  
-  var SchedPayload = (function() {
-    function SchedPayload(timeline) {
-      this.timeline = timeline;
-      this.isBreak  = false;
-    }
-    SchedPayload.prototype.wait = function(msec) {
-      msec = +msec;
-      if (!isNaN(msec)) {
-        this.timeline.currentTime += msec;
-      }
-    };
-    SchedPayload.prototype.break = function() {
-      this.isBreak = true;
-    };
-    return SchedPayload;
-  })();
-
-  var TaskDo = (function() {
-    function TaskLoop(func) {
-      Scheduler.call(this);
-      if (typeof func === "function") {
-        this.func = func;
-      }
-    }
-    fn.extend(TaskLoop, Scheduler);
-
-    TaskLoop.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
-      }
-      this.payload = null;
-    };
-    
-    return TaskLoop;
-  })();
-  
-  var TaskLoop = (function() {
-    function TaskLoop(func) {
-      Scheduler.call(this);
-      if (typeof func === "function") {
-        this.func = func;
-      }
-    }
-    fn.extend(TaskLoop, Scheduler);
-
-    TaskLoop.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
-      }
-      if (!this.payload.isBreak) {
-        this.server.timeline.push(this);
-      }
-    };
-    
-    return TaskLoop;
-  })();
-
-  var TaskEach = (function() {
-    function TaskEach(list, func) {
-      Scheduler.call(this);
-      this.list  = list;
-      if (typeof func === "function") {
-        this.func  = func;
-      }
-      this.index = 0;
-    }
-    fn.extend(TaskEach, Scheduler);
-
-    TaskEach.prototype._execute = function() {
-      if (this.index < this.list.length) {
-        if (this.func) {
-          this.func.call(this.payload, this.list[this.index++]);
-        } else {
-          this.index += 1;
-        }
-        if (!this.payload.isBreak) {
-          this.server.timeline.push(this);
-        } else {
-          this.payload = null;
-        }
-      }
-    };
-    
-    return TaskEach;
-  })();
-
-  var TaskTimeout = (function() {
-    function TaskTimeout() {
-      Scheduler.call(this);
-
-      var delay = 0;
-      var func  = null;
-      
-      var i = 0;
-      if (typeof arguments[i] === "number") {
-        delay = Math.min(0, arguments[i++]);
-        if (isNaN(delay)) {
-          delay = null;
-        }
-      } else {
-        delay = null;
-      }
-      if (typeof arguments[i] === "function") {
-        func = arguments[i++];
-      }
-      this.delay = delay || 0;
-      this.func  = func;
-    }
-    fn.extend(TaskTimeout, Scheduler);
-    
-    TaskTimeout.prototype.play = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(timeline.currentTime + this.delay, function() {
-          that.running = true;
-          timeline.push(0, that);
-        });
-      }
-      return this;
-    };
-    TaskTimeout.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
-      }
-      this.payload = null;
-    };
-    
-    return TaskTimeout;
-  })();
-  
-  var TaskInterval = (function() {
-    function TaskInterval(delay, func) {
-      TaskTimeout.call(this, delay, func);
-    }
-    fn.extend(TaskInterval, TaskTimeout);
-
-    TaskInterval.prototype._execute = function() {
-      this.func.call(this.payload);
-      if (!this.payload.isBreak) {
-        var timeline = this.server.timeline;
-        timeline.push(timeline.currentTime + this.delay, this);
-      }
-    };
-    
-    return TaskInterval;
-  })();
-  
-  var Task = (function() {
-    function Task() {
-      this.klassName = "Task";
-    }
-
-    Task.prototype.$do = function(func) {
-      return new TaskDo(func);
-    };
-    Task.prototype.$loop = function(func) {
-      return new TaskLoop(func);
-    };
-    Task.prototype.$each = function(list, func) {
-      return new TaskEach(list, func);
-    };
-    Task.prototype.$timeout = function(delay, func) {
-      return new TaskTimeout(delay, func);
-    };
-    Task.prototype.$interval = function(delay, func) {
-      return new TaskInterval(delay, func);
-    };
-    
-    fn.classmethod(Task);
-    
-    return Task;
-  })();
-
-  var install = function(register) {
-    register("Task", Task);
-  };
-  
-  module.exports = {
-    Timeline: Timeline,
-    TaskDo  : TaskDo,
-    TaskLoop: TaskLoop,
-    TaskEach: TaskEach,
-    TaskTimeout : TaskTimeout,
-    TaskInterval: TaskInterval,
-    Task    : Task,
     install : install
   };
 
@@ -4969,6 +4993,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
 });
 define('cc/server/unit/ui', function(require, exports, module) {
 
+  var cc = require("../cc");
   var unit = require("./unit");
   
   var log001 = Math.log(0.001);
@@ -4979,7 +5004,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {
@@ -5011,7 +5036,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {
@@ -5043,7 +5068,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {

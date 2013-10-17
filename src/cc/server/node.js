@@ -20,7 +20,9 @@ define(function(require, exports, module) {
     }
     fn.extend(Node, Syncable);
 
-    Node.prototype._sync_new = function(target, addAction) {
+    Node.prototype.new_append = function() {
+    };
+    Node.prototype.new_append.impl = function(target, addAction) {
       target.append(this, addAction);
     };
     
@@ -106,7 +108,7 @@ define(function(require, exports, module) {
       cc.server.timeline.push(this, "play");
       return this;
     };
-    Node.prototype._sync_play = function() {
+    Node.prototype.play.impl = function() {
       this.running = true;
     };
     // SyncMethod
@@ -114,7 +116,7 @@ define(function(require, exports, module) {
       cc.server.timeline.push(this, "pause");
       return this;
     };
-    Node.prototype._sync_pause = function() {
+    Node.prototype.pause.impl = function() {
       this.running = false;
     };
     // SyncMethod
@@ -122,7 +124,7 @@ define(function(require, exports, module) {
       cc.server.timeline.push(this, "stop");
       return this;
     };
-    Node.prototype._sync_stop = function() {
+    Node.prototype.stop.impl = function() {
       this.remove();
     };
     
@@ -162,7 +164,7 @@ define(function(require, exports, module) {
       this.specs = specs = JSON.parse(specs);
 
       var timeline = cc.server.timeline;
-      timeline.push(this, "new", target, addAction);
+      timeline.push(this, "new_append", target, addAction);
       
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -201,7 +203,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    Synth.prototype._sync_set = function(args) {
+    Synth.prototype.set.impl = function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
