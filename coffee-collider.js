@@ -1013,7 +1013,10 @@ define('cc/client/compiler', function(require, exports, module) {
     while (i >= 0) {
       var token = tokens[i];
       if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
-        var name = token[VALUE].substr(1);
+        var name = token[VALUE];
+        if (!/\d/.test(name.charAt(1))) {
+          name = name.substr(1);
+        }
         if (name !== "") {
           token = tokens[i - 1];
           if (!token || token[TAG] !== ".") {
@@ -1063,10 +1066,30 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var insertReturn = function(tokens) {
-    tokens.splice(0, 0, ["UNARY" , "do", _]);
-    tokens.splice(1, 0, ["->"    , "->", _]);
-    tokens.splice(2, 0, ["INDENT", 2   , _]);
-    tokens.splice(tokens.length - 1, 0, ["OUTDENT", 2, _]);
+    tokens.splice(0, 0, ["("          , "("     , _]);
+    tokens.splice(1, 0, ["PARAM_START", "("     , _]);
+    tokens.splice(2, 0, ["IDENTIFIER" , "global", _]);
+    tokens.splice(3, 0, ["PARAM_END"  , ")"     , _]);
+    tokens.splice(4, 0, ["->"         , "->"    , _]);
+    tokens.splice(5, 0, ["INDENT"     , 2       , _]);
+    var i = tokens.length - 1;
+    tokens.splice(i++, 0, ["OUTDENT"   , 2       , _]);
+    tokens.splice(i++, 0, [")"         , ")"     , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "call"  , _]);
+    tokens.splice(i++, 0, ["CALL_START", "("     , _]);
+    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
+    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
+    tokens.splice(i++, 0, [","         , ","     , _]);
+    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
+    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
+    tokens.splice(i++, 0, ["CALL_END"  , ")"     , _]);
     // dumpTokens(tokens);
     return tokens;
   };
@@ -1086,6 +1109,7 @@ define('cc/client/compiler', function(require, exports, module) {
       tokens = replaceCompoundAssign(tokens);
       tokens = replaceSynthDef(tokens);
       tokens = cleanupParenthesis(tokens);
+      tokens = replaceGlobal(tokens);
       tokens = insertReturn(tokens);
       this.code = code;
       this.data = data;

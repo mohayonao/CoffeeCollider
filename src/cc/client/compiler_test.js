@@ -10,7 +10,7 @@ define(function(require, exports, module) {
     });
   };
   
-  describe("compiler.js", function() {
+  describe.only("compiler.js", function() {
     describe("splitCodeAndData", function() {
       it("Without __END__", function() {
         var code = [
@@ -622,14 +622,35 @@ define(function(require, exports, module) {
         ["TERMINATOR", "\n"],
       ];
       var expected = [
-        ["UNARY"     , "do" ],
-        ["->"        , "->" ],
-        ["INDENT"    , 2    ],
-        ["IDENTIFIER", "a"  ],
-        ["="         , "="  ],
-        ["NUMBER"    , "0"  ],
-        ["OUTDENT"   , 2    ],
-        ["TERMINATOR", "\n" ],
+        ["("          , "("     ],
+        ["PARAM_START", "("     ],
+        ["IDENTIFIER" , "global"],
+        ["PARAM_END"  , ")"     ],
+        ["->"         , "->"    ],
+        ["INDENT"     , 2       ],
+        
+        ["IDENTIFIER" , "a"     ],
+        ["="          , "="     ],
+        ["NUMBER"     , "0"     ],
+        
+        ["OUTDENT"    , 2       ],
+        [")"          , ")"     ],
+        ["."          , "."     ],
+        ["IDENTIFIER" , "call"  ],
+        ["CALL_START" , "("     ],
+        ["THIS"       , "this"  ],
+        ["."          , "."     ],
+        ["IDENTIFIER" , "self"  ],
+        ["LOGIC"      , "||"    ],
+        ["IDENTIFIER" , "global"],
+        [","          , ","     ],
+        ["THIS"       , "this"  ],
+        ["."          , "."     ],
+        ["IDENTIFIER" , "self"  ],
+        ["LOGIC"      , "||"    ],
+        ["IDENTIFIER" , "global"],
+        ["CALL_END"   , ")"     ],
+        ["TERMINATOR" , "\n"    ],
       ];
       var actual = compiler.insertReturn(tokens).erode();
       assert.deepEqual(actual, expected);
