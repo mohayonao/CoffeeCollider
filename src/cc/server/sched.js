@@ -5,161 +5,168 @@ define(function(require, exports, module) {
   var fn = require("./fn");
 
   var Timeline = (function() {
-    function Timeline(server) {
+    function Timeline() {
       this.klassName = "Timeline";
-      this.server = server;
-      this.list = [];
-      this.requireSort = false;
-      this.currentTime = 0;
-      this.currentTimeIncr = 0;
+      this.list  = [];
+      this.stack = [];
     }
     Timeline.prototype.play = function() {
-      this.currentTimeIncr = (this.server.bufLength / this.server.sampleRate) * 1000;
+      this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
     };
     Timeline.prototype.pause = function() {
-      this.currentTimeIncr = 0;
     };
     Timeline.prototype.reset = function() {
       this.list = [];
-      this.requireSort = false;
-      this.currentTime = 0;
     };
-    Timeline.prototype.push = function() {
-      var list = this.list;
-
-      var i = 0;
-      var time, looper, immediately;
-
-      if (typeof arguments[i] === "number") {
-        time = arguments[i++];
-      } else {
-        time = this.currentTime;
-      }
-      if (arguments[i] instanceof Scheduler) {
-        looper = arguments[i++];
-      } else if (typeof arguments[i] === "function") {
-        looper = { execute: arguments[i++] };
-      }
-      if (typeof arguments[i] === "boolean") {
-        immediately = arguments[i++];
-      } else {
-        immediately = false;
-      }
-      if (list.length) {
-        if (time < list[list.length - 1][0]) {
-          this.requireSort = true;
-        }
-      }
-      list.push([ time, looper ]);
-      if (immediately && this.requireSort) {
-        list.sort(sortFunction);
-        this.requireSort = false;
+    Timeline.prototype.append = function(sched) {
+      var index = this.list.indexOf(sched);
+      if (index === -1) {
+        this.list.push(sched);
       }
     };
-    var sortFunction = function(a, b) {
-      return a[0] - b[0];
+    Timeline.prototype.remove = function(sched) {
+      var index = this.list.indexOf(sched);
+      if (index !== -1) {
+        this.list.splice(index, 1);
+      }
+    };
+    Timeline.prototype.push = function(func) {
+      var sched = this.stack[this.stack.length - 1];
+      if (sched) {
+        sched.push(func);
+      } else {
+        func();
+      }
     };
     Timeline.prototype.process = function() {
-      var currentTime = this.currentTime;
       var list = this.list;
-      if (this.requireSort) {
-        list.sort(sortFunction);
-        this.requireSort = false;
+      var counterIncr = this.counterIncr;
+      for (var i = 0; i < list.length; ++i) {
+        list[i].process(counterIncr);
       }
-      var i = 0, imax = list.length;
-      while (i < imax) {
-        if (list[i][0] <= currentTime) {
-          list[i][1].execute(currentTime);
-        } else {
-          break;
-        }
-        i += 1;
-      }
-      if (i) {
-        list.splice(0, i);
-      }
-      this.currentTime = currentTime + this.currentTimeIncr;
     };
     return Timeline;
   })();
 
-  var Scheduler = (function() {
-    function Scheduler() {
-      this.klassName = "Scheduler";
-      this.server = cc.server;
-      this.payload = new SchedPayload(this.server.timeline);
-      this.running = false;
+  var Task = (function() {
+    function Task() {
+      this.klassName = "Task";
+      this.timeline = cc.server.timeline;
+      this.payload = new TaskPayload(this);
+      this.events = [];
+      this.bang = false;
+      this.counter = 0;
     }
-    Scheduler.prototype.execute = function(currentTime) {
-      if (this.running) {
-        this._execute();
-        this.server.timeline.currentTime = currentTime;
-      }
-    };
-    Scheduler.prototype.play = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(function() {
-          that.running = true;
-          timeline.push(0, that);
-        }, true);
+    Task.prototype.play = function() {
+      if (this.timeline) {
+        var that = this;
+        this.timeline.push(function() {
+          that.timeline.append(that);
+          if (that.events.length === 0) {
+            that.bang = true;
+          }
+        });
       }
       return this;
     };
-    Scheduler.prototype.pause = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(function() {
-          that.running = false;
-        }, true);
+    Task.prototype.pause = function() {
+      if (this.timeline) {
+        var that = this;
+        this.timeline.push(function() {
+          that.timeline.remove(that);
+          that.bang = false;
+        });
       }
       return this;
     };
-    Scheduler.prototype.stop = function() {
-      var that = this;
-      var timeline = this.server.timeline;
-      timeline.push(function() {
-        that.running = false;
-        that.payload = null;
-      }, true);
+    Task.prototype.stop = function() {
+      if (this.timeline) {
+        var that = this;
+        this.timeline.push(function() {
+          that.pause();
+          that.timeline = null;
+        });
+      }
       return this;
     };
-    return Scheduler;
+    Task.prototype.push = function(func) {
+      if (typeof func === "function") {
+        this.events.push(func);
+      }
+    };
+    Task.prototype.process = function(counterIncr) {
+      var timeline = this.timeline;
+      var events   = this.events;
+      var continuance = false;
+      do {
+        if (this.bang) {
+          timeline.stack.push(this);
+          this._execute();
+          timeline.stack.pop();
+          this.bang = false;
+        }
+        var i = 0;
+        LOOP:
+        while (i < events.length) {
+          switch (typeof events[i]) {
+          case "number":
+            events[i] -= counterIncr;
+            if (events[i] > 0) {
+              break LOOP;
+            }
+            break;
+          case "function":
+            events[i]();
+            break;
+          default:
+            if (events[i] instanceof Task) {
+              if (events[i].timeline !== null) {
+                break LOOP;
+              }
+            }
+          }
+          i += 1;
+        }
+        continuance = false;
+        if (i) {
+          events.splice(0, i);
+          if (events.length === 0) {
+            continuance = this._done();
+          }
+        }
+      } while (continuance);
+    };
+    return Task;
   })();
   
-  var SchedPayload = (function() {
-    function SchedPayload(timeline) {
-      this.timeline = timeline;
-      this.isBreak  = false;
+  var TaskPayload = (function() {
+    function TaskPayload(task) {
+      this.task = task;
     }
-    SchedPayload.prototype.wait = function(msec) {
-      msec = +msec;
-      if (!isNaN(msec)) {
-        this.timeline.currentTime += msec;
-      }
+    TaskPayload.prototype.wait = function(sync) {
+      this.task.events.push(sync); // End of Task
     };
-    SchedPayload.prototype.break = function() {
-      this.isBreak = true;
+    TaskPayload.prototype.pause = function() {
+      this.task.pause();
     };
-    return SchedPayload;
+    TaskPayload.prototype.stop = function() {
+      this.task.stop();
+    };
+    return TaskPayload;
   })();
 
   var TaskDo = (function() {
     function TaskLoop(func) {
-      Scheduler.call(this);
-      if (typeof func === "function") {
-        this.func = func;
-      }
+      Task.call(this);
+      this.func = func;
     }
-    fn.extend(TaskLoop, Scheduler);
+    fn.extend(TaskLoop, Task);
 
     TaskLoop.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
-      }
-      this.payload = null;
+      this.func.call(this.payload);
+    };
+    TaskLoop.prototype._done = function() {
+      this.stop();
     };
     
     return TaskLoop;
@@ -167,20 +174,12 @@ define(function(require, exports, module) {
   
   var TaskLoop = (function() {
     function TaskLoop(func) {
-      Scheduler.call(this);
-      if (typeof func === "function") {
-        this.func = func;
-      }
+      TaskDo.call(this, func);
     }
-    fn.extend(TaskLoop, Scheduler);
+    fn.extend(TaskLoop, TaskDo);
 
-    TaskLoop.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
-      }
-      if (!this.payload.isBreak) {
-        this.server.timeline.push(this);
-      }
+    TaskLoop.prototype._done = function() {
+      this.bang = true;
     };
     
     return TaskLoop;
@@ -188,27 +187,23 @@ define(function(require, exports, module) {
 
   var TaskEach = (function() {
     function TaskEach(list, func) {
-      Scheduler.call(this);
-      this.list  = list;
-      if (typeof func === "function") {
-        this.func  = func;
-      }
+      Task.call(this);
+      this.list = list;
+      this.func = func;
       this.index = 0;
     }
-    fn.extend(TaskEach, Scheduler);
+    fn.extend(TaskEach, Task);
 
     TaskEach.prototype._execute = function() {
       if (this.index < this.list.length) {
-        if (this.func) {
-          this.func.call(this.payload, this.list[this.index++]);
-        } else {
-          this.index += 1;
-        }
-        if (!this.payload.isBreak) {
-          this.server.timeline.push(this);
-        } else {
-          this.payload = null;
-        }
+        this.func.call(this.payload, this.list[this.index++]);
+      }
+    };
+    TaskEach.prototype._done = function() {
+      if (this.index < this.list.length) {
+        this.bang = true;
+      } else {
+        this.stop();
       }
     };
     
@@ -216,45 +211,28 @@ define(function(require, exports, module) {
   })();
 
   var TaskTimeout = (function() {
-    function TaskTimeout() {
-      Scheduler.call(this);
-
-      var delay = 0;
-      var func  = null;
-      
-      var i = 0;
-      if (typeof arguments[i] === "number") {
-        delay = Math.min(0, arguments[i++]);
-        if (isNaN(delay)) {
-          delay = null;
-        }
-      } else {
-        delay = null;
+    function TaskTimeout(delay, func) {
+      Task.call(this);
+      delay = Math.max(0, delay);
+      if (isNaN(delay)) {
+        delay = 0;
       }
-      if (typeof arguments[i] === "function") {
-        func = arguments[i++];
-      }
-      this.delay = delay || 0;
-      this.func  = func;
+      this.func = func;
+      this.events.push(delay);
+      this.once = true;
     }
-    fn.extend(TaskTimeout, Scheduler);
+    fn.extend(TaskTimeout, Task);
     
-    TaskTimeout.prototype.play = function() {
-      var that = this;
-      if (this.payload) {
-        var timeline = this.server.timeline;
-        timeline.push(timeline.currentTime + this.delay, function() {
-          that.running = true;
-          timeline.push(0, that);
-        });
-      }
-      return this;
-    };
     TaskTimeout.prototype._execute = function() {
-      if (this.func) {
-        this.func.call(this.payload);
+      this.func.call(this.payload);
+    };
+    TaskTimeout.prototype._done = function() {
+      if (this.once) {
+        this.bang = true;
+        this.once = false;
+        return true;
       }
-      this.payload = null;
+      this.stop();
     };
     
     return TaskTimeout;
@@ -266,56 +244,69 @@ define(function(require, exports, module) {
     }
     fn.extend(TaskInterval, TaskTimeout);
 
-    TaskInterval.prototype._execute = function() {
-      this.func.call(this.payload);
-      if (!this.payload.isBreak) {
-        var timeline = this.server.timeline;
-        timeline.push(timeline.currentTime + this.delay, this);
-      }
+    TaskInterval.prototype._done = function() {
+      this.bang = true;
+      return true;
     };
     
     return TaskInterval;
   })();
   
-  var Task = (function() {
-    function Task() {
+  var TaskInterface = (function() {
+    function TaskInterface() {
       this.klassName = "Task";
     }
 
-    Task.prototype.$do = function(func) {
-      return new TaskDo(func);
+    TaskInterface.prototype.$do = function(func) {
+      if (typeof func === "function") {
+        return new TaskDo(func);
+      }
+      throw new TypeError();
     };
-    Task.prototype.$loop = function(func) {
-      return new TaskLoop(func);
+    TaskInterface.prototype.$loop = function(func) {
+      if (typeof func === "function") {
+        return new TaskLoop(func);
+      }
+      throw new TypeError();
     };
-    Task.prototype.$each = function(list, func) {
-      return new TaskEach(list, func);
+    TaskInterface.prototype.$each = function(list, func) {
+      if (Array.isArray(list) && typeof func === "function") {
+        return new TaskEach(list, func);
+      }
+      throw new TypeError();
     };
-    Task.prototype.$timeout = function(delay, func) {
-      return new TaskTimeout(delay, func);
+    TaskInterface.prototype.$timeout = function(delay, func) {
+      if (typeof delay === "number" && typeof func === "function") {
+        return new TaskTimeout(delay, func);
+      }
+      throw new TypeError();
     };
-    Task.prototype.$interval = function(delay, func) {
-      return new TaskInterval(delay, func);
+    TaskInterface.prototype.$interval = function(delay, func) {
+      if (typeof delay === "number" && typeof func === "function") {
+        return new TaskInterval(delay, func);
+      }
+      throw new TypeError();
     };
     
-    fn.classmethod(Task);
+    fn.classmethod(TaskInterface);
     
-    return Task;
+    return TaskInterface;
   })();
 
   var install = function(register) {
-    register("Task", Task);
+    register("Task", TaskInterface);
   };
   
   module.exports = {
     Timeline: Timeline,
+    Task    : Task,
     TaskDo  : TaskDo,
     TaskLoop: TaskLoop,
     TaskEach: TaskEach,
     TaskTimeout : TaskTimeout,
     TaskInterval: TaskInterval,
-    Task    : Task,
-    install : install
+    TaskInterface: TaskInterface,
+    install: install
   };
 
 });
