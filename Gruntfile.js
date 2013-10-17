@@ -7,6 +7,13 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-este-watch");
 
   var testFailed = [];
+  var hasExclusiveTest = function() {
+    var files = grunt.file.expand("src/cc/**/*_test.js");
+    return files.some(function(file) {
+      var code = grunt.file.read(file);
+      return/^\s*(describe|it)\.only\(\"/m.test(code);
+    });
+  };
 
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
@@ -23,7 +30,11 @@ module.exports = function(grunt) {
             return "test:" + filepath;
           }
           grunt.config(["jshint", "files"], filepath);
-          return [ "typo", "jshint", "test:" + filepath, "dryice" ];
+          var tasks = [ "typo", "jshint", "test:" + filepath ];
+          if (!hasExclusiveTest()) {
+            tasks.push("dryice");
+          }
+          return tasks;
         }
       },
       json: function() {
@@ -235,12 +246,9 @@ module.exports = function(grunt) {
         testFailed = [];
       }
       if (args === "travis") {
-        files.forEach(function(file) {
-          var code = grunt.file.read(file);
-          if (/^\s*(describe|it)\.only\("/m.test(code)) {
-            grunt.fail.warn("test succeeded, but not completely.");
-          }
-        });
+        if (hasExclusiveTest()) {
+          grunt.fail.warn("test succeeded, but not completely.");
+        }
       }
       done();
     });
