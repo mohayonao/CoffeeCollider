@@ -31,9 +31,6 @@ define(function(require, exports, module) {
     beforeEach(function() {
       cc.server = new MockServer();
       timeline  = cc.server.timeline;
-      sync = function(func) {
-        timeline.push(func);
-      };
       procN = function(n) {
         for (var i = 0; i < n; i++) {
           timeline.process();
@@ -57,7 +54,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed += 1;
           this.wait(100);
-          sync(function() {
+          this.sync(function() {
             passed += 1;
           });
           this.wait(100);
@@ -76,7 +73,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed += 1;
           this.wait(100);
-          sync(function() {
+          this.sync(function() {
             passed += 1;
           });
         }).play();
@@ -94,7 +91,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed += 1;
           this.wait(100);
-          sync(function() {
+          this.sync(function() {
             throw "should not pass through";
           });
         }).play();
@@ -202,7 +199,7 @@ define(function(require, exports, module) {
           this.wait(100);
         }).play();
         this.wait(tt);
-        sync(function() {
+        this.sync(function() {
           passed = 4;
         });
       }).play();

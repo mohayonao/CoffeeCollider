@@ -2453,8 +2453,8 @@ define('cc/server/sched', function(require, exports, module) {
       this.timeline = cc.server.timeline;
       this.payload = new TaskPayload(this);
       this.events = [];
-      this.bang = false;
-      this.counter = 0;
+      this.bang   = false;
+      this.index  = 0;
     }
     fn.extend(Task, Syncable);
     Task.prototype.play = fn.sync(function() {
@@ -2490,6 +2490,7 @@ define('cc/server/sched', function(require, exports, module) {
         if (this.bang) {
           timeline.stack.push(this);
           this._execute();
+          this.index += 1;
           timeline.stack.pop();
           this.bang = false;
         }
@@ -2543,6 +2544,11 @@ define('cc/server/sched', function(require, exports, module) {
     TaskPayload.prototype.stop = function() {
       this.task.stop();
     };
+    TaskPayload.prototype.sync = function(func) {
+      if (typeof func === "function") {
+        cc.server.timeline.push(func);
+      }
+    };
     return TaskPayload;
   })();
 
@@ -2554,7 +2560,7 @@ define('cc/server/sched', function(require, exports, module) {
     fn.extend(TaskLoop, Task);
 
     TaskLoop.prototype._execute = function() {
-      this.func.call(this.payload);
+      this.func.call(this.payload, this.index);
     };
     TaskLoop.prototype._done = function() {
       this.stop();
@@ -2581,13 +2587,12 @@ define('cc/server/sched', function(require, exports, module) {
       Task.call(this);
       this.list = list;
       this.func = func;
-      this.index = 0;
     }
     fn.extend(TaskEach, Task);
 
     TaskEach.prototype._execute = function() {
       if (this.index < this.list.length) {
-        this.func.call(this.payload, this.list[this.index++]);
+        this.func.call(this.payload, this.list[this.index], this.index);
       }
     };
     TaskEach.prototype._done = function() {
@@ -2610,15 +2615,14 @@ define('cc/server/sched', function(require, exports, module) {
       }
       this.func = func;
       this.events.push(delay);
-      this.once = true;
     }
     fn.extend(TaskTimeout, Task);
     
     TaskTimeout.prototype._execute = function() {
-      this.func.call(this.payload);
+      this.func.call(this.payload, this.index);
     };
     TaskTimeout.prototype._done = function() {
-      if (this.once) {
+      if (this.index === 0) {
         this.bang = true;
         this.once = false;
         return true;
