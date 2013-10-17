@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var ugen   = require("./ugen/ugen");
+  var Syncable = require("./sched").Syncable;
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
   var slice = [].slice;
@@ -17,6 +18,11 @@ define(function(require, exports, module) {
       this.parent  = null;
       this.running = true;
     }
+    fn.extend(Node, Syncable);
+
+    Node.prototype._sync_new = function(target, addAction) {
+      target.append(this, addAction);
+    };
     
     var appendFunc = {};
     appendFunc.addToHead = function(node) {
@@ -95,29 +101,29 @@ define(function(require, exports, module) {
       this.parent = null;
       return this;
     };
-
+    // SyncMethod
     Node.prototype.play = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.running = true;
-      });
+      cc.server.timeline.push(this, "play");
       return this;
     };
-    
+    Node.prototype._sync_play = function() {
+      this.running = true;
+    };
+    // SyncMethod
     Node.prototype.pause = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.running = false;
-      });
+      cc.server.timeline.push(this, "pause");
       return this;
     };
-    
+    Node.prototype._sync_pause = function() {
+      this.running = false;
+    };
+    // SyncMethod
     Node.prototype.stop = function() {
-      var that = this;
-      this.server.timeline.push(function() {
-        that.remove();
-      });
+      cc.server.timeline.push(this, "stop");
       return this;
+    };
+    Node.prototype._sync_stop = function() {
+      this.remove();
     };
     
     return Node;
@@ -153,14 +159,10 @@ define(function(require, exports, module) {
     fn.extend(Synth, Node);
 
     var build = function(specs, target, args, addAction) {
-      var that = this;
       this.specs = specs = JSON.parse(specs);
-      this.server = cc.server;
 
-      var timeline = this.server.timeline;
-      timeline.push(function() {
-        target.append(that, addAction);
-      });
+      var timeline = cc.server.timeline;
+      timeline.push(this, "new", target, addAction);
       
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -190,8 +192,16 @@ define(function(require, exports, module) {
       });
       return this;
     };
-
-    var _set = function(args) {
+    
+    // SyncMethod
+    Synth.prototype.set = function(args) {
+      if (args) {
+        cc.server.timeline.push(this, "set", args);
+      }
+      return this;
+    };
+    
+    Synth.prototype._sync_set = function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -231,19 +241,8 @@ define(function(require, exports, module) {
           }
         }, this);
       }
-      
     };
     
-    Synth.prototype.set = function(args) {
-      if (args === undefined) {
-        return this;
-      }
-      var that = this;
-      this.server.timeline.push(function() {
-        _set.call(that, args);
-      });
-      return this;
-    };
     Synth.prototype.process = function(inNumSamples) {
       if (this.running) {
         var unitList = this.unitList;

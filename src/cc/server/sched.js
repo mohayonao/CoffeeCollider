@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var fn = require("./fn");
+  var slice = [].slice;
 
   var Timeline = (function() {
     function Timeline() {
@@ -30,12 +31,19 @@ define(function(require, exports, module) {
         this.list.splice(index, 1);
       }
     };
-    Timeline.prototype.push = function(func) {
+    Timeline.prototype.push = function(syncable) {
       var sched = this.stack[this.stack.length - 1];
       if (sched) {
-        sched.push(func);
+        sched.push(syncable, slice.call(arguments, 1));
       } else {
-        func();
+        if (syncable instanceof Syncable) {
+          var methodName = "_sync_" + arguments[1];
+          if (syncable[methodName]) {
+            syncable[methodName].apply(syncable, slice.call(arguments, 2));
+          }
+        } else {
+          syncable();
+        }
       }
     };
     Timeline.prototype.process = function() {
@@ -48,6 +56,11 @@ define(function(require, exports, module) {
     return Timeline;
   })();
 
+  var Syncable = (function() {
+    function Syncable() {}
+    return Syncable;
+  })();
+
   var Task = (function() {
     function Task() {
       this.klassName = "Task";
@@ -57,41 +70,54 @@ define(function(require, exports, module) {
       this.bang = false;
       this.counter = 0;
     }
+    fn.extend(Task, Syncable);
+    // SyncMethod
     Task.prototype.play = function() {
       if (this.timeline) {
-        var that = this;
-        this.timeline.push(function() {
-          that.timeline.append(that);
-          if (that.events.length === 0) {
-            that.bang = true;
-          }
-        });
+        this.timeline.push(this, "play");
       }
       return this;
     };
+    Task.prototype._sync_play = function() {
+      if (this.timeline) {
+        this.timeline.append(this);
+      }
+      if (this.events.length === 0) {
+        this.bang = true;
+      }
+    };
+    // SyncMethod
     Task.prototype.pause = function() {
       if (this.timeline) {
-        var that = this;
-        this.timeline.push(function() {
-          that.timeline.remove(that);
-          that.bang = false;
-        });
+        this.timeline.push(this, "pause");
       }
       return this;
     };
+    Task.prototype._sync_pause = function() {
+      if (this.timeline) {
+        this.timeline.remove(this);
+      }
+      this.bang = false;
+    };
+    // SyncMethod
     Task.prototype.stop = function() {
       if (this.timeline) {
-        var that = this;
-        this.timeline.push(function() {
-          that.pause();
-          that.timeline = null;
-        });
+        this.timeline.push(this, "stop");
       }
       return this;
     };
-    Task.prototype.push = function(func) {
-      if (typeof func === "function") {
-        this.events.push(func);
+    Task.prototype._sync_stop = function() {
+      this.pause();
+      this.timeline = null;
+    };
+    Task.prototype.push = function(syncable, args) {
+      if (typeof syncable === "function") {
+        this.events.push(syncable);
+      } else if (syncable instanceof Syncable) {
+        var methodName = "_sync_" + args.shift();
+        if (syncable[methodName]) {
+          this.events.push([syncable, methodName, args]);
+        }
       }
     };
     Task.prototype.process = function(counterIncr) {
@@ -108,7 +134,8 @@ define(function(require, exports, module) {
         var i = 0;
         LOOP:
         while (i < events.length) {
-          switch (typeof events[i]) {
+          var e = events[i];
+          switch (typeof e) {
           case "number":
             events[i] -= counterIncr;
             if (events[i] > 0) {
@@ -116,11 +143,13 @@ define(function(require, exports, module) {
             }
             break;
           case "function":
-            events[i]();
+            e();
             break;
           default:
-            if (events[i] instanceof Task) {
-              if (events[i].timeline !== null) {
+            if (Array.isArray(e)) {
+              e[0][e[1]].apply(e[0], e[2]);
+            } else if (e instanceof Task) {
+              if (e.timeline !== null) {
                 break LOOP;
               }
             }
@@ -299,6 +328,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     Timeline: Timeline,
+    Syncable: Syncable,
     Task    : Task,
     TaskDo  : TaskDo,
     TaskLoop: TaskLoop,
