@@ -19,12 +19,6 @@ define(function(require, exports, module) {
       this.running = true;
     }
     fn.extend(Node, Syncable);
-
-    Node.prototype.new_append = function() {
-    };
-    Node.prototype.new_append.impl = function(target, addAction) {
-      target.append(this, addAction);
-    };
     
     var appendFunc = {};
     appendFunc.addToHead = function(node) {
@@ -103,30 +97,15 @@ define(function(require, exports, module) {
       this.parent = null;
       return this;
     };
-    // SyncMethod
-    Node.prototype.play = function() {
-      cc.server.timeline.push(this, "play");
-      return this;
-    };
-    Node.prototype.play.impl = function() {
+    Node.prototype.play = fn.sync(function() {
       this.running = true;
-    };
-    // SyncMethod
-    Node.prototype.pause = function() {
-      cc.server.timeline.push(this, "pause");
-      return this;
-    };
-    Node.prototype.pause.impl = function() {
+    });
+    Node.prototype.pause = fn.sync(function() {
       this.running = false;
-    };
-    // SyncMethod
-    Node.prototype.stop = function() {
-      cc.server.timeline.push(this, "stop");
-      return this;
-    };
-    Node.prototype.stop.impl = function() {
+    });
+    Node.prototype.stop = fn.sync(function() {
       this.remove();
-    };
+    });
     
     return Node;
   })();
@@ -159,12 +138,15 @@ define(function(require, exports, module) {
       build.call(this, specs, target, args, addAction);
     }
     fn.extend(Synth, Node);
-
+    
     var build = function(specs, target, args, addAction) {
       this.specs = specs = JSON.parse(specs);
 
+      var that = this;
       var timeline = cc.server.timeline;
-      timeline.push(this, "new_append", target, addAction);
+      timeline.push(function() {
+        target.append(that, addAction);
+      });
       
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -195,15 +177,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    // SyncMethod
-    Synth.prototype.set = function(args) {
-      if (args) {
-        cc.server.timeline.push(this, "set", args);
-      }
-      return this;
-    };
-    
-    Synth.prototype.set.impl = function(args) {
+    Synth.prototype.set = fn.sync(function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -243,7 +217,7 @@ define(function(require, exports, module) {
           }
         }, this);
       }
-    };
+    });
     
     Synth.prototype.process = function(inNumSamples) {
       if (this.running) {

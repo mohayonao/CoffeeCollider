@@ -3,7 +3,6 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var fn = require("./fn");
-  var slice = [].slice;
 
   var Timeline = (function() {
     function Timeline() {
@@ -31,18 +30,15 @@ define(function(require, exports, module) {
         this.list.splice(index, 1);
       }
     };
-    Timeline.prototype.push = function(syncable) {
+    Timeline.prototype.push = function(that, func, args) {
       var sched = this.stack[this.stack.length - 1];
       if (sched) {
-        sched.push(syncable, slice.call(arguments, 1));
+        sched.push(that, func, args);
       } else {
-        if (syncable instanceof Syncable) {
-          var method = arguments[1];
-          if (syncable[method] && syncable[method].impl) {
-            syncable[method].impl.apply(syncable, slice.call(arguments, 2));
-          }
+        if (typeof that === "function") {
+          that();
         } else {
-          syncable();
+          func.apply(that, args);
         }
       }
     };
@@ -71,53 +67,29 @@ define(function(require, exports, module) {
       this.counter = 0;
     }
     fn.extend(Task, Syncable);
-    // SyncMethod
-    Task.prototype.play = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "play");
-      }
-      return this;
-    };
-    Task.prototype.play.impl = function() {
+    Task.prototype.play = fn.sync(function() {
       if (this.timeline) {
         this.timeline.append(this);
       }
       if (this.events.length === 0) {
         this.bang = true;
       }
-    };
-    // SyncMethod
-    Task.prototype.pause = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "pause");
-      }
-      return this;
-    };
-    Task.prototype.pause.impl = function() {
+    });
+    Task.prototype.pause = fn.sync(function() {
       if (this.timeline) {
         this.timeline.remove(this);
       }
       this.bang = false;
-    };
-    // SyncMethod
-    Task.prototype.stop = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "stop");
-      }
-      return this;
-    };
-    Task.prototype.stop.impl = function() {
+    });
+    Task.prototype.stop = fn.sync(function() {
       this.pause();
       this.timeline = null;
-    };
-    Task.prototype.push = function(syncable, args) {
-      if (typeof syncable === "function") {
-        this.events.push(syncable);
-      } else if (syncable instanceof Syncable) {
-        var method = args.shift();
-        if (syncable[method] && syncable[method].impl) {
-          this.events.push([syncable[method].impl, syncable, args]);
-        }
+    });
+    Task.prototype.push = function(that, func, args) {
+      if (typeof that === "function") {
+        this.events.push([that, null, args]);
+      } else {
+        this.events.push([func, that, args]);
       }
     };
     Task.prototype.process = function(counterIncr) {

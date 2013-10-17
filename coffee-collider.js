@@ -1470,12 +1470,6 @@ define('cc/server/node', function(require, exports, module) {
       this.running = true;
     }
     fn.extend(Node, Syncable);
-
-    Node.prototype.new_append = function() {
-    };
-    Node.prototype.new_append.impl = function(target, addAction) {
-      target.append(this, addAction);
-    };
     
     var appendFunc = {};
     appendFunc.addToHead = function(node) {
@@ -1554,30 +1548,15 @@ define('cc/server/node', function(require, exports, module) {
       this.parent = null;
       return this;
     };
-    // SyncMethod
-    Node.prototype.play = function() {
-      cc.server.timeline.push(this, "play");
-      return this;
-    };
-    Node.prototype.play.impl = function() {
+    Node.prototype.play = fn.sync(function() {
       this.running = true;
-    };
-    // SyncMethod
-    Node.prototype.pause = function() {
-      cc.server.timeline.push(this, "pause");
-      return this;
-    };
-    Node.prototype.pause.impl = function() {
+    });
+    Node.prototype.pause = fn.sync(function() {
       this.running = false;
-    };
-    // SyncMethod
-    Node.prototype.stop = function() {
-      cc.server.timeline.push(this, "stop");
-      return this;
-    };
-    Node.prototype.stop.impl = function() {
+    });
+    Node.prototype.stop = fn.sync(function() {
       this.remove();
-    };
+    });
     
     return Node;
   })();
@@ -1610,12 +1589,15 @@ define('cc/server/node', function(require, exports, module) {
       build.call(this, specs, target, args, addAction);
     }
     fn.extend(Synth, Node);
-
+    
     var build = function(specs, target, args, addAction) {
       this.specs = specs = JSON.parse(specs);
 
+      var that = this;
       var timeline = cc.server.timeline;
-      timeline.push(this, "new_append", target, addAction);
+      timeline.push(function() {
+        target.append(that, addAction);
+      });
       
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
@@ -1646,15 +1628,7 @@ define('cc/server/node', function(require, exports, module) {
       return this;
     };
     
-    // SyncMethod
-    Synth.prototype.set = function(args) {
-      if (args) {
-        cc.server.timeline.push(this, "set", args);
-      }
-      return this;
-    };
-    
-    Synth.prototype.set.impl = function(args) {
+    Synth.prototype.set = fn.sync(function(args) {
       var params = this.params;
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -1694,7 +1668,7 @@ define('cc/server/node', function(require, exports, module) {
           }
         }, this);
       }
-    };
+    });
     
     Synth.prototype.process = function(inNumSamples) {
       if (this.running) {
@@ -1988,6 +1962,7 @@ define('cc/server/node', function(require, exports, module) {
 });
 define('cc/server/fn', function(require, exports, module) {
 
+  var cc = require("../cc");
   var utils = require("./utils");
   var slice = [].slice;
   
@@ -2140,6 +2115,13 @@ define('cc/server/fn', function(require, exports, module) {
       child.classmethods = classmethods;
     };
   })();
+
+  fn.sync = function(func) {
+    return function() {
+      cc.server.timeline.push(this, func, slice.call(arguments));
+      return this;
+    };
+  };
 
   module.exports = fn;
 
@@ -2411,7 +2393,6 @@ define('cc/server/sched', function(require, exports, module) {
 
   var cc = require("../cc");
   var fn = require("./fn");
-  var slice = [].slice;
 
   var Timeline = (function() {
     function Timeline() {
@@ -2439,18 +2420,15 @@ define('cc/server/sched', function(require, exports, module) {
         this.list.splice(index, 1);
       }
     };
-    Timeline.prototype.push = function(syncable) {
+    Timeline.prototype.push = function(that, func, args) {
       var sched = this.stack[this.stack.length - 1];
       if (sched) {
-        sched.push(syncable, slice.call(arguments, 1));
+        sched.push(that, func, args);
       } else {
-        if (syncable instanceof Syncable) {
-          var method = arguments[1];
-          if (syncable[method] && syncable[method].impl) {
-            syncable[method].impl.apply(syncable, slice.call(arguments, 2));
-          }
+        if (typeof that === "function") {
+          that();
         } else {
-          syncable();
+          func.apply(that, args);
         }
       }
     };
@@ -2479,53 +2457,29 @@ define('cc/server/sched', function(require, exports, module) {
       this.counter = 0;
     }
     fn.extend(Task, Syncable);
-    // SyncMethod
-    Task.prototype.play = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "play");
-      }
-      return this;
-    };
-    Task.prototype.play.impl = function() {
+    Task.prototype.play = fn.sync(function() {
       if (this.timeline) {
         this.timeline.append(this);
       }
       if (this.events.length === 0) {
         this.bang = true;
       }
-    };
-    // SyncMethod
-    Task.prototype.pause = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "pause");
-      }
-      return this;
-    };
-    Task.prototype.pause.impl = function() {
+    });
+    Task.prototype.pause = fn.sync(function() {
       if (this.timeline) {
         this.timeline.remove(this);
       }
       this.bang = false;
-    };
-    // SyncMethod
-    Task.prototype.stop = function() {
-      if (this.timeline) {
-        this.timeline.push(this, "stop");
-      }
-      return this;
-    };
-    Task.prototype.stop.impl = function() {
+    });
+    Task.prototype.stop = fn.sync(function() {
       this.pause();
       this.timeline = null;
-    };
-    Task.prototype.push = function(syncable, args) {
-      if (typeof syncable === "function") {
-        this.events.push(syncable);
-      } else if (syncable instanceof Syncable) {
-        var method = args.shift();
-        if (syncable[method] && syncable[method].impl) {
-          this.events.push([syncable[method].impl, syncable, args]);
-        }
+    });
+    Task.prototype.push = function(that, func, args) {
+      if (typeof that === "function") {
+        this.events.push([that, null, args]);
+      } else {
+        this.events.push([func, that, args]);
       }
     };
     Task.prototype.process = function(counterIncr) {

@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
   var utils = require("./utils");
   var slice = [].slice;
   
@@ -153,6 +154,13 @@ define(function(require, exports, module) {
       child.classmethods = classmethods;
     };
   })();
+
+  fn.sync = function(func) {
+    return function() {
+      cc.server.timeline.push(this, func, slice.call(arguments));
+      return this;
+    };
+  };
 
   module.exports = fn;
 

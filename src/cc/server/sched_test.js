@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var cc = require("./cc");
+  var fn = require("./fn");
   var register  = require("./installer").register;
   var sched     = require("./sched");
   var Timeline  = sched.Timeline;
