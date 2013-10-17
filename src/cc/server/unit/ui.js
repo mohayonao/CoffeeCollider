@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
   var unit = require("./unit");
   
   var log001 = Math.log(0.001);
@@ -11,7 +12,7 @@ define(function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {
@@ -43,7 +44,7 @@ define(function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {
@@ -75,7 +76,7 @@ define(function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = this.parent.server.syncItems;
+      this._mouse = cc.server.syncItems;
       this.process(1);
     };
     var next = function() {

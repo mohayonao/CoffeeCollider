@@ -1,6 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
+    
   var units = {};
   
   var Unit = (function() {
@@ -16,7 +18,7 @@ define(function(require, exports, module) {
       this.inputs   = new Array(this.numOfInputs);
       this.inRates  = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate = parent.server.getRate(this.calcRate);
+      this.rate = cc.server.getRate(this.calcRate);
       var bufLength = this.rate.bufLength;
       var outs = new Array(this.numOfOutputs);
       for (var i = 0, imax = outs.length; i < imax; ++i) {
@@ -79,8 +81,8 @@ define(function(require, exports, module) {
   
   var Out = function() {
     var ctor = function() {
-      this._busBuffer = this.parent.server.busBuffer;
-      this._bufLength = this.parent.server.bufLength;
+      this._busBuffer = cc.server.busBuffer;
+      this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
         this.process = next_a;
         this._busOffset = 0;
