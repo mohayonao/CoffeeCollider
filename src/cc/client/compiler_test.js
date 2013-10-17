@@ -10,7 +10,7 @@ define(function(require, exports, module) {
     });
   };
   
-  describe.only("compiler.js", function() {
+  describe("compiler.js", function() {
     describe("splitCodeAndData", function() {
       it("Without __END__", function() {
         var code = [
