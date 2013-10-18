@@ -78,7 +78,9 @@ define(function(require, exports, module) {
         } else {
           result = {};
           Object.keys(data).forEach(function(key) {
-            result[key] = _(data[key], stack);
+            if (key.charAt(0) !== "_") {
+              result[key] = _(data[key], stack);
+            }
           });
         }
         stack.pop();
