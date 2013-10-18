@@ -13,6 +13,7 @@ define(function(require, exports, module) {
   var TaskEach  = sched.TaskEach;
   var TaskTimeout  = sched.TaskTimeout;
   var TaskInterval = sched.TaskInterval;
+  var TaskBlock = sched.TaskBlock;
 
   var MockServer = (function() {
     function MockServer() {
@@ -208,6 +209,47 @@ define(function(require, exports, module) {
           assert.equal(i, passed);
           procT(100);
         }
+      });
+    });
+    describe("TaskBlock", function() {
+      it("create", function() {
+        var t = Task.block();
+        assert.instanceOf(t, TaskBlock);
+      });
+      it("sync", function() {
+        var passed = 0;
+        var block1 = Task.block();
+        var block2 = Task.block();
+        var t = Task.do(function() {
+          passed = 1;
+          this.wait(block1);
+          this.sync(function() {
+            passed = 2;
+          });
+          this.wait(block2);
+          this.sync(function() {
+            passed = 3;
+          });
+        }).on("end", function() {
+        }).play();
+        assert.equal(0, passed);
+        procN(1);
+        assert.equal(1, passed);
+        procT(100);
+        assert.equal(1, passed);
+        block1.free();
+        procN(1);
+        assert.equal(2, passed);
+        
+        procT(100);
+        assert.equal(2, passed);
+        block2.lock();
+        block2.free();
+        procN(1);
+        assert.equal(2, passed);
+        block2.free();
+        procN(1);
+        assert.equal(3, passed);
       });
     });
     it("nesting", function() {

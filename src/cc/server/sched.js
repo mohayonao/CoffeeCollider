@@ -298,6 +298,39 @@ define(function(require, exports, module) {
     
     return TaskInterval;
   })();
+
+  var TaskBlock = (function() {
+    function TaskBlock(count) {
+      Task.call(this);
+      if (typeof count !== "number") {
+        count = 1;
+      }
+      this._index = count;
+    }
+    fn.extend(TaskBlock, Task);
+    TaskBlock.prototype.play = function() {
+    };
+    TaskBlock.prototype.pause = function() {
+    };
+    TaskBlock.prototype.stop = function() {
+    };
+    TaskBlock.prototype.lock = fn.sync(function(count) {
+      if (typeof count !== "number") {
+        count = 1;
+      }
+      this._index += count;
+    });
+    TaskBlock.prototype.free = fn.sync(function(count) {
+      if (typeof count !== "number") {
+        count = 1;
+      }
+      this._index -= count;
+      if (this._index <= 0) {
+        Task.prototype.stop.call(this);
+      }
+    });
+    return TaskBlock;
+  })();
   
   var TaskInterface = {
     "do": function(func) {
@@ -338,7 +371,10 @@ define(function(require, exports, module) {
         throw new TypeError("Task.interval: arguments[1] is not a Function.");
       }
       return new TaskInterval(delay, func);
-    }
+    },
+    block: function() {
+      return new TaskBlock();
+    },
   };
   
   var install = function(register) {
@@ -353,6 +389,7 @@ define(function(require, exports, module) {
     TaskEach: TaskEach,
     TaskTimeout : TaskTimeout,
     TaskInterval: TaskInterval,
+    TaskBlock: TaskBlock,
     TaskInterface: TaskInterface,
     install: install
   };
