@@ -3,13 +3,33 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var utils  = require("./utils");
-  var ugen   = require("./ugen/ugen");
-  var Unit   = require("./unit/unit").Unit;
-  var FixNum = require("./unit/unit").FixNum;
+  var utils = require("./utils");
+  var ugen  = require("./ugen/ugen");
+  var Unit    = require("./unit/unit").Unit;
+  var FixNum  = require("./unit/unit").FixNum;
+  var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
 
   var graphFunc = {};
+  graphFunc[C.FREE] = function() {
+    if (this.parent) {
+      if (this.parent.head === this) {
+        this.parent.head = this.next;
+      }
+      if (this.parent.tail === this) {
+        this.parent.tail = this.prev;
+      }
+    }
+    if (this.prev) {
+      this.prev.next = this.next;
+    }
+    if (this.next) {
+      this.next.prev = this.prev;
+    }
+    this.prev = null;
+    this.next = null;
+    this.parent = null;
+  };
   graphFunc[C.ADD_TO_HEAD] = function(node) {
     var prev;
     if (this.head === null) {
@@ -88,43 +108,24 @@ define(function(require, exports, module) {
   
   var Node = (function() {
     function Node() {
+      Emitter.call(this);
       this.klassName = "Node";
-      this.next    = null;
-      this.prev    = null;
-      this.parent  = null;
-      this.running = true;
-    }
-    
-    Node.prototype.free = function() {
-      if (this.parent) {
-        if (this.parent.head === this) {
-          this.parent.head = this.next;
-        }
-        if (this.parent.tail === this) {
-          this.parent.tail = this.prev;
-        }
-      }
-      if (this.prev) {
-        this.prev.next = this.next;
-      }
-      if (this.next) {
-        this.next.prev = this.prev;
-      }
-      this.prev = null;
-      this.next = null;
+      this.next   = null;
+      this.prev   = null;
       this.parent = null;
-      return this;
-    };
+      this._running = true;
+    }
+    fn.extend(Node, Emitter);
     Node.prototype.play = fn.sync(function() {
-      this.running = true;
+      this._running = true;
     });
     Node.prototype.pause = fn.sync(function() {
-      this.running = false;
+      this._running = false;
     });
     Node.prototype.stop = fn.sync(function() {
-      this.free();
+      graphFunc[C.FREE].call(this);
+      this.emit("end");
     });
-    
     return Node;
   })();
 
@@ -144,12 +145,12 @@ define(function(require, exports, module) {
     }
     fn.extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples) {
-      if (this.head && this.running) {
-        this.head.process(inNumSamples);
+    Group.prototype._process = function(inNumSamples) {
+      if (this.head && this._running) {
+        this.head._process(inNumSamples);
       }
       if (this.next) {
-        this.next.process(inNumSamples);
+        this.next._process(inNumSamples);
       }
     };
     
@@ -247,8 +248,8 @@ define(function(require, exports, module) {
       }
     });
     
-    Synth.prototype.process = function(inNumSamples) {
-      if (this.running) {
+    Synth.prototype._process = function(inNumSamples) {
+      if (this._running) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
@@ -256,7 +257,7 @@ define(function(require, exports, module) {
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples);
+        this.next._process(inNumSamples);
       }
     };
     

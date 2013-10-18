@@ -1319,7 +1319,7 @@ define('cc/server/server', function(require, exports, module) {
       while (n--) {
         timeline.process();
         busBuffer.set(busClear);
-        root.process(bufLength);
+        root._process(bufLength);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
@@ -1452,14 +1452,34 @@ define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var utils  = require("./utils");
-  var ugen   = require("./ugen/ugen");
-  var Unit   = require("./unit/unit").Unit;
-  var FixNum = require("./unit/unit").FixNum;
+  var utils = require("./utils");
+  var ugen  = require("./ugen/ugen");
+  var Unit    = require("./unit/unit").Unit;
+  var FixNum  = require("./unit/unit").FixNum;
+  var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
 
   var graphFunc = {};
-  graphFunc[0] = function(node) {
+  graphFunc[0] = function() {
+    if (this.parent) {
+      if (this.parent.head === this) {
+        this.parent.head = this.next;
+      }
+      if (this.parent.tail === this) {
+        this.parent.tail = this.prev;
+      }
+    }
+    if (this.prev) {
+      this.prev.next = this.next;
+    }
+    if (this.next) {
+      this.next.prev = this.prev;
+    }
+    this.prev = null;
+    this.next = null;
+    this.parent = null;
+  };
+  graphFunc[1] = function(node) {
     var prev;
     if (this.head === null) {
       this.head = this.tail = node;
@@ -1474,7 +1494,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this;
   };
-  graphFunc[1] = function(node) {
+  graphFunc[2] = function(node) {
     var next;
     if (this.tail === null) {
       this.head = this.tail = node;
@@ -1489,7 +1509,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this;
   };
-  graphFunc[2] = function(node) {
+  graphFunc[3] = function(node) {
     var prev = this.prev;
     this.prev = node;
     node.prev = prev;
@@ -1502,7 +1522,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this.parent;
   };
-  graphFunc[3] = function(node) {
+  graphFunc[4] = function(node) {
     var next = this.next;
     this.next = node;
     node.next = next;
@@ -1515,7 +1535,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this.parent;
   };
-  graphFunc[4] = function(node) {
+  graphFunc[5] = function(node) {
     node.next = this.next;
     node.prev = this.prev;
     node.head = this.head;
@@ -1537,43 +1557,24 @@ define('cc/server/node', function(require, exports, module) {
   
   var Node = (function() {
     function Node() {
+      Emitter.call(this);
       this.klassName = "Node";
-      this.next    = null;
-      this.prev    = null;
-      this.parent  = null;
-      this.running = true;
-    }
-    
-    Node.prototype.free = function() {
-      if (this.parent) {
-        if (this.parent.head === this) {
-          this.parent.head = this.next;
-        }
-        if (this.parent.tail === this) {
-          this.parent.tail = this.prev;
-        }
-      }
-      if (this.prev) {
-        this.prev.next = this.next;
-      }
-      if (this.next) {
-        this.next.prev = this.prev;
-      }
-      this.prev = null;
-      this.next = null;
+      this.next   = null;
+      this.prev   = null;
       this.parent = null;
-      return this;
-    };
+      this._running = true;
+    }
+    fn.extend(Node, Emitter);
     Node.prototype.play = fn.sync(function() {
-      this.running = true;
+      this._running = true;
     });
     Node.prototype.pause = fn.sync(function() {
-      this.running = false;
+      this._running = false;
     });
     Node.prototype.stop = fn.sync(function() {
-      this.free();
+      graphFunc[0].call(this);
+      this.emit("end");
     });
-    
     return Node;
   })();
 
@@ -1593,12 +1594,12 @@ define('cc/server/node', function(require, exports, module) {
     }
     fn.extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples) {
-      if (this.head && this.running) {
-        this.head.process(inNumSamples);
+    Group.prototype._process = function(inNumSamples) {
+      if (this.head && this._running) {
+        this.head._process(inNumSamples);
       }
       if (this.next) {
-        this.next.process(inNumSamples);
+        this.next._process(inNumSamples);
       }
     };
     
@@ -1696,8 +1697,8 @@ define('cc/server/node', function(require, exports, module) {
       }
     });
     
-    Synth.prototype.process = function(inNumSamples) {
-      if (this.running) {
+    Synth.prototype._process = function(inNumSamples) {
+      if (this._running) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
@@ -1705,7 +1706,7 @@ define('cc/server/node', function(require, exports, module) {
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples);
+        this.next._process(inNumSamples);
       }
     };
     
@@ -1963,34 +1964,34 @@ define('cc/server/node', function(require, exports, module) {
       if (!(node instanceof Node)) {
         throw new TypeError("Group.after: arguments[0] is not a Node.");
       }
-      return new Group(node, 3);
+      return new Group(node, 4);
     },
     before: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
         throw new TypeError("Group.before: arguments[0] is not a Node.");
       }
-      return new Group(node, 2);
+      return new Group(node, 3);
     },
     head: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
         throw new TypeError("Group.head: arguments[0] is not a Group.");
       }
-      return new Group(node, 0);
+      return new Group(node, 1);
     },
     tail: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
         throw new TypeError("Group.tail: arguments[0] is not a Group.");
       }
-      return new Group(node, 1);
+      return new Group(node, 2);
     },
     replace: function(node) {
       if (!(node instanceof Node)) {
         throw new TypeError("Group.replace: arguments[0] is not a Node.");
       }
-      return new Group(node, 4);
+      return new Group(node, 5);
     }
   };
   
@@ -2018,7 +2019,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 3);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, 4);
     },
     before: function() {
       var node, def, args;
@@ -2037,7 +2038,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 2);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, 3);
     },
     head: function() {
       var node, def, args;
@@ -2056,7 +2057,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 0);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, 1);
     },
     tail: function() {
       var node, def, args;
@@ -2075,7 +2076,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 1);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, 2);
     },
     replace: function(node, def, args) {
       if (!(node instanceof Node)) {
@@ -2084,7 +2085,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 4);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, 5);
     }
   };
   
@@ -2669,6 +2670,75 @@ define('cc/server/unit/unit', function(require, exports, module) {
   };
 
 });
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter() {
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.context, args);
+      }
+      return this;
+    };
+    return Emitter;
+  })();
+
+  module.exports = {
+    Emitter: Emitter
+  };
+
+});
 define('cc/server/sched', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -3025,75 +3095,6 @@ define('cc/server/sched', function(require, exports, module) {
     TaskInterval: TaskInterval,
     TaskInterface: TaskInterface,
     install: install
-  };
-
-});
-define('cc/common/emitter', function(require, exports, module) {
-
-  var Emitter = (function() {
-    function Emitter() {
-      this.__callbacks = {};
-    }
-    Emitter.prototype.getListeners = function(event) {
-      return this.__callbacks[event] || (this.__callbacks[event] = []);
-    };
-    Emitter.prototype.hasListeners = function(event) {
-      return this.getListeners(event).length > 0;
-    };
-    Emitter.prototype.on = function(event, callback) {
-      var __callbacks = this.getListeners(event);
-      if (__callbacks.indexOf(callback) === -1) {
-        __callbacks.push(callback);
-      }
-      return this;
-    };
-    Emitter.prototype.once = function(event, callback) {
-      var that = this;
-      function wrapper() {
-        that.off(event, wrapper);
-        callback.apply(that.context, arguments);
-      }
-      wrapper.callback = callback;
-      this.on(event, wrapper);
-      return this;
-    };
-    Emitter.prototype.off = function(event, callback) {
-      if (arguments.length === 0) {
-        this.__callbacks = {};
-        return this;
-      }
-      var __callbacks = this.getListeners(event);
-      if (arguments.length === 1) {
-        __callbacks.splice(0);
-        return this;
-      }
-      var index = __callbacks.indexOf(callback);
-      if (index === -1) {
-        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-          if (__callbacks[i].callback === callback) {
-            index = i;
-            break;
-          }
-        }
-      }
-      if (index !== -1) {
-        __callbacks.splice(index, 1);
-      }
-      return this;
-    };
-    Emitter.prototype.emit = function(event) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      var __callbacks = this.getListeners(event).slice(0);
-      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.context, args);
-      }
-      return this;
-    };
-    return Emitter;
-  })();
-
-  module.exports = {
-    Emitter: Emitter
   };
 
 });

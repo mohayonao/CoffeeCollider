@@ -57,7 +57,7 @@ define(function(require, exports, module) {
       while (n--) {
         timeline.process();
         busBuffer.set(busClear);
-        root.process(bufLength);
+        root._process(bufLength);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
