@@ -1,8 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var fn = require("./fn");
+  var Emitter = require("../common/emitter").Emitter;
 
   var Timeline = (function() {
     function Timeline() {
@@ -54,6 +55,7 @@ define(function(require, exports, module) {
 
   var Task = (function() {
     function Task() {
+      Emitter.call(this);
       this.klassName = "Task";
       this._timeline = cc.server.timeline;
       this._context = new TaskContext(this);
@@ -61,6 +63,7 @@ define(function(require, exports, module) {
       this._bang  = false;
       this._index = 0;
     }
+    fn.extend(Task, Emitter);
     
     Task.prototype.play = fn.sync(function() {
       if (this._timeline) {
@@ -79,6 +82,7 @@ define(function(require, exports, module) {
     Task.prototype.stop = fn.sync(function() {
       this.pause();
       this._timeline = null;
+      this.emit("end");
     });
     Task.prototype._push = function(that, func, args) {
       if (typeof that === "function") {

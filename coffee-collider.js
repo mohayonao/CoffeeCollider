@@ -2528,8 +2528,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
 });
 define('cc/server/sched', function(require, exports, module) {
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var fn = require("./fn");
+  var Emitter = require("../common/emitter").Emitter;
 
   var Timeline = (function() {
     function Timeline() {
@@ -2581,6 +2582,7 @@ define('cc/server/sched', function(require, exports, module) {
 
   var Task = (function() {
     function Task() {
+      Emitter.call(this);
       this.klassName = "Task";
       this._timeline = cc.server.timeline;
       this._context = new TaskContext(this);
@@ -2588,6 +2590,7 @@ define('cc/server/sched', function(require, exports, module) {
       this._bang  = false;
       this._index = 0;
     }
+    fn.extend(Task, Emitter);
     
     Task.prototype.play = fn.sync(function() {
       if (this._timeline) {
@@ -2606,6 +2609,7 @@ define('cc/server/sched', function(require, exports, module) {
     Task.prototype.stop = fn.sync(function() {
       this.pause();
       this._timeline = null;
+      this.emit("end");
     });
     Task.prototype._push = function(that, func, args) {
       if (typeof that === "function") {
@@ -2833,6 +2837,75 @@ define('cc/server/sched', function(require, exports, module) {
     TaskInterval: TaskInterval,
     TaskInterface: TaskInterface,
     install: install
+  };
+
+});
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter() {
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.context, args);
+      }
+      return this;
+    };
+    return Emitter;
+  })();
+
+  module.exports = {
+    Emitter: Emitter
   };
 
 });

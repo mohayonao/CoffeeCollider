@@ -52,57 +52,67 @@ define(function(require, exports, module) {
       it("sync", function() {
         var passed = 0;
         var t = Task.do(function() {
-          passed += 1;
+          passed = 1;
           this.wait(100);
           this.sync(function() {
-            passed += 1;
+            passed = 2;
           });
           this.wait(100);
+        }).on("end", function() {
+          passed = 3;
         }).play();
+        
         assert.equal(0, passed);
         procN(1);
         assert.equal(1, passed);
         procT(100);
         assert.equal(2, passed);
-        assert.isNotNull(t._timeline);
         procT(100);
-        assert.isNull(t._timeline);
+        assert.equal(3, passed);
       });
       it("pause", function() {
         var passed = 0;
         var t = Task.do(function() {
-          passed += 1;
+          passed = 1;
           this.wait(100);
           this.sync(function() {
-            passed += 1;
+            passed = 2;
           });
+          this.wait(100);
+        }).on("end", function() {
+          passed = 3;
         }).play();
-        procT(80);
+        
+        assert.equal(0, passed);
+        procN(1);
         assert.equal(1, passed);
         t.pause();
-        procT(30);
+        procT(100);
         assert.equal(1, passed);
         t.play();
-        procT(30);
+        procT(100);
         assert.equal(2, passed);
+        procT(100);
+        assert.equal(3, passed);
       });
       it("stop", function() {
         var passed = 0;
         var t = Task.do(function() {
-          passed += 1;
+          passed = 1;
           this.wait(100);
           this.sync(function() {
             throw "should not pass through";
           });
+        }).on("end", function() {
+          passed = 3;
         }).play();
-        procT(80);
+
+        assert.equal(0, passed);
+        procN(1);
         assert.equal(1, passed);
         t.stop();
-        procT(30);
-        assert.equal(1, passed);
-        t.play();
-        procT(30);
-        assert.equal(1, passed);
+        assert.equal(3, passed);
+        procT(100);
       });
     });
     describe("TaskLoop", function() {
@@ -115,13 +125,17 @@ define(function(require, exports, module) {
         var t = Task.loop(function() {
           passed += 1;
           this.wait(100);
+        }).on("end", function() {
+          throw "should not pass through";
         }).play();
+        
         assert.equal(0, passed);
         procN(1);
         for (var i = 1; i <= 10; i++) {
           assert.equal(i, passed);
-          procT(101);
+          procT(100);
         }
+        procT(1000);
       });
     });
     describe("TaskEach", function() {
@@ -132,19 +146,21 @@ define(function(require, exports, module) {
       it("sync", function() {
         var passed = 0;
         var t = Task.each([1,2,3], function(i) {
-          passed += i;
+          passed = i;
           this.wait(100);
+        }).on("end", function() {
+          passed = 4;
         }).play();
+        
         assert.equal(0, passed);
         procN(1);
         assert.equal(1, passed);
         procT(100);
+        assert.equal(2, passed);
+        procT(100);
         assert.equal(3, passed);
         procT(100);
-        assert.equal(6, passed);
-        assert.isNotNull(t._timeline);
-        procT(100);
-        assert.isNull(t._timeline);
+        assert.equal(4, passed);
       });
     });
     describe("TaskTimeout", function() {
@@ -155,17 +171,19 @@ define(function(require, exports, module) {
       it("sync", function() {
         var passed = 0;
         var t = Task.timeout(10, function(i) {
-          passed += 1;
+          passed = 1;
           this.wait(100);
+        }).on("end", function() {
+          passed = 2;
         }).play();
+        
         assert.equal(0, passed);
         procN(1);
         assert.equal(0, passed);
         procT(10);
         assert.equal(1, passed);
-        assert.isNotNull(t._timeline);
         procT(100);
-        assert.isNull(t._timeline);
+        assert.equal(2, passed);
       });
     });
     describe("TaskInterval", function() {
@@ -177,13 +195,16 @@ define(function(require, exports, module) {
         var passed = 0;
         var t = Task.interval(10, function(i) {
           passed += 1;
-          this.wait(90);
+          this.wait(100);
+        }).on("end", function() {
+          throw "should not pass through";
         }).play();
+        
         assert.equal(0, passed);
         procN(1);
         assert.equal(0, passed);
         procT(10);
-        for (var i = 1; i <= 8; i++) {
+        for (var i = 1; i <= 10; i++) {
           assert.equal(i, passed);
           procT(100);
         }
