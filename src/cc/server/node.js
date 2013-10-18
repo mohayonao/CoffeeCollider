@@ -5,7 +5,6 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var ugen   = require("./ugen/ugen");
-  var Syncable = require("./sched").Syncable;
   var Unit   = require("./unit/unit").Unit;
   var FixNum = require("./unit/unit").FixNum;
   var slice = [].slice;
@@ -18,7 +17,6 @@ define(function(require, exports, module) {
       this.parent  = null;
       this.running = true;
     }
-    fn.extend(Node, Syncable);
     
     var appendFunc = {};
     appendFunc.addToHead = function(node) {

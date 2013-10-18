@@ -52,11 +52,6 @@ define(function(require, exports, module) {
     return Timeline;
   })();
 
-  var Syncable = (function() {
-    function Syncable() {}
-    return Syncable;
-  })();
-
   var Task = (function() {
     function Task() {
       this.klassName = "Task";
@@ -66,7 +61,7 @@ define(function(require, exports, module) {
       this.bang   = false;
       this.index  = 0;
     }
-    fn.extend(Task, Syncable);
+    
     Task.prototype.play = fn.sync(function() {
       if (this.timeline) {
         this.timeline.append(this);
@@ -304,7 +299,6 @@ define(function(require, exports, module) {
   
   module.exports = {
     Timeline: Timeline,
-    Syncable: Syncable,
     Task    : Task,
     TaskDo  : TaskDo,
     TaskLoop: TaskLoop,
