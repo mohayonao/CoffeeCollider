@@ -40,7 +40,6 @@ define(function(require, exports, module) {
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent.emit("done");
         this.parent._doneAction(action);
       }
     };

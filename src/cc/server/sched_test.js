@@ -24,7 +24,7 @@ define(function(require, exports, module) {
     return MockServer;
   })();
 
-  describe.only("sched.js", function() {
+  describe("sched.js", function() {
     var timeline, sync, procN, procT;
     before(function() {
       sched.install(register);
