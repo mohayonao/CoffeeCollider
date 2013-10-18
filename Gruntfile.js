@@ -30,10 +30,7 @@ module.exports = function(grunt) {
             return "test:" + filepath;
           }
           grunt.config(["jshint", "files"], filepath);
-          var tasks = [ "typo", "jshint", "test:" + filepath ];
-          if (!hasExclusiveTest()) {
-            tasks.push("dryice");
-          }
+          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice", "uglify" ];
           return tasks;
         }
       },
@@ -109,6 +106,9 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("dryice", function() {
+    if (hasExclusiveTest()) {
+      grunt.fail.warn("NOT builded, '.only' attribute is detected in any tests.");
+    }
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
@@ -255,7 +255,7 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
-  grunt.registerTask("build"  , ["check", "dryice"]);
+  grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
   grunt.registerTask("default", ["build", "connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
