@@ -1584,7 +1584,9 @@ define('cc/server/node', function(require, exports, module) {
     function Synth(specs, target, args, addAction) {
       Node.call(this);
       this.klassName = "Synth";
-      build.call(this, specs, target, args, addAction);
+      if (specs) {
+        build.call(this, specs, target, args, addAction);
+      }
     }
     fn.extend(Synth, Node);
     
@@ -1960,7 +1962,7 @@ define('cc/server/node', function(require, exports, module) {
 });
 define('cc/server/fn', function(require, exports, module) {
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var utils = require("./utils");
   var slice = [].slice;
   
@@ -2595,11 +2597,15 @@ define('cc/server/sched', function(require, exports, module) {
     fn.extend(Task, Emitter);
     
     Task.prototype.play = fn.sync(function() {
-      if (this._timeline) {
-        this._timeline.append(this);
+      var that = this;
+      while (that._prev !== null) {
+        that = that._prev;
       }
-      if (this._queue.length === 0) {
-        this._bang = true;
+      if (that._timeline) {
+        that._timeline.append(that);
+      }
+      if (that._queue.length === 0) {
+        that._bang = true;
       }
     });
     Task.prototype.pause = fn.sync(function() {
@@ -2612,11 +2618,40 @@ define('cc/server/sched', function(require, exports, module) {
       this.pause();
       this._timeline = null;
       this.emit("end");
+      if (this._next) {
+        this._next._prev = null;
+        this._next.play();
+        this._next = null;
+      }
     });
     Task.prototype["do"] = function(func) {
       var next = TaskInterface["do"](func);
-      next.prev = this;
-      this.next = next;
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.loop = function(func) {
+      var next = TaskInterface.loop(func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.each = function(list, func) {
+      var next = TaskInterface.each(list, func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.timeout = function(delay, func) {
+      var next = TaskInterface.timeout(delay, func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.interval = function(delay, func) {
+      var next = TaskInterface.interval(delay, func);
+      next._prev = this;
+      this._next = next;
       return next;
     };
     

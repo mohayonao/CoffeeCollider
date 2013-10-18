@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var fn = require("./fn");
 
-  describe("fn", function() {
+  describe("fn.js", function() {
     var Foo, Bar;
     before(function() {
       Foo = (function() {

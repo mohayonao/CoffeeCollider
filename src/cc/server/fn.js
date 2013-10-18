@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("../cc");
+  var cc = require("./cc");
   var utils = require("./utils");
   var slice = [].slice;
   

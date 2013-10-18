@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var utils = require("./utils");
 
-  describe("utils", function() {
+  describe("utils.js", function() {
     it("isDict", function() {
       var __ = new (function() {})();
       assert.equal(true , utils.isDict({}));

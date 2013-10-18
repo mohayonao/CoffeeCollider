@@ -133,7 +133,9 @@ define(function(require, exports, module) {
     function Synth(specs, target, args, addAction) {
       Node.call(this);
       this.klassName = "Synth";
-      build.call(this, specs, target, args, addAction);
+      if (specs) {
+        build.call(this, specs, target, args, addAction);
+      }
     }
     fn.extend(Synth, Node);
     
