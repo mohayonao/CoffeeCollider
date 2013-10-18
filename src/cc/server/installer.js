@@ -12,23 +12,21 @@ define(function(require, exports, module) {
   };
 
   var register = function(name, func) {
-    if (func) {
-      if (/^[A-Z]/.test(name)) {
-        var Klass = func;
-        var base = global[name] = function() {
-          return new Klass();
-        };
-        if (Klass.classmethods) {
-          Object.keys(Klass.classmethods).forEach(function(key) {
-            key = key.substr(1);
-            if (Klass[key]) {
-              base[key] = Klass[key];
-            }
-          });
-        }
-      } else {
-        global[name] = func;
+    if (typeof func === "function" && /^[A-Z]/.test(name)) {
+      var Klass = func;
+      var base = global[name] = function() {
+        return new Klass();
+      };
+      if (Klass.classmethods) {
+        Object.keys(Klass.classmethods).forEach(function(key) {
+          key = key.substr(1);
+          if (Klass[key]) {
+            base[key] = Klass[key];
+          }
+        });
       }
+    } else {
+      global[name] = func;
     }
   };
   

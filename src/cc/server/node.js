@@ -9,6 +9,83 @@ define(function(require, exports, module) {
   var FixNum = require("./unit/unit").FixNum;
   var slice = [].slice;
 
+  var graphFunc = {};
+  graphFunc[C.ADD_TO_HEAD] = function(node) {
+    var prev;
+    if (this.head === null) {
+      this.head = this.tail = node;
+    } else {
+      prev = this.head.prev;
+      if (prev) {
+        prev.next = node;
+      }
+      node.next = this.head;
+      this.head.prev = node;
+      this.head = node;
+    }
+    node.parent = this;
+  };
+  graphFunc[C.ADD_TO_TAIL] = function(node) {
+    var next;
+    if (this.tail === null) {
+      this.head = this.tail = node;
+    } else {
+      next = this.tail.next;
+      if (next) {
+        next.prev = node;
+      }
+      node.prev = this.tail;
+      this.tail.next = node;
+      this.tail = node;
+    }
+    node.parent = this;
+  };
+  graphFunc[C.ADD_BEFORE] = function(node) {
+    var prev = this.prev;
+    this.prev = node;
+    node.prev = prev;
+    if (prev) {
+      prev.next = node;
+    }
+    node.next = this;
+    if (this.parent && this.parent.head === this) {
+      this.parent.head = node;
+    }
+    node.parent = this.parent;
+  };
+  graphFunc[C.ADD_AFTER] = function(node) {
+    var next = this.next;
+    this.next = node;
+    node.next = next;
+    if (next) {
+      next.prev = node;
+    }
+    node.prev = this;
+    if (this.parent && this.parent.tail === this) {
+      this.parent.tail = node;
+    }
+    node.parent = this.parent;
+  };
+  graphFunc[C.REPLACE] = function(node) {
+    node.next = this.next;
+    node.prev = this.prev;
+    node.head = this.head;
+    node.tail = this.tail;
+    node.parent = this.parent;
+    if (this.prev) {
+      this.prev.next = node;
+    }
+    if (this.next) {
+      this.next.prev = node;
+    }
+    if (this.parent && this.parent.head === this) {
+      this.parent.head = node;
+    }
+    if (this.parent && this.parent.tail === this) {
+      this.parent.tail = node;
+    }
+  };
+  
   var Node = (function() {
     function Node() {
       this.klassName = "Node";
@@ -18,64 +95,7 @@ define(function(require, exports, module) {
       this.running = true;
     }
     
-    var appendFunc = {};
-    appendFunc.addToHead = function(node) {
-      var prev;
-      if (this.head === null) {
-        this.head = this.tail = node;
-      } else {
-        prev = this.head.prev;
-        if (prev) { prev.next = node; }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addToTail = function(node) {
-      var next;
-      if (this.tail === null) {
-        this.head = this.tail = node;
-      } else {
-        next = this.tail.next;
-        if (next) { next.prev = node; }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
-      }
-      node.parent = this;
-    };
-    appendFunc.addBefore = function(node) {
-      var prev = this.prev;
-      this.prev = node;
-      node.prev = prev;
-      if (prev) { prev.next = node; }
-      node.next = this;
-      if (this.parent && this.parent.head === this) {
-        this.parent.head = node;
-      }
-      node.parent = this.parent;
-    };
-    appendFunc.addAfter = function(node) {
-      var next = this.next;
-      this.next = node;
-      node.next = next;
-      if (next) { next.prev = node; }
-      node.prev = this;
-      if (this.parent && this.parent.tail === this) {
-        this.parent.tail = node;
-      }
-      node.parent = this.parent;
-    };
-    
-    Node.prototype.append = function(node, addAction) {
-      if (appendFunc[addAction]) {
-        appendFunc[addAction].call(this, node);
-      }
-      return this;
-    };
-
-    Node.prototype.remove = function() {
+    Node.prototype.free = function() {
       if (this.parent) {
         if (this.parent.head === this) {
           this.parent.head = this.next;
@@ -102,18 +122,25 @@ define(function(require, exports, module) {
       this.running = false;
     });
     Node.prototype.stop = fn.sync(function() {
-      this.remove();
+      this.free();
     });
     
     return Node;
   })();
 
   var Group = (function() {
-    function Group() {
+    function Group(node, addAction) {
       Node.call(this);
       this.klassName = "Group";
       this.head = null;
       this.tail = null;
+      if (node) {
+        var that = this;
+        var timeline = cc.server.timeline;
+        timeline.push(function() {
+          graphFunc[addAction].call(node, that);
+        });
+      }
     }
     fn.extend(Group, Node);
     
@@ -130,24 +157,25 @@ define(function(require, exports, module) {
   })();
   
   var Synth = (function() {
-    function Synth(specs, target, args, addAction) {
+    function Synth(specs, node, args, addAction) {
       Node.call(this);
       this.klassName = "Synth";
       if (specs) {
-        build.call(this, specs, target, args, addAction);
+        build.call(this, specs, args);
+      }
+      if (node) {
+        var that = this;
+        var timeline = cc.server.timeline;
+        timeline.push(function() {
+          graphFunc[addAction].call(node, that);
+        });
       }
     }
     fn.extend(Synth, Node);
     
-    var build = function(specs, target, args, addAction) {
+    var build = function(specs, args) {
       this.specs = specs = JSON.parse(specs);
 
-      var that = this;
-      var timeline = cc.server.timeline;
-      timeline.push(function() {
-        target.append(that, addAction);
-      });
-      
       var fixNumList = specs.consts.map(function(value) {
         return new FixNum(value);
       });
@@ -235,26 +263,9 @@ define(function(require, exports, module) {
     return Synth;
   })();
   
-  var SynthDefInterface = (function() {
-    function SynthDefInterface() {
-    }
-    SynthDefInterface.prototype.$def = function(func) {
-      if (typeof func === "function") {
-        var instance = new SynthDef();
-        instance.initialize.apply(instance, arguments);
-        return instance;
-      }
-      throw "Synth.def() requires a function.";
-    };
-    fn.classmethod(SynthDefInterface);
-    return SynthDefInterface;
-  })();
-  
   var SynthDef = (function() {
-    function SynthDef() {
+    function SynthDef(func, args) {
       this.klassName = "SynthDef";
-    }
-    SynthDef.prototype.initialize = function(func, args) {
       var isVaridArgs = false;
       if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
         args = unpackArguments(args);
@@ -358,9 +369,9 @@ define(function(require, exports, module) {
       };
       this.specs = specs;
       return this;
-    };
+    }
     
-    SynthDef.prototype.play = fn(function(running) {
+    SynthDef.prototype.play = fn(function() {
       var target, args, addAction;
       var i = 0;
       target = args;
@@ -374,8 +385,9 @@ define(function(require, exports, module) {
       }
       if (typeof arguments[i] === "string") {
         addAction = arguments[i];
+      } else {
+        addAction = "addToHead";
       }
-      
       if (args && arguments.length === 1) {
         if (args.target instanceof Node) {
           target = args.target;
@@ -386,19 +398,18 @@ define(function(require, exports, module) {
           delete args.addAction;
         }
       }
-      
       switch (addAction) {
-      case "addToHead": case "addToTail": case "addBefore": case "addAfter":
-        break;
+      case "addToHead":
+        return SynthInterface.head(this, target, args);
+      case "addToTail":
+        return SynthInterface.tail(this, target, args);
+      case "addBefore":
+        return SynthInterface.before(this, target, args);
+      case "addAfter":
+        return SynthInterface.after(this, target, args);
       default:
-        addAction = "addToHead";
+        return SynthInterface.head(this, target, args);
       }
-      var synth = new Synth(JSON.stringify(this.specs), target, args, addAction);
-      if (running === undefined) {
-        running = true;
-      }
-      synth.running = !!running;
-      return synth;
     }).multiCall().build();
 
     var topoSort = (function() {
@@ -496,9 +507,126 @@ define(function(require, exports, module) {
     
     return SynthDef;
   })();
+
+  var GroupInterface = {
+    after: function(node) {
+      node = node || cc.server.rootNode;
+      if (!(node instanceof Node)) {
+        throw new TypeError();
+      }
+      return new Group(node, C.ADD_AFTER);
+    },
+    before: function(node) {
+      node = node || cc.server.rootNode;
+      if (!(node instanceof Node)) {
+        throw new TypeError();
+      }
+      return new Group(node, C.ADD_BEFORE);
+    },
+    head: function(node) {
+      node = node || cc.server.rootNode;
+      if (!(node instanceof Group)) {
+        throw new TypeError();
+      }
+      return new Group(node, C.ADD_TO_HEAD);
+    },
+    tail: function(node) {
+      node = node || cc.server.rootNode;
+      if (!(node instanceof Group)) {
+        throw new TypeError();
+      }
+      return new Group(node, C.ADD_TO_TAIL);
+    },
+    replace: function(node) {
+      if (!(node instanceof Node)) {
+        throw new TypeError();
+      }
+      return new Group(node, C.REPLACE);
+    }
+  };
+  
+  var SynthInterface = {
+    def: function(func, args) {
+      if (typeof func !== "function") {
+        throw new TypeError();
+      }
+      return new SynthDef(func, args);
+    },
+    after: function() {
+      var node, def, args;
+      if (arguments[0] instanceof SynthDef) {
+        node = cc.server.rootNode;
+        def  = arguments[0];
+        args = arguments[1] || {};
+      } else if (arguments[1] instanceof SynthDef) {
+        node = arguments[0];
+        def  = arguments[1];
+        args = arguments[2] || {};
+      }
+      if (!(node instanceof Node && def instanceof SynthDef)) {
+        throw new TypeError();
+      }
+      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_AFTER);
+    },
+    before: function() {
+      var node, def, args;
+      if (arguments[0] instanceof SynthDef) {
+        node = cc.server.rootNode;
+        def  = arguments[0];
+        args = arguments[1] || {};
+      } else if (arguments[1] instanceof SynthDef) {
+        node = arguments[0];
+        def  = arguments[1];
+        args = arguments[2] || {};
+      }
+      if (!(node instanceof Node && def instanceof SynthDef)) {
+        throw new TypeError();
+      }
+      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_BEFORE);
+    },
+    head: function() {
+      var node, def, args;
+      if (arguments[0] instanceof SynthDef) {
+        node = cc.server.rootNode;
+        def  = arguments[0];
+        args = arguments[1] || {};
+      } else if (arguments[1] instanceof SynthDef) {
+        node = arguments[0];
+        def  = arguments[1];
+        args = arguments[2] || {};
+      }
+      if (!(node instanceof Group && def instanceof SynthDef)) {
+        throw new TypeError();
+      }
+      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_HEAD);
+    },
+    tail: function() {
+      var node, def, args;
+      if (arguments[0] instanceof SynthDef) {
+        node = cc.server.rootNode;
+        def  = arguments[0];
+        args = arguments[1] || {};
+      } else if (arguments[1] instanceof SynthDef) {
+        node = arguments[0];
+        def  = arguments[1];
+        args = arguments[2] || {};
+      }
+      if (!(node instanceof Group && def instanceof SynthDef)) {
+        throw new TypeError();
+      }
+      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_TAIL);
+    },
+    replace: function(node, def, args) {
+      if (!(node instanceof Node && def instanceof SynthDef)) {
+        throw new TypeError();
+      }
+      return new Synth(JSON.stringify(def.specs), node, args||{}, C.REPLACE);
+    }
+  };
   
   var install = function(register) {
-    register("Synth", SynthDefInterface);
+    register("Group", GroupInterface);
+    register("Synth", SynthInterface);
   };
   
   module.exports = {

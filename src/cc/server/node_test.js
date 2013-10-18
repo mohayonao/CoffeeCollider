@@ -8,93 +8,86 @@ define(function(require, exports, module) {
   var Synth = node.Synth;
 
   var walk = (function() {
-    var walk = function(node, flag, list) {
+    var walk = function(node, list) {
       if (list.length > 50) {
-        throw "inf loop??";
+        throw "infinite loop??";
       }
       if (node) {
         if (node instanceof Group) {
-          if (flag === "bwd") {
-            walk(node.tail, flag, list);
-            walk(node.prev, flag, list);
-          } else {
-            walk(node.head, flag, list);
-            walk(node.next, flag, list);
-          }
+          walk(node.head, list);
+          walk(node.next, list);
         } else {
           list.push(node);
-          if (flag === "bwd") {
-            walk(node.prev, flag, list);
-          } else {
-            walk(node.next, flag, list);
-          }
+          walk(node.next, list);
         }
       }
       return list;
     };
-    return function(root, flag) {
-      return walk(root, flag, []);
+    return function(root) {
+      return walk(root, []);
     };
   })();
 
-  describe.only("node.js", function() {
-    var root, groups = [], synths = [];
+  cc.server = {
+    timeline: {
+      push: function(func) { func(); }
+    }
+  };
+  
+  describe("node.js", function() {
+    var rootNode;
     beforeEach(function() {
-      root = new Group();
-      for (var i = 0; i < 6; i++) {
-        groups[i] = new Group();
-        synths[i] = new Synth();
-      }
+      rootNode = cc.server.rootNode = new Group();
     });
-    describe("append", function() {
-      it("addToHead", function() {
-        // 5 -> 4 -> 3 -> 2 -> 1 -> 0
-        for (var i = 0; i < synths.length; ++i) {
-          root.append(synths[i], "addToHead");
-        }
-        assert.equal(root.head, synths[5], "root.head should point to synths[5]");
-        assert.equal(root.tail, synths[0], "root.tail should point to synths[0]");
-        assert.deepEqual(walk(root, "fwd"), [
-          synths[5], synths[4], synths[3], synths[2], synths[1], synths[0]
-        ]);
-      });
-      it("addToTail", function() {
-        // 0 -> 1 -> 2 -> 3 -> 4 -> 5
-        for (var i = 0; i < synths.length; ++i) {
-          root.append(synths[i], "addToTail");
-        }
-        assert.equal(root.head, synths[0], "root.head should point to synths[0]");
-        assert.equal(root.tail, synths[5], "root.tail should point to synths[5]");
-        assert.deepEqual(walk(root, "fwd"), [
-          synths[0], synths[1], synths[2], synths[3], synths[4], synths[5]
-        ]);
-      });
-      it("addBefore", function() {
-        // 0 -> 1 -> 2 -> 3 -> 4
-        for (var i = 0; i < synths.length - 1; ++i) {
-          root.append(synths[i], "addToTail");
-        }
-        // 0 (-> 5) -> 1 -> 2-> 3 -> 4
-        synths[1].append(synths[5], "addBefore");
-        assert.equal(root.head, synths[0], "root.head should point to synths[0]");
-        assert.equal(root.tail, synths[4], "root.tail should point to synths[4]");
-        assert.deepEqual(walk(root, "fwd"), [
-          synths[0], synths[5], synths[1], synths[2], synths[3], synths[4]
-        ]);
-      });
-      it("addAfter", function() {
-        // 0 -> 1 -> 2 -> 3 -> 4
-        for (var i = 0; i < synths.length - 1; ++i) {
-          root.append(synths[i], "addToTail");
-        }
-        // 0 -> 1 -> 2 (-> 5) -> 3 -> 4
-        synths[2].append(synths[5], "addAfter");
-        assert.equal(root.head, synths[0], "root.head should point to synths[0]");
-        assert.equal(root.tail, synths[4], "root.tail should point to synths[4]");
-        assert.deepEqual(walk(root, "fwd"), [
-          synths[0], synths[1], synths[2], synths[5], synths[3], synths[4]
-        ]);
-      });
+    it("addToHead", function() {
+      var nodes = [];
+      for (var i = 0; i < 5; i++) {
+        nodes[i] = new Synth(null, rootNode, null, C.ADD_TO_HEAD);
+      }
+      var expected = [ nodes[4], nodes[3], nodes[2], nodes[1], nodes[0] ];
+      var actual = walk(rootNode);
+      assert.deepEqual(expected, actual);
+    });
+    it("addToTail", function() {
+      var nodes = [];
+      for (var i = 0; i < 5; i++) {
+        nodes[i] = new Synth(null, rootNode, null, C.ADD_TO_TAIL);
+      }
+      var expected = [ nodes[0], nodes[1], nodes[2], nodes[3], nodes[4] ];
+      var actual = walk(rootNode);
+      assert.deepEqual(expected, actual);
+    });
+    it("addAfter", function() {
+      var nodes = [];
+      nodes[0] = new Synth(null, rootNode, null, C.ADD_TO_HEAD);
+      for (var i = 1; i < 5; i++) {
+        nodes[i] = new Synth(null, nodes[0], null, C.ADD_AFTER);
+      }
+      var expected = [ nodes[0], nodes[4], nodes[3], nodes[2], nodes[1] ];
+      var actual = walk(rootNode);
+      assert.deepEqual(expected, actual);
+    });
+    it("addBefore", function() {
+      var nodes = [];
+      nodes[0] = new Synth(null, rootNode, null, C.ADD_TO_HEAD);
+      for (var i = 1; i < 5; i++) {
+        nodes[i] = new Synth(null, nodes[0], null, C.ADD_BEFORE);
+      }
+      var expected = [ nodes[1], nodes[2], nodes[3], nodes[4], nodes[0] ];
+      var actual = walk(rootNode);
+      assert.deepEqual(expected, actual);
+    });
+    it("replace", function() {
+      var nodes = [];
+      for (var i = 0; i < 5; i++) {
+        nodes[i] = new Synth(null, rootNode, null, C.ADD_TO_HEAD);
+      }
+      nodes[5] = new Synth(null, nodes[0], null, C.REPLACE);
+      nodes[6] = new Synth(null, nodes[4], null, C.REPLACE);
+      nodes[7] = new Synth(null, nodes[2], null, C.REPLACE);
+      var expected = [ nodes[6], nodes[3], nodes[7], nodes[1], nodes[5] ];
+      var actual = walk(rootNode);
+      assert.deepEqual(expected, actual);
     });
   });
 

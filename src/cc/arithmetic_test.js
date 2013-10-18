@@ -2,10 +2,10 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var Compiler = require("../client/compiler").Compiler;
-  var register = require("../server/installer").register;
-  var uop = require("../server/uop");
-  var bop = require("../server/bop");
+  var Compiler = require("./client/compiler").Compiler;
+  var register = require("./server/installer").register;
+  var uop = require("./server/uop");
+  var bop = require("./server/bop");
 
   describe("arithmetic", function() {
     var calc;
