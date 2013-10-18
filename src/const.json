@@ -12,10 +12,10 @@
   "POS_X"  : 2,
   "POS_Y"  : 3,
   "KEYCODE": 4,
-  "FREE"       : 0,
-  "ADD_TO_HEAD": 1,
-  "ADD_TO_TAIL": 2,
-  "ADD_BEFORE" : 3,
-  "ADD_AFTER"  : 4,
-  "REPLACE"    : 5
+  "FREE"       :  2,
+  "ADD_TO_HEAD": -1,
+  "ADD_TO_TAIL": -2,
+  "ADD_BEFORE" : -3,
+  "ADD_AFTER"  : -4,
+  "REPLACE"    : -5
 }

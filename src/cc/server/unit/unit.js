@@ -37,6 +37,13 @@ define(function(require, exports, module) {
       }
       return this;
     };
+    Unit.prototype.doneAction = function(action) {
+      if (!this.done) {
+        this.done = true;
+        this.parent.emit("done");
+        this.parent._doneAction(action);
+      }
+    };
     return Unit;
   })();
   

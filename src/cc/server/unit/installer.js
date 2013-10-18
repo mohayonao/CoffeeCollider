@@ -5,6 +5,7 @@ define(function(require, exports, module) {
     require("./unit").install();
     require("./basic_ops").install();
     require("./osc").install();
+    require("./line").install();
     require("./ui").install();
   };
   

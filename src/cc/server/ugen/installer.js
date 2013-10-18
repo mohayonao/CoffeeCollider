@@ -5,6 +5,7 @@ define(function(require, exports, module) {
     require("./ugen").install(register);
     require("./basic_ops").install(register);
     require("./osc").install(register);
+    require("./line").install(register);
     require("./ui").install(register);
   };
 

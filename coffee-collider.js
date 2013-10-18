@@ -1460,26 +1460,7 @@ define('cc/server/node', function(require, exports, module) {
   var slice = [].slice;
 
   var graphFunc = {};
-  graphFunc[0] = function() {
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
-      }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
-      }
-    }
-    if (this.prev) {
-      this.prev.next = this.next;
-    }
-    if (this.next) {
-      this.next.prev = this.prev;
-    }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
-  };
-  graphFunc[1] = function(node) {
+  graphFunc[-1] = function(node) {
     var prev;
     if (this.head === null) {
       this.head = this.tail = node;
@@ -1494,7 +1475,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this;
   };
-  graphFunc[2] = function(node) {
+  graphFunc[-2] = function(node) {
     var next;
     if (this.tail === null) {
       this.head = this.tail = node;
@@ -1509,7 +1490,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this;
   };
-  graphFunc[3] = function(node) {
+  graphFunc[-3] = function(node) {
     var prev = this.prev;
     this.prev = node;
     node.prev = prev;
@@ -1522,7 +1503,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this.parent;
   };
-  graphFunc[4] = function(node) {
+  graphFunc[-4] = function(node) {
     var next = this.next;
     this.next = node;
     node.next = next;
@@ -1535,7 +1516,7 @@ define('cc/server/node', function(require, exports, module) {
     }
     node.parent = this.parent;
   };
-  graphFunc[5] = function(node) {
+  graphFunc[-5] = function(node) {
     node.next = this.next;
     node.prev = this.prev;
     node.head = this.head;
@@ -1554,6 +1535,141 @@ define('cc/server/node', function(require, exports, module) {
       this.parent.tail = node;
     }
   };
+
+  var doneAction = {}; // TODO: correct?
+  doneAction[0] = function() {
+    // do nothing when the UGen is finished
+  };
+  doneAction[1] = function() {
+    // pause the enclosing synth, but do not free it
+    this._running = false;
+  };
+  doneAction[2] = function() {
+    // free the enclosing synth
+    free.call(this);
+  };
+  doneAction[3] = function() {
+    // free both this synth and the preceding node
+    var prev = this.prev;
+    free.call(this);
+    if (prev) {
+      free.call(prev);
+    }
+  };
+  doneAction[4] = function() {
+    // free both this synth and the following node
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      free.call(next);
+    }
+  };
+  doneAction[5] = function() {
+    // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
+    var prev = this.prev;
+    free.call(this);
+    if (prev instanceof Group) {
+      free.call(prev);
+    }
+  };
+  doneAction[6] = function() {
+    // free this synth; if the following node is a group then do g_freeAll on it, else free it
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      free.call(next);
+    }
+  };
+  doneAction[7] = function() {
+    // free this synth and all preceding nodes in this group
+    this.parent.head = this.next;
+    if (this.prev) {
+      this.prev.next = null;
+    }
+    if (this.next) {
+      this.next.prev = null;
+    }
+  };
+  doneAction[8] = function() {
+    // free this synth and all following nodes in this group
+    this.parent.tail = this.prev;
+    if (this.prev) {
+      this.prev.next = null;
+    }
+    if (this.next) {
+      this.next.prev = null;
+    }
+  };
+  doneAction[9] = function() {
+    // free this synth and pause the preceding node
+    var prev = this.prev;
+    free.call(this);
+    if (prev) {
+      prev._running = false;
+    }
+  };
+  doneAction[10] = function() {
+    // free this synth and pause the following node
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      next._running = false;
+    }
+  };
+  doneAction[11] = function() {
+    // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
+    var prev = this.prev;
+    free.call(this);
+    if (prev instanceof Group) {
+      doneAction[2].call(prev);
+    }
+  };
+  doneAction[12] = function() {
+    // free this synth and if the following node is a group then do g_deepFree on it, else free it
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      free.call(next);
+    }
+  };
+  doneAction[13] = function() {
+    // free this synth and all other nodes in this group (before and after)
+    var parent = this.parent;
+    free.call(this);
+    if (parent.head) {
+      parent.head = null;
+    }
+    if (parent.tail) {
+      parent.tail = null;
+    }
+  };
+  doneAction[14] = function() {
+    // free the enclosing group and all nodes within it (including this synth)
+    free.call(this);
+  };
+  var free = function() {
+    if (this.parent) {
+      if (this.parent.head === this) {
+        this.parent.head = this.next;
+      }
+      if (this.parent.tail === this) {
+        this.parent.tail = this.prev;
+      }
+    }
+    if (this.prev) {
+      this.prev.next = this.next;
+    }
+    if (this.next) {
+      this.next.prev = this.prev;
+    }
+    this.prev = null;
+    this.next = null;
+    this.parent = null;
+    if (!this._free) {
+      this.emit("end");
+      this._free = true;
+    }
+  };
   
   var Node = (function() {
     function Node() {
@@ -1563,6 +1679,7 @@ define('cc/server/node', function(require, exports, module) {
       this.prev   = null;
       this.parent = null;
       this._running = true;
+      this._free    = false;
     }
     fn.extend(Node, Emitter);
     Node.prototype.play = fn.sync(function() {
@@ -1572,9 +1689,14 @@ define('cc/server/node', function(require, exports, module) {
       this._running = false;
     });
     Node.prototype.stop = fn.sync(function() {
-      graphFunc[0].call(this);
-      this.emit("end");
+      free.call(this);
     });
+    Node.prototype._doneAction = function(action) {
+      var func = doneAction[action];
+      if (func) {
+        func.call(this);
+      }
+    };
     return Node;
   })();
 
@@ -1964,34 +2086,34 @@ define('cc/server/node', function(require, exports, module) {
       if (!(node instanceof Node)) {
         throw new TypeError("Group.after: arguments[0] is not a Node.");
       }
-      return new Group(node, 4);
+      return new Group(node, -4);
     },
     before: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
         throw new TypeError("Group.before: arguments[0] is not a Node.");
       }
-      return new Group(node, 3);
+      return new Group(node, -3);
     },
     head: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
         throw new TypeError("Group.head: arguments[0] is not a Group.");
       }
-      return new Group(node, 1);
+      return new Group(node, -1);
     },
     tail: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
         throw new TypeError("Group.tail: arguments[0] is not a Group.");
       }
-      return new Group(node, 2);
+      return new Group(node, -2);
     },
     replace: function(node) {
       if (!(node instanceof Node)) {
         throw new TypeError("Group.replace: arguments[0] is not a Node.");
       }
-      return new Group(node, 5);
+      return new Group(node, -5);
     }
   };
   
@@ -2019,7 +2141,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 4);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, -4);
     },
     before: function() {
       var node, def, args;
@@ -2038,7 +2160,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 3);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, -3);
     },
     head: function() {
       var node, def, args;
@@ -2057,7 +2179,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 1);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, -1);
     },
     tail: function() {
       var node, def, args;
@@ -2076,7 +2198,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 2);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, -2);
     },
     replace: function(node, def, args) {
       if (!(node instanceof Node)) {
@@ -2085,7 +2207,7 @@ define('cc/server/node', function(require, exports, module) {
       if (!(def instanceof SynthDef)) {
         throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
       }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, 5);
+      return new Synth(JSON.stringify(def.specs), node, args||{}, -5);
     }
   };
   
@@ -2570,6 +2692,13 @@ define('cc/server/unit/unit', function(require, exports, module) {
         console.warn(this.name + "'s ctor is not found.");
       }
       return this;
+    };
+    Unit.prototype.doneAction = function(action) {
+      if (!this.done) {
+        this.done = true;
+        this.parent.emit("done");
+        this.parent._doneAction(action);
+      }
     };
     return Unit;
   })();
@@ -3774,6 +3903,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     require("./ugen").install(register);
     require("./basic_ops").install(register);
     require("./osc").install(register);
+    require("./line").install(register);
     require("./ui").install(register);
   };
 
@@ -3813,6 +3943,41 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   
   module.exports = {
     SinOsc: SinOsc,
+    install: install
+  };
+
+});
+define('cc/server/ugen/line', function(require, exports, module) {
+  
+  var fn = require("../fn");
+  var UGen = require("./ugen").UGen;
+
+  var Line = (function() {
+    function Line() {
+      UGen.call(this);
+      this.klassName = "Line";
+    }
+    fn.extend(Line, UGen);
+    
+    Line.prototype.$ar = fn(function(start, end, dur, mul, add, doneAction) {
+      return this.multiNew(2, start, end, dur, doneAction).madd(mul, add);
+    }).defaults("start=0,end=1,dur=1,mul=1,add=0,doneAction=0").build();
+    
+    Line.prototype.$kr = fn(function(start, end, dur, mul, add, doneAction) {
+      return this.multiNew(1, start, end, dur, doneAction).madd(mul, add);
+    }).defaults("start=0,end=1,dur=1,mul=1,add=0,doneAction=0").build();
+    
+    fn.classmethod(Line);
+    
+    return Line;
+  })();
+  
+  var install = function(register) {
+    register("Line", Line);
+  };
+  
+  module.exports = {
+    Line: Line,
     install: install
   };
 
@@ -3897,6 +4062,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
     require("./unit").install();
     require("./basic_ops").install();
     require("./osc").install();
+    require("./line").install();
     require("./ui").install();
   };
   
@@ -5289,6 +5455,71 @@ define('cc/server/unit/osc', function(require, exports, module) {
   module.exports = {
     install: function() {
       unit.register("SinOsc", SinOsc);
+    }
+  };
+
+});
+define('cc/server/unit/line', function(require, exports, module) {
+
+  var unit = require("./unit");
+  
+  var Line = function() {
+    var ctor = function() {
+      this.process = next;
+      var start = this.inputs[0][0];
+      var end = this.inputs[1][0];
+      var dur = this.inputs[2][0];
+      var counter = Math.round(dur * this.rate.sampleRate);
+      this._counter = Math.max(1, counter);
+      if (counter === 0) {
+        this._level = end;
+        this._slope = 0;
+      } else {
+        this._slope = (end - start) / this._counter;
+        this._level = start + this._slope;
+      }
+      this._endLevel = end;
+      this._doneAction = this.inputs[3][0];
+      this.outs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var level   = this._level;
+      var counter = this._counter;
+      var slope   = this._slope;
+      var i, remain = inNumSamples;
+      do {
+        var nsmps;
+        if (counter === 0) {
+          nsmps  = remain;
+          remain = 0;
+          var endLevel = this._endLevel;
+          for (i = 0; i < nsmps; ++i) {
+            outs[i] = endLevel;
+          }
+        } else {
+          nsmps = Math.min(remain, counter);
+          counter -= nsmps;
+          remain  -= nsmps;
+          for (i = 0; i < nsmps; ++i) {
+            outs[i] = level;
+            level += slope;
+          }
+          if (counter === 0) {
+            this.doneAction(this._doneAction);
+          }
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  };
+  
+  module.exports = {
+    install: function() {
+      unit.register("Line", Line);
     }
   };
 
