@@ -185,8 +185,10 @@ define(function(require, exports, module) {
   var TaskContext = (function() {
     function TaskContext(task) {
       this.klassName = "TaskContext";
-      this.wait = function(sync) {
-        task._queue.push(sync);
+      this.wait = function() {
+        for (var i = 0, imax = arguments.length; i < imax; ++i) {
+          task._queue.push(arguments[i]);
+        }
       };
       this.pause = function() {
         task.pause();
