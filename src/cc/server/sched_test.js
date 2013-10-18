@@ -24,7 +24,7 @@ define(function(require, exports, module) {
     return MockServer;
   })();
 
-  describe("sched.js", function() {
+  describe.only("sched.js", function() {
     var timeline, sync, procN, procT;
     before(function() {
       sched.install(register);
@@ -112,6 +112,7 @@ define(function(require, exports, module) {
         procN(1);
         assert.equal(1, passed);
         t.stop();
+        procN(1);
         assert.equal(3, passed);
         procT(100);
       });

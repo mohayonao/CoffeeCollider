@@ -4,12 +4,13 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var Emitter = require("../common/emitter").Emitter;
+  var push  = [].push;
+  var slice = [].slice;
 
   var Timeline = (function() {
     function Timeline() {
       this.klassName = "Timeline";
-      this._list  = [];
-      this._stack = [];
+      this.reset();
     }
     Timeline.prototype.play = function() {
       this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
@@ -17,7 +18,10 @@ define(function(require, exports, module) {
     Timeline.prototype.pause = function() {
     };
     Timeline.prototype.reset = function() {
-      this._list = [];
+      var globalTask = new GlobalTask(this);
+      this._list  = [ globalTask ];
+      this._stack = [ globalTask ];
+      this._globalTask = globalTask;
     };
     Timeline.prototype.append = function(sched) {
       var index = this._list.indexOf(sched);
@@ -33,15 +37,7 @@ define(function(require, exports, module) {
     };
     Timeline.prototype.push = function(that, func, args) {
       var sched = this._stack[this._stack.length - 1];
-      if (sched) {
-        sched._push(that, func, args);
-      } else {
-        if (typeof that === "function") {
-          that();
-        } else {
-          func.apply(that, args);
-        }
-      }
+      sched._push(that, func, args);
     };
     Timeline.prototype.process = function() {
       var _list = this._list;
@@ -54,10 +50,10 @@ define(function(require, exports, module) {
   })();
 
   var Task = (function() {
-    function Task() {
+    function Task(timeline) {
       Emitter.call(this);
       this.klassName = "Task";
-      this._timeline = cc.server.timeline;
+      this._timeline = timeline || cc.server.timeline;
       this._context = new TaskContext(this);
       this._queue = [];
       this._bang  = false;
@@ -86,7 +82,10 @@ define(function(require, exports, module) {
       this._bang = false;
     });
     Task.prototype.stop = fn.sync(function() {
-      this.pause();
+      if (this._timeline) {
+        this._timeline.remove(this);
+      }
+      this._bang = false;
       this._timeline = null;
       this.emit("end");
       if (this._next) {
@@ -127,11 +126,19 @@ define(function(require, exports, module) {
     };
     
     Task.prototype._push = function(that, func, args) {
-      if (typeof that === "function") {
+      switch (typeof that) {
+      case "function":
         this._queue.push([that, null, args]);
-      } else {
+        break;
+      case "number":
+        this._queue.push(that);
+        break;
+      default:
         this._queue.push([func, that, args]);
+        break;
       }
+    };
+    Task.prototype._done = function() {
     };
     Task.prototype._process = function(counterIncr) {
       var _timeline = this._timeline;
@@ -181,14 +188,12 @@ define(function(require, exports, module) {
     };
     return Task;
   })();
-  
+
   var TaskContext = (function() {
     function TaskContext(task) {
       this.klassName = "TaskContext";
       this.wait = function() {
-        for (var i = 0, imax = arguments.length; i < imax; ++i) {
-          task._queue.push(arguments[i]);
-        }
+        push.apply(task._queue, slice.call(arguments));
       };
       this.pause = function() {
         task.pause();
@@ -203,6 +208,18 @@ define(function(require, exports, module) {
       };
     }
     return TaskContext;
+  })();
+
+  var GlobalTask = (function() {
+    function GlobalTask(timeline) {
+      Task.call(this, timeline);
+      this.klassName = "GlobalTask";
+    }
+    fn.extend(GlobalTask, Task);
+    GlobalTask.prototype.play  = function() {};
+    GlobalTask.prototype.pause = function() {};
+    GlobalTask.prototype.stop  = function() {};
+    return GlobalTask;
   })();
 
   var TaskDo = (function() {
@@ -379,14 +396,25 @@ define(function(require, exports, module) {
   
   var install = function(register) {
     register("Task", TaskInterface);
+    register("wait", function() {
+      var globalTask = cc.server.timeline._globalTask;
+      push.apply(globalTask._queue, slice.call(arguments));
+    });
+    register("sync", function(func) {
+      if (typeof func === "function") {
+        var globalTask = cc.server.timeline._globalTask;
+        globalTask._push(func);
+      }
+    });
   };
   
   module.exports = {
     Timeline: Timeline,
-    Task    : Task,
-    TaskDo  : TaskDo,
-    TaskLoop: TaskLoop,
-    TaskEach: TaskEach,
+    GlobalTask: GlobalTask,
+    Task      : Task,
+    TaskDo    : TaskDo,
+    TaskLoop  : TaskLoop,
+    TaskEach  : TaskEach,
     TaskTimeout : TaskTimeout,
     TaskInterval: TaskInterval,
     TaskBlock: TaskBlock,
