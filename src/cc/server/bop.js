@@ -85,7 +85,7 @@ define(function(require, exports, module) {
           return this.__mul__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String *: an invalid operand.");
     };
     Function.prototype.__mul__ = function(b) {
       if (typeof b === "function") {
@@ -110,7 +110,7 @@ define(function(require, exports, module) {
           return this.__div__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String /: an invalid operand.");
     };
 
     setup("__mod__", function(a, b) {
@@ -126,7 +126,7 @@ define(function(require, exports, module) {
           return this.__mod__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String %: an invalid operand.");
     };
   };
   

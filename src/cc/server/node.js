@@ -512,34 +512,34 @@ define(function(require, exports, module) {
     after: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.after: arguments[0] is not a Node.");
       }
       return new Group(node, C.ADD_AFTER);
     },
     before: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.before: arguments[0] is not a Node.");
       }
       return new Group(node, C.ADD_BEFORE);
     },
     head: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
-        throw new TypeError();
+        throw new TypeError("Group.head: arguments[0] is not a Group.");
       }
       return new Group(node, C.ADD_TO_HEAD);
     },
     tail: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
-        throw new TypeError();
+        throw new TypeError("Group.tail: arguments[0] is not a Group.");
       }
       return new Group(node, C.ADD_TO_TAIL);
     },
     replace: function(node) {
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.replace: arguments[0] is not a Node.");
       }
       return new Group(node, C.REPLACE);
     }
@@ -548,7 +548,7 @@ define(function(require, exports, module) {
   var SynthInterface = {
     def: function(func, args) {
       if (typeof func !== "function") {
-        throw new TypeError();
+        throw new TypeError("Synth.def: arguments[0] is not a Function.");
       }
       return new SynthDef(func, args);
     },
@@ -563,8 +563,11 @@ define(function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.after: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_AFTER);
     },
@@ -579,8 +582,11 @@ define(function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.before: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_BEFORE);
     },
@@ -595,8 +601,11 @@ define(function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Group && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Group)) {
+        throw new TypeError("Synth.head: arguments[0] is not a Group.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_HEAD);
     },
@@ -611,14 +620,20 @@ define(function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Group && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Group)) {
+        throw new TypeError("Synth.tail: arguments[0] is not a Group.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_TAIL);
     },
     replace: function(node, def, args) {
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.replace: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, C.REPLACE);
     }

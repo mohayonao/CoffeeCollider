@@ -297,47 +297,48 @@ define(function(require, exports, module) {
     return TaskInterval;
   })();
   
-  var TaskInterface = (function() {
-    function TaskInterface() {
-      this.klassName = "Task";
+  var TaskInterface = {
+    "do": function(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.do: arguments[0] is not a Function.");
+      }
+      return new TaskDo(func);
+    },
+    loop: function(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.loop: arguments[0] is not a Function.");
+      }
+      return new TaskLoop(func);
+    },
+    each: function(list, func) {
+      if (!(Array.isArray(list))) {
+        throw new TypeError("Task.each: arguments[0] is not an Array.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.each: arguments[1] is not a Function.");
+      }
+      return new TaskEach(list, func);
+    },
+    timeout: function(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.timeout: arguments[0] is not a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.timeout: arguments[1] is not a Function.");
+      }
+      return new TaskTimeout(delay, func);
+    },
+    interval: function(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.interval: arguments[0] is not a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.interval: arguments[1] is not a Function.");
+      }
+      return new TaskInterval(delay, func);
     }
-
-    TaskInterface.prototype.$do = function(func) {
-      if (typeof func === "function") {
-        return new TaskDo(func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$loop = function(func) {
-      if (typeof func === "function") {
-        return new TaskLoop(func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$each = function(list, func) {
-      if (Array.isArray(list) && typeof func === "function") {
-        return new TaskEach(list, func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$timeout = function(delay, func) {
-      if (typeof delay === "number" && typeof func === "function") {
-        return new TaskTimeout(delay, func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$interval = function(delay, func) {
-      if (typeof delay === "number" && typeof func === "function") {
-        return new TaskInterval(delay, func);
-      }
-      throw new TypeError();
-    };
-    
-    fn.classmethod(TaskInterface);
-    
-    return TaskInterface;
-  })();
-
+  };
+  
   var install = function(register) {
     register("Task", TaskInterface);
   };

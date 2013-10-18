@@ -1961,34 +1961,34 @@ define('cc/server/node', function(require, exports, module) {
     after: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.after: arguments[0] is not a Node.");
       }
       return new Group(node, 3);
     },
     before: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.before: arguments[0] is not a Node.");
       }
       return new Group(node, 2);
     },
     head: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
-        throw new TypeError();
+        throw new TypeError("Group.head: arguments[0] is not a Group.");
       }
       return new Group(node, 0);
     },
     tail: function(node) {
       node = node || cc.server.rootNode;
       if (!(node instanceof Group)) {
-        throw new TypeError();
+        throw new TypeError("Group.tail: arguments[0] is not a Group.");
       }
       return new Group(node, 1);
     },
     replace: function(node) {
       if (!(node instanceof Node)) {
-        throw new TypeError();
+        throw new TypeError("Group.replace: arguments[0] is not a Node.");
       }
       return new Group(node, 4);
     }
@@ -1997,7 +1997,7 @@ define('cc/server/node', function(require, exports, module) {
   var SynthInterface = {
     def: function(func, args) {
       if (typeof func !== "function") {
-        throw new TypeError();
+        throw new TypeError("Synth.def: arguments[0] is not a Function.");
       }
       return new SynthDef(func, args);
     },
@@ -2012,8 +2012,11 @@ define('cc/server/node', function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.after: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, 3);
     },
@@ -2028,8 +2031,11 @@ define('cc/server/node', function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.before: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, 2);
     },
@@ -2044,8 +2050,11 @@ define('cc/server/node', function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Group && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Group)) {
+        throw new TypeError("Synth.head: arguments[0] is not a Group.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, 0);
     },
@@ -2060,14 +2069,20 @@ define('cc/server/node', function(require, exports, module) {
         def  = arguments[1];
         args = arguments[2] || {};
       }
-      if (!(node instanceof Group && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Group)) {
+        throw new TypeError("Synth.tail: arguments[0] is not a Group.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, 1);
     },
     replace: function(node, def, args) {
-      if (!(node instanceof Node && def instanceof SynthDef)) {
-        throw new TypeError();
+      if (!(node instanceof Node)) {
+        throw new TypeError("Synth.replace: arguments[0] is not a Node.");
+      }
+      if (!(def instanceof SynthDef)) {
+        throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
       }
       return new Synth(JSON.stringify(def.specs), node, args||{}, 4);
     }
@@ -2952,47 +2967,48 @@ define('cc/server/sched', function(require, exports, module) {
     return TaskInterval;
   })();
   
-  var TaskInterface = (function() {
-    function TaskInterface() {
-      this.klassName = "Task";
+  var TaskInterface = {
+    "do": function(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.do: arguments[0] is not a Function.");
+      }
+      return new TaskDo(func);
+    },
+    loop: function(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.loop: arguments[0] is not a Function.");
+      }
+      return new TaskLoop(func);
+    },
+    each: function(list, func) {
+      if (!(Array.isArray(list))) {
+        throw new TypeError("Task.each: arguments[0] is not an Array.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.each: arguments[1] is not a Function.");
+      }
+      return new TaskEach(list, func);
+    },
+    timeout: function(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.timeout: arguments[0] is not a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.timeout: arguments[1] is not a Function.");
+      }
+      return new TaskTimeout(delay, func);
+    },
+    interval: function(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.interval: arguments[0] is not a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.interval: arguments[1] is not a Function.");
+      }
+      return new TaskInterval(delay, func);
     }
-
-    TaskInterface.prototype.$do = function(func) {
-      if (typeof func === "function") {
-        return new TaskDo(func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$loop = function(func) {
-      if (typeof func === "function") {
-        return new TaskLoop(func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$each = function(list, func) {
-      if (Array.isArray(list) && typeof func === "function") {
-        return new TaskEach(list, func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$timeout = function(delay, func) {
-      if (typeof delay === "number" && typeof func === "function") {
-        return new TaskTimeout(delay, func);
-      }
-      throw new TypeError();
-    };
-    TaskInterface.prototype.$interval = function(delay, func) {
-      if (typeof delay === "number" && typeof func === "function") {
-        return new TaskInterval(delay, func);
-      }
-      throw new TypeError();
-    };
-    
-    fn.classmethod(TaskInterface);
-    
-    return TaskInterface;
-  })();
-
+  };
+  
   var install = function(register) {
     register("Task", TaskInterface);
   };
@@ -3165,7 +3181,7 @@ define('cc/server/bop', function(require, exports, module) {
           return this.__mul__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String *: an invalid operand.");
     };
     Function.prototype.__mul__ = function(b) {
       if (typeof b === "function") {
@@ -3190,7 +3206,7 @@ define('cc/server/bop', function(require, exports, module) {
           return this.__div__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String /: an invalid operand.");
     };
 
     setup("__mod__", function(a, b) {
@@ -3206,7 +3222,7 @@ define('cc/server/bop', function(require, exports, module) {
           return this.__mod__(b);
         }, this);
       }
-      return this; // throw TypeError?
+      return new TypeError("String %: an invalid operand.");
     };
   };
   
