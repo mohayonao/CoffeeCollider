@@ -234,6 +234,26 @@ define(function(require, exports, module) {
       procT(100);
       assert.equal(4, passed);
     });
+    it("chain", function() {
+      var passed = 0;
+      var t = Task.do(function() {
+        passed = 1;
+        this.wait(100);
+      }).do(function() {
+        passed = 2;
+        this.wait(100);
+      }).on("end", function() {
+        passed = 3;
+      }).play();
+      
+      assert.equal(0, passed);
+      procN(1);
+      assert.equal(1, passed);
+      procT(100);
+      assert.equal(2, passed);
+      procT(100);
+      assert.equal(3, passed);
+    });
   });
 
 });

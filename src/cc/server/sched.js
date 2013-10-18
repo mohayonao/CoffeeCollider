@@ -62,15 +62,21 @@ define(function(require, exports, module) {
       this._queue = [];
       this._bang  = false;
       this._index = 0;
+      this._prev  = null;
+      this._next  = null;
     }
     fn.extend(Task, Emitter);
     
     Task.prototype.play = fn.sync(function() {
-      if (this._timeline) {
-        this._timeline.append(this);
+      var that = this;
+      while (that._prev !== null) {
+        that = that._prev;
       }
-      if (this._queue.length === 0) {
-        this._bang = true;
+      if (that._timeline) {
+        that._timeline.append(that);
+      }
+      if (that._queue.length === 0) {
+        that._bang = true;
       }
     });
     Task.prototype.pause = fn.sync(function() {
@@ -83,7 +89,43 @@ define(function(require, exports, module) {
       this.pause();
       this._timeline = null;
       this.emit("end");
+      if (this._next) {
+        this._next._prev = null;
+        this._next.play();
+        this._next = null;
+      }
     });
+    Task.prototype["do"] = function(func) {
+      var next = TaskInterface["do"](func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.loop = function(func) {
+      var next = TaskInterface.loop(func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.each = function(list, func) {
+      var next = TaskInterface.each(list, func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.timeout = function(delay, func) {
+      var next = TaskInterface.timeout(delay, func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    Task.prototype.interval = function(delay, func) {
+      var next = TaskInterface.interval(delay, func);
+      next._prev = this;
+      this._next = next;
+      return next;
+    };
+    
     Task.prototype._push = function(that, func, args) {
       if (typeof that === "function") {
         this._queue.push([that, null, args]);

@@ -2589,6 +2589,8 @@ define('cc/server/sched', function(require, exports, module) {
       this._queue = [];
       this._bang  = false;
       this._index = 0;
+      this._prev  = null;
+      this._next  = null;
     }
     fn.extend(Task, Emitter);
     
@@ -2611,6 +2613,13 @@ define('cc/server/sched', function(require, exports, module) {
       this._timeline = null;
       this.emit("end");
     });
+    Task.prototype["do"] = function(func) {
+      var next = TaskInterface["do"](func);
+      next.prev = this;
+      this.next = next;
+      return next;
+    };
+    
     Task.prototype._push = function(that, func, args) {
       if (typeof that === "function") {
         this._queue.push([that, null, args]);
