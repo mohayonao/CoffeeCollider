@@ -7,8 +7,8 @@ define(function(require, exports, module) {
   var Timeline = (function() {
     function Timeline() {
       this.klassName = "Timeline";
-      this.list  = [];
-      this.stack = [];
+      this._list  = [];
+      this._stack = [];
     }
     Timeline.prototype.play = function() {
       this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
@@ -16,24 +16,24 @@ define(function(require, exports, module) {
     Timeline.prototype.pause = function() {
     };
     Timeline.prototype.reset = function() {
-      this.list = [];
+      this._list = [];
     };
     Timeline.prototype.append = function(sched) {
-      var index = this.list.indexOf(sched);
+      var index = this._list.indexOf(sched);
       if (index === -1) {
-        this.list.push(sched);
+        this._list.push(sched);
       }
     };
     Timeline.prototype.remove = function(sched) {
-      var index = this.list.indexOf(sched);
+      var index = this._list.indexOf(sched);
       if (index !== -1) {
-        this.list.splice(index, 1);
+        this._list.splice(index, 1);
       }
     };
     Timeline.prototype.push = function(that, func, args) {
-      var sched = this.stack[this.stack.length - 1];
+      var sched = this._stack[this._stack.length - 1];
       if (sched) {
-        sched.push(that, func, args);
+        sched._push(that, func, args);
       } else {
         if (typeof that === "function") {
           that();
@@ -43,10 +43,10 @@ define(function(require, exports, module) {
       }
     };
     Timeline.prototype.process = function() {
-      var list = this.list;
+      var _list = this._list;
       var counterIncr = this.counterIncr;
-      for (var i = 0; i < list.length; ++i) {
-        list[i].process(counterIncr);
+      for (var i = 0; i < _list.length; ++i) {
+        _list[i]._process(counterIncr);
       }
     };
     return Timeline;
@@ -55,58 +55,58 @@ define(function(require, exports, module) {
   var Task = (function() {
     function Task() {
       this.klassName = "Task";
-      this.timeline = cc.server.timeline;
-      this.payload = new TaskPayload(this);
-      this.events = [];
-      this.bang   = false;
-      this.index  = 0;
+      this._timeline = cc.server.timeline;
+      this._context = new TaskContext(this);
+      this._queue = [];
+      this._bang  = false;
+      this._index = 0;
     }
     
     Task.prototype.play = fn.sync(function() {
-      if (this.timeline) {
-        this.timeline.append(this);
+      if (this._timeline) {
+        this._timeline.append(this);
       }
-      if (this.events.length === 0) {
-        this.bang = true;
+      if (this._queue.length === 0) {
+        this._bang = true;
       }
     });
     Task.prototype.pause = fn.sync(function() {
-      if (this.timeline) {
-        this.timeline.remove(this);
+      if (this._timeline) {
+        this._timeline.remove(this);
       }
-      this.bang = false;
+      this._bang = false;
     });
     Task.prototype.stop = fn.sync(function() {
       this.pause();
-      this.timeline = null;
+      this._timeline = null;
     });
-    Task.prototype.push = function(that, func, args) {
+    Task.prototype._push = function(that, func, args) {
       if (typeof that === "function") {
-        this.events.push([that, null, args]);
+        this._queue.push([that, null, args]);
       } else {
-        this.events.push([func, that, args]);
+        this._queue.push([func, that, args]);
       }
     };
-    Task.prototype.process = function(counterIncr) {
-      var timeline = this.timeline;
-      var events   = this.events;
+    Task.prototype._process = function(counterIncr) {
+      var _timeline = this._timeline;
+      var _queue   = this._queue;
       var continuance = false;
       do {
-        if (this.bang) {
-          timeline.stack.push(this);
+        if (this._bang) {
+          _timeline._stack.push(this);
           this._execute();
-          this.index += 1;
-          timeline.stack.pop();
-          this.bang = false;
+          this._index += 1;
+          _timeline._stack.pop();
+          this._bang = false;
         }
         var i = 0;
         LOOP:
-        while (i < events.length) {
-          var e = events[i];
+        while (i < _queue.length) {
+          var e = _queue[i];
           switch (typeof e) {
           case "number":
-            events[i] -= counterIncr;
-            if (events[i] > 0) {
+            _queue[i] -= counterIncr;
+            if (_queue[i] > 0) {
               break LOOP;
             }
             break;
@@ -117,7 +117,7 @@ define(function(require, exports, module) {
             if (Array.isArray(e)) {
               e[0].apply(e[1], e[2]);
             } else if (e instanceof Task) {
-              if (e.timeline !== null) {
+              if (e._timeline !== null) {
                 break LOOP;
               }
             }
@@ -126,8 +126,8 @@ define(function(require, exports, module) {
         }
         continuance = false;
         if (i) {
-          events.splice(0, i);
-          if (events.length === 0) {
+          _queue.splice(0, i);
+          if (_queue.length === 0) {
             continuance = this._done();
           }
         }
@@ -136,25 +136,25 @@ define(function(require, exports, module) {
     return Task;
   })();
   
-  var TaskPayload = (function() {
-    function TaskPayload(task) {
-      this.task = task;
+  var TaskContext = (function() {
+    function TaskContext(task) {
+      this.klassName = "TaskContext";
+      this.wait = function(sync) {
+        task._queue.push(sync);
+      };
+      this.pause = function() {
+        task.pause();
+      };
+      this.stop = function() {
+        task.stop();
+      };
+      this.sync = function(func) {
+        if (typeof func === "function") {
+          cc.server.timeline.push(func);
+        }
+      };
     }
-    TaskPayload.prototype.wait = function(sync) {
-      this.task.events.push(sync); // End of Task
-    };
-    TaskPayload.prototype.pause = function() {
-      this.task.pause();
-    };
-    TaskPayload.prototype.stop = function() {
-      this.task.stop();
-    };
-    TaskPayload.prototype.sync = function(func) {
-      if (typeof func === "function") {
-        cc.server.timeline.push(func);
-      }
-    };
-    return TaskPayload;
+    return TaskContext;
   })();
 
   var TaskDo = (function() {
@@ -165,7 +165,7 @@ define(function(require, exports, module) {
     fn.extend(TaskLoop, Task);
 
     TaskLoop.prototype._execute = function() {
-      this.func.call(this.payload, this.index);
+      this.func.call(this._context, this._index);
     };
     TaskLoop.prototype._done = function() {
       this.stop();
@@ -181,7 +181,7 @@ define(function(require, exports, module) {
     fn.extend(TaskLoop, TaskDo);
 
     TaskLoop.prototype._done = function() {
-      this.bang = true;
+      this._bang = true;
     };
     
     return TaskLoop;
@@ -196,13 +196,13 @@ define(function(require, exports, module) {
     fn.extend(TaskEach, Task);
 
     TaskEach.prototype._execute = function() {
-      if (this.index < this.list.length) {
-        this.func.call(this.payload, this.list[this.index], this.index);
+      if (this._index < this.list.length) {
+        this.func.call(this._context, this.list[this._index], this._index);
       }
     };
     TaskEach.prototype._done = function() {
-      if (this.index < this.list.length) {
-        this.bang = true;
+      if (this._index < this.list.length) {
+        this._bang = true;
       } else {
         this.stop();
       }
@@ -219,17 +219,16 @@ define(function(require, exports, module) {
         delay = 0;
       }
       this.func = func;
-      this.events.push(delay);
+      this._queue.push(delay);
     }
     fn.extend(TaskTimeout, Task);
     
     TaskTimeout.prototype._execute = function() {
-      this.func.call(this.payload, this.index);
+      this.func.call(this._context, this._index);
     };
     TaskTimeout.prototype._done = function() {
-      if (this.index === 0) {
-        this.bang = true;
-        this.once = false;
+      if (this._index === 0) {
+        this._bang = true;
         return true;
       }
       this.stop();
@@ -245,7 +244,7 @@ define(function(require, exports, module) {
     fn.extend(TaskInterval, TaskTimeout);
 
     TaskInterval.prototype._done = function() {
-      this.bang = true;
+      this._bang = true;
       return true;
     };
     

@@ -64,9 +64,9 @@ define(function(require, exports, module) {
         assert.equal(1, passed);
         procT(100);
         assert.equal(2, passed);
-        assert.isNotNull(t.timeline);
+        assert.isNotNull(t._timeline);
         procT(100);
-        assert.isNull(t.timeline);
+        assert.isNull(t._timeline);
       });
       it("pause", function() {
         var passed = 0;
@@ -142,9 +142,9 @@ define(function(require, exports, module) {
         assert.equal(3, passed);
         procT(100);
         assert.equal(6, passed);
-        assert.isNotNull(t.timeline);
+        assert.isNotNull(t._timeline);
         procT(100);
-        assert.isNull(t.timeline);
+        assert.isNull(t._timeline);
       });
     });
     describe("TaskTimeout", function() {
@@ -163,9 +163,9 @@ define(function(require, exports, module) {
         assert.equal(0, passed);
         procT(10);
         assert.equal(1, passed);
-        assert.isNotNull(t.timeline);
+        assert.isNotNull(t._timeline);
         procT(100);
-        assert.isNull(t.timeline);
+        assert.isNull(t._timeline);
       });
     });
     describe("TaskInterval", function() {
