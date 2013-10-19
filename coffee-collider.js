@@ -1227,37 +1227,17 @@ define('cc/client/utils', function(require, exports, module) {
 define('cc/server/installer', function(require, exports, module) {
   
   var install = function() {
-    require("./server").install(register);
-    require("./bop").install(register);
-    require("./uop").install(register);
-    require("./node").install(register);
-    require("./sched").install(register);
-    require("./ugen/installer").install(register);
-    require("./unit/installer").install(register);
-  };
-
-  var register = function(name, func) {
-    if (typeof func === "function" && /^[A-Z]/.test(name)) {
-      var Klass = func;
-      var base = global[name] = function() {
-        return new Klass();
-      };
-      if (Klass.classmethods) {
-        Object.keys(Klass.classmethods).forEach(function(key) {
-          key = key.substr(1);
-          if (Klass[key]) {
-            base[key] = Klass[key];
-          }
-        });
-      }
-    } else {
-      global[name] = func;
-    }
+    require("./server").install();
+    require("./bop").install();
+    require("./uop").install();
+    require("./node").install();
+    require("./sched").install();
+    require("./ugen/installer").install();
+    require("./unit/installer").install();
   };
   
   module.exports = {
-    install : install,
-    register: register
+    install : install
     };
 
 });
@@ -1923,7 +1903,7 @@ define('cc/server/node', function(require, exports, module) {
         flatten = flatten.concat(args.vals[i]);
       }
       var reshaped = [];
-      var controls = ugen.Control.kr(flatten);
+      var controls = new ugen.Control(1).init(flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
@@ -2256,9 +2236,9 @@ define('cc/server/node', function(require, exports, module) {
     }
   };
   
-  var install = function(register) {
-    register("Group", GroupInterface);
-    register("Synth", SynthInterface);
+  var install = function() {
+    global.Group = GroupInterface;
+    global.Synth = SynthInterface;
   };
   
   module.exports = {
@@ -2366,22 +2346,10 @@ define('cc/server/fn', function(require, exports, module) {
     };
   })();
   
-  var copy = function(obj) {
-    var ret = {};
-    Object.keys(obj).forEach(function(key) {
-      ret[key] = obj[key];
-    });
-    return ret;
-  };
-  
   fn.extend = function(child, parent) {
     for (var key in parent) {
       if (parent.hasOwnProperty(key)) {
-        if (key === "classmethods") {
-          child[key] = copy(parent[key]);
-        } else {
-          child[key] = parent[key];
-        }
+        child[key] = parent[key];
       }
     }
     /*jshint validthis:true */
@@ -2396,35 +2364,7 @@ define('cc/server/fn', function(require, exports, module) {
     child.__super__ = parent.prototype;
     return child;
   };
-
-  fn.classmethod = (function() {
-    var _classmethod = function(Klass, func) {
-      return function() {
-        if (this instanceof Klass) {
-          return func.apply(this, arguments);
-        } else {
-          return func.apply(new Klass(), arguments);
-        }
-      };
-    };
-    return function(child) {
-      var classmethods = child.classmethods || {};
-      Object.keys(child.prototype).forEach(function(key) {
-        if (key.charAt(0) === "$" && typeof child.prototype[key] === "function") {
-          classmethods[key] = child.prototype[key];
-          delete child.prototype[key];
-        }
-      });
-      Object.keys(classmethods).forEach(function(key) {
-        var func = classmethods[key];
-        key = key.substr(1);
-        child[key] = _classmethod(child, func);
-        child.prototype[key] = func;
-      });
-      child.classmethods = classmethods;
-    };
-  })();
-
+  
   fn.sync = function(func) {
     return function() {
       cc.server.timeline.push(this, func, slice.call(arguments));
@@ -2542,14 +2482,13 @@ define('cc/server/utils', function(require, exports, module) {
 define('cc/server/ugen/ugen', function(require, exports, module) {
 
   var fn = require("../fn");
-  var utils = require("../utils");
   var slice = [].slice;
 
   var addToSynthDef = null;
-
+  
   var UGen = (function() {
-    function UGen() {
-      this.klassName = "UGen";
+    function UGen(name) {
+      this.klassName = name;
       this.rate = 2;
       this.signalRange = 2;
       this.specialIndex = 0;
@@ -2558,51 +2497,28 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
-
-    UGen.prototype.$new1 = function(rate) {
-      var args = slice.call(arguments, 1);
+    UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
         addToSynthDef(this);
       }
+      this.inputs = slice.call(arguments, 1);
       this.numOfInputs = this.inputs.length;
-      return this.initialize.apply(this, args);
-    };
-    UGen.prototype.$multiNew = function() {
-      return this.multiNewList(slice.call(arguments));
-    };
-    UGen.prototype.$multiNewList = function(list) {
-      var zipped = utils.flop(list);
-      if (zipped.length === 1) {
-        return this.new1.apply(this, list);
-      }
-      return zipped.map(function(list) {
-        return this.constructor.multiNewList(list);
-      }, this);
-    };
-    fn.classmethod(UGen);
-
-    UGen.prototype.initialize = function() {
-      this.inputs = slice.call(arguments);
       return this;
     };
-    
     return UGen;
   })();
-
+  
   var MultiOutUGen = (function() {
-    function MultiOutUGen() {
-      UGen.call(this);
-      this.klassName = "MultiOutUGen";
+    function MultiOutUGen(name) {
+      UGen.call(this, name || "MultiOutUGen");
       this.channels = null;
     }
     fn.extend(MultiOutUGen, UGen);
-    fn.classmethod(MultiOutUGen);
-    
     MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
       var channels = new Array(numChannels);
       for (var i = 0; i < numChannels; ++i) {
-        channels[i] = OutputProxy.new(rate, this, i);
+        channels[i] = new OutputProxy(rate, this, i);
       }
       this.channels = channels;
       this.numOfOutputs = channels.length;
@@ -2612,83 +2528,86 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;
     };
-    
     return MultiOutUGen;
   })();
-
+  
   var OutputProxy = (function() {
-    function OutputProxy() {
-      UGen.call(this);
-      this.klassName = "OutputProxy";
+    function OutputProxy(rate, source, index) {
+      UGen.call(this, "OutputProxy");
+      this.init(rate);
+      this.inputs = [ source ];
+      this.numOfOutputs = 1;
+      this.outputIndex  = index;
     }
     fn.extend(OutputProxy, UGen);
-
-    OutputProxy.prototype.$new = function(rate, source, index) {
-      return this.new1(rate, source, index);
-    };
-    fn.classmethod(OutputProxy);
-
-    OutputProxy.prototype.initialize = function(source, index) {
-      this.inputs = [ source ];
-      this.numOfInputs = 1;
-      this.outputIndex = index;
-      return this;
-    };
-    
     return OutputProxy;
   })();
-
+  
   var Control = (function() {
-    function Control() {
-      MultiOutUGen.call(this);
-      this.klassName = "Control";
-      this.values = [];
+    function Control(rate) {
+      MultiOutUGen.call(this, "Control");
+      this.rate   = rate;
+      this.values = null;
     }
     fn.extend(Control, MultiOutUGen);
-
-    Control.prototype.$kr = function(values) {
-      return this.multiNewList([1].concat(values));
-    };
-    fn.classmethod(Control);
-
-    Control.prototype.initialize = function() {
-      this.values = slice.call(arguments);
+    Control.prototype.init = function(list) {
+      UGen.prototype.init.apply(this, [this.rate].concat(list));
+      this.values = list.slice();
       return this.initOutputs(this.values.length, this.rate);
     };
-
     return Control;
   })();
 
   var Out = (function() {
     function Out() {
-      UGen.call(this);
-      this.klassName = "Out";
-      this.numOutputs = 0;
+      UGen.call(this, "Out");
     }
     fn.extend(Out, UGen);
-
-    Out.prototype.$ar = fn(function(bus, channelsArray) {
-      this.multiNewList([2, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    Out.prototype.$kr = fn(function(bus, channelsArray) {
-      this.multiNewList([1, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    
-    fn.classmethod(Out);
-    
     return Out;
   })();
-
+  
+  var OutIntarface = {
+    ar: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.init.apply(this, [2, bus].concat(channelsArray));
+        return 0; // Out has no output
+      },
+      Klass: Out
+    },
+    kr: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.init.apply(this, [1, bus].concat(channelsArray));
+        return 0; // Out has no output
+      },
+      Klass: Out
+    }
+  };
+  
   var setSynthDef = function(func) {
     addToSynthDef = func;
   };
-
-  var install = function(register) {
-    register("Out", Out);
+  
+  var install = function() {
+    register("Out", OutIntarface);
   };
-
+  
+  var register = function(name, payload) {
+    var klass = global[name] = function() {
+      return new UGen(name);
+    };
+    Object.keys(payload).forEach(function(key) {
+      var defaults = payload[key].defaults;
+      var ctor     = payload[key].ctor;
+      var Klass    = payload[key].Klass || UGen;
+      klass[key] = fn(function() {
+        return ctor.apply(new Klass(name), arguments);
+      }).defaults(defaults).multiCall().build();
+    });
+    payload = 0;
+  };
+  
   module.exports = {
     UGen: UGen,
     MultiOutUGen: MultiOutUGen,
@@ -2696,6 +2615,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     Control     : Control,
     Out         : Out,
     setSynthDef : setSynthDef,
+    register: register,
     install: install,
   };
 
@@ -3303,18 +3223,18 @@ define('cc/server/sched', function(require, exports, module) {
     },
   };
   
-  var install = function(register) {
-    register("Task", TaskInterface);
-    register("wait", function() {
+  var install = function() {
+    global.Task = TaskInterface;
+    global.wait = function() {
       var globalTask = cc.server.timeline._globalTask;
       push.apply(globalTask._queue, slice.call(arguments));
-    });
-    register("sync", function(func) {
+    };
+    global.sync = function(func) {
       if (typeof func === "function") {
         var globalTask = cc.server.timeline._globalTask;
         globalTask._push(func);
       }
-    });
+    };
   };
   
   module.exports = {
@@ -3345,7 +3265,7 @@ define('cc/server/bop', function(require, exports, module) {
           return this[selector](b);
         }, this);
       } else if (b instanceof UGen) {
-        return BinaryOpUGen.new(ugenSelector, this, b);
+        return new BinaryOpUGen().init(ugenSelector, this, b);
       }
       return func(this, b);
     };
@@ -3368,7 +3288,7 @@ define('cc/server/bop', function(require, exports, module) {
           });
         }
       } else if (b instanceof UGen) {
-        return BinaryOpUGen.new(ugenSelector, this, b);
+        return new BinaryOpUGen().init(ugenSelector, this, b);
       }
       return a.map(function(a) {
         return a[selector](b);
@@ -3377,7 +3297,7 @@ define('cc/server/bop', function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function(b) {
-      return BinaryOpUGen.new(selector, this, b);
+      return new BinaryOpUGen().init(selector, this, b);
     };
   };
 
@@ -3484,29 +3404,24 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   };
 
   var UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
-  
+
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
-      UGen.call(this);
-      this.klassName = "UnaryOpUGen";
+      UGen.call(this, "UnaryOpUGen");
     }
     fn.extend(UnaryOpUGen, UGen);
 
-    UnaryOpUGen.prototype.$new = function(selector, a) {
-      return this.multiNew(2, selector, a);
-    };
-
-    fn.classmethod(UnaryOpUGen);
-
-    UnaryOpUGen.prototype.initialize = function(op, a) {
-      this.op = op;
-      var index = UNARY_OP_UGEN_MAP.indexOf(op);
+    UnaryOpUGen.prototype.init = function(selector, a) {
+      var index = UNARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
-        throw "Unknown operator: " + op;
+        throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
       }
+      var rate = a.rate|0;
+      UGen.prototype.init.call(rate);
+      this.op = selector;
       this.specialIndex = index;
-      this.rate   = a.rate|0;
       this.inputs = [a];
+      this.numOfInputs = 1;
       return this;
     };
 
@@ -3517,15 +3432,11 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
-      UGen.call(this);
-      this.klassName = "BinaryOpUGen";
+      UGen.call(this, "BinaryOpUGen");
     }
     fn.extend(BinaryOpUGen, UGen);
 
-    BinaryOpUGen.prototype.$new = function(selector, a, b) {
-      return this.multiNew(null, selector, a, b);
-    };
-    BinaryOpUGen.prototype.$new1 = function(rate, selector, a, b) {
+    BinaryOpUGen.prototype.init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -3551,20 +3462,20 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
           return a;
         } else if (a instanceof BinaryOpUGen) {
           if (a.op === "*") {
-            return MulAdd.new1(null, a.inputs[0], a.inputs[1], b);
+            return new MulAdd().init(a.inputs[0], a.inputs[1], b);
           }
         } else if (a instanceof MulAdd) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
-              return BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
+              return new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
             } else {
               a.inputs[2] += b;
               return a;
             }
           }
-          b = BinaryOpUGen.new1(null, "+", a.inputs[2], b);
-          a = BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
-          return BinaryOpUGen.new1(null, "+", a, b);
+          b = new BinaryOpUGen().init("+", a.inputs[2], b);
+          a = new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
+          return new BinaryOpUGen().init("+", a, b);
         }
         return optimizeSumObjects(a, b);
       }
@@ -3573,36 +3484,30 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       } else if (selector === "*!") {
         selector = "*";
       }
-      return UGen.new1.apply(this, [2].concat(selector, a, b));
-    };
-    fn.classmethod(BinaryOpUGen);
-
-    BinaryOpUGen.prototype.initialize = function(op, a, b) {
-      this.op = op;
-      var index = BINARY_OP_UGEN_MAP.indexOf(op);
+      
+      var index = BINARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
-        throw "Unknown operator: " + op;
+        throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
       }
+      var rate = Math.max(a.rate|0, b.rate|0);
+      UGen.prototype.init.call(this, rate);
+      this.op = selector;
       this.specialIndex = index;
-      this.rate = Math.max(a.rate|0, b.rate|0);
       this.inputs = [a, b];
+      this.numOfInputs = 2;
       return this;
     };
-    
+
     return BinaryOpUGen;
   })();
 
   var MulAdd = (function() {
     function MulAdd() {
-      UGen.call(this);
-      this.klassName = "MulAdd";
+      UGen.call(this, "MulAdd");
     }
     fn.extend(MulAdd, UGen);
-    
-    MulAdd.prototype.$new = function(_in, mul, add) {
-      return this.multiNew(null, _in, mul, add);
-    };
-    MulAdd.prototype.$new1 = function(rate, _in, mul, add) {
+
+    MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd;
       if (_in.rate - mul.rate < 0) {
         t = _in; _in = mul; mul = t;
@@ -3618,32 +3523,29 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
         return _in;
       }
       if (minus && noadd) {
-        return BinaryOpUGen.new1(null, "*", _in, -1);
+        return new BinaryOpUGen().init("*", _in, -1);
       }
       if (noadd) {
-        return BinaryOpUGen.new1(null, "*", _in, mul);
+        return new BinaryOpUGen().init("*", _in, mul);
       }
       if (minus) {
-        return BinaryOpUGen.new1(null, "-", add, _in);
+        return new BinaryOpUGen().init("-", add, _in);
       }
       if (nomul) {
-        return BinaryOpUGen.new1(null, "+", _in, add);
+        return new BinaryOpUGen().init("+", _in, add);
       }
       if (validate(_in, mul, add)) {
-        return UGen.new1.apply(this, [2].concat(_in, mul, add));
+        return init.call(this, _in, mul, add);
       }
       if (validate(mul, _in, add)) {
-        return UGen.new1.apply(this, [2].concat(mul, _in, add));
+        return init.call(this, mul, _in, add);
       }
       return _in * mul + add;
     };
-    fn.classmethod(MulAdd);
-    
-    MulAdd.prototype.initialize = function(_in, mul, add) {
-      var argArray = [_in, mul, add];
-      this.inputs = argArray;
-      this.rate   = asRate(argArray);
-      return this;
+
+    var init = function(_in, mul, add) {
+      var rate = asRate([_in, mul, add]);
+      return UGen.prototype.init.apply(this, [rate, _in, mul, add]);
     };
     
     var validate = function(_in, mul, add) {
@@ -3660,73 +3562,61 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       }
       return false;
     };
-
+    
     return MulAdd;
   })();
 
   var Sum3 = (function() {
     function Sum3() {
-      UGen.call(this);
-      this.klassName = "Sum3";
+      UGen.call(this, "Sum3");
     }
     fn.extend(Sum3, UGen);
     
-    Sum3.prototype.$new = function(in0, in1, in2) {
-      return this.multiNew(null, in0, in1, in2);
-    };
-    Sum3.prototype.$new1 = function(dummyRate, in0, in1, in2) {
+    Sum3.prototype.init = function(in0, in1, in2) {
       if (in0 === 0) {
-        return BinaryOpUGen.new1(null, "+", in1, in2);
+        return new BinaryOpUGen().init("+", in1, in2);
       }
       if (in1 === 0) {
-        return BinaryOpUGen.new1(null, "+", in0, in2);
+        return new BinaryOpUGen().init("+", in0, in2);
       }
       if (in2 === 0) {
-        return BinaryOpUGen.new1(null, "+", in0, in1);
+        return new BinaryOpUGen().init("+", in0, in1);
       }
-      var argArray = [in0, in1, in2];
-      var rate = asRate(argArray);
-      var sortedArgs = argArray.sort(function(a, b) {
+      var rate = asRate([in0, in1, in2]);
+      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
         return b.rate - a.rate;
       });
-      return UGen.new1.apply(this, [rate].concat(sortedArgs));
+      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-    fn.classmethod(Sum3);
     
     return Sum3;
   })();
 
   var Sum4 = (function() {
     function Sum4() {
-      UGen.call(this);
-      this.klassName = "Sum4";
+      UGen.call(this, "Sum4");
     }
     fn.extend(Sum4, UGen);
     
-    Sum4.prototype.$new = function(in0, in1, in2, in3) {
-      return this.multiNew(null, in0, in1, in2, in3);
-    };
-    Sum4.prototype.$new1 = function(dummyRate, in0, in1, in2, in3) {
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
       if (in0 === 0) {
-        return Sum3.new1(null, in1, in2, in3);
+        return new Sum3().init(in1, in2, in3);
       }
       if (in1 === 0) {
-        return Sum3.new1(null, in0, in2, in3);
+        return new Sum3().init(in0, in2, in3);
       }
       if (in2 === 0) {
-        return Sum3.new1(null, in0, in1, in3);
+        return new Sum3().init(in0, in1, in3);
       }
       if (in3 === 0) {
-        return Sum3.new1(null, in0, in1, in2);
+        return new Sum3().init(in0, in1, in2);
       }
-      var argArray = [in0, in1, in2, in3];
-      var rate = asRate(argArray);
-      var sortedArgs = argArray.sort(function(a, b) {
+      var rate = asRate([in0, in1, in2, in3]);
+      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
         return b.rate - a.rate;
       });
-      return UGen.new1.apply(this, [rate].concat(sortedArgs));
+      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-    fn.classmethod(Sum4);
     
     return Sum4;
   })();
@@ -3749,16 +3639,16 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         switch (a.length) {
-        case 4: return Sum4.new1(null, a[0], a[1], a[2], a[3]);
-        case 3: return Sum3.new1(null, a[0], a[1], a[2]);
-        case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
+        case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
+        case 3: return new Sum3().init(a[0], a[1], a[2]);
+        case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
         case 1: return a[0];
         }
       });
       switch (a.length) {
-      case 4: return Sum4.new1(null, a[0], a[1], a[2], a[3]);
-      case 3: return Sum3.new1(null, a[0], a[1], a[2]);
-      case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
+      case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
+      case 3: return new Sum4().init(a[0], a[1], a[2]);
+      case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
       case 1: return a[0];
       default: return work(utils.clump(a, 4));
       }
@@ -3778,7 +3668,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       }
       list = utils.clump(list, 4);
       if (list.length === 1 && list[0].length === 2) {
-        return BinaryOpUGen.new1(null, "+!", list[0][0], list[0][1]);
+        return new BinaryOpUGen().init("+!", list[0][0], list[0][1]);
       }
       return work(list);
     };
@@ -3796,14 +3686,14 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         if (a.length === 2) {
-          return BinaryOpUGen.new1(null, "*!", a[0], a[1]);
+          return new BinaryOpUGen().init("*!", a[0], a[1]);
         } else {
           return a[0];
         }
       });
       switch (a.length) {
       case 2:
-        return BinaryOpUGen.new1(null, "*!", a[0], a[1]);
+        return new BinaryOpUGen().init("*!", a[0], a[1]);
       case 1:
         return a[0];
       default:
@@ -3825,23 +3715,23 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       }
       list = utils.clump(list, 2);
       if (list.length === 1 && list[0].length === 2) {
-        return BinaryOpUGen.new1(null, "*!", list[0][0], list[0][1]);
+        return new BinaryOpUGen().init("*!", list[0][0], list[0][1]);
       }
       return work(list);
     };
   })();
   
   Number.prototype.madd = fn(function(mul, add) {
-    return MulAdd.new(this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("mul=1,add=0").build();
   Array.prototype.madd = fn(function(mul, add) {
     return utils.flop([this, mul, add]).map(function(items) {
       var _in = items[0], mul = items[1], add = items[2];
-      return MulAdd.new(_in, mul, add);
+      return new MulAdd().init(_in, mul, add);
     });
   }).defaults("mul=1,add=0").build();
   UGen.prototype.madd = fn(function(mul, add) {
-    return MulAdd.new(this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("mul=1,add=0").build();
 
   UGen.prototype.range = fn(function(lo, hi) {
@@ -3853,7 +3743,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
       mul = (hi - lo);
       add = lo;
     }
-    return MulAdd.new1(null, this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("lo=0,hi=1").multiCall().build();
 
   UGen.prototype.unipolar = fn(function(mul) {
@@ -3898,7 +3788,7 @@ define('cc/server/uop', function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function() {
-      return UnaryOpUGen.new(selector, this);
+      return new UnaryOpUGen(selector, this);
     };
   };
 
@@ -3939,12 +3829,12 @@ define('cc/server/uop', function(require, exports, module) {
 });
 define('cc/server/ugen/installer', function(require, exports, module) {
 
-  var install = function(register) {
-    require("./ugen").install(register);
-    require("./basic_ops").install(register);
-    require("./osc").install(register);
-    require("./line").install(register);
-    require("./ui").install(register);
+  var install = function() {
+    require("./ugen").install();
+    require("./basic_ops").install();
+    require("./osc").install();
+    require("./line").install();
+    require("./ui").install();
   };
 
   module.exports = {
@@ -3954,31 +3844,25 @@ define('cc/server/ugen/installer', function(require, exports, module) {
 });
 define('cc/server/ugen/osc', function(require, exports, module) {
   
-  var fn = require("../fn");
-  var UGen = require("./ugen").UGen;
-
-  var SinOsc = (function() {
-    function SinOsc() {
-      UGen.call(this);
-      this.klassName = "SinOsc";
+  var ugen = require("./ugen");
+  
+  var SinOsc = {
+    ar: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
     }
-    fn.extend(SinOsc, UGen);
-    
-    SinOsc.prototype.$ar = fn(function(freq, phase, mul, add) {
-      return this.multiNew(2, freq, phase).madd(mul, add);
-    }).defaults("freq=440,phase=0,mul=1,add=0").build();
-    
-    SinOsc.prototype.$kr = fn(function(freq, phase, mul, add) {
-      return this.multiNew(1, freq, phase).madd(mul, add);
-    }).defaults("freq=440,phase=0,mul=1,add=0").build();
-    
-    fn.classmethod(SinOsc);
-    
-    return SinOsc;
-  })();
-
-  var install = function(register) {
-    register("SinOsc", SinOsc);
+  };
+  
+  var install = function() {
+    ugen.register("SinOsc", SinOsc);
   };
   
   module.exports = {
@@ -3989,31 +3873,25 @@ define('cc/server/ugen/osc', function(require, exports, module) {
 });
 define('cc/server/ugen/line', function(require, exports, module) {
   
-  var fn = require("../fn");
-  var UGen = require("./ugen").UGen;
-
-  var Line = (function() {
-    function Line() {
-      UGen.call(this);
-      this.klassName = "Line";
-    }
-    fn.extend(Line, UGen);
-    
-    Line.prototype.$ar = fn(function(start, end, dur, mul, add, doneAction) {
-      return this.multiNew(2, start, end, dur, doneAction).madd(mul, add);
-    }).defaults("start=0,end=1,dur=1,mul=1,add=0,doneAction=0").build();
-    
-    Line.prototype.$kr = fn(function(start, end, dur, mul, add, doneAction) {
-      return this.multiNew(1, start, end, dur, doneAction).madd(mul, add);
-    }).defaults("start=0,end=1,dur=1,mul=1,add=0,doneAction=0").build();
-    
-    fn.classmethod(Line);
-    
-    return Line;
-  })();
+  var ugen = require("./ugen");
   
-  var install = function(register) {
-    register("Line", Line);
+  var Line = {
+    ar: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+  
+  var install = function() {
+    ugen.register("Line", Line);
   };
   
   module.exports = {
@@ -4023,74 +3901,50 @@ define('cc/server/ugen/line', function(require, exports, module) {
 
 });
 define('cc/server/ugen/ui', function(require, exports, module) {
-
-  var fn = require("../fn");
-  var UGen = require("./ugen").UGen;
-
-  var MouseX = (function() {
-    function MouseX() {
-      UGen.call(this);
-      this.klassName = "MouseX";
-    }
-    fn.extend(MouseX, UGen);
-
-    MouseX.prototype.$kr = fn(function(minval, maxval, warp, lag) {
-      if (warp === "exponential") {
-        warp = 1;
-      } else if (typeof warp !== "number") {
-        warp = 0;
+  
+  var ugen = require("./ugen");
+  
+  var MouseX = {
+    kr: {
+      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
+      ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential") {
+          warp = 1;
+        } else if (typeof warp !== "number") {
+          warp = 0;
+        }
+        return this.init(1, minval, maxval, warp, lag);
       }
-      return this.multiNew(1, minval, maxval, warp, lag);
-    }).defaults("minval=0,maxval=1,warp=0,lag=0.2").build();
-    
-    fn.classmethod(MouseX);
-    
-    return MouseX;
-  })();
-  
-  var MouseY = (function() {
-    function MouseY() {
-      UGen.call(this);
-      this.klassName = "MouseY";
     }
-    fn.extend(MouseY, UGen);
-
-    MouseY.prototype.$kr = fn(function(minval, maxval, warp, lag) {
-      if (warp === "exponential") {
-        warp = 1;
-      } else if (typeof warp !== "number") {
-        warp = 0;
-      }
-      return this.multiNew(1, minval, maxval, warp, lag);
-    }).defaults("minval=0,maxval=1,warp=0,lag=0.2").build();
-    
-    fn.classmethod(MouseY);
-    
-    return MouseY;
-  })();
-  
-  var MouseButton = (function() {
-    function MouseButton() {
-      UGen.call(this);
-      this.klassName = "MouseButton";
-    }
-    fn.extend(MouseButton, UGen);
-
-    MouseButton.prototype.$kr = fn(function(minval, maxval, lag) {
-      return this.multiNew(1, minval, maxval, lag);
-    }).defaults("minval=0,maxval=1,lag=0.2").build();
-    
-    fn.classmethod(MouseButton);
-    
-    return MouseButton;
-  })();
-  
-  var install = function(register) {
-    register("MouseX", MouseX);
-    register("MouseY", MouseY);
-    register("MouseButton", MouseButton);
   };
-
+  var MouseY = {
+    kr: {
+      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
+      ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential") {
+          warp = 1;
+        } else if (typeof warp !== "number") {
+          warp = 0;
+        }
+        return this.init(1, minval, maxval, warp, lag);
+      }
+    }
+  };
+  var MouseButton = {
+    kr: {
+      defaults: "minval=0,maxval=1,lag=0.2",
+      ctor: function(minval, maxval, lag) {
+        return this.init(1, minval, maxval, lag);
+      }
+    }
+  };
+  
+  var install = function() {
+    ugen.register("MouseX", MouseX);
+    ugen.register("MouseY", MouseY);
+    ugen.register("MouseButton", MouseButton);
+  };
+  
   module.exports = {
     install: install
   };

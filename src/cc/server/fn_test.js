@@ -5,39 +5,16 @@ define(function(require, exports, module) {
   var fn = require("./fn");
 
   describe("fn.js", function() {
-    var Foo, Bar;
-    before(function() {
-      Foo = (function() {
-        function Foo() {}
-        Foo.prototype.$new1 = function() {
-          this.name = "Foo";
-          return this;
-        };
-        Foo.prototype.$create = function(value) {
-          return this.new1().setValue(value);
-        };
-        Foo.prototype.setValue = function(value) {
-          this.value = value;
-          return this;
-        };
-        fn.classmethod(Foo);
-        return Foo;
-      })();
-      Bar = (function() {
-        function Bar() {}
-        fn.extend(Bar, Foo);
-        Bar.prototype.$new1 = function() {
-          this.name = "Bar";
-          return this;
-        };
-        Bar.prototype.setValue = function(value) {
-          this.value = value * 100;
-          return this;
-        };
-        fn.classmethod(Bar);
-        return Bar;
-      })();
-    });
+    var Foo = (function() {
+      function Foo() {}
+      return Foo;
+    })();
+    var Bar = (function() {
+      function Bar() {}
+      fn.extend(Bar, Foo);
+      return Bar;
+    })();
+    
     describe("Fn", function() {
       it("defaults", function() {
         var madd = fn(function(val, mul, add) {
@@ -56,21 +33,6 @@ define(function(require, exports, module) {
     });
     it("extend", function() {
       assert.instanceOf(new Bar(), Foo);
-    });
-    describe("classmethod", function() {
-      it("create", function() {
-        var f = Foo.create(1000);
-        assert.instanceOf(f, Foo);
-        assert.equal(f.value, 1000);
-        assert.equal(f.name , "Foo");
-      });
-      it("extend", function() {
-        var b = Bar.create(1000);
-        assert.instanceOf(b, Bar);
-        assert.instanceOf(b, Foo);
-        assert.equal(b.value, 1000 * 100);
-        assert.equal(b.name , "Bar");
-      });
     });
   });
   

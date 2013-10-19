@@ -18,7 +18,7 @@ define(function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function() {
-      return UnaryOpUGen.new(selector, this);
+      return new UnaryOpUGen(selector, this);
     };
   };
 

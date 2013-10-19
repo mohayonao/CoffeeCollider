@@ -2,14 +2,13 @@ define(function(require, exports, module) {
   "use strict";
 
   var fn = require("../fn");
-  var utils = require("../utils");
   var slice = [].slice;
 
   var addToSynthDef = null;
-
+  
   var UGen = (function() {
-    function UGen() {
-      this.klassName = "UGen";
+    function UGen(name) {
+      this.klassName = name;
       this.rate = C.AUDIO;
       this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
@@ -18,51 +17,28 @@ define(function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
-
-    UGen.prototype.$new1 = function(rate) {
-      var args = slice.call(arguments, 1);
+    UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
         addToSynthDef(this);
       }
+      this.inputs = slice.call(arguments, 1);
       this.numOfInputs = this.inputs.length;
-      return this.initialize.apply(this, args);
-    };
-    UGen.prototype.$multiNew = function() {
-      return this.multiNewList(slice.call(arguments));
-    };
-    UGen.prototype.$multiNewList = function(list) {
-      var zipped = utils.flop(list);
-      if (zipped.length === 1) {
-        return this.new1.apply(this, list);
-      }
-      return zipped.map(function(list) {
-        return this.constructor.multiNewList(list);
-      }, this);
-    };
-    fn.classmethod(UGen);
-
-    UGen.prototype.initialize = function() {
-      this.inputs = slice.call(arguments);
       return this;
     };
-    
     return UGen;
   })();
-
+  
   var MultiOutUGen = (function() {
-    function MultiOutUGen() {
-      UGen.call(this);
-      this.klassName = "MultiOutUGen";
+    function MultiOutUGen(name) {
+      UGen.call(this, name || "MultiOutUGen");
       this.channels = null;
     }
     fn.extend(MultiOutUGen, UGen);
-    fn.classmethod(MultiOutUGen);
-    
     MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
       var channels = new Array(numChannels);
       for (var i = 0; i < numChannels; ++i) {
-        channels[i] = OutputProxy.new(rate, this, i);
+        channels[i] = new OutputProxy(rate, this, i);
       }
       this.channels = channels;
       this.numOfOutputs = channels.length;
@@ -72,83 +48,86 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;
     };
-    
     return MultiOutUGen;
   })();
-
+  
   var OutputProxy = (function() {
-    function OutputProxy() {
-      UGen.call(this);
-      this.klassName = "OutputProxy";
+    function OutputProxy(rate, source, index) {
+      UGen.call(this, "OutputProxy");
+      this.init(rate);
+      this.inputs = [ source ];
+      this.numOfOutputs = 1;
+      this.outputIndex  = index;
     }
     fn.extend(OutputProxy, UGen);
-
-    OutputProxy.prototype.$new = function(rate, source, index) {
-      return this.new1(rate, source, index);
-    };
-    fn.classmethod(OutputProxy);
-
-    OutputProxy.prototype.initialize = function(source, index) {
-      this.inputs = [ source ];
-      this.numOfInputs = 1;
-      this.outputIndex = index;
-      return this;
-    };
-    
     return OutputProxy;
   })();
-
+  
   var Control = (function() {
-    function Control() {
-      MultiOutUGen.call(this);
-      this.klassName = "Control";
-      this.values = [];
+    function Control(rate) {
+      MultiOutUGen.call(this, "Control");
+      this.rate   = rate;
+      this.values = null;
     }
     fn.extend(Control, MultiOutUGen);
-
-    Control.prototype.$kr = function(values) {
-      return this.multiNewList([C.CONTROL].concat(values));
-    };
-    fn.classmethod(Control);
-
-    Control.prototype.initialize = function() {
-      this.values = slice.call(arguments);
+    Control.prototype.init = function(list) {
+      UGen.prototype.init.apply(this, [this.rate].concat(list));
+      this.values = list.slice();
       return this.initOutputs(this.values.length, this.rate);
     };
-
     return Control;
   })();
 
   var Out = (function() {
     function Out() {
-      UGen.call(this);
-      this.klassName = "Out";
-      this.numOutputs = 0;
+      UGen.call(this, "Out");
     }
     fn.extend(Out, UGen);
-
-    Out.prototype.$ar = fn(function(bus, channelsArray) {
-      this.multiNewList([C.AUDIO, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    Out.prototype.$kr = fn(function(bus, channelsArray) {
-      this.multiNewList([C.CONTROL, bus].concat(channelsArray));
-      return 0; // Out has no output
-    }).defaults("bus=0,channelsArray=0").build();
-    
-    fn.classmethod(Out);
-    
     return Out;
   })();
-
+  
+  var OutIntarface = {
+    ar: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.init.apply(this, [C.AUDIO, bus].concat(channelsArray));
+        return 0; // Out has no output
+      },
+      Klass: Out
+    },
+    kr: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.init.apply(this, [C.CONTROL, bus].concat(channelsArray));
+        return 0; // Out has no output
+      },
+      Klass: Out
+    }
+  };
+  
   var setSynthDef = function(func) {
     addToSynthDef = func;
   };
-
-  var install = function(register) {
-    register("Out", Out);
+  
+  var install = function() {
+    register("Out", OutIntarface);
   };
-
+  
+  var register = function(name, payload) {
+    var klass = global[name] = function() {
+      return new UGen(name);
+    };
+    Object.keys(payload).forEach(function(key) {
+      var defaults = payload[key].defaults;
+      var ctor     = payload[key].ctor;
+      var Klass    = payload[key].Klass || UGen;
+      klass[key] = fn(function() {
+        return ctor.apply(new Klass(name), arguments);
+      }).defaults(defaults).multiCall().build();
+    });
+    payload = 0;
+  };
+  
   module.exports = {
     UGen: UGen,
     MultiOutUGen: MultiOutUGen,
@@ -156,6 +135,7 @@ define(function(require, exports, module) {
     Control     : Control,
     Out         : Out,
     setSynthDef : setSynthDef,
+    register: register,
     install: install,
   };
 

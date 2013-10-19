@@ -12,7 +12,7 @@ define(function(require, exports, module) {
           return this[selector](b);
         }, this);
       } else if (b instanceof UGen) {
-        return BinaryOpUGen.new(ugenSelector, this, b);
+        return new BinaryOpUGen().init(ugenSelector, this, b);
       }
       return func(this, b);
     };
@@ -35,7 +35,7 @@ define(function(require, exports, module) {
           });
         }
       } else if (b instanceof UGen) {
-        return BinaryOpUGen.new(ugenSelector, this, b);
+        return new BinaryOpUGen().init(ugenSelector, this, b);
       }
       return a.map(function(a) {
         return a[selector](b);
@@ -44,7 +44,7 @@ define(function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function(b) {
-      return BinaryOpUGen.new(selector, this, b);
+      return new BinaryOpUGen().init(selector, this, b);
     };
   };
 

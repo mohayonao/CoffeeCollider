@@ -3,18 +3,15 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var Compiler = require("./client/compiler").Compiler;
-  var register = require("./server/installer").register;
   var uop = require("./server/uop");
   var bop = require("./server/bop");
 
   describe("arithmetic", function() {
     var calc;
-    var cc = {};
-    cc.register = register(cc);
     before(function() {
       var compiler = new Compiler();
-      uop.install(cc);
-      bop.install(cc);
+      uop.install();
+      bop.install();
       calc = function(expr) {
         return eval.call(null, compiler.compile(expr));
       };

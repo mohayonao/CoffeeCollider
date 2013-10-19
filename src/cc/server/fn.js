@@ -96,22 +96,10 @@ define(function(require, exports, module) {
     };
   })();
   
-  var copy = function(obj) {
-    var ret = {};
-    Object.keys(obj).forEach(function(key) {
-      ret[key] = obj[key];
-    });
-    return ret;
-  };
-  
   fn.extend = function(child, parent) {
     for (var key in parent) {
       if (parent.hasOwnProperty(key)) {
-        if (key === "classmethods") {
-          child[key] = copy(parent[key]);
-        } else {
-          child[key] = parent[key];
-        }
+        child[key] = parent[key];
       }
     }
     /*jshint validthis:true */
@@ -126,35 +114,7 @@ define(function(require, exports, module) {
     child.__super__ = parent.prototype;
     return child;
   };
-
-  fn.classmethod = (function() {
-    var _classmethod = function(Klass, func) {
-      return function() {
-        if (this instanceof Klass) {
-          return func.apply(this, arguments);
-        } else {
-          return func.apply(new Klass(), arguments);
-        }
-      };
-    };
-    return function(child) {
-      var classmethods = child.classmethods || {};
-      Object.keys(child.prototype).forEach(function(key) {
-        if (key.charAt(0) === "$" && typeof child.prototype[key] === "function") {
-          classmethods[key] = child.prototype[key];
-          delete child.prototype[key];
-        }
-      });
-      Object.keys(classmethods).forEach(function(key) {
-        var func = classmethods[key];
-        key = key.substr(1);
-        child[key] = _classmethod(child, func);
-        child.prototype[key] = func;
-      });
-      child.classmethods = classmethods;
-    };
-  })();
-
+  
   fn.sync = function(func) {
     return function() {
       cc.server.timeline.push(this, func, slice.call(arguments));

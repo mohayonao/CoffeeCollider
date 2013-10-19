@@ -15,29 +15,24 @@ define(function(require, exports, module) {
   };
 
   var UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
-  
+
   var UnaryOpUGen = (function() {
     function UnaryOpUGen() {
-      UGen.call(this);
-      this.klassName = "UnaryOpUGen";
+      UGen.call(this, "UnaryOpUGen");
     }
     fn.extend(UnaryOpUGen, UGen);
 
-    UnaryOpUGen.prototype.$new = function(selector, a) {
-      return this.multiNew(C.AUDIO, selector, a);
-    };
-
-    fn.classmethod(UnaryOpUGen);
-
-    UnaryOpUGen.prototype.initialize = function(op, a) {
-      this.op = op;
-      var index = UNARY_OP_UGEN_MAP.indexOf(op);
+    UnaryOpUGen.prototype.init = function(selector, a) {
+      var index = UNARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
-        throw "Unknown operator: " + op;
+        throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
       }
+      var rate = a.rate|C.SCALAR;
+      UGen.prototype.init.call(rate);
+      this.op = selector;
       this.specialIndex = index;
-      this.rate   = a.rate|C.SCALAR;
       this.inputs = [a];
+      this.numOfInputs = 1;
       return this;
     };
 
@@ -48,15 +43,11 @@ define(function(require, exports, module) {
 
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
-      UGen.call(this);
-      this.klassName = "BinaryOpUGen";
+      UGen.call(this, "BinaryOpUGen");
     }
     fn.extend(BinaryOpUGen, UGen);
 
-    BinaryOpUGen.prototype.$new = function(selector, a, b) {
-      return this.multiNew(null, selector, a, b);
-    };
-    BinaryOpUGen.prototype.$new1 = function(rate, selector, a, b) {
+    BinaryOpUGen.prototype.init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -82,20 +73,20 @@ define(function(require, exports, module) {
           return a;
         } else if (a instanceof BinaryOpUGen) {
           if (a.op === "*") {
-            return MulAdd.new1(null, a.inputs[0], a.inputs[1], b);
+            return new MulAdd().init(a.inputs[0], a.inputs[1], b);
           }
         } else if (a instanceof MulAdd) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
-              return BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
+              return new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
             } else {
               a.inputs[2] += b;
               return a;
             }
           }
-          b = BinaryOpUGen.new1(null, "+", a.inputs[2], b);
-          a = BinaryOpUGen.new1(null, "*!", a.inputs[0], a.inputs[1]);
-          return BinaryOpUGen.new1(null, "+", a, b);
+          b = new BinaryOpUGen().init("+", a.inputs[2], b);
+          a = new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
+          return new BinaryOpUGen().init("+", a, b);
         }
         return optimizeSumObjects(a, b);
       }
@@ -104,36 +95,30 @@ define(function(require, exports, module) {
       } else if (selector === "*!") {
         selector = "*";
       }
-      return UGen.new1.apply(this, [C.AUDIO].concat(selector, a, b));
-    };
-    fn.classmethod(BinaryOpUGen);
-
-    BinaryOpUGen.prototype.initialize = function(op, a, b) {
-      this.op = op;
-      var index = BINARY_OP_UGEN_MAP.indexOf(op);
+      
+      var index = BINARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
-        throw "Unknown operator: " + op;
+        throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
       }
+      var rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
+      UGen.prototype.init.call(this, rate);
+      this.op = selector;
       this.specialIndex = index;
-      this.rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       this.inputs = [a, b];
+      this.numOfInputs = 2;
       return this;
     };
-    
+
     return BinaryOpUGen;
   })();
 
   var MulAdd = (function() {
     function MulAdd() {
-      UGen.call(this);
-      this.klassName = "MulAdd";
+      UGen.call(this, "MulAdd");
     }
     fn.extend(MulAdd, UGen);
-    
-    MulAdd.prototype.$new = function(_in, mul, add) {
-      return this.multiNew(null, _in, mul, add);
-    };
-    MulAdd.prototype.$new1 = function(rate, _in, mul, add) {
+
+    MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd;
       if (_in.rate - mul.rate < 0) {
         t = _in; _in = mul; mul = t;
@@ -149,32 +134,29 @@ define(function(require, exports, module) {
         return _in;
       }
       if (minus && noadd) {
-        return BinaryOpUGen.new1(null, "*", _in, -1);
+        return new BinaryOpUGen().init("*", _in, -1);
       }
       if (noadd) {
-        return BinaryOpUGen.new1(null, "*", _in, mul);
+        return new BinaryOpUGen().init("*", _in, mul);
       }
       if (minus) {
-        return BinaryOpUGen.new1(null, "-", add, _in);
+        return new BinaryOpUGen().init("-", add, _in);
       }
       if (nomul) {
-        return BinaryOpUGen.new1(null, "+", _in, add);
+        return new BinaryOpUGen().init("+", _in, add);
       }
       if (validate(_in, mul, add)) {
-        return UGen.new1.apply(this, [C.AUDIO].concat(_in, mul, add));
+        return init.call(this, _in, mul, add);
       }
       if (validate(mul, _in, add)) {
-        return UGen.new1.apply(this, [C.AUDIO].concat(mul, _in, add));
+        return init.call(this, mul, _in, add);
       }
       return _in * mul + add;
     };
-    fn.classmethod(MulAdd);
-    
-    MulAdd.prototype.initialize = function(_in, mul, add) {
-      var argArray = [_in, mul, add];
-      this.inputs = argArray;
-      this.rate   = asRate(argArray);
-      return this;
+
+    var init = function(_in, mul, add) {
+      var rate = asRate([_in, mul, add]);
+      return UGen.prototype.init.apply(this, [rate, _in, mul, add]);
     };
     
     var validate = function(_in, mul, add) {
@@ -191,73 +173,61 @@ define(function(require, exports, module) {
       }
       return false;
     };
-
+    
     return MulAdd;
   })();
 
   var Sum3 = (function() {
     function Sum3() {
-      UGen.call(this);
-      this.klassName = "Sum3";
+      UGen.call(this, "Sum3");
     }
     fn.extend(Sum3, UGen);
     
-    Sum3.prototype.$new = function(in0, in1, in2) {
-      return this.multiNew(null, in0, in1, in2);
-    };
-    Sum3.prototype.$new1 = function(dummyRate, in0, in1, in2) {
+    Sum3.prototype.init = function(in0, in1, in2) {
       if (in0 === 0) {
-        return BinaryOpUGen.new1(null, "+", in1, in2);
+        return new BinaryOpUGen().init("+", in1, in2);
       }
       if (in1 === 0) {
-        return BinaryOpUGen.new1(null, "+", in0, in2);
+        return new BinaryOpUGen().init("+", in0, in2);
       }
       if (in2 === 0) {
-        return BinaryOpUGen.new1(null, "+", in0, in1);
+        return new BinaryOpUGen().init("+", in0, in1);
       }
-      var argArray = [in0, in1, in2];
-      var rate = asRate(argArray);
-      var sortedArgs = argArray.sort(function(a, b) {
+      var rate = asRate([in0, in1, in2]);
+      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
         return b.rate - a.rate;
       });
-      return UGen.new1.apply(this, [rate].concat(sortedArgs));
+      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-    fn.classmethod(Sum3);
     
     return Sum3;
   })();
 
   var Sum4 = (function() {
     function Sum4() {
-      UGen.call(this);
-      this.klassName = "Sum4";
+      UGen.call(this, "Sum4");
     }
     fn.extend(Sum4, UGen);
     
-    Sum4.prototype.$new = function(in0, in1, in2, in3) {
-      return this.multiNew(null, in0, in1, in2, in3);
-    };
-    Sum4.prototype.$new1 = function(dummyRate, in0, in1, in2, in3) {
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
       if (in0 === 0) {
-        return Sum3.new1(null, in1, in2, in3);
+        return new Sum3().init(in1, in2, in3);
       }
       if (in1 === 0) {
-        return Sum3.new1(null, in0, in2, in3);
+        return new Sum3().init(in0, in2, in3);
       }
       if (in2 === 0) {
-        return Sum3.new1(null, in0, in1, in3);
+        return new Sum3().init(in0, in1, in3);
       }
       if (in3 === 0) {
-        return Sum3.new1(null, in0, in1, in2);
+        return new Sum3().init(in0, in1, in2);
       }
-      var argArray = [in0, in1, in2, in3];
-      var rate = asRate(argArray);
-      var sortedArgs = argArray.sort(function(a, b) {
+      var rate = asRate([in0, in1, in2, in3]);
+      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
         return b.rate - a.rate;
       });
-      return UGen.new1.apply(this, [rate].concat(sortedArgs));
+      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-    fn.classmethod(Sum4);
     
     return Sum4;
   })();
@@ -280,16 +250,16 @@ define(function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         switch (a.length) {
-        case 4: return Sum4.new1(null, a[0], a[1], a[2], a[3]);
-        case 3: return Sum3.new1(null, a[0], a[1], a[2]);
-        case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
+        case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
+        case 3: return new Sum3().init(a[0], a[1], a[2]);
+        case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
         case 1: return a[0];
         }
       });
       switch (a.length) {
-      case 4: return Sum4.new1(null, a[0], a[1], a[2], a[3]);
-      case 3: return Sum3.new1(null, a[0], a[1], a[2]);
-      case 2: return BinaryOpUGen.new1(null, "+!", a[0], a[1]);
+      case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
+      case 3: return new Sum4().init(a[0], a[1], a[2]);
+      case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
       case 1: return a[0];
       default: return work(utils.clump(a, 4));
       }
@@ -309,7 +279,7 @@ define(function(require, exports, module) {
       }
       list = utils.clump(list, 4);
       if (list.length === 1 && list[0].length === 2) {
-        return BinaryOpUGen.new1(null, "+!", list[0][0], list[0][1]);
+        return new BinaryOpUGen().init("+!", list[0][0], list[0][1]);
       }
       return work(list);
     };
@@ -327,14 +297,14 @@ define(function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         if (a.length === 2) {
-          return BinaryOpUGen.new1(null, "*!", a[0], a[1]);
+          return new BinaryOpUGen().init("*!", a[0], a[1]);
         } else {
           return a[0];
         }
       });
       switch (a.length) {
       case 2:
-        return BinaryOpUGen.new1(null, "*!", a[0], a[1]);
+        return new BinaryOpUGen().init("*!", a[0], a[1]);
       case 1:
         return a[0];
       default:
@@ -356,23 +326,23 @@ define(function(require, exports, module) {
       }
       list = utils.clump(list, 2);
       if (list.length === 1 && list[0].length === 2) {
-        return BinaryOpUGen.new1(null, "*!", list[0][0], list[0][1]);
+        return new BinaryOpUGen().init("*!", list[0][0], list[0][1]);
       }
       return work(list);
     };
   })();
   
   Number.prototype.madd = fn(function(mul, add) {
-    return MulAdd.new(this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("mul=1,add=0").build();
   Array.prototype.madd = fn(function(mul, add) {
     return utils.flop([this, mul, add]).map(function(items) {
       var _in = items[0], mul = items[1], add = items[2];
-      return MulAdd.new(_in, mul, add);
+      return new MulAdd().init(_in, mul, add);
     });
   }).defaults("mul=1,add=0").build();
   UGen.prototype.madd = fn(function(mul, add) {
-    return MulAdd.new(this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("mul=1,add=0").build();
 
   UGen.prototype.range = fn(function(lo, hi) {
@@ -384,7 +354,7 @@ define(function(require, exports, module) {
       mul = (hi - lo);
       add = lo;
     }
-    return MulAdd.new1(null, this, mul, add);
+    return new MulAdd().init(this, mul, add);
   }).defaults("lo=0,hi=1").multiCall().build();
 
   UGen.prototype.unipolar = fn(function(mul) {

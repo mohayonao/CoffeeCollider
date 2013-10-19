@@ -390,18 +390,18 @@ define(function(require, exports, module) {
     },
   };
   
-  var install = function(register) {
-    register("Task", TaskInterface);
-    register("wait", function() {
+  var install = function() {
+    global.Task = TaskInterface;
+    global.wait = function() {
       var globalTask = cc.server.timeline._globalTask;
       push.apply(globalTask._queue, slice.call(arguments));
-    });
-    register("sync", function(func) {
+    };
+    global.sync = function(func) {
       if (typeof func === "function") {
         var globalTask = cc.server.timeline._globalTask;
         globalTask._push(func);
       }
-    });
+    };
   };
   
   module.exports = {

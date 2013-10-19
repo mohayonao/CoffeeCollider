@@ -1,12 +1,12 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function(register) {
-    require("./ugen").install(register);
-    require("./basic_ops").install(register);
-    require("./osc").install(register);
-    require("./line").install(register);
-    require("./ui").install(register);
+  var install = function() {
+    require("./ugen").install();
+    require("./basic_ops").install();
+    require("./osc").install();
+    require("./line").install();
+    require("./ui").install();
   };
 
   module.exports = {

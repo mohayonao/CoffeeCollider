@@ -474,7 +474,7 @@ define(function(require, exports, module) {
         flatten = flatten.concat(args.vals[i]);
       }
       var reshaped = [];
-      var controls = ugen.Control.kr(flatten);
+      var controls = new ugen.Control(C.CONTROL).init(flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
@@ -807,9 +807,9 @@ define(function(require, exports, module) {
     }
   };
   
-  var install = function(register) {
-    register("Group", GroupInterface);
-    register("Synth", SynthInterface);
+  var install = function() {
+    global.Group = GroupInterface;
+    global.Synth = SynthInterface;
   };
   
   module.exports = {
