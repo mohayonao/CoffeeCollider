@@ -2581,22 +2581,28 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     fn.extend(Out, UGen);
     return Out;
   })();
+
+  var out_ctor = function(rate) {
+    return function(bus, channelsArray) {
+      if (!(bus instanceof UGen || typeof bus === "number")) {
+        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
+      }
+      this.init.apply(this, [rate, bus].concat(channelsArray));
+      return 0; // Out has no output
+    };
+  };
   
   var OutIntarface = {
     ar: {
       defaults: "bus=0,channelsArray=0",
-      ctor: function(bus, channelsArray) {
-        this.init.apply(this, [2, bus].concat(channelsArray));
-        return 0; // Out has no output
-      },
+      ctor: out_ctor(2),
+      multiCall: false,
       Klass: Out
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
-      ctor: function(bus, channelsArray) {
-        this.init.apply(this, [1, bus].concat(channelsArray));
-        return 0; // Out has no output
-      },
+      ctor: out_ctor(1),
+      multiCall: false,
       Klass: Out
     }
   };
@@ -2614,17 +2620,20 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       return new UGen(name);
     };
     Object.keys(payload).forEach(function(key) {
-      var defaults = payload[key].defaults;
-      var ctor     = payload[key].ctor;
-      var Klass    = payload[key].Klass || UGen;
-      defaults += ",tag";
+      var setting   = payload[key];
+      var defaults  = setting.defaults + ",tag";
+      var ctor      = setting.ctor;
+      var multiCall = setting.multiCall;
+      if (multiCall === undefined) {
+        multiCall = true;
+      }
+      var Klass     = setting.Klass || UGen;
       klass[key] = fn(function() {
         var args = slice.call(arguments, 0, arguments.length - 1);
         var tag  = arguments[arguments.length - 1];
         return ctor.apply(new Klass(name, tag), args);
-      }).defaults(defaults).multiCall().build();
+      }).defaults(defaults).multiCall(multiCall).build();
     });
-    payload = 0;
   };
   
   module.exports = {
@@ -3852,15 +3861,45 @@ define('cc/server/ugen/installer', function(require, exports, module) {
   var install = function() {
     require("./ugen").install();
     require("./basic_ops").install();
-    require("./osc").install();
     require("./line").install();
+    require("./osc").install();
+    require("./pan").install();
     require("./ui").install();
   };
-
+  
   module.exports = {
     install: install
   };
  
+});
+define('cc/server/ugen/line', function(require, exports, module) {
+  
+  var ugen = require("./ugen");
+  
+  var Line = {
+    ar: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+  
+  var install = function() {
+    ugen.register("Line", Line);
+  };
+  
+  module.exports = {
+    Line: Line,
+    install: install
+  };
+
 });
 define('cc/server/ugen/osc', function(require, exports, module) {
   
@@ -3891,31 +3930,41 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/line', function(require, exports, module) {
-  
+define('cc/server/ugen/pan', function(require, exports, module) {
+
   var ugen = require("./ugen");
+  var OutputProxy = ugen.OutputProxy;
+
+  var pan2_ctor = function(rate) {
+    return function(_in, pos, level) {
+      this.init.call(this, rate, _in, pos, level);
+      this.channels = [
+        new OutputProxy(this.rate, this, 0),
+        new OutputProxy(this.rate, this, 1),
+      ];
+      this.numOfOutputs = 2;
+      return this.channels;
+    };
+  };
   
-  var Line = {
+  var Pan2 = {
     ar: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(2, start, end, dur, doneAction).madd(mul, add);
-      }
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(2),
+      Klass: ugen.MultiOutUGen
     },
     kr: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(1, start, end, dur, doneAction).madd(mul, add);
-      }
-    }
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(1),
+      Klass: ugen.MultiOutUGen
+    },
   };
   
   var install = function() {
-    ugen.register("Line", Line);
+    ugen.register("Pan2", Pan2);
   };
   
   module.exports = {
-    Line: Line,
     install: install
   };
 
@@ -3975,8 +4024,9 @@ define('cc/server/unit/installer', function(require, exports, module) {
   var install = function() {
     require("./unit").install();
     require("./basic_ops").install();
-    require("./osc").install();
     require("./line").install();
+    require("./osc").install();
+    require("./pan").install();
     require("./ui").install();
   };
   
@@ -5157,47 +5207,80 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/osc', function(require, exports, module) {
+define('cc/server/unit/line', function(require, exports, module) {
 
   var unit = require("./unit");
   
-  var twopi     = 2 * Math.PI;
-  var kSineSize = 8192;
-  var kSineMask = kSineSize - 1;
-  var kBadValue = new Float32Array([1e20])[0];
-  var gSine          = new Float32Array(kSineSize + 1);
-  var gInvSine       = new Float32Array(kSineSize + 1);
-  var gSineWavetable = new Float32Array(kSineSize * 2);
-  (function() {
-    var i;
-    for (i = 0; i < kSineSize; ++i) {
-      var d = Math.sin(twopi * (i / kSineSize));
-      gSine[i] = d;
-      gInvSine[i] = 1 / d;
-    }
-    gSine[kSineSize] = gSine[0];
-    gInvSine[0] = gInvSine[kSineSize>>1] = gInvSine[kSineSize] = kBadValue;
-    var sz = kSineSize, sz2 = sz >> 1;
-    for (i = 1; i <= 8; ++i) {
-      gInvSine[i] = gInvSine[sz-i] = gInvSine[sz2-i] = gInvSine[sz2+i] = kBadValue;
-    }
-  })();
-  (function() {
-    (function(signal, wavetable, inSize) {
-      var val1, val2;
-      var i, j;
-      for (i = j = 0; i < inSize - 1; ++i) {
-        val1 = signal[i];
-        val2 = signal[i+1];
-        wavetable[j++] = 2 * val1 - val2;
-        wavetable[j++] = val2 - val1;
+  var Line = function() {
+    var ctor = function() {
+      this.process = next;
+      var start = this.inputs[0][0];
+      var end = this.inputs[1][0];
+      var dur = this.inputs[2][0];
+      var counter = Math.round(dur * this.rate.sampleRate);
+      this._counter = Math.max(1, counter);
+      if (counter === 0) {
+        this._level = end;
+        this._slope = 0;
+      } else {
+        this._slope = (end - start) / this._counter;
+        this._level = start + this._slope;
       }
-      val1 = signal[inSize - 1];
-      val2 = signal[0];
-      wavetable[j++] = 2 * val1 - val2;
-      wavetable[j++] = val2 - val1;
-    })(gSine, gSineWavetable, kSineSize);
-  })();
+      this._endLevel = end;
+      this._doneAction = this.inputs[3][0];
+      this.outs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var level   = this._level;
+      var counter = this._counter;
+      var slope   = this._slope;
+      var i, remain = inNumSamples;
+      do {
+        var nsmps;
+        if (counter === 0) {
+          nsmps  = remain;
+          remain = 0;
+          var endLevel = this._endLevel;
+          for (i = 0; i < nsmps; ++i) {
+            outs[i] = endLevel;
+          }
+        } else {
+          nsmps = Math.min(remain, counter);
+          counter -= nsmps;
+          remain  -= nsmps;
+          for (i = 0; i < nsmps; ++i) {
+            outs[i] = level;
+            level += slope;
+          }
+          if (counter === 0) {
+            this.doneAction(this._doneAction);
+          }
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  };
+  
+  module.exports = {
+    install: function() {
+      unit.register("Line", Line);
+    }
+  };
+
+});
+define('cc/server/unit/osc', function(require, exports, module) {
+
+  var unit = require("./unit");
+  var table = require("./table");
+  
+  var twopi = 2 * Math.PI;
+  var kSineSize = table.kSineSize;
+  var kSineMask = table.kSineMask;
+  var gSineWavetable = table.gSineWavetable;
   
   var SinOsc = function() {
     var ctor = function() {
@@ -5373,67 +5456,155 @@ define('cc/server/unit/osc', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/line', function(require, exports, module) {
+define('cc/server/unit/table', function(require, exports, module) {
+
+  var twopi     = 2 * Math.PI;
+  var kSineSize = 8192;
+  var kSineMask = kSineSize - 1;
+  var kBadValue = new Float32Array([1e20])[0];
+  var gSine          = new Float32Array(kSineSize + 1);
+  var gInvSine       = new Float32Array(kSineSize + 1);
+  var gSineWavetable = new Float32Array(kSineSize * 2);
+  (function() {
+    var i;
+    for (i = 0; i < kSineSize; ++i) {
+      var d = Math.sin(twopi * (i / kSineSize));
+      gSine[i] = d;
+      gInvSine[i] = 1 / d;
+    }
+    gSine[kSineSize] = gSine[0];
+    gInvSine[0] = gInvSine[kSineSize>>1] = gInvSine[kSineSize] = kBadValue;
+    var sz = kSineSize, sz2 = sz >> 1;
+    for (i = 1; i <= 8; ++i) {
+      gInvSine[i] = gInvSine[sz-i] = gInvSine[sz2-i] = gInvSine[sz2+i] = kBadValue;
+    }
+  })();
+  (function() {
+    (function(signal, wavetable, inSize) {
+      var val1, val2;
+      var i, j;
+      for (i = j = 0; i < inSize - 1; ++i) {
+        val1 = signal[i];
+        val2 = signal[i+1];
+        wavetable[j++] = 2 * val1 - val2;
+        wavetable[j++] = val2 - val1;
+      }
+      val1 = signal[inSize - 1];
+      val2 = signal[0];
+      wavetable[j++] = 2 * val1 - val2;
+      wavetable[j++] = val2 - val1;
+    })(gSine, gSineWavetable, kSineSize);
+  })();
+  
+  module.exports = {
+    kSineSize: kSineSize,
+    kSineMask: kSineMask,
+    gSine         : gSine,
+    gInvSine      : gInvSine,
+    gSineWavetable: gSineWavetable,
+  };
+
+});
+
+       
+define('cc/server/unit/pan', function(require, exports, module) {
 
   var unit = require("./unit");
+  var table = require("./table");
+  var gSine = table.gSine;
   
-  var Line = function() {
+  var Pan2 = function() {
     var ctor = function() {
-      this.process = next;
-      var start = this.inputs[0][0];
-      var end = this.inputs[1][0];
-      var dur = this.inputs[2][0];
-      var counter = Math.round(dur * this.rate.sampleRate);
-      this._counter = Math.max(1, counter);
-      if (counter === 0) {
-        this._level = end;
-        this._slope = 0;
+      if (this.inRates[1] === 2) {
+        this.process = aa;
       } else {
-        this._slope = (end - start) / this._counter;
-        this._level = start + this._slope;
+        this.process = ak;
       }
-      this._endLevel = end;
-      this._doneAction = this.inputs[3][0];
-      this.outs[0][0] = this._level;
+      this._pos   = this.inputs[1][0];
+      this._level = this.inputs[2][0];
+      var ipos = (1024 * this._pos + 1024 + 0.5)|0;
+      ipos = Math.max(0, Math.min(ipos, 2048));
+      this._leftAmp  = this._level * gSine[2048 - ipos];
+      this._rightAmp = this._level * gSine[ipos];
+      aa.call(this, 1);
     };
-    var next = function(inNumSamples) {
+    var ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var level   = this._level;
-      var counter = this._counter;
-      var slope   = this._slope;
-      var i, remain = inNumSamples;
-      do {
-        var nsmps;
-        if (counter === 0) {
-          nsmps  = remain;
-          remain = 0;
-          var endLevel = this._endLevel;
-          for (i = 0; i < nsmps; ++i) {
-            outs[i] = endLevel;
-          }
-        } else {
-          nsmps = Math.min(remain, counter);
-          counter -= nsmps;
-          remain  -= nsmps;
-          for (i = 0; i < nsmps; ++i) {
-            outs[i] = level;
-            level += slope;
-          }
-          if (counter === 0) {
-            this.doneAction(this._doneAction);
-          }
+      var leftOut  = this.outs[0];
+      var rightOut = this.outs[1];
+      var inIn  = this.inputs[0];
+      var pos   = this.inputs[1][0];
+      var level = this.inputs[2][0];
+      var leftAmp  = this._leftAmp;
+      var rightAmp = this._rightAmp;
+      var i, _in;
+      if (pos !== this._pos || level !== this._level) {
+        var ipos = (1024 * pos + 1024 + 0.5)|0;
+        ipos = Math.max(0, Math.min(ipos, 2048));
+        var nextLeftAmp  = level * gSine[2048 - ipos];
+        var nextRightAmp = level * gSine[ipos];
+        var slopeFactor = this.rate.slopeFactor;
+        var leftAmp_slope  = (nextLeftAmp  - leftAmp ) * slopeFactor;
+        var rightAmp_slope = (nextRightAmp - rightAmp) * slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+          leftAmp  += leftAmp_slope;
+          rightAmp += rightAmp_slope;
         }
-      } while (remain);
-      this._counter = counter;
-      this._level   = level;
+        this._pos = pos;
+        this._level = level;
+        this._leftAmp  = nextLeftAmp;
+        this._rightAmp = nextRightAmp;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+        }
+      }
+    };
+    var aa = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var leftOut  = this.outs[0];
+      var rightOut = this.outs[1];
+      var inIn  = this.inputs[0];
+      var posIn = this.inputs[1];
+      var nextLevel = this.inputs[2][0];
+      var level = this._level;
+      var i, _in, ipos, leftAmp, rightAmp;
+      if (level !== nextLevel) {
+        var level_slope = (nextLevel - level) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          ipos = (1024 * posIn[i] + 1024 + 0.5)|0;
+          ipos = Math.max(0, Math.min(ipos, 2048));
+          leftAmp  = level * gSine[2048 - ipos];
+          rightAmp = level * gSine[ipos];
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+          level += level_slope;
+        }
+        this._level = nextLevel;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          ipos = (1024 * posIn[i] + 1024 + 0.5)|0;
+          ipos = Math.max(0, Math.min(ipos, 2048));
+          leftAmp  = level * gSine[2048 - ipos];
+          rightAmp = level * gSine[ipos];
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+        }
+      }
     };
     return ctor;
   };
   
   module.exports = {
     install: function() {
-      unit.register("Line", Line);
+      unit.register("Pan2", Pan2);
     }
   };
 
