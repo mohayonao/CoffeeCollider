@@ -28,19 +28,20 @@ define(function(require, exports, module) {
       this.bufLength = bufLength;
       this.done      = false;
     }
-    Unit.prototype.init = function() {
+    Unit.prototype.init = function(tag) {
       var ctor = units[this.name];
       if (ctor) {
         ctor.call(this);
       } else {
         console.warn(this.name + "'s ctor is not found.");
       }
+      this.tag = tag;
       return this;
     };
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent._doneAction(action);
+        this.parent._doneAction(action, this.tag);
       }
     };
     return Unit;

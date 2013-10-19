@@ -1711,10 +1711,10 @@ define('cc/server/node', function(require, exports, module) {
     Node.prototype.stop = fn.sync(function() {
       free.call(this);
     });
-    Node.prototype._doneAction = function(action) {
+    Node.prototype._doneAction = function(action, tag) {
       var func = doneAction[action];
       if (func) {
-        this.emit("done");
+        this.emit("done", tag);
         func.call(this);
       }
     };
@@ -1782,6 +1782,7 @@ define('cc/server/node', function(require, exports, module) {
         var inputs  = unit.inputs;
         var inRates = unit.inRates;
         var inSpec  = unit.specs[3];
+        var tag     = unit.specs[5];
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
@@ -1792,7 +1793,7 @@ define('cc/server/node', function(require, exports, module) {
             inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
           }
         }
-        unit.init();
+        unit.init(tag);
         return !!unit.process;
       });
       return this;
@@ -1957,7 +1958,7 @@ define('cc/server/node', function(require, exports, module) {
         } else {
           outputs = [];
         }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
       });
       var specs = {
         consts: consts,
@@ -2489,8 +2490,9 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   var addToSynthDef = null;
   
   var UGen = (function() {
-    function UGen(name) {
+    function UGen(name, tag) {
       this.klassName = name;
+      this.tag  = tag || "";
       this.rate = 2;
       this.signalRange = 2;
       this.specialIndex = 0;
@@ -2603,8 +2605,11 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       var defaults = payload[key].defaults;
       var ctor     = payload[key].ctor;
       var Klass    = payload[key].Klass || UGen;
+      defaults += ",tag";
       klass[key] = fn(function() {
-        return ctor.apply(new Klass(name), arguments);
+        var args = slice.call(arguments, 0, arguments.length - 1);
+        var tag  = arguments[arguments.length - 1];
+        return ctor.apply(new Klass(name, tag), args);
       }).defaults(defaults).multiCall().build();
     });
     payload = 0;
@@ -2651,19 +2656,20 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.bufLength = bufLength;
       this.done      = false;
     }
-    Unit.prototype.init = function() {
+    Unit.prototype.init = function(tag) {
       var ctor = units[this.name];
       if (ctor) {
         ctor.call(this);
       } else {
         console.warn(this.name + "'s ctor is not found.");
       }
+      this.tag = tag;
       return this;
     };
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent._doneAction(action);
+        this.parent._doneAction(action, this.tag);
       }
     };
     return Unit;

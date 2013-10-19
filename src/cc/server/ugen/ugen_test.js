@@ -35,6 +35,12 @@ define(function(require, exports, module) {
         assert.equal(C.AUDIO  , Test.ar().rate);
         assert.equal(C.CONTROL, Test.kr().rate);
       });
+      it("args", function() {
+        var instance = Test.ar(10, {tag:"TEST"});
+        assert.equal(2, instance.numOfInputs);
+        assert.deepEqual([10, 2], instance.inputs);
+        assert.equal("TEST", instance.tag);
+      });
     });
     describe("MultiOutUGen", function() {
       it("case 1", function() {

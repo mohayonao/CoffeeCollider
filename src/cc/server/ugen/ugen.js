@@ -7,8 +7,9 @@ define(function(require, exports, module) {
   var addToSynthDef = null;
   
   var UGen = (function() {
-    function UGen(name) {
+    function UGen(name, tag) {
       this.klassName = name;
+      this.tag  = tag || "";
       this.rate = C.AUDIO;
       this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
@@ -121,8 +122,11 @@ define(function(require, exports, module) {
       var defaults = payload[key].defaults;
       var ctor     = payload[key].ctor;
       var Klass    = payload[key].Klass || UGen;
+      defaults += ",tag";
       klass[key] = fn(function() {
-        return ctor.apply(new Klass(name), arguments);
+        var args = slice.call(arguments, 0, arguments.length - 1);
+        var tag  = arguments[arguments.length - 1];
+        return ctor.apply(new Klass(name, tag), args);
       }).defaults(defaults).multiCall().build();
     });
     payload = 0;

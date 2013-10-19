@@ -282,10 +282,10 @@ define(function(require, exports, module) {
     Node.prototype.stop = fn.sync(function() {
       free.call(this);
     });
-    Node.prototype._doneAction = function(action) {
+    Node.prototype._doneAction = function(action, tag) {
       var func = doneAction[action];
       if (func) {
-        this.emit("done");
+        this.emit("done", tag);
         func.call(this);
       }
     };
@@ -353,6 +353,7 @@ define(function(require, exports, module) {
         var inputs  = unit.inputs;
         var inRates = unit.inRates;
         var inSpec  = unit.specs[3];
+        var tag     = unit.specs[5];
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
@@ -363,7 +364,7 @@ define(function(require, exports, module) {
             inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
           }
         }
-        unit.init();
+        unit.init(tag);
         return !!unit.process;
       });
       return this;
@@ -528,7 +529,7 @@ define(function(require, exports, module) {
         } else {
           outputs = [];
         }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs ];
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
       });
       var specs = {
         consts: consts,
