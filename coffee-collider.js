@@ -1906,6 +1906,11 @@ define('cc/server/node', function(require, exports, module) {
         args = { keys:[], vals:[] };
       }
       
+      var children = [];
+      ugen.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
       var params  = { names:[], indices:[], length:[], values:[] };
       var flatten = [];
       var i, imax, length;
@@ -1930,11 +1935,6 @@ define('cc/server/node', function(require, exports, module) {
           reshaped.push(saved.shift());
         }
       }
-      
-      var children = [];
-      ugen.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
       
       try {
         func.apply(null, reshaped);
