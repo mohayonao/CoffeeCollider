@@ -431,26 +431,30 @@ define(function(require, exports, module) {
     function SynthDef(func, args) {
       this.klassName = "SynthDef";
       var isVaridArgs = false;
-      if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
-        args = unpackArguments(args);
-        if (args) {
-          isVaridArgs = args.vals.every(function(item) {
-            if (typeof item === "number") {
-              return true;
-            } else if (Array.isArray(item)) {
-              return item.every(function(item) {
-                return typeof item === "number";
-              });
-            }
-            if (item === undefined || item === null) {
-              return true;
-            }
-            return false;
-          });
+      if (args) {
+        if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
+          args = unpackArguments(args);
+          if (args) {
+            isVaridArgs = args.vals.every(function(item) {
+              if (typeof item === "number") {
+                return true;
+              } else if (Array.isArray(item)) {
+                return item.every(function(item) {
+                  return typeof item === "number";
+                });
+              }
+              if (item === undefined || item === null) {
+                return true;
+              }
+              return false;
+            });
+          }
         }
-      }
-      if (!isVaridArgs) {
-        throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
+        if (!isVaridArgs) {
+          throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
+        }
+      } else {
+        args = { keys:[], vals:[] };
       }
       
       var params  = { names:[], indices:[], length:[], values:[] };
