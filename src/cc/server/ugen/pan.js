@@ -16,7 +16,7 @@ define(function(require, exports, module) {
     };
   };
   
-  var Pan2 = {
+  var iPan2 = {
     ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.AUDIO),
@@ -30,7 +30,7 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("Pan2", Pan2);
+    ugen.register("Pan2", iPan2);
   };
   
   module.exports = {

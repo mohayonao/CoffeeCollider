@@ -103,7 +103,7 @@ define(function(require, exports, module) {
     };
   };
   
-  var OutIntarface = {
+  var iOut = {
     ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.AUDIO),
@@ -118,7 +118,7 @@ define(function(require, exports, module) {
     }
   };
 
-  var InInterface = {
+  var iIn = {
     ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
@@ -144,8 +144,8 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    register("Out", OutIntarface);
-    register("In" , InInterface );
+    register("Out", iOut);
+    register("In" , iIn );
   };
   
   var register = function(name, payload) {

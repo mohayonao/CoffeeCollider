@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var ugen = require("./ugen");
 
-  var Comb = {
+  var iComb = {
     ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
@@ -20,9 +20,9 @@ define(function(require, exports, module) {
   
   module.exports = {
     install: function() {
-      ugen.register("CombN", Comb);
-      ugen.register("CombL", Comb);
-      ugen.register("CombC", Comb);
+      ugen.register("CombN", iComb);
+      ugen.register("CombL", iComb);
+      ugen.register("CombC", iComb);
     }
   };
 

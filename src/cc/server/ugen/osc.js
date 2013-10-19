@@ -3,7 +3,7 @@ define(function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var SinOsc = {
+  var iSinOsc = {
     ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
@@ -19,11 +19,10 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("SinOsc", SinOsc);
+    ugen.register("SinOsc", iSinOsc);
   };
   
   module.exports = {
-    SinOsc: SinOsc,
     install: install
   };
 

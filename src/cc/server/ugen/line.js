@@ -3,7 +3,7 @@ define(function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var Line = {
+  var iLine = {
     ar: {
       defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
@@ -19,11 +19,10 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("Line", Line);
+    ugen.register("Line", iLine);
   };
   
   module.exports = {
-    Line: Line,
     install: install
   };
 

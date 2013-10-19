@@ -3,7 +3,7 @@ define(function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var MouseX = {
+  var iMouseXY = {
     kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
@@ -16,20 +16,7 @@ define(function(require, exports, module) {
       }
     }
   };
-  var MouseY = {
-    kr: {
-      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
-      ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
-        return this.init(C.CONTROL, minval, maxval, warp, lag);
-      }
-    }
-  };
-  var MouseButton = {
+  var iMouseButton = {
     kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
@@ -39,9 +26,9 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("MouseX", MouseX);
-    ugen.register("MouseY", MouseY);
-    ugen.register("MouseButton", MouseButton);
+    ugen.register("MouseX", iMouseXY);
+    ugen.register("MouseY", iMouseXY);
+    ugen.register("MouseButton", iMouseButton);
   };
   
   module.exports = {

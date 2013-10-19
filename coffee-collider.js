@@ -2592,7 +2592,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     };
   };
   
-  var OutIntarface = {
+  var iOut = {
     ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(2),
@@ -2607,7 +2607,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
     }
   };
 
-  var InInterface = {
+  var iIn = {
     ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
@@ -2633,8 +2633,8 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   };
   
   var install = function() {
-    register("Out", OutIntarface);
-    register("In" , InInterface );
+    register("Out", iOut);
+    register("In" , iIn );
   };
   
   var register = function(name, payload) {
@@ -3932,7 +3932,7 @@ define('cc/server/ugen/delay', function(require, exports, module) {
 
   var ugen = require("./ugen");
 
-  var Comb = {
+  var iComb = {
     ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
@@ -3949,9 +3949,9 @@ define('cc/server/ugen/delay', function(require, exports, module) {
   
   module.exports = {
     install: function() {
-      ugen.register("CombN", Comb);
-      ugen.register("CombL", Comb);
-      ugen.register("CombC", Comb);
+      ugen.register("CombN", iComb);
+      ugen.register("CombL", iComb);
+      ugen.register("CombC", iComb);
     }
   };
 
@@ -3960,7 +3960,7 @@ define('cc/server/ugen/line', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var Line = {
+  var iLine = {
     ar: {
       defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
@@ -3976,11 +3976,10 @@ define('cc/server/ugen/line', function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("Line", Line);
+    ugen.register("Line", iLine);
   };
   
   module.exports = {
-    Line: Line,
     install: install
   };
 
@@ -3989,7 +3988,7 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var SinOsc = {
+  var iSinOsc = {
     ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
@@ -4005,11 +4004,10 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("SinOsc", SinOsc);
+    ugen.register("SinOsc", iSinOsc);
   };
   
   module.exports = {
-    SinOsc: SinOsc,
     install: install
   };
 
@@ -4031,7 +4029,7 @@ define('cc/server/ugen/pan', function(require, exports, module) {
     };
   };
   
-  var Pan2 = {
+  var iPan2 = {
     ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(2),
@@ -4045,7 +4043,7 @@ define('cc/server/ugen/pan', function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("Pan2", Pan2);
+    ugen.register("Pan2", iPan2);
   };
   
   module.exports = {
@@ -4057,7 +4055,7 @@ define('cc/server/ugen/ui', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
-  var MouseX = {
+  var iMouseXY = {
     kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
@@ -4070,20 +4068,7 @@ define('cc/server/ugen/ui', function(require, exports, module) {
       }
     }
   };
-  var MouseY = {
-    kr: {
-      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
-      ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
-        return this.init(1, minval, maxval, warp, lag);
-      }
-    }
-  };
-  var MouseButton = {
+  var iMouseButton = {
     kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
@@ -4093,9 +4078,9 @@ define('cc/server/ugen/ui', function(require, exports, module) {
   };
   
   var install = function() {
-    ugen.register("MouseX", MouseX);
-    ugen.register("MouseY", MouseY);
-    ugen.register("MouseButton", MouseButton);
+    ugen.register("MouseX", iMouseXY);
+    ugen.register("MouseY", iMouseXY);
+    ugen.register("MouseButton", iMouseButton);
   };
   
   module.exports = {
