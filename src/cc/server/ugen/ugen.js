@@ -117,6 +117,27 @@ define(function(require, exports, module) {
       Klass: Out
     }
   };
+
+  var InInterface = {
+    ar: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, C.AUDIO);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    },
+    kr: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, C.CONTROL);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    }
+  };
   
   var setSynthDef = function(func) {
     addToSynthDef = func;
@@ -124,6 +145,7 @@ define(function(require, exports, module) {
   
   var install = function() {
     register("Out", OutIntarface);
+    register("In" , InInterface );
   };
   
   var register = function(name, payload) {

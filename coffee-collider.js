@@ -2606,6 +2606,27 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       Klass: Out
     }
   };
+
+  var InInterface = {
+    ar: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 2);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    },
+    kr: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 1);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    }
+  };
   
   var setSynthDef = function(func) {
     addToSynthDef = func;
@@ -2613,6 +2634,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
   
   var install = function() {
     register("Out", OutIntarface);
+    register("In" , InInterface );
   };
   
   var register = function(name, payload) {
@@ -2773,6 +2795,38 @@ define('cc/server/unit/unit', function(require, exports, module) {
     return ctor;
   };
 
+  var In = function() {
+    var ctor = function() {
+      this._busBuffer = cc.server.busBuffer;
+      this._bufLength = cc.server.bufLength;
+      if (this.calcRate === 2) {
+        this.process = next_a;
+        this._busOffset = 0;
+      } else {
+        this.process = next_k;
+        this._busOffset = this._bufLength * 128;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var busBuffer = this._busBuffer;
+      var bufLength = this._bufLength;
+      var offset = (this.inputs[0][0] * bufLength)|0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        outs[i] = busBuffer[offset + i];
+      }
+    };
+    var next_k = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs  = this.outs[0];
+      var value = this._busBuffer[this._busOffset + (this.inputs[0][0]|0)];
+      for (var i = 0; i < inNumSamples; ++i) {
+        outs[i] = value;
+      }
+    };
+    return ctor;
+  };
   
   var register = function(name, payload) {
     units[name] = payload();
@@ -2781,6 +2835,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
   var install = function() {
     register("Control", Control);
     register("Out"    , Out    );
+    register("In"     , In     );
   };
   
   module.exports = {
