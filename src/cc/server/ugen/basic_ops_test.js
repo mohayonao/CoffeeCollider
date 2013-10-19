@@ -15,7 +15,6 @@ define(function(require, exports, module) {
         var a = new UGen().init(C.AUDIO);
         var b = new UGen().init(C.AUDIO);
         var x = new BinaryOpUGen().init("+", a, b);
-        console.log(x.klassName);
         assert.instanceOf(x, BinaryOpUGen);
         assert.equal(x.inputs[0], a);
         assert.equal(x.inputs[1], b);

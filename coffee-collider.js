@@ -2011,7 +2011,8 @@ define('cc/server/node', function(require, exports, module) {
     }).multiCall().build();
 
     var topoSort = (function() {
-      var _topoSort = function(x, list) {
+      var _topoSort = function(x, list, checked) {
+        checked.push(x);
         var index = list.indexOf(x);
         if (index !== -1) {
           list.splice(index, 1);
@@ -2019,17 +2020,22 @@ define('cc/server/node', function(require, exports, module) {
         list.unshift(x);
         if (x.inputs) {
           x.inputs.forEach(function(x) {
-            _topoSort(x, list);
+            _topoSort(x, list, checked);
           });
         }
       };
       return function(list) {
+        var checked = [];
         list.forEach(function(x) {
           if (x instanceof ugen.Out) {
+            checked.push(x);
             x.inputs.forEach(function(x) {
-              _topoSort(x, list);
+              _topoSort(x, list, checked);
             });
           }
+        });
+        list = list.filter(function(x) {
+          return checked.indexOf(x) !== -1;
         });
         return list;
       };
@@ -2527,7 +2533,13 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.channels = channels;
       this.numOfOutputs = channels.length;
       this.inputs = this.inputs.map(function(ugen) {
-        return (ugen instanceof UGen) ? ugen : ugen.valueOf();
+        if (!(ugen instanceof UGen)) {
+          ugen = +ugen;
+          if (isNaN(ugen)) {
+            ugen = 0;
+          }
+        }
+        return ugen;
       });
       this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;

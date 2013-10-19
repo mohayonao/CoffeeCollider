@@ -582,7 +582,8 @@ define(function(require, exports, module) {
     }).multiCall().build();
 
     var topoSort = (function() {
-      var _topoSort = function(x, list) {
+      var _topoSort = function(x, list, checked) {
+        checked.push(x);
         var index = list.indexOf(x);
         if (index !== -1) {
           list.splice(index, 1);
@@ -590,17 +591,22 @@ define(function(require, exports, module) {
         list.unshift(x);
         if (x.inputs) {
           x.inputs.forEach(function(x) {
-            _topoSort(x, list);
+            _topoSort(x, list, checked);
           });
         }
       };
       return function(list) {
+        var checked = [];
         list.forEach(function(x) {
           if (x instanceof ugen.Out) {
+            checked.push(x);
             x.inputs.forEach(function(x) {
-              _topoSort(x, list);
+              _topoSort(x, list, checked);
             });
           }
+        });
+        list = list.filter(function(x) {
+          return checked.indexOf(x) !== -1;
         });
         return list;
       };

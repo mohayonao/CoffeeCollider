@@ -44,7 +44,13 @@ define(function(require, exports, module) {
       this.channels = channels;
       this.numOfOutputs = channels.length;
       this.inputs = this.inputs.map(function(ugen) {
-        return (ugen instanceof UGen) ? ugen : ugen.valueOf();
+        if (!(ugen instanceof UGen)) {
+          ugen = +ugen;
+          if (isNaN(ugen)) {
+            ugen = 0;
+          }
+        }
+        return ugen;
       });
       this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;
