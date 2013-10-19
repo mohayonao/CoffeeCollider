@@ -92,22 +92,28 @@ define(function(require, exports, module) {
     fn.extend(Out, UGen);
     return Out;
   })();
+
+  var out_ctor = function(rate) {
+    return function(bus, channelsArray) {
+      if (!(bus instanceof UGen || typeof bus === "number")) {
+        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
+      }
+      this.init.apply(this, [rate, bus].concat(channelsArray));
+      return 0; // Out has no output
+    };
+  };
   
   var OutIntarface = {
     ar: {
       defaults: "bus=0,channelsArray=0",
-      ctor: function(bus, channelsArray) {
-        this.init.apply(this, [C.AUDIO, bus].concat(channelsArray));
-        return 0; // Out has no output
-      },
+      ctor: out_ctor(C.AUDIO),
+      multiCall: false,
       Klass: Out
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
-      ctor: function(bus, channelsArray) {
-        this.init.apply(this, [C.CONTROL, bus].concat(channelsArray));
-        return 0; // Out has no output
-      },
+      ctor: out_ctor(C.CONTROL),
+      multiCall: false,
       Klass: Out
     }
   };
@@ -125,17 +131,20 @@ define(function(require, exports, module) {
       return new UGen(name);
     };
     Object.keys(payload).forEach(function(key) {
-      var defaults = payload[key].defaults;
-      var ctor     = payload[key].ctor;
-      var Klass    = payload[key].Klass || UGen;
-      defaults += ",tag";
+      var setting   = payload[key];
+      var defaults  = setting.defaults + ",tag";
+      var ctor      = setting.ctor;
+      var multiCall = setting.multiCall;
+      if (multiCall === undefined) {
+        multiCall = true;
+      }
+      var Klass     = setting.Klass || UGen;
       klass[key] = fn(function() {
         var args = slice.call(arguments, 0, arguments.length - 1);
         var tag  = arguments[arguments.length - 1];
         return ctor.apply(new Klass(name, tag), args);
-      }).defaults(defaults).multiCall().build();
+      }).defaults(defaults).multiCall(multiCall).build();
     });
-    payload = 0;
   };
   
   module.exports = {
