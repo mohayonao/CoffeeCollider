@@ -1685,6 +1685,7 @@ define('cc/server/node', function(require, exports, module) {
     this.prev = null;
     this.next = null;
     this.parent = null;
+    this.blocking = false;
   };
   var g_freeAll = function(node) {
     var next = node.head;
@@ -1717,6 +1718,7 @@ define('cc/server/node', function(require, exports, module) {
       this.next   = null;
       this.prev   = null;
       this.parent = null;
+      this.blocking = true;
       this._running = true;
     }
     fn.extend(Node, Emitter);
@@ -2960,6 +2962,7 @@ define('cc/server/sched', function(require, exports, module) {
     function Task(timeline) {
       Emitter.call(this);
       this.klassName = "Task";
+      this.blocking  = true;
       this._timeline = timeline || cc.server.timeline;
       this._context = new TaskContext(this);
       this._queue = [];
@@ -2994,6 +2997,7 @@ define('cc/server/sched', function(require, exports, module) {
       }
       this._bang = false;
       this._timeline = null;
+      this.blocking = false;
       this.emit("end");
       if (this._next) {
         this._next._prev = null;
@@ -3076,8 +3080,8 @@ define('cc/server/sched', function(require, exports, module) {
           default:
             if (Array.isArray(e)) {
               e[0].apply(e[1], e[2]);
-            } else if (e instanceof Task) {
-              if (e._timeline !== null) {
+            } else {
+              if (e.blocking) {
                 break LOOP;
               }
             }
@@ -3222,35 +3226,29 @@ define('cc/server/sched', function(require, exports, module) {
     
     return TaskInterval;
   })();
-
+  
   var TaskBlock = (function() {
     function TaskBlock(count) {
-      Task.call(this);
+      this.klassName = "TaskBlock";
       if (typeof count !== "number") {
         count = 1;
       }
-      this._index = count;
+      this._count = count;
+      this.blocking = true;
     }
-    fn.extend(TaskBlock, Task);
-    TaskBlock.prototype.play = function() {
-    };
-    TaskBlock.prototype.pause = function() {
-    };
-    TaskBlock.prototype.stop = function() {
-    };
     TaskBlock.prototype.lock = fn.sync(function(count) {
       if (typeof count !== "number") {
         count = 1;
       }
-      this._index += count;
+      this._count += count;
     });
     TaskBlock.prototype.free = fn.sync(function(count) {
       if (typeof count !== "number") {
         count = 1;
       }
-      this._index -= count;
-      if (this._index <= 0) {
-        Task.prototype.stop.call(this);
+      this._count -= count;
+      if (this._count <= 0) {
+        this.blocking = false;
       }
     });
     return TaskBlock;

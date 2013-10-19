@@ -236,6 +236,7 @@ define(function(require, exports, module) {
     this.prev = null;
     this.next = null;
     this.parent = null;
+    this.blocking = false;
   };
   var g_freeAll = function(node) {
     var next = node.head;
@@ -268,6 +269,7 @@ define(function(require, exports, module) {
       this.next   = null;
       this.prev   = null;
       this.parent = null;
+      this.blocking = true;
       this._running = true;
     }
     fn.extend(Node, Emitter);
