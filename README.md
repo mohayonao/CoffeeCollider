@@ -29,7 +29,7 @@ Task.loop ->
 
 ## Documents
 
-[imperfect documents](https://github.com/mohayonao/CoffeeCollider/wiki)
+[imperfect documents](https://github.com/mohayonao/CoffeeCollider/wiki/_pages)
 
 ## Supports
 
