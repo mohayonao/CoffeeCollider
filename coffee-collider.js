@@ -2105,135 +2105,137 @@ define('cc/server/node', function(require, exports, module) {
     return SynthDef;
   })();
 
-  var GroupInterface = {
-    after: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.after: arguments[0] is not a Node.");
-      }
-      return new Group(node, -4);
-    },
-    before: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.before: arguments[0] is not a Node.");
-      }
-      return new Group(node, -3);
-    },
-    head: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Group)) {
-        throw new TypeError("Group.head: arguments[0] is not a Group.");
-      }
-      return new Group(node, -1);
-    },
-    tail: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Group)) {
-        throw new TypeError("Group.tail: arguments[0] is not a Group.");
-      }
-      return new Group(node, -2);
-    },
-    replace: function(node) {
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.replace: arguments[0] is not a Node.");
-      }
-      return new Group(node, -5);
+  var GroupInterface = function() {
+    return new Group();
+  };
+  GroupInterface.after = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.after: arguments[0] is not a Node.");
     }
+    return new Group(node, -4);
+  };
+  GroupInterface.before = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.before: arguments[0] is not a Node.");
+    }
+    return new Group(node, -3);
+  };
+  GroupInterface.head = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.head: arguments[0] is not a Group.");
+    }
+    return new Group(node, -1);
+  };
+  GroupInterface.tail = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.tail: arguments[0] is not a Group.");
+    }
+    return new Group(node, -2);
+  };
+  GroupInterface.replace = function(node) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.replace: arguments[0] is not a Node.");
+    }
+    return new Group(node, -5);
   };
   
-  var SynthInterface = {
-    def: function(func, args) {
-      if (typeof func !== "function") {
-        throw new TypeError("Synth.def: arguments[0] is not a Function.");
-      }
-      return new SynthDef(func, args);
-    },
-    after: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.after: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, -4);
-    },
-    before: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.before: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, -3);
-    },
-    head: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Group)) {
-        throw new TypeError("Synth.head: arguments[0] is not a Group.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, -1);
-    },
-    tail: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Group)) {
-        throw new TypeError("Synth.tail: arguments[0] is not a Group.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, -2);
-    },
-    replace: function(node, def, args) {
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.replace: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, -5);
+  var SynthInterface = function() {
+    return new Synth();
+  };
+  SynthInterface.def = function(func, args) {
+    if (typeof func !== "function") {
+      throw new TypeError("Synth.def: arguments[0] is not a Function.");
     }
+    return new SynthDef(func, args);
+  };
+  SynthInterface.after = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.after: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, -4);
+  };
+  SynthInterface.before = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.before: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, -3);
+  };
+  SynthInterface.head = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.head: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, -1);
+  };
+  SynthInterface.tail = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, -2);
+  };
+  SynthInterface.replace = function(node, def, args) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, -5);
   };
   
   var install = function() {
@@ -3178,49 +3180,49 @@ define('cc/server/sched', function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var TaskInterface = {
-    "do": function(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.do: arguments[0] is not a Function.");
-      }
-      return new TaskDo(func);
-    },
-    loop: function(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.loop: arguments[0] is not a Function.");
-      }
-      return new TaskLoop(func);
-    },
-    each: function(list, func) {
-      if (!(Array.isArray(list))) {
-        throw new TypeError("Task.each: arguments[0] is not an Array.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.each: arguments[1] is not a Function.");
-      }
-      return new TaskEach(list, func);
-    },
-    timeout: function(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.timeout: arguments[0] is not a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.timeout: arguments[1] is not a Function.");
-      }
-      return new TaskTimeout(delay, func);
-    },
-    interval: function(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.interval: arguments[0] is not a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.interval: arguments[1] is not a Function.");
-      }
-      return new TaskInterval(delay, func);
-    },
-    block: function() {
-      return new TaskBlock();
-    },
+  var TaskInterface = function() {
+  };
+  TaskInterface["do"] = function(func) {
+    if (typeof func !== "function") {
+      throw new TypeError("Task.do: arguments[0] is not a Function.");
+    }
+    return new TaskDo(func);
+  };
+  TaskInterface.loop = function(func) {
+    if (typeof func !== "function") {
+      throw new TypeError("Task.loop: arguments[0] is not a Function.");
+    }
+    return new TaskLoop(func);
+  };
+  TaskInterface.each = function(list, func) {
+    if (!(Array.isArray(list))) {
+      throw new TypeError("Task.each: arguments[0] is not an Array.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.each: arguments[1] is not a Function.");
+    }
+    return new TaskEach(list, func);
+  };
+  TaskInterface.timeout = function(delay, func) {
+    if (typeof delay !== "number") {
+      throw new TypeError("Task.timeout: arguments[0] is not a Number.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.timeout: arguments[1] is not a Function.");
+    }
+    return new TaskTimeout(delay, func);
+  };
+  TaskInterface.interval = function(delay, func) {
+    if (typeof delay !== "number") {
+      throw new TypeError("Task.interval: arguments[0] is not a Number.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.interval: arguments[1] is not a Function.");
+    }
+    return new TaskInterval(delay, func);
+  };
+  TaskInterface.block = function() {
+    return new TaskBlock();
   };
   
   var install = function() {

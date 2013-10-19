@@ -676,135 +676,137 @@ define(function(require, exports, module) {
     return SynthDef;
   })();
 
-  var GroupInterface = {
-    after: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.after: arguments[0] is not a Node.");
-      }
-      return new Group(node, C.ADD_AFTER);
-    },
-    before: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.before: arguments[0] is not a Node.");
-      }
-      return new Group(node, C.ADD_BEFORE);
-    },
-    head: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Group)) {
-        throw new TypeError("Group.head: arguments[0] is not a Group.");
-      }
-      return new Group(node, C.ADD_TO_HEAD);
-    },
-    tail: function(node) {
-      node = node || cc.server.rootNode;
-      if (!(node instanceof Group)) {
-        throw new TypeError("Group.tail: arguments[0] is not a Group.");
-      }
-      return new Group(node, C.ADD_TO_TAIL);
-    },
-    replace: function(node) {
-      if (!(node instanceof Node)) {
-        throw new TypeError("Group.replace: arguments[0] is not a Node.");
-      }
-      return new Group(node, C.REPLACE);
+  var GroupInterface = function() {
+    return new Group();
+  };
+  GroupInterface.after = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.after: arguments[0] is not a Node.");
     }
+    return new Group(node, C.ADD_AFTER);
+  };
+  GroupInterface.before = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.before: arguments[0] is not a Node.");
+    }
+    return new Group(node, C.ADD_BEFORE);
+  };
+  GroupInterface.head = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.head: arguments[0] is not a Group.");
+    }
+    return new Group(node, C.ADD_TO_HEAD);
+  };
+  GroupInterface.tail = function(node) {
+    node = node || cc.server.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.tail: arguments[0] is not a Group.");
+    }
+    return new Group(node, C.ADD_TO_TAIL);
+  };
+  GroupInterface.replace = function(node) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.replace: arguments[0] is not a Node.");
+    }
+    return new Group(node, C.REPLACE);
   };
   
-  var SynthInterface = {
-    def: function(func, args) {
-      if (typeof func !== "function") {
-        throw new TypeError("Synth.def: arguments[0] is not a Function.");
-      }
-      return new SynthDef(func, args);
-    },
-    after: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.after: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_AFTER);
-    },
-    before: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.before: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_BEFORE);
-    },
-    head: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Group)) {
-        throw new TypeError("Synth.head: arguments[0] is not a Group.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_HEAD);
-    },
-    tail: function() {
-      var node, def, args;
-      if (arguments[0] instanceof SynthDef) {
-        node = cc.server.rootNode;
-        def  = arguments[0];
-        args = arguments[1] || {};
-      } else if (arguments[1] instanceof SynthDef) {
-        node = arguments[0];
-        def  = arguments[1];
-        args = arguments[2] || {};
-      }
-      if (!(node instanceof Group)) {
-        throw new TypeError("Synth.tail: arguments[0] is not a Group.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_TAIL);
-    },
-    replace: function(node, def, args) {
-      if (!(node instanceof Node)) {
-        throw new TypeError("Synth.replace: arguments[0] is not a Node.");
-      }
-      if (!(def instanceof SynthDef)) {
-        throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
-      }
-      return new Synth(JSON.stringify(def.specs), node, args||{}, C.REPLACE);
+  var SynthInterface = function() {
+    return new Synth();
+  };
+  SynthInterface.def = function(func, args) {
+    if (typeof func !== "function") {
+      throw new TypeError("Synth.def: arguments[0] is not a Function.");
     }
+    return new SynthDef(func, args);
+  };
+  SynthInterface.after = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.after: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_AFTER);
+  };
+  SynthInterface.before = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.before: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_BEFORE);
+  };
+  SynthInterface.head = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.head: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_HEAD);
+  };
+  SynthInterface.tail = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.server.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, C.ADD_TO_TAIL);
+  };
+  SynthInterface.replace = function(node, def, args) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(JSON.stringify(def.specs), node, args||{}, C.REPLACE);
   };
   
   var install = function() {

@@ -345,49 +345,49 @@ define(function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var TaskInterface = {
-    "do": function(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.do: arguments[0] is not a Function.");
-      }
-      return new TaskDo(func);
-    },
-    loop: function(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.loop: arguments[0] is not a Function.");
-      }
-      return new TaskLoop(func);
-    },
-    each: function(list, func) {
-      if (!(Array.isArray(list))) {
-        throw new TypeError("Task.each: arguments[0] is not an Array.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.each: arguments[1] is not a Function.");
-      }
-      return new TaskEach(list, func);
-    },
-    timeout: function(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.timeout: arguments[0] is not a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.timeout: arguments[1] is not a Function.");
-      }
-      return new TaskTimeout(delay, func);
-    },
-    interval: function(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.interval: arguments[0] is not a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.interval: arguments[1] is not a Function.");
-      }
-      return new TaskInterval(delay, func);
-    },
-    block: function() {
-      return new TaskBlock();
-    },
+  var TaskInterface = function() {
+  };
+  TaskInterface["do"] = function(func) {
+    if (typeof func !== "function") {
+      throw new TypeError("Task.do: arguments[0] is not a Function.");
+    }
+    return new TaskDo(func);
+  };
+  TaskInterface.loop = function(func) {
+    if (typeof func !== "function") {
+      throw new TypeError("Task.loop: arguments[0] is not a Function.");
+    }
+    return new TaskLoop(func);
+  };
+  TaskInterface.each = function(list, func) {
+    if (!(Array.isArray(list))) {
+      throw new TypeError("Task.each: arguments[0] is not an Array.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.each: arguments[1] is not a Function.");
+    }
+    return new TaskEach(list, func);
+  };
+  TaskInterface.timeout = function(delay, func) {
+    if (typeof delay !== "number") {
+      throw new TypeError("Task.timeout: arguments[0] is not a Number.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.timeout: arguments[1] is not a Function.");
+    }
+    return new TaskTimeout(delay, func);
+  };
+  TaskInterface.interval = function(delay, func) {
+    if (typeof delay !== "number") {
+      throw new TypeError("Task.interval: arguments[0] is not a Number.");
+    }
+    if (typeof func !== "function") {
+      throw new TypeError("Task.interval: arguments[1] is not a Function.");
+    }
+    return new TaskInterval(delay, func);
+  };
+  TaskInterface.block = function() {
+    return new TaskBlock();
   };
   
   var install = function() {
