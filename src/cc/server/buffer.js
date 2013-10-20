@@ -17,6 +17,7 @@ define(function(require, exports, module) {
       this.numFrames   = 0;
       this.numChannels = 0;
       this.sampleRate  = 0;
+      this.blocking = true;
       this._bufid = bufid++;
       bufferStore[this._bufid] = this;
     }
@@ -56,6 +57,7 @@ define(function(require, exports, module) {
     this.numFrames  = numFrames;
     this.numChannels = buffer.numChannels;
     this.sampleRate  = buffer.sampleRate;
+    this.blocking = false;
     this.emit("load", this);
   };
   

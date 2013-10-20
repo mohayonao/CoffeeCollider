@@ -2991,7 +2991,6 @@ define('cc/server/sched', function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var Emitter = require("../common/emitter").Emitter;
-  var push  = [].push;
   var slice = [].slice;
 
   var Timeline = (function() {
@@ -3159,6 +3158,9 @@ define('cc/server/sched', function(require, exports, module) {
             if (Array.isArray(e)) {
               e[0].apply(e[1], e[2]);
             } else {
+              if (e instanceof TaskWaitToken) {
+                e.process(counterIncr);
+              }
               if (e.blocking) {
                 break LOOP;
               }
@@ -3178,22 +3180,61 @@ define('cc/server/sched', function(require, exports, module) {
     return Task;
   })();
 
+  var TaskWaitToken = (function() {
+    function TaskWaitToken(time, list, callback) {
+      this.time = time;
+      this.list = list;
+      this.callback = callback;
+      this.blocking = true;
+    }
+    TaskWaitToken.create = function() {
+      var args = slice.call(arguments);
+      var callback = null;
+      if (typeof args[args.length - 1] === "function") {
+        callback = args.pop();
+      }
+      var time = 0;
+      var list = [];
+      args.forEach(function(x) {
+        if (x) {
+          if (typeof x === "number") {
+            if (time < x) {
+              time = x;
+            }
+          } else if (typeof x.blocking === "boolean") {
+            list.push(x);
+          }
+        }
+      });
+      return new TaskWaitToken(time, list, callback);
+    };
+    TaskWaitToken.prototype.process = function(counterIncr) {
+      this.time -= counterIncr;
+      var blocking = this.list.some(function(x) {
+        return x.blocking;
+      });
+      if (this.time <= 0 && !blocking) {
+        this.blocking = false;
+        if (this.callback) {
+          this.callback();
+          delete this.callback;
+        }
+      }
+    };
+    return TaskWaitToken;
+  })();
+
   var TaskContext = (function() {
     function TaskContext(task) {
       this.klassName = "TaskContext";
       this.wait = function() {
-        push.apply(task._queue, slice.call(arguments));
+        task._queue.push(TaskWaitToken.create.apply(null, arguments));
       };
       this.pause = function() {
         task.pause();
       };
       this.stop = function() {
         task.stop();
-      };
-      this.sync = function(func) {
-        if (typeof func === "function") {
-          cc.server.timeline.push(func);
-        }
       };
     }
     return TaskContext;
@@ -3381,13 +3422,7 @@ define('cc/server/sched', function(require, exports, module) {
     global.Task = TaskInterface;
     global.wait = function() {
       var globalTask = cc.server.timeline._globalTask;
-      push.apply(globalTask._queue, slice.call(arguments));
-    };
-    global.sync = function(func) {
-      if (typeof func === "function") {
-        var globalTask = cc.server.timeline._globalTask;
-        globalTask._push(func);
-      }
+      globalTask._queue.push(TaskWaitToken.create.apply(null, arguments));
     };
   };
   
@@ -3424,6 +3459,7 @@ define('cc/server/buffer', function(require, exports, module) {
       this.numFrames   = 0;
       this.numChannels = 0;
       this.sampleRate  = 0;
+      this.blocking = true;
       this._bufid = bufid++;
       bufferStore[this._bufid] = this;
     }
@@ -3463,6 +3499,7 @@ define('cc/server/buffer', function(require, exports, module) {
     this.numFrames  = numFrames;
     this.numChannels = buffer.numChannels;
     this.sampleRate  = buffer.sampleRate;
+    this.blocking = false;
     this.emit("load", this);
   };
   
