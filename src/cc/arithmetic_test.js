@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var uop = require("./server/uop");
   var bop = require("./server/bop");
 
-  describe("arithmetic", function() {
+  describe("arithmetic.js", function() {
     var calc;
     before(function() {
       var compiler = new Compiler();

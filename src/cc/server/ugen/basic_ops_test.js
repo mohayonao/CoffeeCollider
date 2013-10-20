@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var Sum3 = basic_ops.Sum3;
   var Sum4 = basic_ops.Sum4;
 
-  describe("basic_ops", function() {
+  describe("basic_ops.js", function() {
     describe("BinaryOpUGen", function() {
       it("create", function() {
         var a = new UGen().init(C.AUDIO);
@@ -126,15 +126,6 @@ define(function(require, exports, module) {
           assert.equal(x.op, "+");
         });
       });
-      it("Sum3 -> BinaryOpUGen(+)", function() {
-        [ 4, 2, 1 ].forEach(function(i) {
-          var a = (i & 0x04) ? new UGen().init(C.AUDIO) : 0;
-          var b = (i & 0x02) ? new UGen().init(C.AUDIO) : 0;
-          var c = (i & 0x01) ? new UGen().init(C.AUDIO) : 0;
-          var x = new Sum3().init(a, b, c);
-          assert.include([a, b, c], x);
-        });
-      });
       it("Sum3 -> Sum4", function() {
         var a = new UGen().init(C.AUDIO);
         var b = new UGen().init(C.AUDIO);
@@ -205,16 +196,6 @@ define(function(require, exports, module) {
           var x = new Sum4().init(a, b, c, d);
           assert.instanceOf(x, BinaryOpUGen);
           assert.equal(x.op, "+");
-        });
-      });
-      it("Sum4 -> UGen", function() {
-        [ 8, 4, 2, 1 ].forEach(function(i) {
-          var a = (i & 0x08) ? new UGen().init(C.AUDIO) : 0;
-          var b = (i & 0x04) ? new UGen().init(C.AUDIO) : 0;
-          var c = (i & 0x02) ? new UGen().init(C.AUDIO) : 0;
-          var d = (i & 0x01) ? new UGen().init(C.AUDIO) : 0;
-          var x = new Sum4().init(a, b, c, d);
-          assert.include([a, b, c, d], x);
         });
       });
       it("Sum4 + Number -> Sum4", function() {
