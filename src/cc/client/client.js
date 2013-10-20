@@ -117,6 +117,7 @@ define(function(require, exports, module) {
       var sys = this.sys;
       if (!sys.api.decodeAudioFile) {
         callback(null);
+        return;
       }
       var decode = function(buffer) {
         sys.api.decodeAudioFile(buffer, function(buffer) {
