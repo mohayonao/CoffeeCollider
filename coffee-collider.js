@@ -273,6 +273,33 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.sync = function(syncItems) {
       this.send(syncItems);
     };
+    SynthClient.prototype.readAudioFile = function(path, callback) {
+      var sys = this.sys;
+      if (!sys.api.decodeAudioFile) {
+        callback(null);
+        return;
+      }
+      var decode = function(buffer) {
+        sys.api.decodeAudioFile(buffer, function(buffer) {
+          callback(buffer);
+        });
+      };
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path);
+      xhr.responseType = "arraybuffer";
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200 && xhr.response) {
+            if (callback) {
+              decode(xhr.response);
+            }
+          } else {
+            callback(null);
+          }
+        }
+      };
+      xhr.send();
+    };
     return SynthClient;
   })();
   
@@ -293,6 +320,13 @@ define('cc/client/client', function(require, exports, module) {
       callback(result);
       delete this.execCallbacks[execId];
     }
+  };
+  commands["/buffer/request"] = function(msg) {
+    var that = this;
+    var requestId = msg[2];
+    this.readAudioFile(msg[1], function(buffer) {
+      that.send(["/buffer/response", buffer, requestId]);
+    });
   };
   commands["/console/log"] = function(msg) {
     console.log.apply(console, unpack(msg[1]));
@@ -475,6 +509,20 @@ define('cc/client/sound_system', function(require, exports, module) {
       WebAudioAPI.prototype.pause = function() {
         this.bufSrc.disconnect();
         this.jsNode.disconnect();
+      };
+      WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
+        buffer = this.context.createBuffer(buffer, false);
+        var numSamples = buffer.length * buffer.numberOfChannels;
+        var samples = new Float32Array(numSamples);
+        for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
+          samples.set(buffer.getChannelData(i), i * buffer.length);
+        }
+        callback({
+          sampleRate : buffer.sampleRate,
+          numChannels: buffer.numberOfChannels,
+          numFrames  : buffer.length,
+          samples    : samples,
+        });
       };
       return WebAudioAPI;
     })();
@@ -1230,6 +1278,7 @@ define('cc/server/installer', function(require, exports, module) {
     require("./server").install();
     require("./bop").install();
     require("./uop").install();
+    require("./buffer").install();
     require("./node").install();
     require("./sched").install();
     require("./ugen/installer").install();
@@ -1246,6 +1295,7 @@ define('cc/server/server', function(require, exports, module) {
   var cc = require("./cc");
   var Group    = require("./node").Group;
   var Timeline = require("./sched").Timeline;
+  var buffer   = require("./buffer");
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -1258,6 +1308,8 @@ define('cc/server/server', function(require, exports, module) {
       this.syncItems = new Float32Array(5);
       this.timeline = new Timeline(this);
       this.timerId = 0;
+      this.bufferRequestId = 0;
+      this.bufferRequestCallback = {};
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -1272,6 +1324,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      buffer.reset();
       this.timeline.reset();
       this.rootNode.prev = null;
       this.rootNode.next = null;
@@ -1280,6 +1333,14 @@ define('cc/server/server', function(require, exports, module) {
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[1];
+    };
+    SynthServer.prototype.requestBuffer = function(path, callback) {
+      if (!(typeof path === "string" && typeof callback === "function")) {
+        return;
+      }
+      var requestId = this.bufferRequestId++;
+      this.bufferRequestCallback[requestId] = callback;
+      this.send(["/buffer/request", path, requestId]);
     };
     SynthServer.prototype.onaudioprocess = function() {
       if (this.syncCount - this.sysSyncCount >= 4) {
@@ -1361,6 +1422,15 @@ define('cc/server/server', function(require, exports, module) {
     var result = eval.call(global, code);
     if (callback) {
       this.send(["/execute", execId, pack(result)]);
+    }
+  };
+  commands["/buffer/response"] = function(msg) {
+    var buffer = msg[1];
+    var requestId = msg[2];
+    var callback = this.bufferRequestCallback[requestId];
+    if (callback) {
+      callback(buffer);
+      delete this.bufferRequestCallback[requestId];
     }
   };
   commands["/importScripts"] = function(msg) {
@@ -3336,6 +3406,104 @@ define('cc/server/sched', function(require, exports, module) {
   };
 
 });
+define('cc/server/buffer', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var Emitter = require("../common/emitter").Emitter;
+
+  var bufferCache = {};
+  var bufferStore = {};
+  var bufid = 0;
+
+  var Buffer = (function() {
+    function Buffer() {
+      Emitter.call(this);
+      this.klassName = "Buffer";
+      this.samples     = null;
+      this.numFrames   = 0;
+      this.numChannels = 0;
+      this.sampleRate  = 0;
+      this._bufid = bufid++;
+      bufferStore[this._bufid] = this;
+    }
+    fn.extend(Buffer, Emitter);
+    return Buffer;
+  })();
+  
+  var setBuffer = function(buffer, startFrame, numFrames) {
+    if (!buffer) {
+      throw new Error("Buffer failed to decode an audio file.");
+    }
+    startFrame = Math.max( 0, Math.min(startFrame|0, buffer.numFrames));
+    numFrames  = Math.max(-1, Math.min(numFrames |0, buffer.numFrames - startFrame));
+    var samples, x, i, imax;
+    if (startFrame === 0) {
+      if (numFrames === -1) {
+        samples   = buffer.samples;
+        numFrames = buffer.numFrames;
+      } else {
+        samples = new Float32Array(numFrames * buffer.numChannels);
+        for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
+          x = i * buffer.numFrames;
+          samples.set(buffer.samples.subarray(x, x + numFrames));
+        }
+      }
+    } else {
+      if (numFrames === -1) {
+        numFrames = buffer.numFrames - startFrame;
+      }
+      samples = new Float32Array(numFrames * buffer.numChannels);
+      for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
+        x = i * buffer.numFrames + startFrame;
+        samples.set(buffer.samples.subarray(x, x + numFrames));
+      }
+    }
+    this.samples    = samples;
+    this.numFrames  = numFrames;
+    this.numChannels = buffer.numChannels;
+    this.sampleRate  = buffer.sampleRate;
+    this.emit("load", this);
+  };
+  
+  var BufferInterface = function() {
+  };
+  BufferInterface.read = fn(function(path, startFrame, numFrames) {
+    if (typeof path !== "string") {
+      throw new TypeError("Buffer.Read: arguments[0] should be a string.");
+    }
+    var buffer = new Buffer();
+    if (bufferCache[path]) {
+      setBuffer.call(buffer, bufferCache[path], startFrame, numFrames);
+    } else {
+      cc.server.requestBuffer(path, function(result) {
+        bufferCache[path] = result;
+        setBuffer.call(buffer, result, startFrame, numFrames);
+      });
+    }
+    return buffer;
+  }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
+
+  var reset = function() {
+    bufferCache = {};
+  };
+  
+  var fetch = function(id) {
+    return bufferStore[id];
+  };
+  
+  var install = function() {
+    global.Buffer = BufferInterface;
+  };
+  
+  module.exports = {
+    Buffer: Buffer,
+    reset : reset,
+    fetch : fetch,
+    install: install
+  };
+
+});
 define('cc/server/bop', function(require, exports, module) {
 
   var utils = require("./utils");
@@ -3916,6 +4084,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
   var install = function() {
     require("./ugen").install();
     require("./basic_ops").install();
+    require("./bufio").install();
     require("./delay").install();
     require("./line").install();
     require("./osc").install();
@@ -3927,6 +4096,50 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     install: install
   };
  
+});
+define('cc/server/ugen/bufio', function(require, exports, module) {
+
+  var ugen = require("./ugen");
+  var Buffer = require("../buffer").Buffer;
+  var slice = [].slice;
+  
+  var playBuf_ctor = function(rate) {
+    return function(numChannels, buffer) {
+      if (typeof numChannels !== "number") {
+        throw new TypeError("Buffer: arguments[0] should be an integer.");
+      }
+      if (!(buffer instanceof Buffer)) {
+        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      }
+      numChannels = Math.max(0, numChannels|0);
+      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
+      this.specialIndex = buffer._bufid;
+      if (buffer.samples !== null) {
+        numChannels = buffer.numChannels;
+      }
+      return this.initOutputs(numChannels, this.rate);
+    };
+  };
+  
+  var iPlayBuf = {
+    ar: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(2),
+      Klass: ugen.MultiOutUGen
+    },
+    kr: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(1),
+      Klass: ugen.MultiOutUGen
+    },
+  };
+
+  module.exports = {
+    install: function() {
+      ugen.register("PlayBuf", iPlayBuf);
+    }
+  };
+
 });
 define('cc/server/ugen/delay', function(require, exports, module) {
 
@@ -4093,6 +4306,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
   var install = function() {
     require("./unit").install();
     require("./basic_ops").install();
+    require("./bufio").install();
     require("./delay").install();
     require("./line").install();
     require("./osc").install();
@@ -5273,6 +5487,143 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
       unit.register("MulAdd", MulAdd);
       unit.register("Sum3"  , Sum3  );
       unit.register("Sum4"  , Sum4  );
+    }
+  };
+
+});
+define('cc/server/unit/bufio', function(require, exports, module) {
+  
+  var unit = require("./unit");
+  var buffer = require("../buffer");
+  
+  var sc_loop = function(unit, index, hi, loop) {
+    if (index >= hi) {
+      if (!loop) {
+        unit.done = true;
+        return hi;
+      }
+      index -= hi;
+      if (index < hi) {
+        return index;
+      }
+    } else if (index < 0) {
+      if (!loop) {
+        unit.done = true;
+        return 0;
+      }
+      index += hi;
+      if (index >= 0) {
+        return index;
+      }
+    } else {
+      return index;
+    }
+    return index - hi * Math.floor(index/hi);
+  };
+  
+  var cubicinterp = function(x, y0, y1, y2, y3) {
+    var c0 = y1;
+    var c1 = 0.5 * (y2 - y0);
+    var c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3;
+    var c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+    return ((c3 * x + c2) * x + c1) * x + c0;
+  };
+  
+  var PlayBuf = function() {
+    var ctor = function() {
+      this._buffer = buffer.fetch(this.specialIndex);
+      this._phase  = this.inputs[3][0];
+      this._trig   = 0;
+      this.process = next_choose;
+      this.process.call(this);
+    };
+    var next_choose  = function(inNumSamples) {
+      if (this._buffer.samples !== null) {
+        if (this.inRates[1] === 2) {
+          if (this.inRates[2] === 2) {
+            this.process = next_kk; // aa
+          } else {
+            this.process = next_kk; // ak
+          }
+        } else {
+          if (this.inRates[2] === 2) {
+            this.process = next_kk; // ka
+          } else {
+            this.process = next_kk; // kk
+          }
+        }
+        this.process.call(this, inNumSamples);
+      }
+    };
+    var next_kk = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var buf = this._buffer;
+      var outs = this.outs;
+      var phase = this._phase;
+      var rate  = this.inputs[1][0];
+      var trig  = this.inputs[2][0];
+      var loop  = this.inputs[4][0];
+      var samples     = buf.samples;
+      var numChannels = buf.numChannels;
+      var numFrames   = buf.numFrames;
+      var index0, index1, index2, index3, frac, a, b, c, d, offset;
+
+      var hi = numFrames - 1;
+      if (trig > 0 && this._trig <= 0) {
+        this.done = false;
+        phase = this.inputs[3][0];
+      }
+      this._trig = trig;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase = sc_loop(this, phase, hi, loop);
+        index1 = phase|0;
+        index0 = index1 - 1;
+        index2 = index1 + 1;
+        index3 = index2 + 1;
+        if (index1 === 0) {
+          if (loop) {
+            index0 = hi;
+          } else {
+            index0 = index1;
+          }
+        } else if (index3 > hi) {
+          if (index2 > hi) {
+            if (loop) {
+              index2 = 0;
+              index3 = 1;
+            } else {
+              index2 = index3 = hi;
+            }
+          } else {
+            if (loop) {
+              index3 = 0;
+            } else {
+              index3 = hi;
+            }
+          }
+        }
+        frac = phase - (phase|0);
+        for (var j = 0, jmax = outs.length; j < jmax; ++j) {
+          offset = numFrames * (j % numChannels);
+          a = samples[index0 + offset];
+          b = samples[index1 + offset];
+          c = samples[index2 + offset];
+          d = samples[index3 + offset];
+          outs[j][i] = cubicinterp(frac, a, b, c, d);
+        }
+        phase += rate;
+      }
+      if (this.done) {
+        this.doneAction(this.inputs[5][0]|0, this.tag);
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  };
+  
+  module.exports = {
+    install: function() {
+      unit.register("PlayBuf", PlayBuf);
     }
   };
 

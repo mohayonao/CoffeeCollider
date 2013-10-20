@@ -17,63 +17,46 @@ define(function(require, exports, module) {
       this.numFrames   = 0;
       this.numChannels = 0;
       this.sampleRate  = 0;
-      this._pendings   = null;
       this._bufid = bufid++;
       bufferStore[this._bufid] = this;
     }
     fn.extend(Buffer, Emitter);
-    Buffer.prototype._deferred = function(ugen) {
-      if (this._pendings === null) {
-        this._pendings = [];
-      }
-      this._pendings.push(ugen);
-    };
     return Buffer;
   })();
   
   var setBuffer = function(buffer, startFrame, numFrames) {
-    if (buffer) {
-      startFrame = Math.max( 0, Math.min(startFrame|0, buffer.numFrames));
-      numFrames  = Math.max(-1, Math.min(numFrames |0, buffer.numFrames - startFrame));
-      var samples, x, i, imax;
-      if (startFrame === 0) {
-        if (numFrames === -1) {
-          samples   = buffer.samples;
-          numFrames = buffer.numFrames;
-        } else {
-          samples = new Float32Array(numFrames * buffer.numChannels);
-          for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
-            x = i * buffer.numFrames;
-            samples.set(buffer.samples.subarray(x, x + numFrames));
-          }
-        }
+    if (!buffer) {
+      throw new Error("Buffer failed to decode an audio file.");
+    }
+    startFrame = Math.max( 0, Math.min(startFrame|0, buffer.numFrames));
+    numFrames  = Math.max(-1, Math.min(numFrames |0, buffer.numFrames - startFrame));
+    var samples, x, i, imax;
+    if (startFrame === 0) {
+      if (numFrames === -1) {
+        samples   = buffer.samples;
+        numFrames = buffer.numFrames;
       } else {
-        if (numFrames === -1) {
-          numFrames = buffer.numFrames - startFrame;
-        }
         samples = new Float32Array(numFrames * buffer.numChannels);
         for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
-          x = i * buffer.numFrames + startFrame;
+          x = i * buffer.numFrames;
           samples.set(buffer.samples.subarray(x, x + numFrames));
         }
       }
-      this.samples    = samples;
-      this.numFrames  = numFrames;
-      this.numChannels = buffer.numChannels;
-      this.sampleRate  = buffer.sampleRate;
-      if (this._pendings) {
-        this._pendings.forEach(function(ugen) {
-          if (ugen._resolve) {
-            ugen._resolve(this);
-          }
-        }, this);
-      }
-      this.pendings = null;
-      this.emit("load", this);
     } else {
-      this.pendings = null;
-      throw new Error("Buffer failed to decode an audio file.");
+      if (numFrames === -1) {
+        numFrames = buffer.numFrames - startFrame;
+      }
+      samples = new Float32Array(numFrames * buffer.numChannels);
+      for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
+        x = i * buffer.numFrames + startFrame;
+        samples.set(buffer.samples.subarray(x, x + numFrames));
+      }
     }
+    this.samples    = samples;
+    this.numFrames  = numFrames;
+    this.numChannels = buffer.numChannels;
+    this.sampleRate  = buffer.sampleRate;
+    this.emit("load", this);
   };
   
   var BufferInterface = function() {

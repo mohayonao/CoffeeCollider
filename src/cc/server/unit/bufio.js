@@ -39,33 +39,34 @@ define(function(require, exports, module) {
   
   var PlayBuf = function() {
     var ctor = function() {
-      if (this.inRates[1] === C.AUDIO) {
-        if (this.inRates[2] === C.AUDIO) {
-          this.process = next_kk; // aa
-        } else {
-          this.process = next_kk; // ak
-        }
-      } else {
-        if (this.inRates[2] === C.AUDIO) {
-          this.process = next_kk; // ka
-        } else {
-          this.process = next_kk; // kk
-        }
-      }
       this._buffer = buffer.fetch(this.specialIndex);
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
+      this.process = next_choose;
+      this.process.call(this);
+    };
+    var next_choose  = function(inNumSamples) {
+      if (this._buffer.samples !== null) {
+        if (this.inRates[1] === C.AUDIO) {
+          if (this.inRates[2] === C.AUDIO) {
+            this.process = next_kk; // aa
+          } else {
+            this.process = next_kk; // ak
+          }
+        } else {
+          if (this.inRates[2] === C.AUDIO) {
+            this.process = next_kk; // ka
+          } else {
+            this.process = next_kk; // kk
+          }
+        }
+        this.process.call(this, inNumSamples);
+      }
     };
     var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var buf = this._buffer;
-      if (!buf.samples) {
-        return;
-      }
       var outs = this.outs;
-      if (buf.numChannels !== outs.length) {
-        return;
-      }
       var phase = this._phase;
       var rate  = this.inputs[1][0];
       var trig  = this.inputs[2][0];
@@ -110,8 +111,8 @@ define(function(require, exports, module) {
           }
         }
         frac = phase - (phase|0);
-        for (var j = 0; j < numChannels; ++j) {
-          offset = numFrames * j;
+        for (var j = 0, jmax = outs.length; j < jmax; ++j) {
+          offset = numFrames * (j % numChannels);
           a = samples[index0 + offset];
           b = samples[index1 + offset];
           c = samples[index2 + offset];

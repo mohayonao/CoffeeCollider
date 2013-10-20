@@ -16,16 +16,9 @@ define(function(require, exports, module) {
       numChannels = Math.max(0, numChannels|0);
       this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
       this.specialIndex = buffer._bufid;
-      if (buffer.samples === null) {
-        buffer._deferred(this);
-      } else {
+      if (buffer.samples !== null) {
         numChannels = buffer.numChannels;
       }
-      this._resolve = function(_buffer) {
-        if (_buffer.numChannels !== numChannels) {
-          console.warn("PlayBuf - Buffer: non-conformity numChannels");
-        }
-      };
       return this.initOutputs(numChannels, this.rate);
     };
   };
