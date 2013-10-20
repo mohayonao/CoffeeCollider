@@ -5,6 +5,7 @@ define(function(require, exports, module) {
     require("./server").install();
     require("./bop").install();
     require("./uop").install();
+    require("./buffer").install();
     require("./node").install();
     require("./sched").install();
     require("./ugen/installer").install();

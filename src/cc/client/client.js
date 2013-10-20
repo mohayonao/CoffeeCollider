@@ -113,6 +113,32 @@ define(function(require, exports, module) {
     SynthClient.prototype.sync = function(syncItems) {
       this.send(syncItems);
     };
+    SynthClient.prototype.readAudioFile = function(path, callback) {
+      var sys = this.sys;
+      if (!sys.api.decodeAudioFile) {
+        callback(null);
+      }
+      var decode = function(buffer) {
+        sys.api.decodeAudioFile(buffer, function(buffer) {
+          callback(buffer);
+        });
+      };
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path);
+      xhr.responseType = "arraybuffer";
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200 && xhr.response) {
+            if (callback) {
+              decode(xhr.response);
+            }
+          } else {
+            callback(null);
+          }
+        }
+      };
+      xhr.send();
+    };
     return SynthClient;
   })();
   
@@ -133,6 +159,13 @@ define(function(require, exports, module) {
       callback(result);
       delete this.execCallbacks[execId];
     }
+  };
+  commands["/buffer/request"] = function(msg) {
+    var that = this;
+    var requestId = msg[2];
+    this.readAudioFile(msg[1], function(buffer) {
+      that.send(["/buffer/response", buffer, requestId]);
+    });
   };
   commands["/console/log"] = function(msg) {
     console.log.apply(console, unpack(msg[1]));

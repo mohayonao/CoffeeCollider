@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var Group    = require("./node").Group;
   var Timeline = require("./sched").Timeline;
+  var buffer   = require("./buffer");
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -16,6 +17,8 @@ define(function(require, exports, module) {
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
       this.timeline = new Timeline(this);
       this.timerId = 0;
+      this.bufferRequestId = 0;
+      this.bufferRequestCallback = {};
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -30,6 +33,7 @@ define(function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      buffer.reset();
       this.timeline.reset();
       this.rootNode.prev = null;
       this.rootNode.next = null;
@@ -38,6 +42,14 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[C.CONTROL];
+    };
+    SynthServer.prototype.requestBuffer = function(path, callback) {
+      if (!(typeof path === "string" && typeof callback === "function")) {
+        return;
+      }
+      var requestId = this.bufferRequestId++;
+      this.bufferRequestCallback[requestId] = callback;
+      this.send(["/buffer/request", path, requestId]);
     };
     SynthServer.prototype.onaudioprocess = function() {
       if (this.syncCount - this.sysSyncCount >= 4) {
@@ -119,6 +131,15 @@ define(function(require, exports, module) {
     var result = eval.call(global, code);
     if (callback) {
       this.send(["/execute", execId, pack(result)]);
+    }
+  };
+  commands["/buffer/response"] = function(msg) {
+    var buffer = msg[1];
+    var requestId = msg[2];
+    var callback = this.bufferRequestCallback[requestId];
+    if (callback) {
+      callback(buffer);
+      delete this.bufferRequestCallback[requestId];
     }
   };
   commands["/importScripts"] = function(msg) {

@@ -160,6 +160,20 @@ define(function(require, exports, module) {
         this.bufSrc.disconnect();
         this.jsNode.disconnect();
       };
+      WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
+        buffer = this.context.createBuffer(buffer, false);
+        var numSamples = buffer.length * buffer.numberOfChannels;
+        var samples = new Float32Array(numSamples);
+        for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
+          samples.set(buffer.getChannelData(i), i * buffer.length);
+        }
+        callback({
+          sampleRate : buffer.sampleRate,
+          numChannels: buffer.numberOfChannels,
+          numFrames  : buffer.length,
+          samples    : samples,
+        });
+      };
       return WebAudioAPI;
     })();
   } else if (typeof Audio === "function" && typeof new Audio().mozSetup === "function") {
