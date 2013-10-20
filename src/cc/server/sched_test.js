@@ -55,7 +55,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed = 1;
           this.wait(100);
-          this.sync(function() {
+          this.wait(function() {
             passed = 2;
           });
           this.wait(100);
@@ -76,7 +76,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed = 1;
           this.wait(100);
-          this.sync(function() {
+          this.wait(function() {
             passed = 2;
           });
           this.wait(100);
@@ -101,7 +101,7 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed = 1;
           this.wait(100);
-          this.sync(function() {
+          this.wait(function() {
             throw "should not pass through";
           });
         }).on("end", function() {
@@ -224,11 +224,11 @@ define(function(require, exports, module) {
         var t = Task.do(function() {
           passed = 1;
           this.wait(block1);
-          this.sync(function() {
+          this.wait(function() {
             passed = 2;
           });
           this.wait(block2);
-          this.sync(function() {
+          this.wait(function() {
             passed = 3;
           });
         }).on("end", function() {
@@ -263,7 +263,7 @@ define(function(require, exports, module) {
           this.wait(100);
         }).play();
         this.wait(tt);
-        this.sync(function() {
+        this.wait(function() {
           passed = 4;
         });
       }).play();
