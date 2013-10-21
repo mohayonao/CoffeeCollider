@@ -16,11 +16,11 @@ define(function(require, exports, module) {
     before(function() {
       scale.install();
     });
-    describe.only("Tuning", function() {
+    describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {
-        et12 = Tuning.et12();
-        just = Tuning.just();
+        et12 = Tuning.at("et12");
+        just = Tuning.at("just");
       });
       it("create", function() {
         var list = [0,1,2,3,4,5,6,7,8,9,10,11];
@@ -95,6 +95,134 @@ define(function(require, exports, module) {
       });
     });
     describe("Scale", function() {
+      var major, kumoi, expected, actual;
+      before(function() {
+        major = Scale.at("major");
+        kumoi = Scale.at("kumoi");
+      });
+      it("create", function() {
+        var list = [0,2,4,5,7,9,11];
+        var s = Scale(list, 12, null, "test");
+        assert.instanceOf(s, _Scale);
+        assert.equal("test", s.name);
+      });
+      it("tuning", function() {
+        major.tuning(Tuning.at("just"));
+        assert.notOk(major.tuning().equals(Tuning.at("et12")));
+        major.tuning(Tuning.at("et12"));
+        assert.ok(major.tuning().equals(Tuning.at("et12")));
+      });
+      it("semitones", function() {
+        expected = [ 0, 2, 4, 5, 7, 9, 11 ];
+        actual = major.semitones();
+        assert.deepEqual(expected, actual);
+
+        expected = [ 0, 2, 3, 7, 9 ];
+        actual = kumoi.semitones();
+        assert.deepEqual(expected, actual);
+      });
+      it("cents", function() {
+        expected = [ 0, 200, 400, 500, 700, 900, 1100 ];
+        actual = major.cents();
+        assert.deepEqual(expected, actual);
+
+        expected = [ 0, 200, 300, 700, 900 ];
+        actual = kumoi.cents();
+        assert.deepEqual(expected, actual);
+      });
+      it("ratios", function() {
+        expected = [ 1, 1.1224620483089, 1.2599210498937, 1.3348398541685, 1.4983070768743, 1.6817928305039, 1.8877486253586 ];
+        actual = major.ratios();
+        assert.deepCloseTo(expected, actual, 1e-6);
+
+        expected = [ 1, 1.1224620483089, 1.1892071150019, 1.4983070768743, 1.6817928305039 ];[ 0, 200, 300, 700, 900 ];
+        actual = kumoi.ratios();
+        assert.deepCloseTo(expected, actual, 1e-6);
+      });
+      it("size", function() {
+        expected = 7;
+        actual = major.size();
+        assert.equal(expected, actual);
+
+        expected = 5;
+        actual = kumoi.size();
+        assert.equal(expected, actual);
+      });
+      it("pitchesPerOctave", function() {
+        expected = 12;
+        actual = major.pitchesPerOctave();
+        assert.equal(expected, actual);
+
+        expected = 12;
+        actual = kumoi.pitchesPerOctave();
+        assert.equal(expected, actual);
+      });
+      it("stepsPerOctave", function() {
+        expected = 12;
+        actual = major.stepsPerOctave();
+        assert.equal(expected, actual);
+
+        expected = 12;
+        actual = kumoi.stepsPerOctave();
+        assert.equal(expected, actual);
+      });
+      it("at", function() {
+        assert.equal(0, major.at(0));
+        assert.equal(2, major.at(1));
+        assert.equal(4, major.at(2));
+        assert.deepEqual([5,7,9], major.at([3,4,5]));
+        assert.equal(9, major.at(12));
+        assert.equal(11, major.at(-1));
+      });
+      it("wrapAt", function() {
+        assert.equal(0, major.wrapAt(0));
+        assert.equal(2, major.wrapAt(1));
+        assert.equal(4, major.wrapAt(2));
+        assert.deepEqual([5,7,9], major.wrapAt([3,4,5]));
+        assert.equal(9, major.wrapAt(12));
+        assert.equal(11, major.wrapAt(-1));
+      });
+      it("degreeToFreq", function() {
+        expected = 739.98884542173;
+        actual   = major.degreeToFreq(5, 440, 0);
+        assert.closeTo(expected, actual, 1e-6);
+        
+        expected = [ 493.8833012559, 1046.5022612017, 329.62755691234 ];
+        actual   = kumoi.degreeToFreq([1,2,3], 440, [0, 1, -1]);
+        assert.deepCloseTo(expected, actual, 1e-6);
+      });
+      it("degreeToRatio", function() {
+        expected = 3.3635856610079;
+        actual   = major.degreeToRatio(5, 1);
+        assert.closeTo(expected, actual, 1e-6);
+
+        expected = [ 1.1224620483089, 2.3784142300038, 0.74915353843713 ];
+        actual   = kumoi.degreeToRatio([1,2,3], [0,1,-1]);
+        assert.deepCloseTo(expected, actual, 1e-6);
+      });
+      it("degrees", function() {
+        expected = [ 0, 2, 4, 5, 7, 9, 11 ];
+        actual   = major.degrees();
+        assert.deepEqual(expected, actual);
+
+        expected = [ 0, 2, 3, 7, 9 ];
+        actual   = kumoi.degrees();
+        assert.deepEqual(expected, actual);
+      });
+      it("octaveRatio", function() {
+        expected = 2;
+        actual   = major.octaveRatio();
+        assert.equal(expected, actual);
+
+        expected = 2;
+        actual   = kumoi.octaveRatio();
+        assert.equal(expected, actual);
+      });
+      it("equals", function() {
+        var copied = major.copy();
+        assert.notEqual(major, copied);
+        assert.ok(major.equals(copied));
+      });
     });
   });
 
