@@ -108,6 +108,7 @@ module.exports = function(grunt) {
   grunt.registerTask("dryice", function() {
     if (hasExclusiveTest()) {
       grunt.fail.warn("NOT builded, '.only' attribute is detected in any tests.");
+      return;
     }
     var copy = require("dryice").copy;
     var srcroot = "src";
@@ -256,7 +257,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
-  grunt.registerTask("default", ["build", "connect", "esteWatch"]);
+  grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
 };
