@@ -214,7 +214,14 @@ define(function(require, exports, module) {
         tokens.splice(i, 1);
         token = tokens[i - 1];
         if (token && token[TAG] === "NUMBER") {
-          a = findOperandHead(tokens, i);
+          a = i - 1;
+          token = tokens[i - 2];
+          if (token) {
+            switch (token[TAG]) {
+              case "UNARY": case "+": case "-":
+              a -= 1;
+            }
+          }
           tokens.splice(i, 0, ["MATH", "*", _]);
           b = i;
         } else {
@@ -266,7 +273,7 @@ define(function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);

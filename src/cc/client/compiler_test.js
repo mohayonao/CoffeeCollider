@@ -228,6 +228,29 @@ define(function(require, exports, module) {
         var actual = compiler.replacePi(tokens).erode();
         assert.deepEqual(actual, expected);
       });
+      it("[10pi] => [(10 * Math.PI)]", function() {
+        var tokens = [
+          ["["         , "[" ],
+          ["NUMBER"    , "10"],
+          ["IDENTIFIER", "pi"],
+          ["]"         , "]" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["["         , "["   ],
+          ["("         , "("   ],
+          ["NUMBER"    , "10"  ],
+          ["MATH"      , "*"   ],
+          ["IDENTIFIER", "Math"],
+          ["."         , "."   ],
+          ["IDENTIFIER", "PI"  ],
+          [")"         , ")"   ],
+          ["]"         , "]"   ],
+          ["TERMINATOR", "\n"  ],
+        ];
+        var actual = compiler.replacePi(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
       it("-10pi => (-10 * Math.PI)", function() {
         var tokens = [
           ["-"         , "-" ],
@@ -355,6 +378,31 @@ define(function(require, exports, module) {
           ["+"         , "+"        ],
           ["IDENTIFIER", "a"        ],
           ["TERMINATOR", "\n"       ],
+        ];
+        var actual = compiler.replaceUnaryOp(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("{a:+100}", function() {
+        var tokens = [
+          ["{"         , "{"  ],
+          ["IDENTIFIER", "a"  ],
+          [":"         , ":"  ],
+          ["+"         , "+"  ],
+          ["NUMBER"    , "100"],
+          ["}"         , "}"  ],
+          ["TERMINATOR", "\n" ],
+        ];
+        var expected = [
+          ["{"         , "{"       ],
+          ["IDENTIFIER", "a"       ],
+          [":"         , ":"       ],
+          ["NUMBER"    , "100"     ],
+          ["."         , "."       ],
+          ["IDENTIFIER", "__plus__"],
+          ["CALL_START", "("       ],
+          ["CALL_END"  , ")"       ],
+          ["}"         , "}"       ],
+          ["TERMINATOR", "\n"      ],
         ];
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
