@@ -47,7 +47,7 @@ define(function(require, exports, module) {
           ret = function() {
             var args = slice.call(arguments);
             if (containsArray(args)) {
-              return utils.apply(args).map(function(items) {
+              return utils.flop(args).map(function(items) {
                 return func.apply(this, items);
               }, this);
             }
