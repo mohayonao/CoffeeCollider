@@ -39,7 +39,7 @@ define(function(require, exports, module) {
   
   var PlayBuf = function() {
     var ctor = function() {
-      this._buffer = buffer.fetch(this.specialIndex);
+      this._buffer = buffer.get(this.specialIndex);
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
       this.process = next_choose;

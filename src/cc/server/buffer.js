@@ -83,7 +83,7 @@ define(function(require, exports, module) {
     bufferCache = {};
   };
   
-  var fetch = function(id) {
+  var get = function(id) {
     return bufferStore[id];
   };
   
@@ -94,7 +94,7 @@ define(function(require, exports, module) {
   module.exports = {
     Buffer: Buffer,
     reset : reset,
-    fetch : fetch,
+    get   : get,
     install: install
   };
 
