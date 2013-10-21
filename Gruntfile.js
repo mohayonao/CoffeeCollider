@@ -34,8 +34,16 @@ module.exports = function(grunt) {
           return tasks;
         }
       },
-      json: function() {
+      json: function(filepath) {
+        if (/src\/cc\/test\//.test(filepath)) {
+          return "test:test";
+        }
         return [ "dryice" ];
+      },
+      coffee: function(filepath) {
+        if (/src\/cc\/test\//.test(filepath)) {
+          return "test:test";
+        }
       },
       as: function() {
         return [ "swf" ];
@@ -212,6 +220,8 @@ module.exports = function(grunt) {
     if (args) {
       if (args === "travis") {
         reporter = "list";
+      } else if (args === "test") {
+        files = grunt.file.expand("src/cc/test/*_test.js");
       } else {
         if (grunt.file.exists(args)) {
           files.push(args);
@@ -225,6 +235,10 @@ module.exports = function(grunt) {
 
     if (!files.length) {
       files = grunt.file.expand("src/cc/**/*_test.js");
+    } else {
+      files = files.concat(
+        grunt.file.expand("src/cc/test/*_test.js")
+      );
     }
     files = files.concat(testFailed);
     var set = {};
