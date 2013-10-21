@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("./cc");
   var fn = require("./fn");
   
   var ratiomidi = function(list) {
@@ -23,6 +24,7 @@ define(function(require, exports, module) {
       this._octaveRatio = octaveRatio;
       this.name = name;
     }
+    fn.extend(Tuning, cc.Object);
     Tuning.prototype.semitones = function() {
       return this._tuning.slice();
     };
@@ -312,6 +314,7 @@ define(function(require, exports, module) {
       this.name = name;
       this.tuning(tuning);
     }
+    fn.extend(Scale, cc.Object);
     Scale.prototype.tuning = function(inTuning) {
       if (arguments.length === 0) {
         return this._tuning;

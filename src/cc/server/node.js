@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var FixNum  = require("./unit/unit").FixNum;
   var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
-
+  
   var graphFunc = {};
   graphFunc[C.ADD_TO_HEAD] = function(node) {
     var prev;

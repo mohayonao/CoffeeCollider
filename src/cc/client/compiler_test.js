@@ -296,7 +296,7 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceUnaryOp", function() {
-      it("+a + a => a.num() + a", function() {
+      it("+a + a => a.__plus__() + a", function() {
         var tokens = [
           ["+"         , "+" ],
           ["IDENTIFIER", "a" ],
@@ -305,19 +305,19 @@ define(function(require, exports, module) {
           ["TERMINATOR", "\n"],
         ];
         var expected = [
-          ["IDENTIFIER", "a"  ],
-          ["."         , "."  ],
-          ["IDENTIFIER", "num"],
-          ["CALL_START", "("  ],
-          ["CALL_END"  , ")"  ],
-          ["+"         , "+"  ],
-          ["IDENTIFIER", "a"  ],
-          ["TERMINATOR", "\n" ],
+          ["IDENTIFIER", "a"       ],
+          ["."         , "."       ],
+          ["IDENTIFIER", "__plus__"],
+          ["CALL_START", "("       ],
+          ["CALL_END"  , ")"       ],
+          ["+"         , "+"       ],
+          ["IDENTIFIER", "a"       ],
+          ["TERMINATOR", "\n"      ],
         ];
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("-a + a => a.neg() + a", function() {
+      it("-a + a => a._minus__() + a", function() {
         var tokens = [
           ["-"         , "-" ],
           ["IDENTIFIER", "a" ],
@@ -326,19 +326,19 @@ define(function(require, exports, module) {
           ["TERMINATOR", "\n"],
         ];
         var expected = [
-          ["IDENTIFIER", "a"  ],
-          ["."         , "."  ],
-          ["IDENTIFIER", "neg"],
-          ["CALL_START", "("  ],
-          ["CALL_END"  , ")"  ],
-          ["+"         , "+"  ],
-          ["IDENTIFIER", "a"  ],
-          ["TERMINATOR", "\n" ],
+          ["IDENTIFIER", "a"        ],
+          ["."         , "."        ],
+          ["IDENTIFIER", "__minus__"],
+          ["CALL_START", "("        ],
+          ["CALL_END"  , ")"        ],
+          ["+"         , "+"        ],
+          ["IDENTIFIER", "a"        ],
+          ["TERMINATOR", "\n"       ],
         ];
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("-a + a => a.neg() + a", function() {
+      it("-a + a => a.__minus__() + a", function() {
         var tokens = [
           ["-"         , "-" ],
           ["IDENTIFIER", "a" ],
@@ -347,14 +347,14 @@ define(function(require, exports, module) {
           ["TERMINATOR", "\n"],
         ];
         var expected = [
-          ["IDENTIFIER", "a"  ],
-          ["."         , "."  ],
-          ["IDENTIFIER", "neg"],
-          ["CALL_START", "("  ],
-          ["CALL_END"  , ")"  ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "a" ],
-          ["TERMINATOR", "\n" ],
+          ["IDENTIFIER", "a"        ],
+          ["."         , "."        ],
+          ["IDENTIFIER", "__minus__"],
+          ["CALL_START", "("        ],
+          ["CALL_END"  , ")"        ],
+          ["+"         , "+"        ],
+          ["IDENTIFIER", "a"        ],
+          ["TERMINATOR", "\n"       ],
         ];
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);

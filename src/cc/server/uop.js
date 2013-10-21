@@ -4,52 +4,23 @@ define(function(require, exports, module) {
   var UGen = require("./ugen/ugen").UGen;
   var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
   
-  var setupFunction = function(func) {
-    return function() {
-      return func(this);
-    };
-  };
-  var setupArrayFunction = function(selector) {
-    return function() {
+  var install = function() {
+    Array.prototype.__plus__ = function() {
       return this.map(function(x) {
-        return x[selector]();
+        return +x;
       });
     };
-  };
-  var setupUGenFunction = function(selector) {
-    return function() {
-      return new UnaryOpUGen(selector, this);
+    UGen.prototype.__plus__ = function() {
+      return new UnaryOpUGen("+", this);
     };
-  };
-
-  var setup = function(selector, func, others) {
-    func = setupFunction(func);
-    Number.prototype[selector] = func;
-    Array.prototype[selector]  = setupArrayFunction(selector);
-    UGen.prototype[selector]   = setupUGenFunction(selector);
-    if (others) {
-      String.prototype[selector]   = func;
-      Boolean.prototype[selector]  = func;
-      Function.prototype[selector] = func;
-    }
-  };
-  
-  var install = function() {
-    setup("num", function(a) {
-      return +a;
-    }, true);
-    
-    setup("neg", function(a) {
-      return -a;
-    }, true);
-
-    setup("not", function(a) {
-      return !a;
-    }, true);
-    
-    setup("tilde", function(a) {
-      return ~a;
-    }, true);
+    Array.prototype.__minus__ = function() {
+      return this.map(function(x) {
+        return -x;
+      });
+    };
+    UGen.prototype.__minus__ = function() {
+      return new UnaryOpUGen("-", this);
+    };
   };
 
   module.exports = {

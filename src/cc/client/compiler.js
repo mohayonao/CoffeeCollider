@@ -252,7 +252,7 @@ define(function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "num", "-": "neg"
+    "+": "__plus__", "-": "__minus__"
   };
 
   var replaceUnaryOp = function(tokens) {

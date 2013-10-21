@@ -2,6 +2,7 @@ define(function(require, exports, module) {
   "use strict";
   
   var install = function() {
+    require("./object").install();
     require("./server").install();
     require("./bop").install();
     require("./uop").install();

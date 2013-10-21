@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
-
+  
+  var cc = require("../cc");
   var fn = require("../fn");
   var slice = [].slice;
 
@@ -18,6 +19,7 @@ define(function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
+    fn.extend(UGen, cc.Object);
     UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
