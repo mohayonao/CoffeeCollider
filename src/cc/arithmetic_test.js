@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var Compiler = require("./client/compiler").Compiler;
+  var object = require("./server/object");
   var uop = require("./server/uop");
   var bop = require("./server/bop");
 
@@ -10,6 +11,7 @@ define(function(require, exports, module) {
     var calc;
     before(function() {
       var compiler = new Compiler();
+      object.install();
       uop.install();
       bop.install();
       calc = function(expr) {
