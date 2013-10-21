@@ -19,8 +19,8 @@ define(function(require, exports, module) {
     describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {
-        et12 = Tuning.at("et12");
-        just = Tuning.at("just");
+        et12 = Tuning.et12;
+        just = Tuning.just;
       });
       it("create", function() {
         var list = [0,1,2,3,4,5,6,7,8,9,10,11];
@@ -97,8 +97,8 @@ define(function(require, exports, module) {
     describe("Scale", function() {
       var major, kumoi, expected, actual;
       before(function() {
-        major = Scale.at("major");
-        kumoi = Scale.at("kumoi");
+        major = Scale.major;
+        kumoi = Scale.kumoi;
       });
       it("create", function() {
         var list = [0,2,4,5,7,9,11];
@@ -107,10 +107,11 @@ define(function(require, exports, module) {
         assert.equal("test", s.name);
       });
       it("tuning", function() {
-        major.tuning(Tuning.at("just"));
-        assert.notOk(major.tuning().equals(Tuning.at("et12")));
+        major.tuning(Tuning.just);
+        assert.notOk(major.tuning().equals(Tuning.et12));
         major.tuning(Tuning.at("et12"));
-        assert.ok(major.tuning().equals(Tuning.at("et12")));
+        assert.notEqual(major.tuning(), Tuning.et12);
+        assert.ok(major.tuning().equals(Tuning.et12));
       });
       it("semitones", function() {
         expected = [ 0, 2, 4, 5, 7, 9, 11 ];

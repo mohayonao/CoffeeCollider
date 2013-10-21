@@ -4383,9 +4383,7 @@ define('cc/server/scale', function(require, exports, module) {
   Object.keys(tuningInfo).forEach(function(key) {
     var params = tuningInfo[key];
     tunings[key] = new Tuning(params[0], params[1], params[2]);
-    // TuningInterface[key] = function() {
-    //   return tunings[key];
-    // };
+    TuningInterface[key] = tunings[key];
   });
   TuningInterface.choose = fn(function(size) {
     if (typeof size !== "number") {
@@ -4893,9 +4891,7 @@ define('cc/server/scale', function(require, exports, module) {
       params[2] = TuningInterface["default"](params[1]);
     }
     scales[key] = new Scale(params[0], params[1], params[2], params[3]);
-    // ScaleInterface[key] = function() {
-    //   return scales[key];
-    // };
+    ScaleInterface[key] = scales[key];
   });
   ScaleInterface.choose = fn(function(size, pitchesPerOctave) {
     if (typeof size !== "number") {
