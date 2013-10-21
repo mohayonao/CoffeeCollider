@@ -8,6 +8,7 @@ define(function(require, exports, module) {
     require("./buffer").install();
     require("./node").install();
     require("./sched").install();
+    require("./scale").install();
     require("./ugen/installer").install();
     require("./unit/installer").install();
   };
