@@ -57,8 +57,12 @@ define('cc/loader', function(require, exports, module) {
 });
 define('cc/cc', function(require, exports, module) {
 
+  function CCObject() {
+  }
+  
   module.exports = {
     version: "0",
+    Object: CCObject
   };
 
 });
@@ -877,7 +881,14 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens.splice(i, 1);
         token = tokens[i - 1];
         if (token && token[TAG] === "NUMBER") {
-          a = findOperandHead(tokens, i);
+          a = i - 1;
+          token = tokens[i - 2];
+          if (token) {
+            switch (token[TAG]) {
+              case "UNARY": case "+": case "-":
+              a -= 1;
+            }
+          }
           tokens.splice(i, 0, ["MATH", "*", _]);
           b = i;
         } else {
@@ -915,7 +926,7 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "num", "-": "neg"
+    "+": "__plus__", "-": "__minus__"
   };
 
   var replaceUnaryOp = function(tokens) {
@@ -929,7 +940,7 @@ define('cc/client/compiler', function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
@@ -1275,6 +1286,7 @@ define('cc/client/utils', function(require, exports, module) {
 define('cc/server/installer', function(require, exports, module) {
   
   var install = function() {
+    require("./object").install();
     require("./server").install();
     require("./bop").install();
     require("./uop").install();
@@ -1289,6 +1301,59 @@ define('cc/server/installer', function(require, exports, module) {
   module.exports = {
     install : install
     };
+
+});
+define('cc/server/object', function(require, exports, module) {
+
+  var cc = require("./cc");
+  
+  var setup = function(key, func) {
+    [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      Klass.prototype[key] = func;
+    });
+  };
+
+  var install = function() {
+    setup("__plus__", function() {
+      return +this;
+    });
+    setup("__minus__", function() {
+      return -this;
+    });
+    setup("__add__", function(b) {
+      return this + b;
+    });
+    setup("__sub__", function(b) {
+      return this - b;
+    });
+    setup("__mod__", function(b) {
+      return this * b;
+    });
+    setup("__div__", function(b) {
+      return this / b;
+    });
+    setup("__mod__", function(b) {
+      return this % b;
+    });
+    setup("__and__", function(b) {
+      return this && b;
+    });
+    setup("__or__", function(b) {
+      return this || b;
+    });
+    setup("next", function() {
+      return this;
+    });
+  };
+  
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  module.exports = require("../cc");
 
 });
 define('cc/server/server', function(require, exports, module) {
@@ -1494,11 +1559,6 @@ define('cc/server/server', function(require, exports, module) {
   };
 
 });
-define('cc/server/cc', function(require, exports, module) {
-
-  module.exports = require("../cc");
-
-});
 define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -1509,85 +1569,85 @@ define('cc/server/node', function(require, exports, module) {
   var FixNum  = require("./unit/unit").FixNum;
   var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
-
+  
   var graphFunc = {};
   graphFunc[-1] = function(node) {
     var prev;
     if (this instanceof Group) {
-      if (this.head === null) {
-        this.head = this.tail = node;
+      if (this.headNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        prev = this.head.prev;
+        prev = this.headNode.prevNode;
         if (prev) {
-          prev.next = node;
+          prev.nextNode = node;
         }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
+        node.nextNode = this.headNode;
+        this.headNode.prevNode = node;
+        this.headNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[-2] = function(node) {
     var next;
     if (this instanceof Group) {
-      if (this.tail === null) {
-        this.head = this.tail = node;
+      if (this.tailNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        next = this.tail.next;
+        next = this.tailNode.nextNode;
         if (next) {
-          next.prev = node;
+          next.prevNode = node;
         }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
+        node.prevNode = this.tailNode;
+        this.tailNode.nextNode = node;
+        this.tailNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[-3] = function(node) {
-    var prev = this.prev;
-    this.prev = node;
-    node.prev = prev;
+    var prev = this.prevNode;
+    this.prevNode = node;
+    node.prevNode = prev;
     if (prev) {
-      prev.next = node;
+      prev.nextNode = node;
     }
-    node.next = this;
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    node.nextNode = this;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[-4] = function(node) {
-    var next = this.next;
-    this.next = node;
-    node.next = next;
+    var next = this.nextNode;
+    this.nextNode = node;
+    node.nextNode = next;
     if (next) {
-      next.prev = node;
+      next.prevNode = node;
     }
-    node.prev = this;
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    node.prevNode = this;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[-5] = function(node) {
-    node.next = this.next;
-    node.prev = this.prev;
-    node.head = this.head;
-    node.tail = this.tail;
-    node.parent = this.parent;
-    if (this.prev) {
-      this.prev.next = node;
+    node.nextNode = this.nextNode;
+    node.prevNode = this.prevNode;
+    node.headNode = this.headNode;
+    node.tailNode = this.tailNode;
+    node.parentNode = this.parentNode;
+    if (this.prevNode) {
+      this.prevNode.nextNode = node;
     }
-    if (this.next) {
-      this.next.prev = node;
+    if (this.nextNode) {
+      this.nextNode.prevNode = node;
     }
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
   };
 
@@ -1605,7 +1665,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[3] = function() {
     // free both this synth and the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev) {
       free.call(prev);
     }
@@ -1613,7 +1673,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[4] = function() {
     // free both this synth and the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       free.call(next);
@@ -1621,7 +1681,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[5] = function() {
     // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_freeAll(prev);
     } else {
@@ -1631,7 +1691,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[6] = function() {
     // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_freeAll(next);
@@ -1641,11 +1701,11 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[7] = function() {
     // free this synth and all preceding nodes in this group
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node && node !== this) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1654,12 +1714,12 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[8] = function() {
     // free this synth and all following nodes in this group
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1667,7 +1727,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[9] = function() {
     // free this synth and pause the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     free.call(this);
     if (prev) {
       prev._running = false;
@@ -1675,7 +1735,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[10] = function() {
     // free this synth and pause the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       next._running = false;
@@ -1683,7 +1743,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[11] = function() {
     // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_deepFree(prev);
     } else {
@@ -1693,7 +1753,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[12] = function() {
     // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_deepFree(next);
@@ -1703,11 +1763,11 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[13] = function() {
     // free this synth and all other nodes in this group (before and after)
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1718,42 +1778,42 @@ define('cc/server/node', function(require, exports, module) {
     g_deepFree(this);
   };
   var free = function() {
-    if (this.prev) {
-      this.prev.next = this.next;
+    if (this.prevNode) {
+      this.prevNode.nextNode = this.nextNode;
     }
-    if (this.next) {
-      this.next.prev = this.prev;
+    if (this.nextNode) {
+      this.nextNode.prevNode = this.prevNode;
     }
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
+    if (this.parentNode) {
+      if (this.parentNode.headNode === this) {
+        this.parentNode.headNode = this.nextNode;
       }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
+      if (this.parentNode.tailNode === this) {
+        this.parentNode.tailNode = this.prevNode;
       }
       this.emit("end");
     }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
+    this.prevNode = null;
+    this.nextNode = null;
+    this.parentNode = null;
     this.blocking = false;
   };
   var g_freeAll = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       node = next;
     }
   };
   var g_deepFree = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       if (node instanceof Group) {
         g_deepFree(node);
@@ -1764,15 +1824,15 @@ define('cc/server/node', function(require, exports, module) {
   
   var Node = (function() {
     function Node() {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Node";
-      this.next   = null;
-      this.prev   = null;
-      this.parent = null;
+      this.nextNode   = null;
+      this.prevNode   = null;
+      this.parentNode = null;
       this.blocking = true;
       this._running = true;
     }
-    fn.extend(Node, Emitter);
+    fn.extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
       this._running = true;
     });
@@ -1796,8 +1856,8 @@ define('cc/server/node', function(require, exports, module) {
     function Group(node, addAction) {
       Node.call(this);
       this.klassName = "Group";
-      this.head = null;
-      this.tail = null;
+      this.headNode = null;
+      this.tailNode = null;
       if (node) {
         var that = this;
         var timeline = cc.server.timeline;
@@ -1809,11 +1869,11 @@ define('cc/server/node', function(require, exports, module) {
     fn.extend(Group, Node);
     
     Group.prototype._process = function(inNumSamples) {
-      if (this.head && this._running) {
-        this.head._process(inNumSamples);
+      if (this.headNode && this._running) {
+        this.headNode._process(inNumSamples);
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     
@@ -1920,8 +1980,8 @@ define('cc/server/node', function(require, exports, module) {
           unit.process(unit.rate.bufLength);
         }
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     
@@ -2560,7 +2620,8 @@ define('cc/server/utils', function(require, exports, module) {
 
 });
 define('cc/server/ugen/ugen', function(require, exports, module) {
-
+  
+  var cc = require("../cc");
   var fn = require("../fn");
   var slice = [].slice;
 
@@ -2578,6 +2639,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
+    fn.extend(UGen, cc.Object);
     UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
@@ -2921,7 +2983,8 @@ define('cc/server/unit/unit', function(require, exports, module) {
 define('cc/common/emitter', function(require, exports, module) {
 
   var Emitter = (function() {
-    function Emitter() {
+    function Emitter(context) {
+      this.__context   = context || this;
       this.__callbacks = {};
     }
     Emitter.prototype.getListeners = function(event) {
@@ -2941,7 +3004,7 @@ define('cc/common/emitter', function(require, exports, module) {
       var that = this;
       function wrapper() {
         that.off(event, wrapper);
-        callback.apply(that.context, arguments);
+        callback.apply(that.__context, arguments);
       }
       wrapper.callback = callback;
       this.on(event, wrapper);
@@ -2975,9 +3038,18 @@ define('cc/common/emitter', function(require, exports, module) {
       var args = Array.prototype.slice.call(arguments, 1);
       var __callbacks = this.getListeners(event).slice(0);
       for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.context, args);
+        __callbacks[i].apply(this.__context, args);
       }
       return this;
+    };
+    Emitter.bind = function(obj) {
+      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+        if (!obj[method]) {
+          obj[method] = Emitter.prototype[method];
+        }
+      });
+      Emitter.call(obj);
+      return obj;
     };
     return Emitter;
   })();
@@ -3038,7 +3110,7 @@ define('cc/server/sched', function(require, exports, module) {
 
   var Task = (function() {
     function Task(timeline) {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
       this._timeline = timeline || cc.server.timeline;
@@ -3049,7 +3121,7 @@ define('cc/server/sched', function(require, exports, module) {
       this._prev  = null;
       this._next  = null;
     }
-    fn.extend(Task, Emitter);
+    fn.extend(Task, cc.Object);
     
     Task.prototype.play = fn.sync(function() {
       var that = this;
@@ -3454,7 +3526,7 @@ define('cc/server/buffer', function(require, exports, module) {
 
   var Buffer = (function() {
     function Buffer() {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Buffer";
       this.samples     = null;
       this.numFrames   = 0;
@@ -3464,7 +3536,7 @@ define('cc/server/buffer', function(require, exports, module) {
       this._bufid = bufid++;
       bufferStore[this._bufid] = this;
     }
-    fn.extend(Buffer, Emitter);
+    fn.extend(Buffer, cc.Object);
     return Buffer;
   })();
   
@@ -4064,52 +4136,23 @@ define('cc/server/uop', function(require, exports, module) {
   var UGen = require("./ugen/ugen").UGen;
   var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
   
-  var setupFunction = function(func) {
-    return function() {
-      return func(this);
-    };
-  };
-  var setupArrayFunction = function(selector) {
-    return function() {
+  var install = function() {
+    Array.prototype.__plus__ = function() {
       return this.map(function(x) {
-        return x[selector]();
+        return +x;
       });
     };
-  };
-  var setupUGenFunction = function(selector) {
-    return function() {
-      return new UnaryOpUGen(selector, this);
+    UGen.prototype.__plus__ = function() {
+      return new UnaryOpUGen("+", this);
     };
-  };
-
-  var setup = function(selector, func, others) {
-    func = setupFunction(func);
-    Number.prototype[selector] = func;
-    Array.prototype[selector]  = setupArrayFunction(selector);
-    UGen.prototype[selector]   = setupUGenFunction(selector);
-    if (others) {
-      String.prototype[selector]   = func;
-      Boolean.prototype[selector]  = func;
-      Function.prototype[selector] = func;
-    }
-  };
-  
-  var install = function() {
-    setup("num", function(a) {
-      return +a;
-    }, true);
-    
-    setup("neg", function(a) {
-      return -a;
-    }, true);
-
-    setup("not", function(a) {
-      return !a;
-    }, true);
-    
-    setup("tilde", function(a) {
-      return ~a;
-    }, true);
+    Array.prototype.__minus__ = function() {
+      return this.map(function(x) {
+        return -x;
+      });
+    };
+    UGen.prototype.__minus__ = function() {
+      return new UnaryOpUGen("-", this);
+    };
   };
 
   module.exports = {
@@ -4119,6 +4162,7 @@ define('cc/server/uop', function(require, exports, module) {
 });
 define('cc/server/scale', function(require, exports, module) {
 
+  var cc = require("./cc");
   var fn = require("./fn");
   
   var ratiomidi = function(list) {
@@ -4141,6 +4185,7 @@ define('cc/server/scale', function(require, exports, module) {
       this._octaveRatio = octaveRatio;
       this.name = name;
     }
+    fn.extend(Tuning, cc.Object);
     Tuning.prototype.semitones = function() {
       return this._tuning.slice();
     };
@@ -4177,7 +4222,8 @@ define('cc/server/scale', function(require, exports, module) {
       return this._tuning;
     };
     Tuning.prototype.equals = function(that) {
-      return this._octaveRatio === that._octaveRatio &&
+      return (that instanceof Tuning) &&
+        (this._octaveRatio === that._octaveRatio) &&
         this._tuning.every(function(x, i) {
           return x === that._tuning[i];
         }, this);
@@ -4385,6 +4431,13 @@ define('cc/server/scale', function(require, exports, module) {
     tunings[key] = new Tuning(params[0], params[1], params[2]);
     TuningInterface[key] = tunings[key];
   });
+  TuningInterface.at = function(key) {
+    var t = tunings[key];
+    if (t) {
+      t = t.copy();
+    }
+    return t;
+  };
   TuningInterface.choose = fn(function(size) {
     if (typeof size !== "number") {
       size = 12;
@@ -4403,21 +4456,15 @@ define('cc/server/scale', function(require, exports, module) {
       return t.copy();
     }
   }).multiCall().build();
-  TuningInterface.at = function(key) {
-    return tunings[key].copy();
-  };
-  TuningInterface.names = function() {
-    return Object.keys(tunings).sort();
-  };
-  TuningInterface["default"] = function(pitchesPerOctave) {
-    return TuningInterface.et(pitchesPerOctave);
-  };
   TuningInterface.et = function(pitchesPerOctave) {
     var list = new Array(pitchesPerOctave);
     for (var i = 0; i < pitchesPerOctave; ++i) {
       list[i] = i * (12 / pitchesPerOctave);
     }
     return new Tuning(list, 2, "ET" + pitchesPerOctave);
+  };
+  TuningInterface.names = function() {
+    return Object.keys(tunings).sort();
   };
   
   var Scale = (function() {
@@ -4428,6 +4475,7 @@ define('cc/server/scale', function(require, exports, module) {
       this.name = name;
       this.tuning(tuning);
     }
+    fn.extend(Scale, cc.Object);
     Scale.prototype.tuning = function(inTuning) {
       if (arguments.length === 0) {
         return this._tuning;
@@ -4497,9 +4545,10 @@ define('cc/server/scale', function(require, exports, module) {
       return this._tuning.octaveRatio();
     };
     Scale.prototype.equals = function(that) {
-      return this._degrees.every(function(x, i) {
-        return x === that._degrees[i];
-      }) && this._tuning.equals(that._tuning);
+      return (that instanceof Scale) &&
+        this._degrees.every(function(x, i) {
+          return x === that._degrees[i];
+        }) && this._tuning.equals(that._tuning);
     };
     Scale.prototype.copy = function() {
       return new Scale(
@@ -4888,11 +4937,21 @@ define('cc/server/scale', function(require, exports, module) {
     if (params[2]) {
       params[2] = tunings[params[2]].copy();
     } else {
-      params[2] = TuningInterface["default"](params[1]);
+      params[2] = TuningInterface.et(params[1]);
     }
     scales[key] = new Scale(params[0], params[1], params[2], params[3]);
     ScaleInterface[key] = scales[key];
   });
+  ScaleInterface.at = function(key, tuning) {
+    var s = scales[key];
+    if (s) {
+      s = s.copy();
+      if (tuning) {
+        s.tuning(tuning);
+      }
+    }
+    return s;
+  };
   ScaleInterface.choose = fn(function(size, pitchesPerOctave) {
     if (typeof size !== "number") {
       size = 7;
@@ -4914,13 +4973,6 @@ define('cc/server/scale', function(require, exports, module) {
       return s.copy();
     }
   }).multiCall().build();
-  ScaleInterface.at = function(key, tuning) {
-    var s = scales[key].copy();
-    if (tuning) {
-      s.tuning(tuning);
-    }
-    return s;
-  };
   ScaleInterface.names = function() {
     return Object.keys(scales).sort();
   };

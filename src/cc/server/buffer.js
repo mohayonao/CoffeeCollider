@@ -11,7 +11,7 @@ define(function(require, exports, module) {
 
   var Buffer = (function() {
     function Buffer() {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Buffer";
       this.samples     = null;
       this.numFrames   = 0;
@@ -21,7 +21,7 @@ define(function(require, exports, module) {
       this._bufid = bufid++;
       bufferStore[this._bufid] = this;
     }
-    fn.extend(Buffer, Emitter);
+    fn.extend(Buffer, cc.Object);
     return Buffer;
   })();
   

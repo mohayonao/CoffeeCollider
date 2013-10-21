@@ -264,7 +264,7 @@ define(function(require, exports, module) {
   
   var Node = (function() {
     function Node() {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Node";
       this.nextNode   = null;
       this.prevNode   = null;
@@ -272,7 +272,7 @@ define(function(require, exports, module) {
       this.blocking = true;
       this._running = true;
     }
-    fn.extend(Node, Emitter);
+    fn.extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
       this._running = true;
     });

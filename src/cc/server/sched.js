@@ -50,7 +50,7 @@ define(function(require, exports, module) {
 
   var Task = (function() {
     function Task(timeline) {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
       this._timeline = timeline || cc.server.timeline;
@@ -61,7 +61,7 @@ define(function(require, exports, module) {
       this._prev  = null;
       this._next  = null;
     }
-    fn.extend(Task, Emitter);
+    fn.extend(Task, cc.Object);
     
     Task.prototype.play = fn.sync(function() {
       var that = this;

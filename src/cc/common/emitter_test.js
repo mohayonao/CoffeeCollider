@@ -5,8 +5,11 @@ define(function(require, exports, module) {
   var Emitter = require("./emitter").Emitter;
 
   describe("emitter.js", function() {
+    var e;
+    beforeEach(function() {
+      e = Emitter.bind({});
+    });
     it("on", function() {
-      var e = new Emitter();
       var actual = 0;
       e.on("hello", function() {
         actual++;
@@ -18,7 +21,6 @@ define(function(require, exports, module) {
       assert.equal(actual, 4);
     });
     it("once", function() {
-      var e = new Emitter();
       var actual = 0;
       e.once("hello", function() {
         actual++;
@@ -30,7 +32,6 @@ define(function(require, exports, module) {
       assert.equal(actual, 1);
     });
     it("off", function() {
-      var e = new Emitter();
       var actual = 0;
       var f1 = function() {
         throw "should not pass through";
@@ -50,7 +51,6 @@ define(function(require, exports, module) {
       assert.equal(actual, 1);
     });
     it("off-once", function() {
-      var e = new Emitter();
       var actual = 0;
       var f1 = function() {
         throw "should not pass through";
@@ -71,7 +71,6 @@ define(function(require, exports, module) {
       assert.equal(actual, 1);
     });
     it("emit-with-args", function() {
-      var e = new Emitter();
       var actual = 0;
       e.on("hello", function(x) {
         assert.equal(10, x);
