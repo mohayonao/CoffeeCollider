@@ -14,80 +14,80 @@ define(function(require, exports, module) {
   graphFunc[C.ADD_TO_HEAD] = function(node) {
     var prev;
     if (this instanceof Group) {
-      if (this.head === null) {
-        this.head = this.tail = node;
+      if (this.headNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        prev = this.head.prev;
+        prev = this.headNode.prevNode;
         if (prev) {
-          prev.next = node;
+          prev.nextNode = node;
         }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
+        node.nextNode = this.headNode;
+        this.headNode.prevNode = node;
+        this.headNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[C.ADD_TO_TAIL] = function(node) {
     var next;
     if (this instanceof Group) {
-      if (this.tail === null) {
-        this.head = this.tail = node;
+      if (this.tailNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        next = this.tail.next;
+        next = this.tailNode.nextNode;
         if (next) {
-          next.prev = node;
+          next.prevNode = node;
         }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
+        node.prevNode = this.tailNode;
+        this.tailNode.nextNode = node;
+        this.tailNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[C.ADD_BEFORE] = function(node) {
-    var prev = this.prev;
-    this.prev = node;
-    node.prev = prev;
+    var prev = this.prevNode;
+    this.prevNode = node;
+    node.prevNode = prev;
     if (prev) {
-      prev.next = node;
+      prev.nextNode = node;
     }
-    node.next = this;
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    node.nextNode = this;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[C.ADD_AFTER] = function(node) {
-    var next = this.next;
-    this.next = node;
-    node.next = next;
+    var next = this.nextNode;
+    this.nextNode = node;
+    node.nextNode = next;
     if (next) {
-      next.prev = node;
+      next.prevNode = node;
     }
-    node.prev = this;
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    node.prevNode = this;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[C.REPLACE] = function(node) {
-    node.next = this.next;
-    node.prev = this.prev;
-    node.head = this.head;
-    node.tail = this.tail;
-    node.parent = this.parent;
-    if (this.prev) {
-      this.prev.next = node;
+    node.nextNode = this.nextNode;
+    node.prevNode = this.prevNode;
+    node.headNode = this.headNode;
+    node.tailNode = this.tailNode;
+    node.parentNode = this.parentNode;
+    if (this.prevNode) {
+      this.prevNode.nextNode = node;
     }
-    if (this.next) {
-      this.next.prev = node;
+    if (this.nextNode) {
+      this.nextNode.prevNode = node;
     }
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
   };
 
@@ -105,7 +105,7 @@ define(function(require, exports, module) {
   };
   doneAction[3] = function() {
     // free both this synth and the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev) {
       free.call(prev);
     }
@@ -113,7 +113,7 @@ define(function(require, exports, module) {
   };
   doneAction[4] = function() {
     // free both this synth and the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       free.call(next);
@@ -121,7 +121,7 @@ define(function(require, exports, module) {
   };
   doneAction[5] = function() {
     // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_freeAll(prev);
     } else {
@@ -131,7 +131,7 @@ define(function(require, exports, module) {
   };
   doneAction[6] = function() {
     // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_freeAll(next);
@@ -141,11 +141,11 @@ define(function(require, exports, module) {
   };
   doneAction[7] = function() {
     // free this synth and all preceding nodes in this group
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node && node !== this) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -154,12 +154,12 @@ define(function(require, exports, module) {
   };
   doneAction[8] = function() {
     // free this synth and all following nodes in this group
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -167,7 +167,7 @@ define(function(require, exports, module) {
   };
   doneAction[9] = function() {
     // free this synth and pause the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     free.call(this);
     if (prev) {
       prev._running = false;
@@ -175,7 +175,7 @@ define(function(require, exports, module) {
   };
   doneAction[10] = function() {
     // free this synth and pause the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       next._running = false;
@@ -183,7 +183,7 @@ define(function(require, exports, module) {
   };
   doneAction[11] = function() {
     // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_deepFree(prev);
     } else {
@@ -193,7 +193,7 @@ define(function(require, exports, module) {
   };
   doneAction[12] = function() {
     // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_deepFree(next);
@@ -203,11 +203,11 @@ define(function(require, exports, module) {
   };
   doneAction[13] = function() {
     // free this synth and all other nodes in this group (before and after)
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -218,42 +218,42 @@ define(function(require, exports, module) {
     g_deepFree(this);
   };
   var free = function() {
-    if (this.prev) {
-      this.prev.next = this.next;
+    if (this.prevNode) {
+      this.prevNode.nextNode = this.nextNode;
     }
-    if (this.next) {
-      this.next.prev = this.prev;
+    if (this.nextNode) {
+      this.nextNode.prevNode = this.prevNode;
     }
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
+    if (this.parentNode) {
+      if (this.parentNode.headNode === this) {
+        this.parentNode.headNode = this.nextNode;
       }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
+      if (this.parentNode.tailNode === this) {
+        this.parentNode.tailNode = this.prevNode;
       }
       this.emit("end");
     }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
+    this.prevNode = null;
+    this.nextNode = null;
+    this.parentNode = null;
     this.blocking = false;
   };
   var g_freeAll = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       node = next;
     }
   };
   var g_deepFree = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       if (node instanceof Group) {
         g_deepFree(node);
@@ -266,9 +266,9 @@ define(function(require, exports, module) {
     function Node() {
       Emitter.call(this);
       this.klassName = "Node";
-      this.next   = null;
-      this.prev   = null;
-      this.parent = null;
+      this.nextNode   = null;
+      this.prevNode   = null;
+      this.parentNode = null;
       this.blocking = true;
       this._running = true;
     }
@@ -296,8 +296,8 @@ define(function(require, exports, module) {
     function Group(node, addAction) {
       Node.call(this);
       this.klassName = "Group";
-      this.head = null;
-      this.tail = null;
+      this.headNode = null;
+      this.tailNode = null;
       if (node) {
         var that = this;
         var timeline = cc.server.timeline;
@@ -309,11 +309,11 @@ define(function(require, exports, module) {
     fn.extend(Group, Node);
     
     Group.prototype._process = function(inNumSamples) {
-      if (this.head && this._running) {
-        this.head._process(inNumSamples);
+      if (this.headNode && this._running) {
+        this.headNode._process(inNumSamples);
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     
@@ -420,8 +420,8 @@ define(function(require, exports, module) {
           unit.process(unit.rate.bufLength);
         }
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     

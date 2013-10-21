@@ -17,9 +17,9 @@ define(function(require, exports, module) {
     if (node) {
       node.emit("end");
       if (node instanceof Group) {
-        walk(node.head);
+        walk(node.headNode);
       }
-      walk(node.next);
+      walk(node.nextNode);
     }
   };
   
