@@ -59,7 +59,8 @@ define(function(require, exports, module) {
       return this._tuning;
     };
     Tuning.prototype.equals = function(that) {
-      return this._octaveRatio === that._octaveRatio &&
+      return (that instanceof Tuning) &&
+        (this._octaveRatio === that._octaveRatio) &&
         this._tuning.every(function(x, i) {
           return x === that._tuning[i];
         }, this);
@@ -267,6 +268,13 @@ define(function(require, exports, module) {
     tunings[key] = new Tuning(params[0], params[1], params[2]);
     TuningInterface[key] = tunings[key];
   });
+  TuningInterface.at = function(key) {
+    var t = tunings[key];
+    if (t) {
+      t = t.copy();
+    }
+    return t;
+  };
   TuningInterface.choose = fn(function(size) {
     if (typeof size !== "number") {
       size = 12;
@@ -285,21 +293,15 @@ define(function(require, exports, module) {
       return t.copy();
     }
   }).multiCall().build();
-  TuningInterface.at = function(key) {
-    return tunings[key].copy();
-  };
-  TuningInterface.names = function() {
-    return Object.keys(tunings).sort();
-  };
-  TuningInterface["default"] = function(pitchesPerOctave) {
-    return TuningInterface.et(pitchesPerOctave);
-  };
   TuningInterface.et = function(pitchesPerOctave) {
     var list = new Array(pitchesPerOctave);
     for (var i = 0; i < pitchesPerOctave; ++i) {
       list[i] = i * (12 / pitchesPerOctave);
     }
     return new Tuning(list, 2, "ET" + pitchesPerOctave);
+  };
+  TuningInterface.names = function() {
+    return Object.keys(tunings).sort();
   };
   
   var Scale = (function() {
@@ -379,9 +381,10 @@ define(function(require, exports, module) {
       return this._tuning.octaveRatio();
     };
     Scale.prototype.equals = function(that) {
-      return this._degrees.every(function(x, i) {
-        return x === that._degrees[i];
-      }) && this._tuning.equals(that._tuning);
+      return (that instanceof Scale) &&
+        this._degrees.every(function(x, i) {
+          return x === that._degrees[i];
+        }) && this._tuning.equals(that._tuning);
     };
     Scale.prototype.copy = function() {
       return new Scale(
@@ -770,11 +773,21 @@ define(function(require, exports, module) {
     if (params[2]) {
       params[2] = tunings[params[2]].copy();
     } else {
-      params[2] = TuningInterface["default"](params[1]);
+      params[2] = TuningInterface.et(params[1]);
     }
     scales[key] = new Scale(params[0], params[1], params[2], params[3]);
     ScaleInterface[key] = scales[key];
   });
+  ScaleInterface.at = function(key, tuning) {
+    var s = scales[key];
+    if (s) {
+      s = s.copy();
+      if (tuning) {
+        s.tuning(tuning);
+      }
+    }
+    return s;
+  };
   ScaleInterface.choose = fn(function(size, pitchesPerOctave) {
     if (typeof size !== "number") {
       size = 7;
@@ -796,13 +809,6 @@ define(function(require, exports, module) {
       return s.copy();
     }
   }).multiCall().build();
-  ScaleInterface.at = function(key, tuning) {
-    var s = scales[key].copy();
-    if (tuning) {
-      s.tuning(tuning);
-    }
-    return s;
-  };
   ScaleInterface.names = function() {
     return Object.keys(scales).sort();
   };
