@@ -1816,10 +1816,10 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.reset = function() {
       buffer.reset();
       this.timeline.reset();
-      this.rootNode.prev = null;
-      this.rootNode.next = null;
-      this.rootNode.head = null;
-      this.rootNode.tail = null;
+      this.rootNode.prevNode = null;
+      this.rootNode.nextNode = null;
+      this.rootNode.headNode = null;
+      this.rootNode.tailNode = null;
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[1];
