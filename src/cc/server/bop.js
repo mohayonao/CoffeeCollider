@@ -35,7 +35,9 @@ define(function(require, exports, module) {
           });
         }
       } else if (b instanceof UGen) {
-        return new BinaryOpUGen().init(ugenSelector, this, b);
+        return a.map(function(a) {
+          return new BinaryOpUGen().init(ugenSelector, a, b);
+        });
       }
       return a.map(function(a) {
         return a[selector](b);
