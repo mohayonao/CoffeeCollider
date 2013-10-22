@@ -15,6 +15,23 @@ module.exports = function(grunt) {
     });
   };
 
+  var resetPrototype = (function() {
+    var builtins = {};
+    [Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      builtins[Klass.toString()] = Object.getOwnPropertyNames(Klass.prototype);
+    });
+    return function() {
+      [Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+        var builtin = builtins[Klass.toString()];
+        Object.getOwnPropertyNames(Klass.prototype).map(function(key) {
+          if (builtin.indexOf(key) === -1) {
+            delete Klass.prototype[key];
+          }
+        });
+      });
+    };
+  })();
+  
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
     esteWatch: {
@@ -208,6 +225,8 @@ module.exports = function(grunt) {
       }
     });
     require("amd-loader");
+
+    resetPrototype();
 
     var Mocha = require("mocha");
     var mocha = new Mocha();
