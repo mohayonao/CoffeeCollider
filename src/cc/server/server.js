@@ -5,7 +5,7 @@ define(function(require, exports, module) {
   var Group    = require("./node").Group;
   var Timeline = require("./sched").Timeline;
   var buffer   = require("./buffer");
-  var pack = require("./utils").pack;
+  var pack = require("../common/pack").pack;
   
   var commands = {};
   var twopi = 2 * Math.PI;

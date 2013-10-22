@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var SoundSystem = require("./sound_system").SoundSystem;
   var Compiler = require("./compiler").Compiler;
-  var unpack = require("./utils").unpack;
+  var unpack = require("../common/pack").unpack;
 
   var commands = {};
   
