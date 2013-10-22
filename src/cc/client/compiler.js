@@ -10,6 +10,8 @@ define(function(require, exports, module) {
     } catch(e) {}
   })();
 
+  var timevalue = require("../common/timevalue").calc;
+
   // CoffeeScript tags
   // IDENTIFIER
   // NUMBER
@@ -206,6 +208,23 @@ define(function(require, exports, module) {
     return tokens.length - 1;
   };
 
+  var replaceTimeValue = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
+        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
+        if (typeof time === "number") {
+          token[TAG] = "NUMBER";
+          token[VALUE] = time.toString();
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
   var replacePi = function(tokens) {
     var i = tokens.length - 1;
     while (0 <= i) {
@@ -214,7 +233,14 @@ define(function(require, exports, module) {
         tokens.splice(i, 1);
         token = tokens[i - 1];
         if (token && token[TAG] === "NUMBER") {
-          a = findOperandHead(tokens, i);
+          a = i - 1;
+          token = tokens[i - 2];
+          if (token) {
+            switch (token[TAG]) {
+              case "UNARY": case "+": case "-":
+              a -= 1;
+            }
+          }
           tokens.splice(i, 0, ["MATH", "*", _]);
           b = i;
         } else {
@@ -252,7 +278,7 @@ define(function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "num", "-": "neg"
+    "+": "__plus__", "-": "__minus__"
   };
 
   var replaceUnaryOp = function(tokens) {
@@ -266,7 +292,7 @@ define(function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
@@ -487,6 +513,7 @@ define(function(require, exports, module) {
       var code  = items[0];
       var data  = items[1];
       var tokens = CoffeeScript.tokens(code);
+      tokens = replaceTimeValue(tokens);
       tokens = replacePi(tokens);
       tokens = replaceUnaryOp(tokens);
       tokens = replacePrecedence(tokens);
@@ -548,6 +575,7 @@ define(function(require, exports, module) {
     splitCodeAndData: splitCodeAndData,
     findOperandHead : findOperandHead,
     findOperandTail : findOperandTail,
+    replaceTimeValue     : replaceTimeValue,
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
     replaceUnaryOp       : replaceUnaryOp,

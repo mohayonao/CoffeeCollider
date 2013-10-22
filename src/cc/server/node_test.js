@@ -17,14 +17,14 @@ define(function(require, exports, module) {
     if (node) {
       node.emit("end");
       if (node instanceof Group) {
-        walk(node.head);
+        walk(node.headNode);
       }
-      walk(node.next);
+      walk(node.nextNode);
     }
   };
   
   describe("node.js", function() {
-    var rootNode, nodes, passed, passed_push;
+    var rootNode, nodes, actual, actual_push;
     beforeEach(function() {
       rootNode = cc.server.rootNode = new Group();
       nodes = [];
@@ -37,51 +37,51 @@ define(function(require, exports, module) {
       nodes[6] = new Synth(null, nodes[4], null, C.ADD_TO_HEAD);
       nodes[7] = new Group(nodes[6], C.ADD_AFTER);
       nodes[8] = new Synth(null, nodes[7], null, C.ADD_AFTER);
-      passed = [];
-      passed_push = function(i) {
+      actual = [];
+      actual_push = function(i) {
         return function() {
-          passed.push(i);
+          actual.push(i);
         };
       };
       for (var i = 0; i < nodes.length; i++) {
-        nodes[i].on("end", passed_push(i));
+        nodes[i].on("end", actual_push(i));
       }
     });
     describe("graphFunction", function() {
       it("addToHead", function() {
-        new Synth(null, nodes[1], null, C.ADD_TO_HEAD).on("end", passed_push(9));
+        new Synth(null, nodes[1], null, C.ADD_TO_HEAD).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 1, 9, 3, 4, 6, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [0, 1, 9, 3, 4, 6, 7, 8, 5, 2]);
       });
       it("do nothing - addToHead of a synth", function() {
-        new Synth(null, nodes[0], null, C.ADD_TO_HEAD).on("end", passed_push(9));
+        new Synth(null, nodes[0], null, C.ADD_TO_HEAD).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 1, 3, 4, 6, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [0, 1, 3, 4, 6, 7, 8, 5, 2]);
       });
       it("addToTail", function() {
-        new Synth(null, nodes[1], null, C.ADD_TO_TAIL).on("end", passed_push(9));
+        new Synth(null, nodes[1], null, C.ADD_TO_TAIL).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 1, 3, 4, 6, 7, 8, 5, 9, 2], passed);
+        assert.deepEqual(actual, [0, 1, 3, 4, 6, 7, 8, 5, 9, 2]);
       });
       it("no nothing - addToTail of a synth", function() {
-        new Synth(null, nodes[2], null, C.ADD_TO_TAIL).on("end", passed_push(9));
+        new Synth(null, nodes[2], null, C.ADD_TO_TAIL).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 1, 3, 4, 6, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [0, 1, 3, 4, 6, 7, 8, 5, 2]);
       });
       it("addAfter", function() {
-        new Synth(null, nodes[0], null, C.ADD_AFTER).on("end", passed_push(9));
+        new Synth(null, nodes[0], null, C.ADD_AFTER).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 9, 1, 3, 4, 6, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [0, 9, 1, 3, 4, 6, 7, 8, 5, 2]);
       });
       it("addBefore", function() {
-        new Synth(null, nodes[0], null, C.ADD_BEFORE).on("end", passed_push(9));
+        new Synth(null, nodes[0], null, C.ADD_BEFORE).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([9, 0, 1, 3, 4, 6, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [9, 0, 1, 3, 4, 6, 7, 8, 5, 2]);
       });
       it("replace", function() {
-        new Synth(null, nodes[6], null, C.REPLACE).on("end", passed_push(9));
+        new Synth(null, nodes[6], null, C.REPLACE).on("end", actual_push(9));
         walk(rootNode);
-        assert.deepEqual([0, 1, 3, 4, 9, 7, 8, 5, 2], passed);
+        assert.deepEqual(actual, [0, 1, 3, 4, 9, 7, 8, 5, 2]);
       });
     });
     describe("doneAction", function() {
@@ -89,80 +89,80 @@ define(function(require, exports, module) {
       it("0", function() {
         desc = "do nothing when the UGen is finished";
         nodes[1]._doneAction(0);
-        assert.deepEqual([], passed, desc);
+        assert.deepEqual(actual, [], desc);
       });
       it("1", function() {
         desc = "pause the enclosing synth, but do not free it";
         nodes[1]._doneAction(1);
-        assert.deepEqual([], passed, desc);
+        assert.deepEqual(actual, [], desc);
         assert.isFalse(nodes[1]._running, desc);
       });
       it("2", function() {
         desc = "free the enclosing synth";
         nodes[1]._doneAction(2);
-        assert.deepEqual([1], passed, desc);
+        assert.deepEqual(actual, [1], desc);
       });
       it("3", function() {
         desc = "free both this synth and the preceding node";
         nodes[1]._doneAction(3);
-        assert.deepEqual([0, 1], passed, desc);
+        assert.deepEqual(actual, [0, 1], desc);
       });
       it("4", function() {
         desc = "free both this synth and the following node";
         nodes[1]._doneAction(4);
-        assert.deepEqual([1, 2], passed, desc);
+        assert.deepEqual(actual, [1, 2], desc);
       });
       it("5", function() {
         desc = "free this synth; if the preceding node is a group then do g_freeAll on it, else free it";
         nodes[2]._doneAction(5);
-        assert.deepEqual([1, 3, 4, 5, 2], passed, desc);
+        assert.deepEqual(actual, [1, 3, 4, 5, 2], desc);
       });
       it("6", function() {
         desc = "free this synth; if the following node is a group then do g_freeAll on it, else free it";
         nodes[0]._doneAction(6);
-        assert.deepEqual([0, 1, 3, 4, 5], passed, desc);
+        assert.deepEqual(actual, [0, 1, 3, 4, 5], desc);
       });
       it("7", function() {
         desc = "free this synth and all preceding nodes in this group";
         nodes[2]._doneAction(7);
-        assert.deepEqual([0, 1, 2], passed, desc);
+        assert.deepEqual(actual, [0, 1, 2], desc);
       });
       it("8", function() {
         desc = "free this synth and all following nodes in this group";
         nodes[0]._doneAction(8);
-        assert.deepEqual([0, 1, 2], passed, desc);
+        assert.deepEqual(actual, [0, 1, 2], desc);
       });
       it("9", function() {
         desc = "free this synth and pause the preceding node";
         nodes[1]._doneAction(9);
-        assert.deepEqual([1], passed, desc);
+        assert.deepEqual(actual, [1], desc);
         assert.isFalse(nodes[0]._running);
       });
       it("10", function() {
         desc = "free this synth and pause the following node";
         nodes[1]._doneAction(10);
-        assert.deepEqual([1], passed, desc);
+        assert.deepEqual(actual, [1], desc);
         assert.isFalse(nodes[2]._running);
       });
       it("11", function() {
         desc = "free this synth and if the preceding node is a group then do g_deepFree on it, else free it";
         nodes[2]._doneAction(11);
-        assert.deepEqual([1, 3, 4, 6, 7, 8, 5, 2], passed, desc);
+        assert.deepEqual(actual, [1, 3, 4, 6, 7, 8, 5, 2], desc);
       });
       it("12", function() {
         desc = "free this synth and if the following node is a group then do g_deepFree on it, else free it";
         nodes[0]._doneAction(12);
-        assert.deepEqual([0, 1, 3, 4, 6, 7, 8, 5], passed, desc);
+        assert.deepEqual(actual, [0, 1, 3, 4, 6, 7, 8, 5], desc);
       });
       it("13", function() {
         desc = "free this synth and all other nodes in this group (before and after)";
         nodes[1]._doneAction(13);
-        assert.deepEqual([0, 1, 2], passed, desc);
+        assert.deepEqual(actual, [0, 1, 2], desc);
       });
       it("14", function() {
         desc = "free the enclosing group and all nodes within it (including this synth)";
         nodes[1]._doneAction(14);
-        assert.deepEqual([1, 3, 4, 6, 7, 8, 5], passed, desc);
+        assert.deepEqual(actual, [1, 3, 4, 6, 7, 8, 5], desc);
       });
     });
   });

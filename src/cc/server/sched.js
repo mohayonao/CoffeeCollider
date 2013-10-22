@@ -4,7 +4,6 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var Emitter = require("../common/emitter").Emitter;
-  var push  = [].push;
   var slice = [].slice;
 
   var Timeline = (function() {
@@ -51,7 +50,7 @@ define(function(require, exports, module) {
 
   var Task = (function() {
     function Task(timeline) {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
       this._timeline = timeline || cc.server.timeline;
@@ -62,7 +61,7 @@ define(function(require, exports, module) {
       this._prev  = null;
       this._next  = null;
     }
-    fn.extend(Task, Emitter);
+    fn.extend(Task, cc.Object);
     
     Task.prototype.play = fn.sync(function() {
       var that = this;
@@ -172,6 +171,9 @@ define(function(require, exports, module) {
             if (Array.isArray(e)) {
               e[0].apply(e[1], e[2]);
             } else {
+              if (e instanceof TaskWaitToken) {
+                e.process(counterIncr);
+              }
               if (e.blocking) {
                 break LOOP;
               }
@@ -191,22 +193,61 @@ define(function(require, exports, module) {
     return Task;
   })();
 
+  var TaskWaitToken = (function() {
+    function TaskWaitToken(time, list, callback) {
+      this.time = time;
+      this.list = list;
+      this.callback = callback;
+      this.blocking = true;
+    }
+    TaskWaitToken.create = function() {
+      var args = slice.call(arguments);
+      var callback = null;
+      if (typeof args[args.length - 1] === "function") {
+        callback = args.pop();
+      }
+      var time = 0;
+      var list = [];
+      args.forEach(function(x) {
+        if (x) {
+          if (typeof x === "number") {
+            if (time < x) {
+              time = x;
+            }
+          } else if (typeof x.blocking === "boolean") {
+            list.push(x);
+          }
+        }
+      });
+      return new TaskWaitToken(time, list, callback);
+    };
+    TaskWaitToken.prototype.process = function(counterIncr) {
+      this.time -= counterIncr;
+      var blocking = this.list.some(function(x) {
+        return x.blocking;
+      });
+      if (this.time <= 0 && !blocking) {
+        this.blocking = false;
+        if (this.callback) {
+          this.callback();
+          delete this.callback;
+        }
+      }
+    };
+    return TaskWaitToken;
+  })();
+
   var TaskContext = (function() {
     function TaskContext(task) {
       this.klassName = "TaskContext";
       this.wait = function() {
-        push.apply(task._queue, slice.call(arguments));
+        task._queue.push(TaskWaitToken.create.apply(null, arguments));
       };
       this.pause = function() {
         task.pause();
       };
       this.stop = function() {
         task.stop();
-      };
-      this.sync = function(func) {
-        if (typeof func === "function") {
-          cc.server.timeline.push(func);
-        }
       };
     }
     return TaskContext;
@@ -394,13 +435,7 @@ define(function(require, exports, module) {
     global.Task = TaskInterface;
     global.wait = function() {
       var globalTask = cc.server.timeline._globalTask;
-      push.apply(globalTask._queue, slice.call(arguments));
-    };
-    global.sync = function(func) {
-      if (typeof func === "function") {
-        var globalTask = cc.server.timeline._globalTask;
-        globalTask._push(func);
-      }
+      globalTask._queue.push(TaskWaitToken.create.apply(null, arguments));
     };
   };
   

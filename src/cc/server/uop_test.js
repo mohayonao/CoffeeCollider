@@ -3,30 +3,24 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var register = require("./installer").register;
+  var object = require("./object");
   var uop = require("./uop");
 
   describe("uop.js", function() {
     before(function() {
+      object.install();
       uop.install();
     });
-    it("num", function() {
-      var actual   = [-1, 0, 1,true ,false,"str","2",""].num();
-      var expected = [-1, 0, 1,1    ,0    ,NaN  ,2  ,0 ];
+    it("__plus__", function() {
+      var tokens = [-1, 0, 1, [-1, -0, 1], "10"];
+      var expected = [-1, 0, 1, [-1, -0, 1], 10];
+      var actual = tokens.__plus__();
       assert.deepEqual(actual, expected);
     });
-    it("neg", function() {
-      var actual   = [-1, 0, 1,true ,false,"str","2",""].neg();
-      var expected = [ 1,-0,-1,-1   ,-0   ,NaN  ,-2 ,-0];
-      assert.deepEqual(actual, expected);
-    });
-    it("not", function() {
-      var actual   = [-1   ,0   , 1   ,true ,false,"str",""  ].not();
-      var expected = [false,true,false,false,true ,false,true];
-      assert.deepEqual(actual, expected);
-    });
-    it("tilde", function() {
-      var actual   = [ -1, 0, 1,true,false,"str",""].tilde();
-      var expected = [~-1,~0,~1,-2  ,-1   ,-1,  -1 ];
+    it("__minus__", function() {
+      var tokens = [-1, 0, 1, [-1, -0, 1], "10"];
+      var expected = [+1, -0, -1, [+1, 0, -1], -10];
+      var actual = tokens.__minus__();
       assert.deepEqual(actual, expected);
     });
   });  

@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var Emitter = (function() {
-    function Emitter() {
+    function Emitter(context) {
+      this.__context   = context || this;
       this.__callbacks = {};
     }
     Emitter.prototype.getListeners = function(event) {
@@ -22,7 +23,7 @@ define(function(require, exports, module) {
       var that = this;
       function wrapper() {
         that.off(event, wrapper);
-        callback.apply(that.context, arguments);
+        callback.apply(that.__context, arguments);
       }
       wrapper.callback = callback;
       this.on(event, wrapper);
@@ -56,9 +57,18 @@ define(function(require, exports, module) {
       var args = Array.prototype.slice.call(arguments, 1);
       var __callbacks = this.getListeners(event).slice(0);
       for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.context, args);
+        __callbacks[i].apply(this.__context, args);
       }
       return this;
+    };
+    Emitter.bind = function(obj) {
+      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+        if (!obj[method]) {
+          obj[method] = Emitter.prototype[method];
+        }
+      });
+      Emitter.call(obj);
+      return obj;
     };
     return Emitter;
   })();

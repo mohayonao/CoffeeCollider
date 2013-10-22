@@ -57,8 +57,12 @@ define('cc/loader', function(require, exports, module) {
 });
 define('cc/cc', function(require, exports, module) {
 
+  function CCObject() {
+  }
+  
   module.exports = {
     version: "0",
+    Object: CCObject
   };
 
 });
@@ -273,6 +277,33 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.sync = function(syncItems) {
       this.send(syncItems);
     };
+    SynthClient.prototype.readAudioFile = function(path, callback) {
+      var sys = this.sys;
+      if (!sys.api.decodeAudioFile) {
+        callback(null);
+        return;
+      }
+      var decode = function(buffer) {
+        sys.api.decodeAudioFile(buffer, function(buffer) {
+          callback(buffer);
+        });
+      };
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path);
+      xhr.responseType = "arraybuffer";
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200 && xhr.response) {
+            if (callback) {
+              decode(xhr.response);
+            }
+          } else {
+            callback(null);
+          }
+        }
+      };
+      xhr.send();
+    };
     return SynthClient;
   })();
   
@@ -293,6 +324,13 @@ define('cc/client/client', function(require, exports, module) {
       callback(result);
       delete this.execCallbacks[execId];
     }
+  };
+  commands["/buffer/request"] = function(msg) {
+    var that = this;
+    var requestId = msg[2];
+    this.readAudioFile(msg[1], function(buffer) {
+      that.send(["/buffer/response", buffer, requestId]);
+    });
   };
   commands["/console/log"] = function(msg) {
     console.log.apply(console, unpack(msg[1]));
@@ -475,6 +513,20 @@ define('cc/client/sound_system', function(require, exports, module) {
       WebAudioAPI.prototype.pause = function() {
         this.bufSrc.disconnect();
         this.jsNode.disconnect();
+      };
+      WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
+        buffer = this.context.createBuffer(buffer, false);
+        var numSamples = buffer.length * buffer.numberOfChannels;
+        var samples = new Float32Array(numSamples);
+        for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
+          samples.set(buffer.getChannelData(i), i * buffer.length);
+        }
+        callback({
+          sampleRate : buffer.sampleRate,
+          numChannels: buffer.numberOfChannels,
+          numFrames  : buffer.length,
+          samples    : samples,
+        });
       };
       return WebAudioAPI;
     })();
@@ -829,7 +881,14 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens.splice(i, 1);
         token = tokens[i - 1];
         if (token && token[TAG] === "NUMBER") {
-          a = findOperandHead(tokens, i);
+          a = i - 1;
+          token = tokens[i - 2];
+          if (token) {
+            switch (token[TAG]) {
+              case "UNARY": case "+": case "-":
+              a -= 1;
+            }
+          }
           tokens.splice(i, 0, ["MATH", "*", _]);
           b = i;
         } else {
@@ -867,7 +926,7 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
   var replaceUnaryOpTable = {
-    "+": "num", "-": "neg"
+    "+": "__plus__", "-": "__minus__"
   };
 
   var replaceUnaryOp = function(tokens) {
@@ -881,7 +940,7 @@ define('cc/client/compiler', function(require, exports, module) {
         case "INDENT": case "TERMINATOR": case "CALL_START":
         case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
         case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
           var a = findOperandTail(tokens, i);
           tokens.splice(a+1, 0, ["."         , "."     , _]);
           tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
@@ -1227,11 +1286,14 @@ define('cc/client/utils', function(require, exports, module) {
 define('cc/server/installer', function(require, exports, module) {
   
   var install = function() {
+    require("./object").install();
     require("./server").install();
     require("./bop").install();
     require("./uop").install();
+    require("./buffer").install();
     require("./node").install();
     require("./sched").install();
+    require("./scale").install();
     require("./ugen/installer").install();
     require("./unit/installer").install();
   };
@@ -1241,11 +1303,489 @@ define('cc/server/installer', function(require, exports, module) {
     };
 
 });
+define('cc/server/object', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var utils = require("./utils");
+  
+  var MulAdd;
+  
+  var setup = function(key, func) {
+    [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      fn.definePrototypeProperty(Klass, key, func);
+    });
+  };
+
+  var install = function() {
+    setup("__plus__", function() {
+      return +this;
+    });
+    setup("__minus__", function() {
+      return -this;
+    });
+    setup("__add__", function(b) {
+      return this + b;
+    });
+    setup("__sub__", function(b) {
+      return this - b;
+    });
+    setup("__mul__", function(b) {
+      return this * b;
+    });
+    setup("__div__", function(b) {
+      return this / b;
+    });
+    setup("__mod__", function(b) {
+      return this % b;
+    });
+    setup("__and__", function(b) {
+      return this && b;
+    });
+    setup("__or__", function(b) {
+      return this || b;
+    });
+    setup("next", function() {
+      return this;
+    });
+    setup("to_i", function() {
+      return this|0;
+    });
+    setup("to_f", function() {
+      return +this;
+    });
+    setup("to_s", function() {
+      return this.toString();
+    });
+    setup("to_a", function() {
+      return [this];
+    });
+    
+    fn.definePrototypeProperty(String, "__mul__", function(b) {
+      if (typeof b === "number") {
+        var result = new Array(Math.max(0, b));
+        for (var i = 0; i < b; i++) {
+          result[i] = this;
+        }
+        return result.join("");
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mul__(b);
+        }, this);
+      }
+      return this * b;
+    });
+    
+    fn.definePrototypeProperty(Function, "__mul__", function(b) {
+      if (typeof b === "function") {
+        var f = this, g = b;
+        return function() {
+          return f.call(null, g.apply(null, arguments));
+        };
+      }
+      return this * b;
+    });
+    
+    fn.definePrototypeProperty(String, "__div__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__div__(b);
+        }, this);
+      }
+      return this / b;
+    });
+    
+    fn.definePrototypeProperty(String, "__mod__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), b|0).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mod__(b);
+        }, this);
+      }
+      return this % b;
+    });
+    
+    fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build());
+    
+    fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+      return utils.flop([this, mul, add]).map(function(items) {
+        var _in = items[0], mul = items[1], add = items[2];
+        return new MulAdd().init(_in, mul, add);
+      });
+    }).defaults("mul=1,add=0").multiCall().build());
+
+    fn.definePrototypeProperty(Array, "to_i", function() {
+      return this.map(function(x) {
+        return x.to_i();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_f", function() {
+      return this.map(function(x) {
+        return x.to_f();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_s", function() {
+      return this.map(function(x) {
+        return x.to_s();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_a", function() {
+      return this;
+    });
+  };
+  
+  cc.once("basic_ops.js", function(payload) {
+    MulAdd = payload.MulAdd;
+  });
+  
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  var _cc = require("../cc");
+  var Emitter = require("../common/emitter").Emitter;
+  
+  Emitter.bind(_cc);
+  
+  module.exports = _cc;
+
+});
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter(context) {
+      this.__context   = context || this;
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.__context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.__context, args);
+      }
+      return this;
+    };
+    Emitter.bind = function(obj) {
+      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+        if (!obj[method]) {
+          obj[method] = Emitter.prototype[method];
+        }
+      });
+      Emitter.call(obj);
+      return obj;
+    };
+    return Emitter;
+  })();
+
+  module.exports = {
+    Emitter: Emitter
+  };
+
+});
+define('cc/server/fn', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var utils = require("./utils");
+  var slice = [].slice;
+  
+  var fn = (function() {
+    function Fn(func) {
+      this.func  = func;
+      this.def   = null;
+      this.multi = false;
+    }
+    Fn.prototype.defaults = function(def) {
+      this.def = def;
+      return this;
+    };
+    Fn.prototype.multiCall = function(flag) {
+      this.multi = flag === undefined ? true : !!flag;
+      return this;
+    };
+    Fn.prototype.build = function() {
+      var func = this.func;
+      var keys = [];
+      var vals = [];
+      if (this.def) {
+        this.def.split(",").forEach(function(items) {
+          items = items.trim().split("=");
+          keys.push( items[0].trim());
+          vals.push(items.length > 1 ? +items[1].trim() : undefined);
+        });
+      }
+      var ret = func;
+      if (this.multi) {
+        if (this.def) {
+          ret = function() {
+            var args = slice.call(arguments);
+            args = resolve_args(keys, vals, slice.call(arguments));
+            if (containsArray(args)) {
+              return utils.flop(args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        } else {
+          ret = function() {
+            var args = slice.call(arguments);
+            if (containsArray(args)) {
+              return utils.flop(args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        }
+      } else if (this.def) {
+        ret = function() {
+          var args = slice.call(arguments);
+          args = resolve_args(keys, vals, slice.call(arguments));
+          return func.apply(this, args);
+        };
+      }
+      return ret;
+    };
+    var containsArray = function(list) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          return true;
+        }
+      }
+      return false;
+    };
+    var resolve_args = function(keys, vals, given) {
+      var dict;
+      var args = vals.slice();
+      if (utils.isDict(given[given.length - 1])) {
+        dict = given.pop();
+        for (var key in dict) {
+          var index = keys.indexOf(key);
+          if (index !== -1) {
+            args[index] = dict[key];
+          }
+        }
+      }
+      for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
+        args[i] = given[i];
+      }
+      if (dict && args.length < keys.length - 1) {
+        args.push(dict);
+      }
+      return args;
+    };
+    return function(func) {
+      return new Fn(func);
+    };
+  })();
+  
+  fn.extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  
+  fn.sync = function(func) {
+    return function() {
+      cc.server.timeline.push(this, func, slice.call(arguments));
+      return this;
+    };
+  };
+
+  fn.definePrototypeProperty = function(Klass, key, func) {
+    Object.defineProperty(Klass.prototype, key, {
+      configurable: true,
+      enumerable  : false,
+      writable    : true,
+      value       : func
+    });
+  };
+  
+  module.exports = fn;
+
+});
+define('cc/server/utils', function(require, exports, module) {
+
+  var isDict = function(obj) {
+    return !!(obj && obj.constructor === Object);
+  };
+  
+  var flop = function(list) {
+    var maxSize = list.reduce(function(len, sublist) {
+      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
+    }, 0);
+    var result = new Array(maxSize);
+    var length = list.length;
+    if (length) {
+      for (var i = 0; i < maxSize; ++i) {
+        var sublist = result[i] = new Array(length);
+        for (var j = 0; j < length; ++j) {
+          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
+        }
+      }
+    }
+    return result;
+  };
+
+  var flatten = (function() {
+    var _flatten = function(list, result) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          result = _flatten(list[i], result);
+        } else {
+          result.push(list[i]);
+        }
+      }
+      return result;
+    };
+    return function(list) {
+      return _flatten(list, []);
+    };
+  })();
+
+  var clump = function(list, groupSize) {
+    var result  = [];
+    var sublist = [];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      sublist.push(list[i]);
+      if (sublist.length >= groupSize) {
+        result.push(sublist);
+        sublist = [];
+      }
+    }
+    if (sublist.length) {
+      result.push(sublist);
+    }
+    return result;
+  };
+  
+  var pack = (function() {
+    var _ = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            if (key.charAt(0) !== "_") {
+              result[key] = _(data[key], stack);
+            }
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _(data, []);
+    };
+  })();
+  
+  module.exports = {
+    isDict : isDict,
+    flop   : flop,
+    flatten: flatten,
+    clump  : clump,
+    pack   : pack
+  };
+
+});
 define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
   var Group    = require("./node").Group;
   var Timeline = require("./sched").Timeline;
+  var buffer   = require("./buffer");
   var pack = require("./utils").pack;
   
   var commands = {};
@@ -1258,6 +1798,8 @@ define('cc/server/server', function(require, exports, module) {
       this.syncItems = new Float32Array(5);
       this.timeline = new Timeline(this);
       this.timerId = 0;
+      this.bufferRequestId = 0;
+      this.bufferRequestCallback = {};
     }
     SynthServer.prototype.send = function(msg) {
       postMessage(msg);
@@ -1272,14 +1814,23 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.reset = function() {
+      buffer.reset();
       this.timeline.reset();
-      this.rootNode.prev = null;
-      this.rootNode.next = null;
-      this.rootNode.head = null;
-      this.rootNode.tail = null;
+      this.rootNode.prevNode = null;
+      this.rootNode.nextNode = null;
+      this.rootNode.headNode = null;
+      this.rootNode.tailNode = null;
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[1];
+    };
+    SynthServer.prototype.requestBuffer = function(path, callback) {
+      if (!(typeof path === "string" && typeof callback === "function")) {
+        return;
+      }
+      var requestId = this.bufferRequestId++;
+      this.bufferRequestCallback[requestId] = callback;
+      this.send(["/buffer/request", path, requestId]);
     };
     SynthServer.prototype.onaudioprocess = function() {
       if (this.syncCount - this.sysSyncCount >= 4) {
@@ -1363,6 +1914,15 @@ define('cc/server/server', function(require, exports, module) {
       this.send(["/execute", execId, pack(result)]);
     }
   };
+  commands["/buffer/response"] = function(msg) {
+    var buffer = msg[1];
+    var requestId = msg[2];
+    var callback = this.bufferRequestCallback[requestId];
+    if (callback) {
+      callback(buffer);
+      delete this.bufferRequestCallback[requestId];
+    }
+  };
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
@@ -1423,11 +1983,6 @@ define('cc/server/server', function(require, exports, module) {
   };
 
 });
-define('cc/server/cc', function(require, exports, module) {
-
-  module.exports = require("../cc");
-
-});
 define('cc/server/node', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -1438,85 +1993,85 @@ define('cc/server/node', function(require, exports, module) {
   var FixNum  = require("./unit/unit").FixNum;
   var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
-
+  
   var graphFunc = {};
   graphFunc[-1] = function(node) {
     var prev;
     if (this instanceof Group) {
-      if (this.head === null) {
-        this.head = this.tail = node;
+      if (this.headNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        prev = this.head.prev;
+        prev = this.headNode.prevNode;
         if (prev) {
-          prev.next = node;
+          prev.nextNode = node;
         }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
+        node.nextNode = this.headNode;
+        this.headNode.prevNode = node;
+        this.headNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[-2] = function(node) {
     var next;
     if (this instanceof Group) {
-      if (this.tail === null) {
-        this.head = this.tail = node;
+      if (this.tailNode === null) {
+        this.headNode = this.tailNode = node;
       } else {
-        next = this.tail.next;
+        next = this.tailNode.nextNode;
         if (next) {
-          next.prev = node;
+          next.prevNode = node;
         }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
+        node.prevNode = this.tailNode;
+        this.tailNode.nextNode = node;
+        this.tailNode = node;
       }
-      node.parent = this;
+      node.parentNode = this;
     }
   };
   graphFunc[-3] = function(node) {
-    var prev = this.prev;
-    this.prev = node;
-    node.prev = prev;
+    var prev = this.prevNode;
+    this.prevNode = node;
+    node.prevNode = prev;
     if (prev) {
-      prev.next = node;
+      prev.nextNode = node;
     }
-    node.next = this;
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    node.nextNode = this;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[-4] = function(node) {
-    var next = this.next;
-    this.next = node;
-    node.next = next;
+    var next = this.nextNode;
+    this.nextNode = node;
+    node.nextNode = next;
     if (next) {
-      next.prev = node;
+      next.prevNode = node;
     }
-    node.prev = this;
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    node.prevNode = this;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
-    node.parent = this.parent;
+    node.parentNode = this.parentNode;
   };
   graphFunc[-5] = function(node) {
-    node.next = this.next;
-    node.prev = this.prev;
-    node.head = this.head;
-    node.tail = this.tail;
-    node.parent = this.parent;
-    if (this.prev) {
-      this.prev.next = node;
+    node.nextNode = this.nextNode;
+    node.prevNode = this.prevNode;
+    node.headNode = this.headNode;
+    node.tailNode = this.tailNode;
+    node.parentNode = this.parentNode;
+    if (this.prevNode) {
+      this.prevNode.nextNode = node;
     }
-    if (this.next) {
-      this.next.prev = node;
+    if (this.nextNode) {
+      this.nextNode.prevNode = node;
     }
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    if (this.parentNode && this.parentNode.headNode === this) {
+      this.parentNode.headNode = node;
     }
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    if (this.parentNode && this.parentNode.tailNode === this) {
+      this.parentNode.tailNode = node;
     }
   };
 
@@ -1534,7 +2089,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[3] = function() {
     // free both this synth and the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev) {
       free.call(prev);
     }
@@ -1542,7 +2097,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[4] = function() {
     // free both this synth and the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       free.call(next);
@@ -1550,7 +2105,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[5] = function() {
     // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_freeAll(prev);
     } else {
@@ -1560,7 +2115,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[6] = function() {
     // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_freeAll(next);
@@ -1570,11 +2125,11 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[7] = function() {
     // free this synth and all preceding nodes in this group
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node && node !== this) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1583,12 +2138,12 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[8] = function() {
     // free this synth and all following nodes in this group
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1596,7 +2151,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[9] = function() {
     // free this synth and pause the preceding node
-    var prev = this.prev;
+    var prev = this.prevNode;
     free.call(this);
     if (prev) {
       prev._running = false;
@@ -1604,7 +2159,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[10] = function() {
     // free this synth and pause the following node
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       next._running = false;
@@ -1612,7 +2167,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[11] = function() {
     // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prev;
+    var prev = this.prevNode;
     if (prev instanceof Group) {
       g_deepFree(prev);
     } else {
@@ -1622,7 +2177,7 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[12] = function() {
     // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.next;
+    var next = this.nextNode;
     free.call(this);
     if (next) {
       g_deepFree(next);
@@ -1632,11 +2187,11 @@ define('cc/server/node', function(require, exports, module) {
   };
   doneAction[13] = function() {
     // free this synth and all other nodes in this group (before and after)
-    var next = this.parent.head;
+    var next = this.parentNode.headNode;
     if (next) {
       var node = next;
       while (node) {
-        next = node.next;
+        next = node.nextNode;
         free.call(node);
         node = next;
       }
@@ -1647,42 +2202,42 @@ define('cc/server/node', function(require, exports, module) {
     g_deepFree(this);
   };
   var free = function() {
-    if (this.prev) {
-      this.prev.next = this.next;
+    if (this.prevNode) {
+      this.prevNode.nextNode = this.nextNode;
     }
-    if (this.next) {
-      this.next.prev = this.prev;
+    if (this.nextNode) {
+      this.nextNode.prevNode = this.prevNode;
     }
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
+    if (this.parentNode) {
+      if (this.parentNode.headNode === this) {
+        this.parentNode.headNode = this.nextNode;
       }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
+      if (this.parentNode.tailNode === this) {
+        this.parentNode.tailNode = this.prevNode;
       }
       this.emit("end");
     }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
+    this.prevNode = null;
+    this.nextNode = null;
+    this.parentNode = null;
     this.blocking = false;
   };
   var g_freeAll = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       node = next;
     }
   };
   var g_deepFree = function(node) {
-    var next = node.head;
+    var next = node.headNode;
     free.call(node);
     node = next;
     while (node) {
-      next = node.next;
+      next = node.nextNode;
       free.call(node);
       if (node instanceof Group) {
         g_deepFree(node);
@@ -1693,15 +2248,15 @@ define('cc/server/node', function(require, exports, module) {
   
   var Node = (function() {
     function Node() {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Node";
-      this.next   = null;
-      this.prev   = null;
-      this.parent = null;
+      this.nextNode   = null;
+      this.prevNode   = null;
+      this.parentNode = null;
       this.blocking = true;
       this._running = true;
     }
-    fn.extend(Node, Emitter);
+    fn.extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
       this._running = true;
     });
@@ -1725,8 +2280,8 @@ define('cc/server/node', function(require, exports, module) {
     function Group(node, addAction) {
       Node.call(this);
       this.klassName = "Group";
-      this.head = null;
-      this.tail = null;
+      this.headNode = null;
+      this.tailNode = null;
       if (node) {
         var that = this;
         var timeline = cc.server.timeline;
@@ -1738,11 +2293,11 @@ define('cc/server/node', function(require, exports, module) {
     fn.extend(Group, Node);
     
     Group.prototype._process = function(inNumSamples) {
-      if (this.head && this._running) {
-        this.head._process(inNumSamples);
+      if (this.headNode && this._running) {
+        this.headNode._process(inNumSamples);
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     
@@ -1849,8 +2404,8 @@ define('cc/server/node', function(require, exports, module) {
           unit.process(unit.rate.bufLength);
         }
       }
-      if (this.next) {
-        this.next._process(inNumSamples);
+      if (this.nextNode) {
+        this.nextNode._process(inNumSamples);
       }
     };
     
@@ -2258,240 +2813,15 @@ define('cc/server/node', function(require, exports, module) {
   };
 
 });
-define('cc/server/fn', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var utils = require("./utils");
-  var slice = [].slice;
-  
-  var fn = (function() {
-    function Fn(func) {
-      this.func  = func;
-      this.def   = null;
-      this.multi = false;
-    }
-    Fn.prototype.defaults = function(def) {
-      this.def = def;
-      return this;
-    };
-    Fn.prototype.multiCall = function(flag) {
-      this.multi = flag === undefined ? true : !!flag;
-      return this;
-    };
-    Fn.prototype.build = function() {
-      var func = this.func;
-      var keys = [];
-      var vals = [];
-      if (this.def) {
-        this.def.split(",").forEach(function(items) {
-          items = items.trim().split("=");
-          keys.push( items[0].trim());
-          vals.push(items.length > 1 ? +items[1].trim() : undefined);
-        });
-      }
-      var ret = func;
-      if (this.multi) {
-        if (this.def) {
-          ret = function() {
-            var args = slice.call(arguments);
-            args = resolve_args(keys, vals, slice.call(arguments));
-            if (containsArray(args)) {
-              return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
-              }, this);
-            }
-            return func.apply(this, args);
-          };
-        } else {
-          ret = function() {
-            var args = slice.call(arguments);
-            if (containsArray(args)) {
-              return utils.apply(args).map(function(items) {
-                return func.apply(this, items);
-              }, this);
-            }
-            return func.apply(this, args);
-          };
-        }
-      } else if (this.def) {
-        ret = function() {
-          var args = slice.call(arguments);
-          args = resolve_args(keys, vals, slice.call(arguments));
-          return func.apply(this, args);
-        };
-      }
-      return ret;
-    };
-    var containsArray = function(list) {
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        if (Array.isArray(list[i])) {
-          return true;
-        }
-      }
-      return false;
-    };
-    var resolve_args = function(keys, vals, given) {
-      var dict;
-      var args = vals.slice();
-      if (utils.isDict(given[given.length - 1])) {
-        dict = given.pop();
-        for (var key in dict) {
-          var index = keys.indexOf(key);
-          if (index !== -1) {
-            args[index] = dict[key];
-          }
-        }
-      }
-      for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
-        args[i] = given[i];
-      }
-      if (dict && args.length < keys.length - 1) {
-        args.push(dict);
-      }
-      return args;
-    };
-    return function(func) {
-      return new Fn(func);
-    };
-  })();
-  
-  fn.extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
-    /*jshint validthis:true */
-    function ctor() {
-      this.constructor = child;
-    }
-    /*jshint validthis:false */
-    ctor.prototype = parent.prototype;
-    /*jshint newcap:false */
-    child.prototype = new ctor();
-    /*jshint newcap:true */
-    child.__super__ = parent.prototype;
-    return child;
-  };
-  
-  fn.sync = function(func) {
-    return function() {
-      cc.server.timeline.push(this, func, slice.call(arguments));
-      return this;
-    };
-  };
-
-  module.exports = fn;
-
-});
-define('cc/server/utils', function(require, exports, module) {
-
-  var isDict = function(obj) {
-    return !!(obj && obj.constructor === Object);
-  };
-  
-  var flop = function(list) {
-    var maxSize = list.reduce(function(len, sublist) {
-      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
-    }, 0);
-    var result = new Array(maxSize);
-    var length = list.length;
-    if (length) {
-      for (var i = 0; i < maxSize; ++i) {
-        var sublist = result[i] = new Array(length);
-        for (var j = 0; j < length; ++j) {
-          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
-        }
-      }
-    }
-    return result;
-  };
-
-  var flatten = (function() {
-    var _flatten = function(list, result) {
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        if (Array.isArray(list[i])) {
-          result = _flatten(list[i], result);
-        } else {
-          result.push(list[i]);
-        }
-      }
-      return result;
-    };
-    return function(list) {
-      return _flatten(list, []);
-    };
-  })();
-
-  var clump = function(list, groupSize) {
-    var result  = [];
-    var sublist = [];
-    for (var i = 0, imax = list.length; i < imax; ++i) {
-      sublist.push(list[i]);
-      if (sublist.length >= groupSize) {
-        result.push(sublist);
-        sublist = [];
-      }
-    }
-    if (sublist.length) {
-      result.push(sublist);
-    }
-    return result;
-  };
-  
-  var pack = (function() {
-    var _ = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
-              result[key] = _(data[key], stack);
-            }
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data, []);
-    };
-  })();
-  
-  module.exports = {
-    isDict : isDict,
-    flop   : flop,
-    flatten: flatten,
-    clump  : clump,
-    pack   : pack
-  };
-
-});
 define('cc/server/ugen/ugen', function(require, exports, module) {
-
+  
+  var cc = require("../cc");
   var fn = require("../fn");
   var slice = [].slice;
+
+  var UnaryOpUGen;
+  var BinaryOpUGen;
+  var MulAdd;
 
   var addToSynthDef = null;
   
@@ -2507,6 +2837,8 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
+    fn.extend(UGen, cc.Object);
+    
     UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
@@ -2516,6 +2848,31 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
+    
+    UGen.prototype.madd = fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build();
+    
+    UGen.prototype.range = fn(function(lo, hi) {
+      var mul, add;
+      if (this.signalRange === 2) {
+        mul = (hi - lo) * 0.5;
+        add = mul + lo;
+      } else {
+        mul = (hi - lo);
+        add = lo;
+      }
+      return new MulAdd().init(this, mul, add);
+    }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.unipolar = fn(function(mul) {
+      return this.range(0, mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    UGen.prototype.bipolar = fn(function(mul) {
+      return this.range(mul.neg(), mul);
+    }).defaults("mul=1").multiCall().build();
+    
     return UGen;
   })();
   
@@ -2657,6 +3014,12 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       }).defaults(defaults).multiCall(multiCall).build();
     });
   };
+
+  cc.once("basic_ops.js", function(payload) {
+    UnaryOpUGen  = payload.UnaryOpUGen;
+    BinaryOpUGen = payload.BinaryOpUGen;
+    MulAdd       = payload.MulAdd;
+  });
   
   module.exports = {
     UGen: UGen,
@@ -2847,81 +3210,11 @@ define('cc/server/unit/unit', function(require, exports, module) {
   };
 
 });
-define('cc/common/emitter', function(require, exports, module) {
-
-  var Emitter = (function() {
-    function Emitter() {
-      this.__callbacks = {};
-    }
-    Emitter.prototype.getListeners = function(event) {
-      return this.__callbacks[event] || (this.__callbacks[event] = []);
-    };
-    Emitter.prototype.hasListeners = function(event) {
-      return this.getListeners(event).length > 0;
-    };
-    Emitter.prototype.on = function(event, callback) {
-      var __callbacks = this.getListeners(event);
-      if (__callbacks.indexOf(callback) === -1) {
-        __callbacks.push(callback);
-      }
-      return this;
-    };
-    Emitter.prototype.once = function(event, callback) {
-      var that = this;
-      function wrapper() {
-        that.off(event, wrapper);
-        callback.apply(that.context, arguments);
-      }
-      wrapper.callback = callback;
-      this.on(event, wrapper);
-      return this;
-    };
-    Emitter.prototype.off = function(event, callback) {
-      if (arguments.length === 0) {
-        this.__callbacks = {};
-        return this;
-      }
-      var __callbacks = this.getListeners(event);
-      if (arguments.length === 1) {
-        __callbacks.splice(0);
-        return this;
-      }
-      var index = __callbacks.indexOf(callback);
-      if (index === -1) {
-        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-          if (__callbacks[i].callback === callback) {
-            index = i;
-            break;
-          }
-        }
-      }
-      if (index !== -1) {
-        __callbacks.splice(index, 1);
-      }
-      return this;
-    };
-    Emitter.prototype.emit = function(event) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      var __callbacks = this.getListeners(event).slice(0);
-      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.context, args);
-      }
-      return this;
-    };
-    return Emitter;
-  })();
-
-  module.exports = {
-    Emitter: Emitter
-  };
-
-});
 define('cc/server/sched', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
   var Emitter = require("../common/emitter").Emitter;
-  var push  = [].push;
   var slice = [].slice;
 
   var Timeline = (function() {
@@ -2968,7 +3261,7 @@ define('cc/server/sched', function(require, exports, module) {
 
   var Task = (function() {
     function Task(timeline) {
-      Emitter.call(this);
+      Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
       this._timeline = timeline || cc.server.timeline;
@@ -2979,7 +3272,7 @@ define('cc/server/sched', function(require, exports, module) {
       this._prev  = null;
       this._next  = null;
     }
-    fn.extend(Task, Emitter);
+    fn.extend(Task, cc.Object);
     
     Task.prototype.play = fn.sync(function() {
       var that = this;
@@ -3089,6 +3382,9 @@ define('cc/server/sched', function(require, exports, module) {
             if (Array.isArray(e)) {
               e[0].apply(e[1], e[2]);
             } else {
+              if (e instanceof TaskWaitToken) {
+                e.process(counterIncr);
+              }
               if (e.blocking) {
                 break LOOP;
               }
@@ -3108,22 +3404,61 @@ define('cc/server/sched', function(require, exports, module) {
     return Task;
   })();
 
+  var TaskWaitToken = (function() {
+    function TaskWaitToken(time, list, callback) {
+      this.time = time;
+      this.list = list;
+      this.callback = callback;
+      this.blocking = true;
+    }
+    TaskWaitToken.create = function() {
+      var args = slice.call(arguments);
+      var callback = null;
+      if (typeof args[args.length - 1] === "function") {
+        callback = args.pop();
+      }
+      var time = 0;
+      var list = [];
+      args.forEach(function(x) {
+        if (x) {
+          if (typeof x === "number") {
+            if (time < x) {
+              time = x;
+            }
+          } else if (typeof x.blocking === "boolean") {
+            list.push(x);
+          }
+        }
+      });
+      return new TaskWaitToken(time, list, callback);
+    };
+    TaskWaitToken.prototype.process = function(counterIncr) {
+      this.time -= counterIncr;
+      var blocking = this.list.some(function(x) {
+        return x.blocking;
+      });
+      if (this.time <= 0 && !blocking) {
+        this.blocking = false;
+        if (this.callback) {
+          this.callback();
+          delete this.callback;
+        }
+      }
+    };
+    return TaskWaitToken;
+  })();
+
   var TaskContext = (function() {
     function TaskContext(task) {
       this.klassName = "TaskContext";
       this.wait = function() {
-        push.apply(task._queue, slice.call(arguments));
+        task._queue.push(TaskWaitToken.create.apply(null, arguments));
       };
       this.pause = function() {
         task.pause();
       };
       this.stop = function() {
         task.stop();
-      };
-      this.sync = function(func) {
-        if (typeof func === "function") {
-          cc.server.timeline.push(func);
-        }
       };
     }
     return TaskContext;
@@ -3311,13 +3646,7 @@ define('cc/server/sched', function(require, exports, module) {
     global.Task = TaskInterface;
     global.wait = function() {
       var globalTask = cc.server.timeline._globalTask;
-      push.apply(globalTask._queue, slice.call(arguments));
-    };
-    global.sync = function(func) {
-      if (typeof func === "function") {
-        var globalTask = cc.server.timeline._globalTask;
-        globalTask._push(func);
-      }
+      globalTask._queue.push(TaskWaitToken.create.apply(null, arguments));
     };
   };
   
@@ -3336,9 +3665,109 @@ define('cc/server/sched', function(require, exports, module) {
   };
 
 });
+define('cc/server/buffer', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var Emitter = require("../common/emitter").Emitter;
+
+  var bufferCache = {};
+  var bufferStore = {};
+  var bufid = 0;
+
+  var Buffer = (function() {
+    function Buffer() {
+      Emitter.bind(this);
+      this.klassName = "Buffer";
+      this.samples     = null;
+      this.numFrames   = 0;
+      this.numChannels = 0;
+      this.sampleRate  = 0;
+      this.blocking = true;
+      this._bufid = bufid++;
+      bufferStore[this._bufid] = this;
+    }
+    fn.extend(Buffer, cc.Object);
+    return Buffer;
+  })();
+  
+  var setBuffer = function(buffer, startFrame, numFrames) {
+    if (!buffer) {
+      throw new Error("Buffer failed to decode an audio file.");
+    }
+    startFrame = Math.max( 0, Math.min(startFrame|0, buffer.numFrames));
+    numFrames  = Math.max(-1, Math.min(numFrames |0, buffer.numFrames - startFrame));
+    var samples, x, i, imax;
+    if (startFrame === 0) {
+      if (numFrames === -1) {
+        samples   = buffer.samples;
+        numFrames = buffer.numFrames;
+      } else {
+        samples = new Float32Array(numFrames * buffer.numChannels);
+        for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
+          x = i * buffer.numFrames;
+          samples.set(buffer.samples.subarray(x, x + numFrames));
+        }
+      }
+    } else {
+      if (numFrames === -1) {
+        numFrames = buffer.numFrames - startFrame;
+      }
+      samples = new Float32Array(numFrames * buffer.numChannels);
+      for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
+        x = i * buffer.numFrames + startFrame;
+        samples.set(buffer.samples.subarray(x, x + numFrames));
+      }
+    }
+    this.samples    = samples;
+    this.numFrames  = numFrames;
+    this.numChannels = buffer.numChannels;
+    this.sampleRate  = buffer.sampleRate;
+    this.blocking = false;
+    this.emit("load", this);
+  };
+  
+  var BufferInterface = function() {
+  };
+  BufferInterface.read = fn(function(path, startFrame, numFrames) {
+    if (typeof path !== "string") {
+      throw new TypeError("Buffer.Read: arguments[0] should be a string.");
+    }
+    var buffer = new Buffer();
+    if (bufferCache[path]) {
+      setBuffer.call(buffer, bufferCache[path], startFrame, numFrames);
+    } else {
+      cc.server.requestBuffer(path, function(result) {
+        bufferCache[path] = result;
+        setBuffer.call(buffer, result, startFrame, numFrames);
+      });
+    }
+    return buffer;
+  }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
+
+  var reset = function() {
+    bufferCache = {};
+  };
+  
+  var get = function(id) {
+    return bufferStore[id];
+  };
+  
+  var install = function() {
+    global.Buffer = BufferInterface;
+  };
+  
+  module.exports = {
+    Buffer: Buffer,
+    reset : reset,
+    get   : get,
+    install: install
+  };
+
+});
 define('cc/server/bop', function(require, exports, module) {
 
-  var utils = require("./utils");
+  var fn = require("./fn");
   var UGen  = require("./ugen/ugen").UGen;
   var BinaryOpUGen = require("./ugen/basic_ops").BinaryOpUGen;
 
@@ -3387,84 +3816,33 @@ define('cc/server/bop', function(require, exports, module) {
 
   var setup = function(selector, func, ugenSelector) {
     ugenSelector = ugenSelector || selector;
-    Number.prototype[selector] = setupNumberFunction(func, selector, ugenSelector);
-    Array.prototype[selector]  = setupArrayFunction(selector, ugenSelector);
-    UGen.prototype[selector]   = setupUGenFunction(ugenSelector);
+    fn.definePrototypeProperty(
+      Number, selector, setupNumberFunction(func, selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      Array, selector, setupArrayFunction(selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      UGen, selector, setupUGenFunction(ugenSelector)
+    );
   };
-
+  
   var install = function() {
     setup("__add__", function(a, b) {
       return a + b;
     }, "+");
-    String.prototype.__add__ = function(b) {
-      return this + b;
-    };
-    Function.prototype.__add__ = function(b) {
-      return this + b;
-    };
-
     setup("__sub__", function(a, b) {
       return a - b;
     }, "-");
-    
     setup("__mul__", function(a, b) {
       return a * b;
     }, "*");
-    String.prototype.__mul__ = function(b) {
-      if (typeof b === "number") {
-        var result = new Array(Math.max(0, b));
-        for (var i = 0; i < b; i++) {
-          result[i] = this;
-        }
-        return result.join("");
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mul__(b);
-        }, this);
-      }
-      return new TypeError("String *: an invalid operand.");
-    };
-    Function.prototype.__mul__ = function(b) {
-      if (typeof b === "function") {
-        var f = this, g = b;
-        return function() {
-          return f.call(null, g.apply(null, arguments));
-        };
-      }
-      return this;
-    };
-    
     setup("__div__", function(a, b) {
       return a / b;
     }, "/");
-    String.prototype.__div__ = function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__div__(b);
-        }, this);
-      }
-      return new TypeError("String /: an invalid operand.");
-    };
-
     setup("__mod__", function(a, b) {
       return a % b;
     }, "%");
-    String.prototype.__mod__ = function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), b|0).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mod__(b);
-        }, this);
-      }
-      return new TypeError("String %: an invalid operand.");
-    };
   };
   
   module.exports = {
@@ -3474,6 +3852,7 @@ define('cc/server/bop', function(require, exports, module) {
 });
 define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
+  var cc = require("../cc");
   var fn = require("../fn");
   var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
@@ -3805,41 +4184,14 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     };
   })();
   
-  Number.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-  Array.prototype.madd = fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return new MulAdd().init(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").build();
-  UGen.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-
-  UGen.prototype.range = fn(function(lo, hi) {
-    var mul, add;
-    if (this.signalRange === 2) {
-      mul = (hi - lo) * 0.5;
-      add = mul + lo;
-    } else {
-      mul = (hi - lo);
-      add = lo;
-    }
-    return new MulAdd().init(this, mul, add);
-  }).defaults("lo=0,hi=1").multiCall().build();
-
-  UGen.prototype.unipolar = fn(function(mul) {
-    return this.range(0, mul);
-  }).defaults("mul=1").build();
-
-  UGen.prototype.bipolar = fn(function(mul) {
-    return this.range(mul.neg(), mul);
-  }).defaults("mul=1").build();
-  
   var install = function() {
   };
+
+  cc.emit("basic_ops.js", {
+    UnaryOpUGen : UnaryOpUGen,
+    BinaryOpUGen: BinaryOpUGen,
+    MulAdd      : MulAdd,
+  });
   
   module.exports = {
     UnaryOpUGen : UnaryOpUGen,
@@ -3855,58 +4207,859 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 });
 define('cc/server/uop', function(require, exports, module) {
 
+  var fn = require("./fn");
   var UGen = require("./ugen/ugen").UGen;
   var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
   
-  var setupFunction = function(func) {
-    return function() {
-      return func(this);
-    };
-  };
-  var setupArrayFunction = function(selector) {
-    return function() {
+  var install = function() {
+    fn.definePrototypeProperty(Array, "__plus__", function() {
       return this.map(function(x) {
-        return x[selector]();
+        return x.__plus__();
       });
-    };
+    });
+    fn.definePrototypeProperty(UGen, "__plus__", function() {
+      return new UnaryOpUGen("+", this);
+    });
+    fn.definePrototypeProperty(Array, "__minus__", function() {
+      return this.map(function(x) {
+        return x.__minus__();
+      });
+    });
+    fn.definePrototypeProperty(UGen, "__minus__", function() {
+      return new UnaryOpUGen("-", this);
+    });
   };
-  var setupUGenFunction = function(selector) {
-    return function() {
-      return new UnaryOpUGen(selector, this);
-    };
+  
+  module.exports = {
+    install: install
   };
 
-  var setup = function(selector, func, others) {
-    func = setupFunction(func);
-    Number.prototype[selector] = func;
-    Array.prototype[selector]  = setupArrayFunction(selector);
-    UGen.prototype[selector]   = setupUGenFunction(selector);
-    if (others) {
-      String.prototype[selector]   = func;
-      Boolean.prototype[selector]  = func;
-      Function.prototype[selector] = func;
+});
+define('cc/server/scale', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  
+  var ratiomidi = function(list) {
+    return list.map(function(x) {
+      return Math.log(x) * Math.LOG2E * 12;
+    });
+  };
+  var range = function(to) {
+    var list = new Array(to);
+    for (var i = 0; i <= to; ++i) {
+      list[i] = i;
     }
+    return list;
+  };
+  
+  var Tuning = (function() {
+    function Tuning(tuning, octaveRatio, name) {
+      this.klassName = "Tuning";
+      this._tuning = tuning;
+      this._octaveRatio = octaveRatio;
+      this.name = name;
+    }
+    fn.extend(Tuning, cc.Object);
+    Tuning.prototype.semitones = function() {
+      return this._tuning.slice();
+    };
+    Tuning.prototype.cents = function() {
+      return this._tuning.map(function(x) {
+        return x * 100;
+      });
+    };
+    Tuning.prototype.ratios = function() {
+      return this._tuning.map(function(x) {
+        return Math.pow(2, x * 1/12);
+      });
+    };
+    Tuning.prototype.at = fn(function(index) {
+      return this._tuning[index];
+    }).multiCall().build();
+    Tuning.prototype.wrapAt = fn(function(index) {
+      index = index % this._tuning.length;
+      if (index < 0) {
+        index = this._tuning.length + index;
+      }
+      return this._tuning[index];
+    }).multiCall().build();
+    Tuning.prototype.octaveRatio = function() {
+      return this._octaveRatio;
+    };
+    Tuning.prototype.size = function() {
+      return this._tuning.length;
+    };
+    Tuning.prototype.stepsPerOctave = function() {
+      return Math.log(this._octaveRatio) * Math.LOG2E * 12;
+    };
+    Tuning.prototype.tuning = function() {
+      return this._tuning;
+    };
+    Tuning.prototype.equals = function(that) {
+      return (that instanceof Tuning) &&
+        (this._octaveRatio === that._octaveRatio) &&
+        this._tuning.every(function(x, i) {
+          return x === that._tuning[i];
+        }, this);
+    };
+    Tuning.prototype.copy = function() {
+      return new Tuning(this._tuning.slice(0), this._octaveRatio, this.name);
+    };
+    return Tuning;
+  })();
+  
+  var tuningInfo = {
+    et12: [
+      (
+        [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
+      ), 2, "ET12"
+    ],
+    pythagorean: [
+      ratiomidi(
+        [ 1, 256/243, 9/8, 32/27, 81/64, 4/3, 729/512, 3/2, 128/81, 27/16, 16/9, 243/128 ]
+      ), 2, "Pythagorean"
+    ],
+    just: [
+      ratiomidi(
+        [ 1, 16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3, 9/5, 15/8 ]
+      ), 2, "Limit Just Intonation"
+    ],
+    sept1: [
+      ratiomidi(
+        [ 1, 16/15, 9/8, 6/5, 5/4, 4/3, 7/5, 3/2, 8/5, 5/3, 9/5, 15/8 ]
+      ), 2, "Septimal Tritone Just Intonation"
+    ],
+    sept2: [
+      ratiomidi(
+        [ 1, 16/15, 9/8, 6/5, 5/4, 4/3, 7/5, 3/2, 8/5, 5/3, 7/4, 15/8 ]
+      ), 2, "7-Limit Just Intonation"
+    ],
+    mean4: [
+      (
+        [ 0, 0.755, 1.93, 3.105, 3.86, 5.035, 5.79, 6.965, 7.72, 8.895, 10.07, 10.82 ]
+      ), 2, "Meantone, 1/4 Syntonic Comma"
+    ],
+    mean5: [
+      (
+        [ 0, 0.804, 1.944, 3.084, 3.888, 5.028, 5.832, 6.972, 7.776, 8.916, 10.056, 10.86 ]
+      ), 2, "Meantone, 1/5 Pythagorean Comma"
+    ],
+    mean6: [
+      (
+        [ 0, 0.86, 1.96, 3.06, 3.92, 5.02, 5.88, 6.98, 7.84, 8.94, 10.04, 10.9 ]
+      ), 2, "Meantone, 1/6 Pythagorean Comma"
+    ],
+    kirnberger: [
+      ratiomidi(
+        [ 1, 256/243, Math.sqrt(5)/2, 32/27, 5/4, 4/3, 45/32, Math.pow(5, 0.25), 128/81, Math.pow(5, 0.75)/2, 16/9, 15/8 ]
+      ), 2, "Kirnberger III"
+    ],
+    werckmeister: [
+      (
+        [ 0, 0.92, 1.93, 2.94, 3.915, 4.98, 5.9, 6.965, 7.93, 8.895, 9.96, 10.935 ]
+      ), 2, "Werckmeister III"
+    ],
+    vallotti: [
+      (
+        [ 0, 0.94135, 1.9609, 2.98045, 3.92180, 5.01955, 5.9218, 6.98045, 7.9609, 8.94135, 10, 10.90225 ]
+      ), 2, "Vallotti"
+    ],
+    young: [
+      (
+        [ 0, 0.9, 1.96, 2.94, 3.92, 4.98, 5.88, 6.98, 7.92, 8.94, 9.96, 10.9 ]
+      ), 2, "Young"
+    ],
+    reinhard: [
+      ratiomidi(
+        [ 1, 14/13, 13/12, 16/13, 13/10, 18/13, 13/9, 20/13, 13/8, 22/13, 13/7, 208/105 ]
+      ), 2, "Mayumi Reinhard"
+    ],
+    wcHarm: [
+      ratiomidi(
+        [ 1, 17/16, 9/8, 19/16, 5/4, 21/16, 11/8, 3/2, 13/8, 27/16, 7/4, 15/8 ]
+      ), 2, "Wendy Carlos Harmonic"
+    ],
+    wcSJ: [
+      ratiomidi(
+        [ 1, 17/16, 9/8, 6/5, 5/4, 4/3, 11/8, 3/2, 13/8, 5/3, 7/4, 15/8 ]
+      ), 2, "Wendy Carlos Super Just"
+    ],
+    lu: [
+      ratiomidi(
+        [ 1, 2187/2048, 9/8, 19683/16384, 81/64, 177147/131072, 729/612, 3/2, 6561/4096, 27/16, 59049/32768, 243/128 ]
+      ), 2, "Chinese Shi-er-lu scale"
+    ],
+    et19: [
+      range(18).map(function(x) {
+        return x * 12 / 19;
+      }), 2, "ET19"
+    ],
+    et22: [
+      range(22).map(function(x) {
+        return x * 12 / 22;
+      }), 2, "ET22"
+    ],
+    et24: [
+      range(24).map(function(x) {
+        return x * 12 / 24;
+      }), 2, "ET24"
+    ],
+    et31: [
+      range(31).map(function(x) {
+        return x * 12 / 31;
+      }), 2, "ET31"
+    ],
+    et41: [
+      range(41).map(function(x) {
+        return x * 12 / 41;
+      }), 2, "ET41"
+    ],
+    et53: [
+      range(53).map(function(x) {
+        return x * 12 / 53;
+      }), 2, "ET53"
+    ],
+    johnston: [
+      ratiomidi(
+        [ 1, 25/24, 135/128, 16/15, 10/9, 9/8, 75/64, 6/5, 5/4, 81/64, 32/25, 4/3, 27/20, 45/32, 36/25, 3/2, 25/16, 8/5, 5/3, 27/16, 225/128, 16/9, 9/5, 15/8, 48/25 ]
+      ), 2, "Ben Johnston"
+    ],
+    partch: [
+      ratiomidi(
+        [ 1, 81/80, 33/32, 21/20, 16/15, 12/11, 11/10, 10/9, 9/8, 8/7, 7/6, 32/27, 6/5, 11/9, 5/4, 14/11, 9/7, 21/16, 4/3, 27/20, 11/8, 7/5, 10/7, 16/11, 40/27, 3/2, 32/21, 14/9, 11/7, 8/5, 18/11, 5/3, 27/16, 12/7, 7/4, 16/9, 9/5, 20/11, 11/6, 15/8, 40/21, 64/33, 160/81 ]
+      ), 2, "Harry Partch"
+    ],
+    catler: [
+      ratiomidi(
+        [ 1, 33/32, 16/15, 9/8, 8/7, 7/6, 6/5, 128/105, 16/13, 5/4, 21/16, 4/3, 11/8, 45/32, 16/11, 3/2, 8/5, 13/8, 5/3, 27/16, 7/4, 16/9, 24/13, 15/8 ]
+      ), 2, "Jon Catler"
+    ],
+    chalmers: [
+      ratiomidi(
+        [ 1, 21/20, 16/15, 9/8, 7/6, 6/5, 5/4, 21/16, 4/3, 7/5, 35/24, 3/2, 63/40, 8/5, 5/3, 7/4, 9/5, 28/15, 63/32 ]
+      ), 2, "John Chalmers"
+    ],
+    harrison: [
+      ratiomidi(
+        [ 1, 16/15, 10/9, 8/7, 7/6, 6/5, 5/4, 4/3, 17/12, 3/2, 8/5, 5/3, 12/7, 7/4, 9/5, 15/8 ]
+      ), 2, "Lou Harrison"
+    ],
+    sruti: [
+      ratiomidi(
+        [ 1, 256/243, 16/15, 10/9, 9/8, 32/27, 6/5, 5/4, 81/64, 4/3, 27/20, 45/32, 729/512, 3/2, 128/81, 8/5, 5/3, 27/16, 16/9, 9/5, 15/8, 243/128 ]
+      ), 2, "Sruti"
+    ],
+    parret: [
+      ratiomidi(
+        [1, 21/20, 35/32, 9/8, 7/6, 6/5, 5/4, 21/16, 4/3, 7/5, 35/24, 3/2, 63/40, 8/5, 5/3, 7/4, 9/5, 15/8, 63/32]
+      ), 2, "Wilfrid Perret"
+    ],
+    michael_harrison: [
+      ratiomidi(
+        [1, 28/27, 135/128, 16/15, 243/224, 9/8, 8/7, 7/6, 32/27, 6/5, 135/112, 5/4, 81/64, 9/7, 21/16, 4/3, 112/81, 45/32, 64/45, 81/56, 3/2, 32/21, 14/9, 128/81, 8/5, 224/135, 5/3, 27/16, 12/7, 7/4, 16/9, 15/8, 243/128, 27/14 ]
+      ), 2, "Michael Harrison 24 tone 7-limit"
+    ],
+    harmonic: [
+      ratiomidi(
+        range(24).slice(1)
+      ), 2, "Harmonic Series 24"
+    ],
+    bp: [
+      ratiomidi(range(12).map(function(x) {
+        return x * 19.019550008654 / 13;
+      })
+      ), 3, "Bohlen-Pierce"
+    ],
+    wcAlpha: [
+      range(14).map(function(x) {
+        return x * 0.78;
+      }), 1.9656411970852, "Wendy Carlos Alpha"
+    ],
+    wcBeta: [
+      range(18).map(function(x) {
+        return x * 0.638;
+      }), 2.0141437696805, "Wendy Carlos Beta"
+    ],
+    wcGamma: [
+      range(33).map(function(x) {
+        return x * 0.351;
+      }), 1.9923898962606, "Wendy Carlos Gamma"
+    ]
+  };
+  
+  var TuningInterface = fn(function(tuning, octaveRatio, name) {
+    if (!Array.isArray(tuning)) {
+      tuning = [0,1,2,3,4,5,6,7,8,9,10,11];
+    }
+    if (typeof octaveRatio !== "number") {
+      octaveRatio = 2;
+    }
+    if (typeof name !== "string") {
+      name = "Unknown Tuning";
+    }
+    return new Tuning(tuning, octaveRatio, name);
+  }).defaults("tuning,octaveRatio,name").build();
+  var tunings = {};
+  Object.keys(tuningInfo).forEach(function(key) {
+    var params = tuningInfo[key];
+    tunings[key] = new Tuning(params[0], params[1], params[2]);
+    TuningInterface[key] = tunings[key];
+  });
+  TuningInterface.at = function(key) {
+    var t = tunings[key];
+    if (t) {
+      t = t.copy();
+    }
+    return t;
+  };
+  TuningInterface.choose = fn(function(size) {
+    if (typeof size !== "number") {
+      size = 12;
+    }
+    var candidates = [];
+    var keys = Object.keys(tunings);
+    var t;
+    for (var i = 0, imax = keys.length; i < imax; ++i) {
+      t = tunings[keys[i]];
+      if (t._tuning.length === size) {
+        candidates.push(t);
+      }
+    }
+    t = candidates[(Math.random() * candidates.length)|0];
+    if (t) {
+      return t.copy();
+    }
+  }).multiCall().build();
+  TuningInterface.et = function(pitchesPerOctave) {
+    var list = new Array(pitchesPerOctave);
+    for (var i = 0; i < pitchesPerOctave; ++i) {
+      list[i] = i * (12 / pitchesPerOctave);
+    }
+    return new Tuning(list, 2, "ET" + pitchesPerOctave);
+  };
+  TuningInterface.names = function() {
+    return Object.keys(tunings).sort();
+  };
+  
+  var Scale = (function() {
+    function Scale(degrees, pitchesPerOctave, tuning, name) {
+      this.klassName = "Scale";
+      this._degrees = degrees;
+      this._pitchesPerOctave = pitchesPerOctave;
+      this.name = name;
+      this.tuning(tuning);
+    }
+    fn.extend(Scale, cc.Object);
+    Scale.prototype.tuning = function(inTuning) {
+      if (arguments.length === 0) {
+        return this._tuning;
+      }
+      if (inTuning === null) {
+        inTuning = TuningInterface["default"](this._pitchesPerOctave);
+      } else if (typeof inTuning === "string") {
+        inTuning = tunings[inTuning];
+      }
+      if (!(inTuning instanceof Tuning)) {
+        throw new TypeError("Scale: arguments[2] should be a tuning.");
+      }
+      if (this._pitchesPerOctave !== inTuning.size()) {
+        throw new TypeError("Scale steps per octave " + this._pitchesPerOctave + " does not match tuning size.");
+      }
+      this._tuning = inTuning;
+      return inTuning;
+    };
+    Scale.prototype.semitones = function() {
+      return this._degrees.map(function(i) {
+        return this._tuning.wrapAt(i);
+      }, this);
+    };
+    Scale.prototype.cents = function() {
+      return this.semitones().map(function(x) {
+        return x * 100;
+      });
+    };
+    Scale.prototype.ratios = function() {
+      return this.semitones().map(function(x) {
+        return Math.pow(2, x * 1/12);
+      });
+    };
+    Scale.prototype.size = function() {
+      return this._degrees.length;
+    };
+    Scale.prototype.pitchesPerOctave = function() {
+      return this._pitchesPerOctave;
+    };
+    Scale.prototype.stepsPerOctave = function() {
+      return Math.log(this.octaveRatio()) * Math.LOG2E * 12;
+    };
+    Scale.prototype.at = fn(function(index) {
+      index = index % this._degrees.length;
+      if (index < 0) {
+        index = this._degrees.length + index;
+      }
+      return this._tuning.at(this._degrees[index]);
+    }).multiCall().build();
+    Scale.prototype.wrapAt = fn(function(index) {
+      index = index % this._degrees.length;
+      if (index < 0) {
+        index = this._degrees.length + index;
+      }
+      return this._tuning.wrapAt(this._degrees[index]);
+    }).multiCall().build();
+    Scale.prototype.degreeToFreq = fn(function(degree, rootFreq, octave) {
+      return degreeToRatio(this, degree, octave) * rootFreq;
+    }).defaults("degree=0,rootFreq=0,octave=0").multiCall().build();
+    Scale.prototype.degreeToRatio = fn(function(degree, octave) {
+      return degreeToRatio(this, degree, octave);
+    }).defaults("degree=0,octave=0").multiCall().build();
+    Scale.prototype.degrees = function() {
+      return this._degrees;
+    };
+    Scale.prototype.octaveRatio = function() {
+      return this._tuning.octaveRatio();
+    };
+    Scale.prototype.equals = function(that) {
+      return (that instanceof Scale) &&
+        this._degrees.every(function(x, i) {
+          return x === that._degrees[i];
+        }) && this._tuning.equals(that._tuning);
+    };
+    Scale.prototype.copy = function() {
+      return new Scale(
+        this._degrees.slice(),
+        this._pitchesPerOctave,
+        this._tuning.copy(),
+        this.name
+      );
+    };
+    var degreeToRatio = function(that, degree, octave) {
+      octave += (degree / that._degrees.length)|0;
+      var ratios = that.ratios();
+      var index  = degree % ratios.length;
+      if (index < 0) {
+        index = ratios.length + index;
+      }
+      return ratios[index] * Math.pow(that.octaveRatio(), octave);
+    };
+    return Scale;
+  })();
+  
+  var guessPPO = function(degrees) {
+    var i, max = degrees[0] || 0;
+    for (i = degrees.length; i--; ) {
+      if (max < degrees[i]) {
+        max = degrees[i];
+      }
+    }
+    var etTypes = [53,24,19,12];
+    for (i = etTypes.length; i--; ) {
+      if (max < etTypes[i]) {
+        return etTypes[i];
+      }
+    }
+    return 128;
+  };
+  
+  var scaleInfo = {
+    major: [
+      [ 0, 2, 4, 5, 7, 9, 11 ], 12, 0, "Major"
+    ],
+    minor: [
+      [ 0, 2, 3, 5, 7, 8, 10 ], 12, 0, "Natural Minor"
+    ],
+    minorPentatonic: [
+      [ 0, 3, 5, 7, 10 ], 12, 0, "Minor Pentatonic"
+    ],
+    majorPentatonic: [
+      [ 0, 2, 4, 7, 9 ], 12, 0, "Major Pentatonic"
+    ],
+    ritusen: [
+      [ 0, 2, 5, 7, 9 ], 12, 0, "Ritusen"
+    ],
+    egyptian: [
+      [ 0, 2, 5, 7, 10 ], 12, 0, "Egyptian"
+    ],
+    kumoi: [
+      [ 0, 2, 3, 7, 9 ], 12, 0, "Kumoi"
+    ],
+    hirajoshi: [
+      [ 0, 2, 3, 7, 8 ], 12, 0, "Hirajoshi"
+    ],
+    iwato: [
+      [ 0, 1, 5, 6, 10 ], 12, 0, "Iwato"
+    ],
+    ryukyu: [
+      [ 0, 4, 5, 7, 11 ], 12, 0, "Ryukyu"
+    ],
+    chinese: [
+      [ 0, 4, 6, 7, 11 ], 12, 0, "Chinese"
+    ],
+    indian: [
+      [ 0, 4, 5, 7, 10 ], 12, 0, "Indian"
+    ],
+    pelog: [
+      [ 0, 1, 3, 7, 8 ], 12, 0, "Pelog"
+    ],
+    prometheus: [
+      [ 0, 2, 4, 6, 11 ], 12, 0, "Prometheus"
+    ],
+    scriabin: [
+      [ 0, 1, 4, 7, 9 ], 12, 0, "Scriabin"
+    ],
+    gong: [
+      [ 0, 2, 4, 7, 9 ], 12, 0, "Gong"
+    ],
+    shang: [
+      [ 0, 2, 5, 7, 10 ], 12, 0, "Shang"
+    ],
+    jiao: [
+      [ 0, 3, 5, 8, 10 ], 12, 0, "Jiao"
+    ],
+    zhi: [
+      [ 0, 2, 5, 7, 9 ], 12, 0, "Zhi"
+    ],
+    yu: [
+      [ 0, 3, 5, 7, 10 ], 12, 0, "Yu"
+    ],
+    whole: [
+      [ 0, 2, 4, 6, 8, 10 ], 12, 0, "Whole Tone"
+    ],
+    augmented: [
+      [ 0, 3, 4, 7, 8, 11 ], 12, 0, "Augmented"
+    ],
+    augmented2: [
+      [ 0, 1, 4, 5, 8, 9 ], 12, 0, "Augmented 2"
+    ],
+    partch_o1: [
+      [ 0, 8, 14, 20, 25, 34], 43, "partch", "Partch Otonality 1"
+    ],
+    partch_o2: [
+      [ 0, 7, 13, 18, 27, 35 ], 43, "partch", "Partch Otonality 2"
+    ],
+    partch_o3: [
+      [ 0, 6, 12, 21, 29, 36 ], 43, "partch", "Partch Otonality 3"
+    ],
+    partch_o4: [
+      [ 0, 5, 15, 23, 30, 37 ], 43, "partch", "Partch Otonality 4"
+    ],
+    partch_o5: [
+      [ 0, 10, 18, 25, 31, 38 ], 43, "partch", "Partch Otonality 5"
+    ],
+    partch_o6: [
+      [ 0, 9, 16, 22, 28, 33 ], 43, "partch", "Partch Otonality 6"
+    ],
+    partch_u1: [
+      [ 0, 9, 18, 23, 29, 35 ], 43, "partch", "Partch Utonality 1"
+    ],
+    partch_u2: [
+      [ 0, 8, 16, 25, 30, 36 ], 43, "partch", "Partch Utonality 2"
+    ],
+    partch_u3: [
+      [ 0, 7, 14, 22, 31, 37 ], 43, "partch", "Partch Utonality 3"
+    ],
+    partch_u4: [
+      [ 0, 6, 13, 20, 28, 38 ], 43, "partch", "Partch Utonality 4"
+    ],
+    partch_u5: [
+      [ 0, 5, 12, 18, 25, 33 ], 43, "partch", "Partch Utonality 5"
+    ],
+    partch_u6: [
+      [ 0, 10, 15, 21, 27, 34 ], 43, "partch", "Partch Utonality 6"
+    ],
+    hexMajor7: [
+      [ 0, 2, 4, 7, 9, 11 ], 12, 0, "Hex Major 7"
+    ],
+    hexDorian: [
+      [ 0, 2, 3, 5, 7, 10 ], 12, 0, "Hex Dorian"
+    ],
+    hexPhrygian: [
+      [ 0, 1, 3, 5, 8, 10 ], 12, 0, "Hex Phrygian"
+    ],
+    hexSus: [
+      [ 0, 2, 5, 7, 9, 10 ], 12, 0, "Hex Sus"
+    ],
+    hexMajor6: [
+      [ 0, 2, 4, 5, 7, 9 ], 12, 0, "Hex Major 6"
+    ],
+    hexAeolian: [
+      [ 0, 3, 5, 7, 8, 10 ], 12, 0, "Hex Aeolian"
+    ],
+    ionian: [
+      [ 0, 2, 4, 5, 7, 9, 11 ], 12, 0, "Ionian"
+    ],
+    dorian: [
+      [ 0, 2, 3, 5, 7, 9, 10 ], 12, 0, "Dorian"
+    ],
+    phrygian: [
+      [ 0, 1, 3, 5, 7, 8, 10 ], 12, 0, "Phrygian"
+    ],
+    lydian: [
+      [ 0, 2, 4, 6, 7, 9, 11 ], 12, 0, "Lydian"
+    ],
+    mixolydian: [
+      [ 0, 2, 4, 5, 7, 9, 10 ], 12, 0, "Mixolydian"
+    ],
+    aeolian: [
+      [ 0, 2, 3, 5, 7, 8, 10 ], 12, 0, "Aeolian"
+    ],
+    locrian: [
+      [ 0, 1, 3, 5, 6, 8, 10 ], 12, 0, "Locrian"
+    ],
+    harmonicMinor: [
+      [ 0, 2, 3, 5, 7, 8, 11 ], 12, 0, "Harmonic Minor"
+    ],
+    harmonicMajor: [
+      [ 0, 2, 4, 5, 7, 8, 11 ], 12, 0, "Harmonic Major"
+    ],
+    melodicMinor: [
+      [ 0, 2, 3, 5, 7, 9, 11 ], 12, 0, "Melodic Minor"
+    ],
+    melodicMinorDesc: [
+      [ 0, 2, 3, 5, 7, 8, 10 ], 12, 0, "Melodic Minor Descending"
+    ],
+    melodicMajor: [
+      [ 0, 2, 4, 5, 7, 8, 10 ], 12, 0, "Melodic Major"
+    ],
+    bartok: [
+      [ 0, 2, 4, 5, 7, 8, 10 ], 12, 0, "Bartok"
+    ],
+    hindu: [
+      [ 0, 2, 4, 5, 7, 8, 10 ], 12, 0, "Hindu"
+    ],
+    todi: [
+      [ 0, 1, 3, 6, 7, 8, 11 ], 12, 0, "Todi"
+    ],
+    purvi: [
+      [ 0, 1, 4, 6, 7, 8, 11 ], 12, 0, "Purvi"
+    ],
+    marva: [
+      [ 0, 1, 4, 6, 7, 9, 11 ], 12, 0, "Marva"
+    ],
+    bhairav: [
+      [ 0, 1, 4, 5, 7, 8, 11 ], 12, 0, "Bhairav"
+    ],
+    ahirbhairav: [
+      [ 0, 1, 4, 5, 7, 9, 10 ], 12, 0,"Ahirbhairav"
+    ],
+    superLocrian: [
+      [ 0, 1, 3, 4, 6, 8, 10 ], 12, 0, "Super Locrian"
+    ],
+    romanianMinor: [
+      [ 0, 2, 3, 6, 7, 9, 10 ], 12, 0, "Romanian Minor"
+    ],
+    hungarianMinor: [
+      [ 0, 2, 3, 6, 7, 8, 11 ], 12, 0, "Hungarian Minor"
+    ],
+    neapolitanMinor: [
+      [ 0, 1, 3, 5, 7, 8, 11 ], 12, 0, "Neapolitan Minor"
+    ],
+    enigmatic: [
+      [ 0, 1, 4, 6, 8, 10, 11 ], 12, 0, "Enigmatic"
+    ],
+    spanish: [
+      [ 0, 1, 4, 5, 7, 8, 10 ], 12, 0, "Spanish"
+    ],
+    leadingWhole: [
+      [ 0, 2, 4, 6, 8, 10, 11 ], 12, 0, "Leading Whole Tone"
+    ],
+    lydianMinor: [
+      [ 0, 2, 4, 6, 7, 8, 10 ], 12, 0, "Lydian Minor"
+    ],
+    neapolitanMajor: [
+      [ 0, 1, 3, 5, 7, 9, 11 ], 12, 0, "Neapolitan Major"
+    ],
+    locrianMajor: [
+      [ 0, 2, 4, 5, 6, 8, 10 ], 12, 0, "Locrian Major"
+    ],
+    diminished: [
+      [ 0, 1, 3, 4, 6, 7, 9, 10 ], 12, 0, "Diminished"
+    ],
+    diminished2: [
+      [ 0, 2, 3, 5, 6, 8, 9, 11 ], 12, 0, "Diminished 2"
+    ],
+    chromatic: [
+      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ], 12, 0, "Chromatic"
+    ],
+    chromatic24: [
+      range(23), 24, 0, "Chromatic 24"
+    ],
+    ajam: [
+      [ 0, 4, 8, 10, 14, 18, 22 ], 24, 0, "Ajam"
+    ],
+    jiharkah: [
+      [ 0, 4, 8, 10, 14, 18, 21 ], 24, 0, "Jiharkah"
+    ],
+    shawqAfza: [
+      [ 0, 4, 8, 10, 14, 16, 22 ], 24, 0, "Shawq Afza"
+    ],
+    sikah: [
+      [ 0, 3, 7, 11, 14, 17, 21 ], 24, 0, "Sikah"
+    ],
+    sikahDesc: [
+      [ 0 , 3 , 7, 11, 13, 17, 21 ], 24, 0, "Sikah Descending"
+    ],
+    huzam: [
+      [ 0, 3, 7, 9, 15, 17, 21 ], 24, 0, "Huzam"
+    ],
+    iraq: [
+      [ 0, 3, 7, 10, 13, 17, 21 ], 24, 0, "Iraq"
+    ],
+    bastanikar: [
+      [ 0, 3, 7, 10, 13, 15, 21 ], 24, 0, "Bastanikar"
+    ],
+    mustar: [
+      [ 0, 5, 7, 11, 13, 17, 21 ], 24, 0, "Mustar"
+    ],
+    bayati: [
+      [ 0, 3, 6, 10, 14, 16, 20 ], 24, 0, "Bayati"
+    ],
+    karjighar: [
+      [ 0, 3, 6, 10, 12, 18, 20 ], 24, 0, "Karjighar"
+    ],
+    husseini: [
+      [ 0, 3, 6, 10, 14, 17, 21 ], 24, 0, "Husseini"
+    ],
+    nahawand: [
+      [ 0, 4, 6, 10, 14, 16, 22 ], 24, 0, "Nahawand"
+    ],
+    nahawandDesc: [
+      [ 0, 4, 6, 10, 14, 16, 20 ], 24, 0, "Nahawand Descending"
+    ],
+    farahfaza: [
+      [ 0, 4, 6, 10, 14, 16, 20 ], 24, 0, "Farahfaza"
+    ],
+    murassah: [
+      [ 0, 4, 6, 10, 12, 18, 20 ], 24, 0, "Murassah"
+    ],
+    ushaqMashri: [
+      [ 0, 4, 6, 10, 14, 17, 21 ], 24, 0, "Ushaq Mashri"
+    ],
+    rast: [
+      [ 0, 4, 7, 10, 14, 18, 21 ], 24, 0, "Rast"
+    ],
+    rastDesc: [
+      [ 0, 4, 7, 10, 14, 18, 20 ], 24, 0, "Rast Descending"
+    ],
+    suznak: [
+      [ 0, 4, 7, 10, 14, 16, 22 ], 24, 0, "Suznak"
+    ],
+    nairuz: [
+      [ 0, 4, 7, 10, 14, 17, 20 ], 24, 0, "Nairuz"
+    ],
+    yakah: [
+      [ 0, 4, 7, 10, 14, 18, 21 ], 24, 0, "Yakah"
+    ],
+    yakahDesc: [
+      [ 0, 4, 7, 10, 14, 18, 20 ], 24, 0, "Yakah Descending"
+    ],
+    mahur: [
+      [ 0, 4, 7, 10, 14, 18, 22 ], 24, 0, "Mahur"
+    ],
+    hijaz: [
+      [ 0, 2, 8, 10, 14, 17, 20 ], 24, 0, "Hijaz"
+    ],
+    hijazDesc: [
+      [ 0, 2, 8, 10, 14, 16, 20 ], 24, 0, "Hijaz Descending"
+    ],
+    zanjaran: [
+      [ 0, 2, 8, 10, 14, 16, 22 ], 24, 0, "Zanjaran"
+    ],
+    saba: [
+      [ 0, 3, 6, 8, 12, 16, 20 ], 24, 0, "Saba"
+    ],
+    zamzam: [
+      [ 0, 2, 6, 8, 14, 16, 20 ], 24, 0, "Zamzam"
+    ],
+    kurd: [
+      [ 0, 2, 6, 10, 14, 16, 20 ], 24, 0, "Kurd"
+    ],
+    kijazKarKurd: [
+      [ 0, 2, 8, 10, 14, 16, 22 ], 24, 0, "Kijaz Kar Kurd"
+    ],
+    nawaAthar: [
+      [ 0, 4, 6, 12, 14, 16, 22 ], 24, 0, "Nawa Athar"
+    ],
+    nikriz: [
+      [ 0, 4, 6, 12, 14, 18, 20 ], 24, 0, "Nikriz"
+    ],
+    atharKurd: [
+      [ 0, 2, 6, 12, 14, 16, 22 ], 24, 0, "Athar Kurd"
+    ]
+  };
+  
+  var ScaleInterface = fn(function(degrees, pitchesPerOctave, tuning, name) {
+    if (!Array.isArray(degrees)) {
+      degrees = [0,2,4,5,7,9,11]; // ionian
+    }
+    if (typeof pitchesPerOctave !== "number") {
+      pitchesPerOctave = guessPPO(degrees);
+    }
+    if (typeof tuning === "string") {
+      tuning = tunings[tuning];
+    }
+    if (!(tuning instanceof Tuning)) {
+      tuning = tunings.et12;
+    }
+    if (typeof name !== "string") {
+      name = "Unknown Scale";
+    }
+    return new Scale(degrees, pitchesPerOctave, tuning, name);
+  }).defaults("degrees,pitchesPerOctave,tuning,name").build();
+  var scales = {};
+  Object.keys(scaleInfo).forEach(function(key) {
+    var params = scaleInfo[key];
+    if (params[2]) {
+      params[2] = tunings[params[2]].copy();
+    } else {
+      params[2] = TuningInterface.et(params[1]);
+    }
+    scales[key] = new Scale(params[0], params[1], params[2], params[3]);
+    ScaleInterface[key] = scales[key];
+  });
+  ScaleInterface.at = function(key, tuning) {
+    var s = scales[key];
+    if (s) {
+      s = s.copy();
+      if (tuning) {
+        s.tuning(tuning);
+      }
+    }
+    return s;
+  };
+  ScaleInterface.choose = fn(function(size, pitchesPerOctave) {
+    if (typeof size !== "number") {
+      size = 7;
+    }
+    if (typeof pitchesPerOctave !== "number") {
+      pitchesPerOctave = 12;
+    }
+    var candidates = [];
+    var keys = Object.keys(scales);
+    var s;
+    for (var i = 0, imax = keys.length; i < imax; ++i) {
+      s = scales[keys[i]];
+      if (s._degrees.length === size && s._pitchesPerOctave === pitchesPerOctave) {
+        candidates.push(s);
+      }
+    }
+    s = candidates[(Math.random() * candidates.length)|0];
+    if (s) {
+      return s.copy();
+    }
+  }).multiCall().build();
+  ScaleInterface.names = function() {
+    return Object.keys(scales).sort();
   };
   
   var install = function() {
-    setup("num", function(a) {
-      return +a;
-    }, true);
-    
-    setup("neg", function(a) {
-      return -a;
-    }, true);
-
-    setup("not", function(a) {
-      return !a;
-    }, true);
-    
-    setup("tilde", function(a) {
-      return ~a;
-    }, true);
+    global.Scale  = ScaleInterface;
+    global.Tuning = TuningInterface;
   };
-
+  
   module.exports = {
+    Scale  : Scale,
+    Tuning : Tuning,
     install: install
   };
 
@@ -3916,6 +5069,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
   var install = function() {
     require("./ugen").install();
     require("./basic_ops").install();
+    require("./bufio").install();
     require("./delay").install();
     require("./line").install();
     require("./osc").install();
@@ -3927,6 +5081,50 @@ define('cc/server/ugen/installer', function(require, exports, module) {
     install: install
   };
  
+});
+define('cc/server/ugen/bufio', function(require, exports, module) {
+
+  var ugen = require("./ugen");
+  var Buffer = require("../buffer").Buffer;
+  var slice = [].slice;
+  
+  var playBuf_ctor = function(rate) {
+    return function(numChannels, buffer) {
+      if (typeof numChannels !== "number") {
+        throw new TypeError("Buffer: arguments[0] should be an integer.");
+      }
+      if (!(buffer instanceof Buffer)) {
+        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      }
+      numChannels = Math.max(0, numChannels|0);
+      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
+      this.specialIndex = buffer._bufid;
+      if (buffer.samples !== null) {
+        numChannels = buffer.numChannels;
+      }
+      return this.initOutputs(numChannels, this.rate);
+    };
+  };
+  
+  var iPlayBuf = {
+    ar: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(2),
+      Klass: ugen.MultiOutUGen
+    },
+    kr: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(1),
+      Klass: ugen.MultiOutUGen
+    },
+  };
+
+  module.exports = {
+    install: function() {
+      ugen.register("PlayBuf", iPlayBuf);
+    }
+  };
+
 });
 define('cc/server/ugen/delay', function(require, exports, module) {
 
@@ -4093,6 +5291,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
   var install = function() {
     require("./unit").install();
     require("./basic_ops").install();
+    require("./bufio").install();
     require("./delay").install();
     require("./line").install();
     require("./osc").install();
@@ -5273,6 +6472,143 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
       unit.register("MulAdd", MulAdd);
       unit.register("Sum3"  , Sum3  );
       unit.register("Sum4"  , Sum4  );
+    }
+  };
+
+});
+define('cc/server/unit/bufio', function(require, exports, module) {
+  
+  var unit = require("./unit");
+  var buffer = require("../buffer");
+  
+  var sc_loop = function(unit, index, hi, loop) {
+    if (index >= hi) {
+      if (!loop) {
+        unit.done = true;
+        return hi;
+      }
+      index -= hi;
+      if (index < hi) {
+        return index;
+      }
+    } else if (index < 0) {
+      if (!loop) {
+        unit.done = true;
+        return 0;
+      }
+      index += hi;
+      if (index >= 0) {
+        return index;
+      }
+    } else {
+      return index;
+    }
+    return index - hi * Math.floor(index/hi);
+  };
+  
+  var cubicinterp = function(x, y0, y1, y2, y3) {
+    var c0 = y1;
+    var c1 = 0.5 * (y2 - y0);
+    var c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3;
+    var c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+    return ((c3 * x + c2) * x + c1) * x + c0;
+  };
+  
+  var PlayBuf = function() {
+    var ctor = function() {
+      this._buffer = buffer.get(this.specialIndex);
+      this._phase  = this.inputs[3][0];
+      this._trig   = 0;
+      this.process = next_choose;
+      this.process.call(this);
+    };
+    var next_choose  = function(inNumSamples) {
+      if (this._buffer.samples !== null) {
+        if (this.inRates[1] === 2) {
+          if (this.inRates[2] === 2) {
+            this.process = next_kk; // aa
+          } else {
+            this.process = next_kk; // ak
+          }
+        } else {
+          if (this.inRates[2] === 2) {
+            this.process = next_kk; // ka
+          } else {
+            this.process = next_kk; // kk
+          }
+        }
+        this.process.call(this, inNumSamples);
+      }
+    };
+    var next_kk = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var buf = this._buffer;
+      var outs = this.outs;
+      var phase = this._phase;
+      var rate  = this.inputs[1][0];
+      var trig  = this.inputs[2][0];
+      var loop  = this.inputs[4][0];
+      var samples     = buf.samples;
+      var numChannels = buf.numChannels;
+      var numFrames   = buf.numFrames;
+      var index0, index1, index2, index3, frac, a, b, c, d, offset;
+
+      var hi = numFrames - 1;
+      if (trig > 0 && this._trig <= 0) {
+        this.done = false;
+        phase = this.inputs[3][0];
+      }
+      this._trig = trig;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase = sc_loop(this, phase, hi, loop);
+        index1 = phase|0;
+        index0 = index1 - 1;
+        index2 = index1 + 1;
+        index3 = index2 + 1;
+        if (index1 === 0) {
+          if (loop) {
+            index0 = hi;
+          } else {
+            index0 = index1;
+          }
+        } else if (index3 > hi) {
+          if (index2 > hi) {
+            if (loop) {
+              index2 = 0;
+              index3 = 1;
+            } else {
+              index2 = index3 = hi;
+            }
+          } else {
+            if (loop) {
+              index3 = 0;
+            } else {
+              index3 = hi;
+            }
+          }
+        }
+        frac = phase - (phase|0);
+        for (var j = 0, jmax = outs.length; j < jmax; ++j) {
+          offset = numFrames * (j % numChannels);
+          a = samples[index0 + offset];
+          b = samples[index1 + offset];
+          c = samples[index2 + offset];
+          d = samples[index3 + offset];
+          outs[j][i] = cubicinterp(frac, a, b, c, d);
+        }
+        phase += rate;
+      }
+      if (this.done) {
+        this.doneAction(this.inputs[5][0]|0, this.tag);
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  };
+  
+  module.exports = {
+    install: function() {
+      unit.register("PlayBuf", PlayBuf);
     }
   };
 

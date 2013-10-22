@@ -15,6 +15,23 @@ module.exports = function(grunt) {
     });
   };
 
+  var resetPrototype = (function() {
+    var builtins = {};
+    [Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      builtins[Klass.toString()] = Object.getOwnPropertyNames(Klass.prototype);
+    });
+    return function() {
+      [Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+        var builtin = builtins[Klass.toString()];
+        Object.getOwnPropertyNames(Klass.prototype).map(function(key) {
+          if (builtin.indexOf(key) === -1) {
+            delete Klass.prototype[key];
+          }
+        });
+      });
+    };
+  })();
+  
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
     esteWatch: {
@@ -34,8 +51,16 @@ module.exports = function(grunt) {
           return tasks;
         }
       },
-      json: function() {
+      json: function(filepath) {
+        if (/src\/cc\/test\//.test(filepath)) {
+          return "test:test";
+        }
         return [ "dryice" ];
+      },
+      coffee: function(filepath) {
+        if (/src\/cc\/test\//.test(filepath)) {
+          return "test:test";
+        }
       },
       as: function() {
         return [ "swf" ];
@@ -108,6 +133,7 @@ module.exports = function(grunt) {
   grunt.registerTask("dryice", function() {
     if (hasExclusiveTest()) {
       grunt.fail.warn("NOT builded, '.only' attribute is detected in any tests.");
+      return;
     }
     var copy = require("dryice").copy;
     var srcroot = "src";
@@ -200,6 +226,8 @@ module.exports = function(grunt) {
     });
     require("amd-loader");
 
+    resetPrototype();
+
     var Mocha = require("mocha");
     var mocha = new Mocha();
 
@@ -211,6 +239,8 @@ module.exports = function(grunt) {
     if (args) {
       if (args === "travis") {
         reporter = "list";
+      } else if (args === "test") {
+        files = grunt.file.expand("src/cc/test/*_test.js");
       } else {
         if (grunt.file.exists(args)) {
           files.push(args);
@@ -224,6 +254,10 @@ module.exports = function(grunt) {
 
     if (!files.length) {
       files = grunt.file.expand("src/cc/**/*_test.js");
+    } else {
+      files = files.concat(
+        grunt.file.expand("src/cc/test/*_test.js")
+      );
     }
     files = files.concat(testFailed);
     var set = {};
@@ -256,7 +290,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
-  grunt.registerTask("default", ["build", "connect", "esteWatch"]);
+  grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 
 };

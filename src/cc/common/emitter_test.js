@@ -5,33 +5,34 @@ define(function(require, exports, module) {
   var Emitter = require("./emitter").Emitter;
 
   describe("emitter.js", function() {
+    var e;
+    beforeEach(function() {
+      e = Emitter.bind({});
+    });
     it("on", function() {
-      var e = new Emitter();
-      var passed = 0;
+      var actual = 0;
       e.on("hello", function() {
-        passed++;
+        actual++;
       });
       e.emit("hello");
       e.emit("hello");
       e.emit("hello");
       e.emit("hello");
-      assert.equal(4, passed);
+      assert.equal(actual, 4);
     });
     it("once", function() {
-      var e = new Emitter();
-      var passed = 0;
+      var actual = 0;
       e.once("hello", function() {
-        passed++;
+        actual++;
       });
       e.emit("hello");
       e.emit("hello");
       e.emit("hello");
       e.emit("hello");
-      assert.equal(1, passed);
+      assert.equal(actual, 1);
     });
     it("off", function() {
-      var e = new Emitter();
-      var passed = 0;
+      var actual = 0;
       var f1 = function() {
         throw "should not pass through";
       };
@@ -39,7 +40,7 @@ define(function(require, exports, module) {
         throw "should not pass through";
       };
       var f3 = function() {
-        passed++;
+        actual++;
       };
       e.on("foo", f1);
       e.on("foo", f2);
@@ -47,11 +48,10 @@ define(function(require, exports, module) {
       e.off("foo", f1);
       e.off("foo", f2);
       e.emit("foo");
-      assert.equal(1, passed);
+      assert.equal(actual, 1);
     });
     it("off-once", function() {
-      var e = new Emitter();
-      var passed = 0;
+      var actual = 0;
       var f1 = function() {
         throw "should not pass through";
       };
@@ -59,7 +59,7 @@ define(function(require, exports, module) {
         throw "should not pass through";
       };
       var f3 = function() {
-        passed++;
+        actual++;
       };
       e.once("foo", f1);
       e.once("foo", f2);
@@ -68,17 +68,16 @@ define(function(require, exports, module) {
       e.off("foo", f2);
       e.emit("foo");
       e.emit("foo");
-      assert.equal(1, passed);
+      assert.equal(actual, 1);
     });
     it("emit-with-args", function() {
-      var e = new Emitter();
-      var passed = 0;
+      var actual = 0;
       e.on("hello", function(x) {
         assert.equal(10, x);
-        passed += 1;
+        actual += 1;
       });
       e.emit("hello", 10);
-      assert.equal(1, passed);
+      assert.equal(actual, 1);
     });
   });
 

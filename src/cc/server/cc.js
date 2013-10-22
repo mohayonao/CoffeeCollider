@@ -1,6 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
 
-  module.exports = require("../cc");
+  var _cc = require("../cc");
+  var Emitter = require("../common/emitter").Emitter;
+  
+  Emitter.bind(_cc);
+  
+  module.exports = _cc;
 
 });
