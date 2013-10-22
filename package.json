@@ -2,13 +2,13 @@
   "name": "CoffeeCollider",
   "version": 0,
   "dependencies": {
-    "coffee-script": "~1.6.3"
+    "coffee-script": "~1.6.3",
+    "amd-loader": "0.0.5"
   },
   "devDependencies": {
     "mocha": "~1.13.0",
     "chai": "~1.8.0",
     "dryice": "~0.4.10",
-    "amd-loader": "0.0.5",
     "grunt": "~0.4.1",
     "grunt-contrib-connect": "~0.5.0",
     "grunt-contrib-jshint": "~0.6.4",
