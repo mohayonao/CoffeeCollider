@@ -122,6 +122,15 @@ define(function(require, exports, module) {
     };
   };
 
+  fn.definePrototypeProperty = function(Klass, key, func) {
+    Object.defineProperty(Klass.prototype, key, {
+      configurable: true,
+      enumerable  : false,
+      writable    : true,
+      value       : func
+    });
+  };
+  
   module.exports = fn;
 
 });

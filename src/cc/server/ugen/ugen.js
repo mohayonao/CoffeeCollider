@@ -5,6 +5,10 @@ define(function(require, exports, module) {
   var fn = require("../fn");
   var slice = [].slice;
 
+  var UnaryOpUGen;
+  var BinaryOpUGen;
+  var MulAdd;
+
   var addToSynthDef = null;
   
   var UGen = (function() {
@@ -20,6 +24,7 @@ define(function(require, exports, module) {
       this.inputs = [];
     }
     fn.extend(UGen, cc.Object);
+    
     UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
@@ -29,6 +34,31 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
+    
+    UGen.prototype.madd = fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build();
+    
+    UGen.prototype.range = fn(function(lo, hi) {
+      var mul, add;
+      if (this.signalRange === C.BIPOLAR) {
+        mul = (hi - lo) * 0.5;
+        add = mul + lo;
+      } else {
+        mul = (hi - lo);
+        add = lo;
+      }
+      return new MulAdd().init(this, mul, add);
+    }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.unipolar = fn(function(mul) {
+      return this.range(0, mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    UGen.prototype.bipolar = fn(function(mul) {
+      return this.range(mul.neg(), mul);
+    }).defaults("mul=1").multiCall().build();
+    
     return UGen;
   })();
   
@@ -170,6 +200,12 @@ define(function(require, exports, module) {
       }).defaults(defaults).multiCall(multiCall).build();
     });
   };
+
+  cc.once("basic_ops.js", function(payload) {
+    UnaryOpUGen  = payload.UnaryOpUGen;
+    BinaryOpUGen = payload.BinaryOpUGen;
+    MulAdd       = payload.MulAdd;
+  });
   
   module.exports = {
     UGen: UGen,

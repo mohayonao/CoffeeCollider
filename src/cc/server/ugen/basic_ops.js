@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
   var fn = require("../fn");
   var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
@@ -332,41 +333,14 @@ define(function(require, exports, module) {
     };
   })();
   
-  Number.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-  Array.prototype.madd = fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return new MulAdd().init(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").build();
-  UGen.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-
-  UGen.prototype.range = fn(function(lo, hi) {
-    var mul, add;
-    if (this.signalRange === C.BIPOLAR) {
-      mul = (hi - lo) * 0.5;
-      add = mul + lo;
-    } else {
-      mul = (hi - lo);
-      add = lo;
-    }
-    return new MulAdd().init(this, mul, add);
-  }).defaults("lo=0,hi=1").multiCall().build();
-
-  UGen.prototype.unipolar = fn(function(mul) {
-    return this.range(0, mul);
-  }).defaults("mul=1").build();
-
-  UGen.prototype.bipolar = fn(function(mul) {
-    return this.range(mul.neg(), mul);
-  }).defaults("mul=1").build();
-  
   var install = function() {
   };
+
+  cc.emit("basic_ops.js", {
+    UnaryOpUGen : UnaryOpUGen,
+    BinaryOpUGen: BinaryOpUGen,
+    MulAdd      : MulAdd,
+  });
   
   module.exports = {
     UnaryOpUGen : UnaryOpUGen,
