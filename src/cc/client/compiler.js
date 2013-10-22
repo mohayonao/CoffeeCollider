@@ -10,6 +10,8 @@ define(function(require, exports, module) {
     } catch(e) {}
   })();
 
+  var timevalue = require("../common/timevalue").calc;
+
   // CoffeeScript tags
   // IDENTIFIER
   // NUMBER
@@ -204,6 +206,23 @@ define(function(require, exports, module) {
       index += 1;
     }
     return tokens.length - 1;
+  };
+
+  var replaceTimeValue = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
+        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
+        if (typeof time === "number") {
+          token[TAG] = "NUMBER";
+          token[VALUE] = time.toString();
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
   };
 
   var replacePi = function(tokens) {
@@ -494,6 +513,7 @@ define(function(require, exports, module) {
       var code  = items[0];
       var data  = items[1];
       var tokens = CoffeeScript.tokens(code);
+      tokens = replaceTimeValue(tokens);
       tokens = replacePi(tokens);
       tokens = replaceUnaryOp(tokens);
       tokens = replacePrecedence(tokens);
@@ -555,6 +575,7 @@ define(function(require, exports, module) {
     splitCodeAndData: splitCodeAndData,
     findOperandHead : findOperandHead,
     findOperandTail : findOperandTail,
+    replaceTimeValue     : replaceTimeValue,
     replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
     replaceUnaryOp       : replaceUnaryOp,
