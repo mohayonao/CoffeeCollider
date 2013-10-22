@@ -44,7 +44,19 @@ define(function(require, exports, module) {
     setup("next", function() {
       return this;
     });
-
+    setup("to_i", function() {
+      return this|0;
+    });
+    setup("to_f", function() {
+      return +this;
+    });
+    setup("to_s", function() {
+      return this.toString();
+    });
+    setup("to_a", function() {
+      return [this];
+    });
+    
     fn.definePrototypeProperty(String, "__mul__", function(b) {
       if (typeof b === "number") {
         var result = new Array(Math.max(0, b));
@@ -106,6 +118,25 @@ define(function(require, exports, module) {
         return new MulAdd().init(_in, mul, add);
       });
     }).defaults("mul=1,add=0").multiCall().build());
+
+    fn.definePrototypeProperty(Array, "to_i", function() {
+      return this.map(function(x) {
+        return x.to_i();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_f", function() {
+      return this.map(function(x) {
+        return x.to_f();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_s", function() {
+      return this.map(function(x) {
+        return x.to_s();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_a", function() {
+      return this;
+    });
   };
   
   cc.once("basic_ops.js", function(payload) {
