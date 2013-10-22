@@ -1306,10 +1306,14 @@ define('cc/server/installer', function(require, exports, module) {
 define('cc/server/object', function(require, exports, module) {
 
   var cc = require("./cc");
+  var fn = require("./fn");
+  var utils = require("./utils");
+  
+  var MulAdd;
   
   var setup = function(key, func) {
     [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
-      Klass.prototype[key] = func;
+      fn.definePrototypeProperty(Klass, key, func);
     });
   };
 
@@ -1326,7 +1330,7 @@ define('cc/server/object', function(require, exports, module) {
     setup("__sub__", function(b) {
       return this - b;
     });
-    setup("__mod__", function(b) {
+    setup("__mul__", function(b) {
       return this * b;
     });
     setup("__div__", function(b) {
@@ -1344,7 +1348,104 @@ define('cc/server/object', function(require, exports, module) {
     setup("next", function() {
       return this;
     });
+    setup("to_i", function() {
+      return this|0;
+    });
+    setup("to_f", function() {
+      return +this;
+    });
+    setup("to_s", function() {
+      return this.toString();
+    });
+    setup("to_a", function() {
+      return [this];
+    });
+    
+    fn.definePrototypeProperty(String, "__mul__", function(b) {
+      if (typeof b === "number") {
+        var result = new Array(Math.max(0, b));
+        for (var i = 0; i < b; i++) {
+          result[i] = this;
+        }
+        return result.join("");
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mul__(b);
+        }, this);
+      }
+      return this * b;
+    });
+    
+    fn.definePrototypeProperty(Function, "__mul__", function(b) {
+      if (typeof b === "function") {
+        var f = this, g = b;
+        return function() {
+          return f.call(null, g.apply(null, arguments));
+        };
+      }
+      return this * b;
+    });
+    
+    fn.definePrototypeProperty(String, "__div__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__div__(b);
+        }, this);
+      }
+      return this / b;
+    });
+    
+    fn.definePrototypeProperty(String, "__mod__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), b|0).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mod__(b);
+        }, this);
+      }
+      return this % b;
+    });
+    
+    fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build());
+    
+    fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+      return utils.flop([this, mul, add]).map(function(items) {
+        var _in = items[0], mul = items[1], add = items[2];
+        return new MulAdd().init(_in, mul, add);
+      });
+    }).defaults("mul=1,add=0").multiCall().build());
+
+    fn.definePrototypeProperty(Array, "to_i", function() {
+      return this.map(function(x) {
+        return x.to_i();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_f", function() {
+      return this.map(function(x) {
+        return x.to_f();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_s", function() {
+      return this.map(function(x) {
+        return x.to_s();
+      });
+    });
+    fn.definePrototypeProperty(Array, "to_a", function() {
+      return this;
+    });
   };
+  
+  cc.once("basic_ops.js", function(payload) {
+    MulAdd = payload.MulAdd;
+  });
   
   module.exports = {
     install: install
@@ -1353,7 +1454,330 @@ define('cc/server/object', function(require, exports, module) {
 });
 define('cc/server/cc', function(require, exports, module) {
 
-  module.exports = require("../cc");
+  var _cc = require("../cc");
+  var Emitter = require("../common/emitter").Emitter;
+  
+  Emitter.bind(_cc);
+  
+  module.exports = _cc;
+
+});
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter(context) {
+      this.__context   = context || this;
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.__context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.__context, args);
+      }
+      return this;
+    };
+    Emitter.bind = function(obj) {
+      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+        if (!obj[method]) {
+          obj[method] = Emitter.prototype[method];
+        }
+      });
+      Emitter.call(obj);
+      return obj;
+    };
+    return Emitter;
+  })();
+
+  module.exports = {
+    Emitter: Emitter
+  };
+
+});
+define('cc/server/fn', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var utils = require("./utils");
+  var slice = [].slice;
+  
+  var fn = (function() {
+    function Fn(func) {
+      this.func  = func;
+      this.def   = null;
+      this.multi = false;
+    }
+    Fn.prototype.defaults = function(def) {
+      this.def = def;
+      return this;
+    };
+    Fn.prototype.multiCall = function(flag) {
+      this.multi = flag === undefined ? true : !!flag;
+      return this;
+    };
+    Fn.prototype.build = function() {
+      var func = this.func;
+      var keys = [];
+      var vals = [];
+      if (this.def) {
+        this.def.split(",").forEach(function(items) {
+          items = items.trim().split("=");
+          keys.push( items[0].trim());
+          vals.push(items.length > 1 ? +items[1].trim() : undefined);
+        });
+      }
+      var ret = func;
+      if (this.multi) {
+        if (this.def) {
+          ret = function() {
+            var args = slice.call(arguments);
+            args = resolve_args(keys, vals, slice.call(arguments));
+            if (containsArray(args)) {
+              return utils.flop(args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        } else {
+          ret = function() {
+            var args = slice.call(arguments);
+            if (containsArray(args)) {
+              return utils.flop(args).map(function(items) {
+                return func.apply(this, items);
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        }
+      } else if (this.def) {
+        ret = function() {
+          var args = slice.call(arguments);
+          args = resolve_args(keys, vals, slice.call(arguments));
+          return func.apply(this, args);
+        };
+      }
+      return ret;
+    };
+    var containsArray = function(list) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          return true;
+        }
+      }
+      return false;
+    };
+    var resolve_args = function(keys, vals, given) {
+      var dict;
+      var args = vals.slice();
+      if (utils.isDict(given[given.length - 1])) {
+        dict = given.pop();
+        for (var key in dict) {
+          var index = keys.indexOf(key);
+          if (index !== -1) {
+            args[index] = dict[key];
+          }
+        }
+      }
+      for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
+        args[i] = given[i];
+      }
+      if (dict && args.length < keys.length - 1) {
+        args.push(dict);
+      }
+      return args;
+    };
+    return function(func) {
+      return new Fn(func);
+    };
+  })();
+  
+  fn.extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  
+  fn.sync = function(func) {
+    return function() {
+      cc.server.timeline.push(this, func, slice.call(arguments));
+      return this;
+    };
+  };
+
+  fn.definePrototypeProperty = function(Klass, key, func) {
+    Object.defineProperty(Klass.prototype, key, {
+      configurable: true,
+      enumerable  : false,
+      writable    : true,
+      value       : func
+    });
+  };
+  
+  module.exports = fn;
+
+});
+define('cc/server/utils', function(require, exports, module) {
+
+  var isDict = function(obj) {
+    return !!(obj && obj.constructor === Object);
+  };
+  
+  var flop = function(list) {
+    var maxSize = list.reduce(function(len, sublist) {
+      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
+    }, 0);
+    var result = new Array(maxSize);
+    var length = list.length;
+    if (length) {
+      for (var i = 0; i < maxSize; ++i) {
+        var sublist = result[i] = new Array(length);
+        for (var j = 0; j < length; ++j) {
+          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
+        }
+      }
+    }
+    return result;
+  };
+
+  var flatten = (function() {
+    var _flatten = function(list, result) {
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        if (Array.isArray(list[i])) {
+          result = _flatten(list[i], result);
+        } else {
+          result.push(list[i]);
+        }
+      }
+      return result;
+    };
+    return function(list) {
+      return _flatten(list, []);
+    };
+  })();
+
+  var clump = function(list, groupSize) {
+    var result  = [];
+    var sublist = [];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      sublist.push(list[i]);
+      if (sublist.length >= groupSize) {
+        result.push(sublist);
+        sublist = [];
+      }
+    }
+    if (sublist.length) {
+      result.push(sublist);
+    }
+    return result;
+  };
+  
+  var pack = (function() {
+    var _ = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            if (key.charAt(0) !== "_") {
+              result[key] = _(data[key], stack);
+            }
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _(data, []);
+    };
+  })();
+  
+  module.exports = {
+    isDict : isDict,
+    flop   : flop,
+    flatten: flatten,
+    clump  : clump,
+    pack   : pack
+  };
 
 });
 define('cc/server/server', function(require, exports, module) {
@@ -2389,241 +2813,15 @@ define('cc/server/node', function(require, exports, module) {
   };
 
 });
-define('cc/server/fn', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var utils = require("./utils");
-  var slice = [].slice;
-  
-  var fn = (function() {
-    function Fn(func) {
-      this.func  = func;
-      this.def   = null;
-      this.multi = false;
-    }
-    Fn.prototype.defaults = function(def) {
-      this.def = def;
-      return this;
-    };
-    Fn.prototype.multiCall = function(flag) {
-      this.multi = flag === undefined ? true : !!flag;
-      return this;
-    };
-    Fn.prototype.build = function() {
-      var func = this.func;
-      var keys = [];
-      var vals = [];
-      if (this.def) {
-        this.def.split(",").forEach(function(items) {
-          items = items.trim().split("=");
-          keys.push( items[0].trim());
-          vals.push(items.length > 1 ? +items[1].trim() : undefined);
-        });
-      }
-      var ret = func;
-      if (this.multi) {
-        if (this.def) {
-          ret = function() {
-            var args = slice.call(arguments);
-            args = resolve_args(keys, vals, slice.call(arguments));
-            if (containsArray(args)) {
-              return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
-              }, this);
-            }
-            return func.apply(this, args);
-          };
-        } else {
-          ret = function() {
-            var args = slice.call(arguments);
-            if (containsArray(args)) {
-              return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
-              }, this);
-            }
-            return func.apply(this, args);
-          };
-        }
-      } else if (this.def) {
-        ret = function() {
-          var args = slice.call(arguments);
-          args = resolve_args(keys, vals, slice.call(arguments));
-          return func.apply(this, args);
-        };
-      }
-      return ret;
-    };
-    var containsArray = function(list) {
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        if (Array.isArray(list[i])) {
-          return true;
-        }
-      }
-      return false;
-    };
-    var resolve_args = function(keys, vals, given) {
-      var dict;
-      var args = vals.slice();
-      if (utils.isDict(given[given.length - 1])) {
-        dict = given.pop();
-        for (var key in dict) {
-          var index = keys.indexOf(key);
-          if (index !== -1) {
-            args[index] = dict[key];
-          }
-        }
-      }
-      for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
-        args[i] = given[i];
-      }
-      if (dict && args.length < keys.length - 1) {
-        args.push(dict);
-      }
-      return args;
-    };
-    return function(func) {
-      return new Fn(func);
-    };
-  })();
-  
-  fn.extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
-    /*jshint validthis:true */
-    function ctor() {
-      this.constructor = child;
-    }
-    /*jshint validthis:false */
-    ctor.prototype = parent.prototype;
-    /*jshint newcap:false */
-    child.prototype = new ctor();
-    /*jshint newcap:true */
-    child.__super__ = parent.prototype;
-    return child;
-  };
-  
-  fn.sync = function(func) {
-    return function() {
-      cc.server.timeline.push(this, func, slice.call(arguments));
-      return this;
-    };
-  };
-
-  module.exports = fn;
-
-});
-define('cc/server/utils', function(require, exports, module) {
-
-  var isDict = function(obj) {
-    return !!(obj && obj.constructor === Object);
-  };
-  
-  var flop = function(list) {
-    var maxSize = list.reduce(function(len, sublist) {
-      return Math.max(len, Array.isArray(sublist) ? sublist.length : 1);
-    }, 0);
-    var result = new Array(maxSize);
-    var length = list.length;
-    if (length) {
-      for (var i = 0; i < maxSize; ++i) {
-        var sublist = result[i] = new Array(length);
-        for (var j = 0; j < length; ++j) {
-          sublist[j] = Array.isArray(list[j]) ? list[j][i % list[j].length] : list[j];
-        }
-      }
-    }
-    return result;
-  };
-
-  var flatten = (function() {
-    var _flatten = function(list, result) {
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        if (Array.isArray(list[i])) {
-          result = _flatten(list[i], result);
-        } else {
-          result.push(list[i]);
-        }
-      }
-      return result;
-    };
-    return function(list) {
-      return _flatten(list, []);
-    };
-  })();
-
-  var clump = function(list, groupSize) {
-    var result  = [];
-    var sublist = [];
-    for (var i = 0, imax = list.length; i < imax; ++i) {
-      sublist.push(list[i]);
-      if (sublist.length >= groupSize) {
-        result.push(sublist);
-        sublist = [];
-      }
-    }
-    if (sublist.length) {
-      result.push(sublist);
-    }
-    return result;
-  };
-  
-  var pack = (function() {
-    var _ = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
-              result[key] = _(data[key], stack);
-            }
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _(data, []);
-    };
-  })();
-  
-  module.exports = {
-    isDict : isDict,
-    flop   : flop,
-    flatten: flatten,
-    clump  : clump,
-    pack   : pack
-  };
-
-});
 define('cc/server/ugen/ugen', function(require, exports, module) {
   
   var cc = require("../cc");
   var fn = require("../fn");
   var slice = [].slice;
+
+  var UnaryOpUGen;
+  var BinaryOpUGen;
+  var MulAdd;
 
   var addToSynthDef = null;
   
@@ -2640,6 +2838,7 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.inputs = [];
     }
     fn.extend(UGen, cc.Object);
+    
     UGen.prototype.init = function(rate) {
       this.rate = rate;
       if (addToSynthDef) {
@@ -2649,6 +2848,31 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
+    
+    UGen.prototype.madd = fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build();
+    
+    UGen.prototype.range = fn(function(lo, hi) {
+      var mul, add;
+      if (this.signalRange === 2) {
+        mul = (hi - lo) * 0.5;
+        add = mul + lo;
+      } else {
+        mul = (hi - lo);
+        add = lo;
+      }
+      return new MulAdd().init(this, mul, add);
+    }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.unipolar = fn(function(mul) {
+      return this.range(0, mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    UGen.prototype.bipolar = fn(function(mul) {
+      return this.range(mul.neg(), mul);
+    }).defaults("mul=1").multiCall().build();
+    
     return UGen;
   })();
   
@@ -2790,6 +3014,12 @@ define('cc/server/ugen/ugen', function(require, exports, module) {
       }).defaults(defaults).multiCall(multiCall).build();
     });
   };
+
+  cc.once("basic_ops.js", function(payload) {
+    UnaryOpUGen  = payload.UnaryOpUGen;
+    BinaryOpUGen = payload.BinaryOpUGen;
+    MulAdd       = payload.MulAdd;
+  });
   
   module.exports = {
     UGen: UGen,
@@ -2977,85 +3207,6 @@ define('cc/server/unit/unit', function(require, exports, module) {
     Control : Control,
     register: register,
     install : install
-  };
-
-});
-define('cc/common/emitter', function(require, exports, module) {
-
-  var Emitter = (function() {
-    function Emitter(context) {
-      this.__context   = context || this;
-      this.__callbacks = {};
-    }
-    Emitter.prototype.getListeners = function(event) {
-      return this.__callbacks[event] || (this.__callbacks[event] = []);
-    };
-    Emitter.prototype.hasListeners = function(event) {
-      return this.getListeners(event).length > 0;
-    };
-    Emitter.prototype.on = function(event, callback) {
-      var __callbacks = this.getListeners(event);
-      if (__callbacks.indexOf(callback) === -1) {
-        __callbacks.push(callback);
-      }
-      return this;
-    };
-    Emitter.prototype.once = function(event, callback) {
-      var that = this;
-      function wrapper() {
-        that.off(event, wrapper);
-        callback.apply(that.__context, arguments);
-      }
-      wrapper.callback = callback;
-      this.on(event, wrapper);
-      return this;
-    };
-    Emitter.prototype.off = function(event, callback) {
-      if (arguments.length === 0) {
-        this.__callbacks = {};
-        return this;
-      }
-      var __callbacks = this.getListeners(event);
-      if (arguments.length === 1) {
-        __callbacks.splice(0);
-        return this;
-      }
-      var index = __callbacks.indexOf(callback);
-      if (index === -1) {
-        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-          if (__callbacks[i].callback === callback) {
-            index = i;
-            break;
-          }
-        }
-      }
-      if (index !== -1) {
-        __callbacks.splice(index, 1);
-      }
-      return this;
-    };
-    Emitter.prototype.emit = function(event) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      var __callbacks = this.getListeners(event).slice(0);
-      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.__context, args);
-      }
-      return this;
-    };
-    Emitter.bind = function(obj) {
-      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
-        if (!obj[method]) {
-          obj[method] = Emitter.prototype[method];
-        }
-      });
-      Emitter.call(obj);
-      return obj;
-    };
-    return Emitter;
-  })();
-
-  module.exports = {
-    Emitter: Emitter
   };
 
 });
@@ -3616,7 +3767,7 @@ define('cc/server/buffer', function(require, exports, module) {
 });
 define('cc/server/bop', function(require, exports, module) {
 
-  var utils = require("./utils");
+  var fn = require("./fn");
   var UGen  = require("./ugen/ugen").UGen;
   var BinaryOpUGen = require("./ugen/basic_ops").BinaryOpUGen;
 
@@ -3665,84 +3816,33 @@ define('cc/server/bop', function(require, exports, module) {
 
   var setup = function(selector, func, ugenSelector) {
     ugenSelector = ugenSelector || selector;
-    Number.prototype[selector] = setupNumberFunction(func, selector, ugenSelector);
-    Array.prototype[selector]  = setupArrayFunction(selector, ugenSelector);
-    UGen.prototype[selector]   = setupUGenFunction(ugenSelector);
+    fn.definePrototypeProperty(
+      Number, selector, setupNumberFunction(func, selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      Array, selector, setupArrayFunction(selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      UGen, selector, setupUGenFunction(ugenSelector)
+    );
   };
-
+  
   var install = function() {
     setup("__add__", function(a, b) {
       return a + b;
     }, "+");
-    String.prototype.__add__ = function(b) {
-      return this + b;
-    };
-    Function.prototype.__add__ = function(b) {
-      return this + b;
-    };
-
     setup("__sub__", function(a, b) {
       return a - b;
     }, "-");
-    
     setup("__mul__", function(a, b) {
       return a * b;
     }, "*");
-    String.prototype.__mul__ = function(b) {
-      if (typeof b === "number") {
-        var result = new Array(Math.max(0, b));
-        for (var i = 0; i < b; i++) {
-          result[i] = this;
-        }
-        return result.join("");
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mul__(b);
-        }, this);
-      }
-      return new TypeError("String *: an invalid operand.");
-    };
-    Function.prototype.__mul__ = function(b) {
-      if (typeof b === "function") {
-        var f = this, g = b;
-        return function() {
-          return f.call(null, g.apply(null, arguments));
-        };
-      }
-      return this;
-    };
-    
     setup("__div__", function(a, b) {
       return a / b;
     }, "/");
-    String.prototype.__div__ = function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__div__(b);
-        }, this);
-      }
-      return new TypeError("String /: an invalid operand.");
-    };
-
     setup("__mod__", function(a, b) {
       return a % b;
     }, "%");
-    String.prototype.__mod__ = function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), b|0).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mod__(b);
-        }, this);
-      }
-      return new TypeError("String %: an invalid operand.");
-    };
   };
   
   module.exports = {
@@ -3752,6 +3852,7 @@ define('cc/server/bop', function(require, exports, module) {
 });
 define('cc/server/ugen/basic_ops', function(require, exports, module) {
 
+  var cc = require("../cc");
   var fn = require("../fn");
   var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
@@ -4083,41 +4184,14 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
     };
   })();
   
-  Number.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-  Array.prototype.madd = fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return new MulAdd().init(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").build();
-  UGen.prototype.madd = fn(function(mul, add) {
-    return new MulAdd().init(this, mul, add);
-  }).defaults("mul=1,add=0").build();
-
-  UGen.prototype.range = fn(function(lo, hi) {
-    var mul, add;
-    if (this.signalRange === 2) {
-      mul = (hi - lo) * 0.5;
-      add = mul + lo;
-    } else {
-      mul = (hi - lo);
-      add = lo;
-    }
-    return new MulAdd().init(this, mul, add);
-  }).defaults("lo=0,hi=1").multiCall().build();
-
-  UGen.prototype.unipolar = fn(function(mul) {
-    return this.range(0, mul);
-  }).defaults("mul=1").build();
-
-  UGen.prototype.bipolar = fn(function(mul) {
-    return this.range(mul.neg(), mul);
-  }).defaults("mul=1").build();
-  
   var install = function() {
   };
+
+  cc.emit("basic_ops.js", {
+    UnaryOpUGen : UnaryOpUGen,
+    BinaryOpUGen: BinaryOpUGen,
+    MulAdd      : MulAdd,
+  });
   
   module.exports = {
     UnaryOpUGen : UnaryOpUGen,
@@ -4133,28 +4207,29 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
 });
 define('cc/server/uop', function(require, exports, module) {
 
+  var fn = require("./fn");
   var UGen = require("./ugen/ugen").UGen;
   var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
   
   var install = function() {
-    Array.prototype.__plus__ = function() {
+    fn.definePrototypeProperty(Array, "__plus__", function() {
       return this.map(function(x) {
-        return +x;
+        return x.__plus__();
       });
-    };
-    UGen.prototype.__plus__ = function() {
+    });
+    fn.definePrototypeProperty(UGen, "__plus__", function() {
       return new UnaryOpUGen("+", this);
-    };
-    Array.prototype.__minus__ = function() {
+    });
+    fn.definePrototypeProperty(Array, "__minus__", function() {
       return this.map(function(x) {
-        return -x;
+        return x.__minus__();
       });
-    };
-    UGen.prototype.__minus__ = function() {
+    });
+    fn.definePrototypeProperty(UGen, "__minus__", function() {
       return new UnaryOpUGen("-", this);
-    };
+    });
   };
-
+  
   module.exports = {
     install: install
   };
