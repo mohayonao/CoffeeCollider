@@ -3,10 +3,10 @@ define(function(require, exports, module) {
 
   var fs = require("fs");
   var assert = require("chai").assert;
-  var Compiler = require("../client/compiler").Compiler;
-  var object = require("../server/object");
-  var uop = require("../server/uop");
-  var bop = require("../server/bop");
+  var Compiler = require("../exports/compiler").Compiler;
+  var object = require("../client/object");
+  var uop = require("../client/uop");
+  var bop = require("../client/bop");
   
   assert.deepCloseTo = function(expected, actual, delta) {
     expected.forEach(function(x, i) {

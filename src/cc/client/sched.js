@@ -12,7 +12,7 @@ define(function(require, exports, module) {
       this.reset();
     }
     Timeline.prototype.play = function() {
-      this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
+      this.counterIncr = (cc.client.bufLength / cc.client.sampleRate) * 1000;
     };
     Timeline.prototype.pause = function() {
     };
@@ -53,7 +53,7 @@ define(function(require, exports, module) {
       Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
-      this._timeline = timeline || cc.server.timeline;
+      this._timeline = timeline || cc.client.timeline;
       this._context = new TaskContext(this);
       this._queue = [];
       this._bang  = false;
@@ -434,7 +434,7 @@ define(function(require, exports, module) {
   var install = function() {
     global.Task = TaskInterface;
     global.wait = function() {
-      var globalTask = cc.server.timeline._globalTask;
+      var globalTask = cc.client.timeline._globalTask;
       globalTask._queue.push(TaskWaitToken.create.apply(null, arguments));
     };
   };

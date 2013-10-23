@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var unit = require("./unit");
-  var ops  = require("../ugen/basic_ops");
+  var ops  = require("../../client/ugen/basic_ops");
 
   var UnaryOpUGen = (function() {
     var UNARY_OP_UGEN_MAP = ops.UNARY_OP_UGEN_MAP;

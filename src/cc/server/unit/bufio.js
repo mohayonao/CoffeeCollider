@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
   
   var unit = require("./unit");
-  var buffer = require("../buffer");
   
   var sc_loop = function(unit, index, hi, loop) {
     if (index >= hi) {
@@ -39,28 +38,30 @@ define(function(require, exports, module) {
   
   var PlayBuf = function() {
     var ctor = function() {
-      this._buffer = buffer.get(this.specialIndex);
+      this._buffer = null;
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
       this.process = next_choose;
-      this.process.call(this);
     };
-    var next_choose  = function(inNumSamples) {
-      if (this._buffer.samples !== null) {
-        if (this.inRates[1] === C.AUDIO) {
-          if (this.inRates[2] === C.AUDIO) {
-            this.process = next_kk; // aa
+    var next_choose  = function(inNumSamples, heap) {
+      this._buffer = heap.buffers[this.specialIndex];
+      if (this._buffer) {
+        if (this._buffer.samples !== null) {
+          if (this.inRates[1] === C.AUDIO) {
+            if (this.inRates[2] === C.AUDIO) {
+              this.process = next_kk; // aa
+            } else {
+              this.process = next_kk; // ak
+            }
           } else {
-            this.process = next_kk; // ak
+            if (this.inRates[2] === C.AUDIO) {
+              this.process = next_kk; // ka
+            } else {
+              this.process = next_kk; // kk
+            }
           }
-        } else {
-          if (this.inRates[2] === C.AUDIO) {
-            this.process = next_kk; // ka
-          } else {
-            this.process = next_kk; // kk
-          }
+          this.process.call(this, inNumSamples);
         }
-        this.process.call(this, inNumSamples);
       }
     };
     var next_kk = function(inNumSamples) {
