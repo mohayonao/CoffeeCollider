@@ -46,10 +46,16 @@ define(function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function(b) {
-      return new BinaryOpUGen().init(selector, this, b);
+      var a = this;
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return new BinaryOpUGen().init(selector, a, b);
+        });
+      }
+      return new BinaryOpUGen().init(selector, a, b);
     };
   };
-
+  
   var setup = function(selector, func, ugenSelector) {
     ugenSelector = ugenSelector || selector;
     fn.definePrototypeProperty(
