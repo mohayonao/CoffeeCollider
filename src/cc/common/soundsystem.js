@@ -6,11 +6,11 @@ define(function(require, exports, module) {
   var AudioAPI;
   
   var SoundSystem = (function() {
-    function SoundSystem(owner) {
+    function SoundSystem(owner, opts) {
       this.owner = owner;
       this.sampleRate = 44100;
       this.channels   = 2;
-      this.api = new AudioAPI(this);
+      this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
       this.strmLength = 1024;
@@ -21,6 +21,9 @@ define(function(require, exports, module) {
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
       this.isPlaying = false;
     }
+    SoundSystem.prototype.init = function() {
+      this.api.init();
+    };
     SoundSystem.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -44,13 +47,15 @@ define(function(require, exports, module) {
   
   if (AudioContext) {
     AudioAPI = (function() {
-      function WebAudioAPI(sys) {
+      function WebAudioAPI(sys, opts) {
         this.sys = sys;
-        this.context = new AudioContext();
+        this.context = opts.AudioContext || new AudioContext();
         this.sampleRate = this.context.sampleRate;
         this.channels   = 2;
+        this.type = "Web Audio API";
+        this.delegate = !!opts.AudioContext;
       }
-      WebAudioAPI.prototype.play = function() {
+      WebAudioAPI.prototype.init = function() {
         var sys = this.sys;
         var onaudioprocess;
         var strmLength  = sys.strmLength;
@@ -71,13 +76,19 @@ define(function(require, exports, module) {
         this.bufSrc = this.context.createBufferSource();
         this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
         this.jsNode.onaudioprocess = onaudioprocess;
+      };
+      WebAudioAPI.prototype.play = function() {
         this.bufSrc.noteOn(0);
         this.bufSrc.connect(this.jsNode);
-        this.jsNode.connect(this.context.destination);
+        if (!this.delegate) {
+          this.jsNode.connect(this.context.destination);
+        }
       };
       WebAudioAPI.prototype.pause = function() {
         this.bufSrc.disconnect();
-        this.jsNode.disconnect();
+        if (!this.delegate) {
+          this.jsNode.disconnect();
+        }
       };
       WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
         buffer = this.context.createBuffer(buffer, false);
@@ -109,11 +120,16 @@ define(function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.type = "Audio Data API";
       }
+      AudioDataAPI.prototype.init = function() {
+        this.audio = new Audio();
+        this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
+      };
       AudioDataAPI.prototype.play = function() {
         var sys = this.sys;
-        var audio = new Audio();
-        var interleaved = new Float32Array(sys.strmLength * sys.channels);
+        var audio = this.audio;
+        var interleaved = this.interleaved;
         var msec = (sys.strmLength / sys.sampleRate) * 1000;
         var written = 0;
         var start = Date.now();
@@ -152,7 +168,10 @@ define(function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.type = "Fallback";
       }
+      FallbackAudioAPI.prototype.init = function() {
+      };
       FallbackAudioAPI.prototype.play = function() {
         if (fallback.play) {
           this.play = fallback.play;

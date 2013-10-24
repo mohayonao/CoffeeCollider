@@ -8,16 +8,11 @@ define(function(require, exports, module) {
   var commands = {};
   var slice    = [].slice;
   
-  var instance = null;
-  
   var CoffeeCollider = (function() {
-    function CoffeeCollider() {
-      if (instance) {
-        return instance;
-      }
-      instance = this;
+    function CoffeeCollider(opts) {
+      opts = opts || {};
       this.version    = cc.version;
-      this.impl       = new CoffeeColliderImpl();
+      this.impl       = new CoffeeColliderImpl(opts);
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
       this.compiler   = this.impl.compiler;
@@ -45,11 +40,14 @@ define(function(require, exports, module) {
       this.impl.importScripts(slice.call(arguments));
       return this;
     };
+    CoffeeCollider.prototype.getWebAudioComponents = function() {
+      return this.impl.getWebAudioComponents();
+    };
     return CoffeeCollider;
   })();
 
   var CoffeeColliderImpl = (function() {
-    function CoffeeColliderImpl() {
+    function CoffeeColliderImpl(opts) {
       var that = this;
       this.worker = new Worker(cc.coffeeColliderPath);
       this.worker.addEventListener("message", function(e) {
@@ -57,12 +55,11 @@ define(function(require, exports, module) {
       });
       this.compiler = new Compiler();
       
-      this.isConnected = false;
-      this.isPlaying   = false;
+      this.isPlaying = false;
       this.execId = 0;
       this.execCallbacks = {};
 
-      this.sys = new SoundSystem(this);
+      this.sys = new SoundSystem(this, opts);
       this.sampleRate = this.sys.sampleRate;
       this.channels   = this.sys.channels;
       this.strmLength = this.sys.strmLength;
@@ -84,6 +81,9 @@ define(function(require, exports, module) {
         syncItems[C.BUTTON] = 0;
       }, false);
     }
+    CoffeeColliderImpl.prototype.init = function() {
+      this.sys.init();
+    };
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -193,11 +193,17 @@ define(function(require, exports, module) {
       };
       xhr.send();
     };
+    CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
+      if (this.sys.api.type === "Web Audio API") {
+        return [ this.sys.api.context, this.sys.api.jsNode ];
+      }
+      return [];
+    };
     return CoffeeColliderImpl;
   })();
   
   commands["/connect"] = function() {
-    this.isConnected = true;
+    this.init();
     // if the server in the local
     this.sendToClient([
       "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
