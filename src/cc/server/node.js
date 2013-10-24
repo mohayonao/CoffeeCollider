@@ -317,7 +317,7 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, defId, node, args, addAction, heap) {
+    function Synth(nodeId, node, addAction, defId, args, heap) {
       Node.call(this, nodeId, heap);
       if (heap) {
         var specs = heap.defs[defId];

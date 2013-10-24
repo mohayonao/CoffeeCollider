@@ -46,13 +46,13 @@ define(function(require, exports, module) {
     this.defs[defId] = specs;
   };
   commands["/s_new"] = function(msg) {
-    var defId        = msg[1]|0;
-    var nodeId       = msg[2]|0;
-    var addAction    = msg[3]|0;
-    var targetNodeId = msg[4]|0;
+    var nodeId       = msg[1]|0;
+    var addAction    = msg[2]|0;
+    var targetNodeId = msg[3]|0;
+    var defId        = msg[4]|0;
     var target = this.nodes[targetNodeId];
     if (target) {
-      this.nodes[nodeId] = new node.Synth(nodeId, defId, target, {}, addAction, this);
+      this.nodes[nodeId] = new node.Synth(nodeId, target, addAction, defId, {}, this);
     }
   };
   commands["/b_new"] = function(msg) {

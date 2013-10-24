@@ -61,23 +61,25 @@ define(function(require, exports, module) {
   })();
   
   var Synth = (function() {
-    function Synth(def, target, args, addAction) {
+    function Synth(target, addAction, def, args) {
       Node.call(this);
       this.klassName = "Synth";
       this.params = def.specs.params;
+      args = args || {};
       if (target) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
           cc.client.pushCommand([
-            "/s_new", def._defId, that.nodeId, addAction, target.nodeId
+            "/s_new", that.nodeId, addAction, target.nodeId, def._defId
           ]);
+          that._set(args);
         });
       }
     }
     fn.extend(Synth, Node);
-    
-    Synth.prototype.set = fn.sync(function(args) {
+
+    Synth.prototype._set = function(args) {
       var params = this.params;
       var controls = [];
       if (utils.isDict(args)) {
@@ -123,7 +125,9 @@ define(function(require, exports, module) {
           "/n_set", this.nodeId, controls
         ]);
       }
-    });
+    };
+    
+    Synth.prototype.set = fn.sync(Synth.prototype._set);
     
     return Synth;
   })();
@@ -197,7 +201,7 @@ define(function(require, exports, module) {
       } finally {
         ugen.setSynthDef(null);
       }
-      
+      // console.log(children);
       var consts = [];
       children.forEach(function(x) {
         if (x.inputs) {
@@ -212,6 +216,7 @@ define(function(require, exports, module) {
       var ugenlist = topoSort(children).filter(function(x) {
         return !(typeof x === "number" || x instanceof ugen.OutputProxy);
       });
+      // console.log(ugenlist);
       var defs = ugenlist.map(function(x) {
         var inputs = [];
         if (x.inputs) {
@@ -239,6 +244,7 @@ define(function(require, exports, module) {
         params: params,
       };
       this.specs = specs;
+      // console.log(specs);
       cc.client.pushCommand([
         "/s_def", this._defId, JSON.stringify(specs)
       ]);
@@ -248,7 +254,6 @@ define(function(require, exports, module) {
     SynthDef.prototype.play = fn(function() {
       var target, args, addAction;
       var i = 0;
-      target = args;
       if (arguments[i] instanceof Node) {
         target = arguments[i++];
       } else {
@@ -274,15 +279,15 @@ define(function(require, exports, module) {
       }
       switch (addAction) {
       case "addToHead":
-        return SynthInterface.head(this, target, args);
+        return SynthInterface.head(target, this, args);
       case "addToTail":
-        return SynthInterface.tail(this, target, args);
+        return SynthInterface.tail(target, this, args);
       case "addBefore":
-        return SynthInterface.before(this, target, args);
+        return SynthInterface.before(target, this, args);
       case "addAfter":
-        return SynthInterface.after(this, target, args);
+        return SynthInterface.after(target, this, args);
       default:
-        return SynthInterface.head(this, target, args);
+        return SynthInterface.head(target, this, args);
       }
     }).multiCall().build();
 
@@ -452,7 +457,7 @@ define(function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, C.ADD_AFTER);
+    return new Synth(node, C.ADD_AFTER, def, args);
   };
   SynthInterface.before = function() {
     var node, def, args;
@@ -471,7 +476,7 @@ define(function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, C.ADD_BEFORE);
+    return new Synth(node, C.ADD_BEFORE, def, args);
   };
   SynthInterface.head = function() {
     var node, def, args;
@@ -490,7 +495,7 @@ define(function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, C.ADD_TO_HEAD);
+    return new Synth(node, C.ADD_TO_HEAD, def, args);
   };
   SynthInterface.tail = function() {
     var node, def, args;
@@ -509,7 +514,7 @@ define(function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, C.ADD_TO_TAIL);
+    return new Synth(node, C.ADD_TO_TAIL, def, args);
   };
   SynthInterface.replace = function(node, def, args) {
     if (!(node instanceof Node)) {
@@ -518,7 +523,7 @@ define(function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, C.REPLACE);
+    return new Synth(node, C.REPLACE, def, args);
   };
   
   var reset = function() {

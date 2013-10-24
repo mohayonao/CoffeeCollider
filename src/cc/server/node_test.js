@@ -36,55 +36,55 @@ define(function(require, exports, module) {
       nodeId = 0;
       nodes = [];
       nodes[0] = rootNode = cc.server.rootNode = new Group(nodeId++);
-      nodes[1] = new Synth(nodeId++, 0, rootNode, null, C.ADD_TO_HEAD);
+      nodes[1] = new Synth(nodeId++, rootNode, C.ADD_TO_HEAD);
       nodes[2] = new Group(nodeId++, nodes[1], C.ADD_AFTER);
-      nodes[3] = new Synth(nodeId++, 0, nodes[2], null, C.ADD_AFTER);
-      nodes[4] = new Synth(nodeId++, 0, nodes[2], null, C.ADD_TO_HEAD);
+      nodes[3] = new Synth(nodeId++, nodes[2], C.ADD_AFTER);
+      nodes[4] = new Synth(nodeId++, nodes[2], C.ADD_TO_HEAD);
       nodes[5] = new Group(nodeId++, nodes[4], C.ADD_AFTER);
-      nodes[6] = new Synth(nodeId++, 0, nodes[5], null, C.ADD_AFTER);
-      nodes[7] = new Synth(nodeId++, 0, nodes[5], null, C.ADD_TO_HEAD);
+      nodes[6] = new Synth(nodeId++, nodes[5], C.ADD_AFTER);
+      nodes[7] = new Synth(nodeId++, nodes[5], C.ADD_TO_HEAD);
       nodes[8] = new Group(nodeId++, nodes[7], C.ADD_AFTER);
-      nodes[9] = new Synth(nodeId++, 0, nodes[8], null, C.ADD_AFTER);
+      nodes[9] = new Synth(nodeId++, nodes[8], C.ADD_AFTER);
     });
     describe("graphFunction", function() {
       it("addToHead", function() {
-        new Synth(nodeId++, 0, nodes[2], null, C.ADD_TO_HEAD);
+        new Synth(nodeId++, nodes[2], C.ADD_TO_HEAD);
         var expected = [0, 1, 2, 10, 4, 5, 7, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("do nothing - addToHead of a synth", function() {
-        new Synth(nodeId++, 0, nodes[1], null, C.ADD_TO_HEAD);
+        new Synth(nodeId++, nodes[1], C.ADD_TO_HEAD);
         var expected = [0, 1, 2, 4, 5, 7, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("addToTail", function() {
-        new Synth(nodeId++, 0, nodes[2], null, C.ADD_TO_TAIL);
+        new Synth(nodeId++, nodes[2], C.ADD_TO_TAIL);
         var expected = [0, 1, 2, 4, 5, 7, 8, 9, 6, 10, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("no nothing - addToTail of a synth", function() {
-        new Synth(nodeId++, 0, nodes[3], null, C.ADD_TO_TAIL);
+        new Synth(nodeId++, nodes[3], C.ADD_TO_TAIL);
         var expected = [0, 1, 2, 4, 5, 7, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("addAfter", function() {
-        new Synth(nodeId++, 0, nodes[1], null, C.ADD_AFTER);
+        new Synth(nodeId++, nodes[1], C.ADD_AFTER);
         var expected = [0, 1, 10, 2, 4, 5, 7, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("addBefore", function() {
-        new Synth(nodeId++, 0, nodes[1], null, C.ADD_BEFORE);
+        new Synth(nodeId++, nodes[1], C.ADD_BEFORE);
         var expected = [0, 10, 1, 2, 4, 5, 7, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);
       });
       it("replace", function() {
-        new Synth(nodeId++, 0, nodes[7], null, C.REPLACE);
+        new Synth(nodeId++, nodes[7], C.REPLACE);
         var expected = [0, 1, 2, 4, 5, 10, 8, 9, 6, 3];
         var actual = walk(rootNode);
         assert.deepEqual(actual, expected);

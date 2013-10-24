@@ -12,9 +12,9 @@ define(function(require, exports, module) {
   var addToSynthDef = null;
   
   var UGen = (function() {
-    function UGen(name, tag) {
+    function UGen(name) {
       this.klassName = name;
-      this.tag  = tag || "";
+      this.tag  = "";
       this.rate = C.AUDIO;
       this.signalRange = C.BIPOLAR;
       this.specialIndex = 0;
@@ -130,7 +130,15 @@ define(function(require, exports, module) {
       if (!(bus instanceof UGen || typeof bus === "number")) {
         throw new TypeError("Out: arguments[0] should be an UGen or a number.");
       }
-      new Out().init(rate, bus, channelsArray);
+      if (!Array.isArray(channelsArray)) {
+        channelsArray = [ channelsArray ];
+      }
+      channelsArray = channelsArray.filter(function(x) {
+        return x !== 0;
+      });
+      if (channelsArray.length) {
+        UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
+      }
     }
     return function(bus, channelsArray) {
       if (Array.isArray(bus)) {
@@ -149,13 +157,13 @@ define(function(require, exports, module) {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.AUDIO),
       multiCall: false,
-      Klass: Out
+      Klass: null
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.CONTROL),
       multiCall: false,
-      Klass: Out
+      Klass: null
     }
   };
 
@@ -193,6 +201,7 @@ define(function(require, exports, module) {
     var klass = global[name] = function() {
       return new UGen(name);
     };
+    
     Object.keys(payload).forEach(function(key) {
       var setting   = payload[key];
       var defaults  = setting.defaults + ",tag";
@@ -201,15 +210,31 @@ define(function(require, exports, module) {
       if (multiCall === undefined) {
         multiCall = true;
       }
-      var Klass     = setting.Klass || UGen;
-      klass[key] = fn(function() {
-        var args = slice.call(arguments, 0, arguments.length - 1);
-        var tag  = arguments[arguments.length - 1];
-        return ctor.apply(new Klass(name, tag), args);
-      }).defaults(defaults).multiCall(multiCall).build();
+      if (setting.Klass !== null) {
+        var Klass = setting.Klass || UGen;
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(new Klass(name), args);
+          if (instance !== null && instance !== undefined) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      } else {
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(null, args);
+          if (instance !== null && instance !== undefined) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      }
     });
   };
-
+  
   cc.once("basic_ops.js", function(payload) {
     UnaryOpUGen  = payload.UnaryOpUGen;
     BinaryOpUGen = payload.BinaryOpUGen;
