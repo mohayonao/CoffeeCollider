@@ -197,7 +197,7 @@ define(function(require, exports, module) {
       } finally {
         ugen.setSynthDef(null);
       }
-
+      
       var consts = [];
       children.forEach(function(x) {
         if (x.inputs) {
@@ -302,7 +302,7 @@ define(function(require, exports, module) {
       };
       return function(list) {
         var checked = [];
-        list.forEach(function(x) {
+        list.slice().forEach(function(x) {
           if (x instanceof ugen.Out) {
             checked.push(x);
             x.inputs.forEach(function(x) {

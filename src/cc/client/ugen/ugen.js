@@ -126,11 +126,20 @@ define(function(require, exports, module) {
   })();
 
   var out_ctor = function(rate) {
-    return function(bus, channelsArray) {
+    function ctor(bus, channelsArray) {
       if (!(bus instanceof UGen || typeof bus === "number")) {
         throw new TypeError("Out: arguments[0] should be an UGen or a number.");
       }
-      this.init.apply(this, [rate, bus].concat(channelsArray));
+      new Out().init(rate, bus, channelsArray);
+    }
+    return function(bus, channelsArray) {
+      if (Array.isArray(bus)) {
+        bus.forEach(function(bus) {
+          ctor(bus, channelsArray);
+        });
+      } else {
+        ctor(bus, channelsArray);
+      }
       return 0; // Out has no output
     };
   };
