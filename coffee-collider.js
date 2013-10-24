@@ -110,16 +110,11 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   var commands = {};
   var slice    = [].slice;
   
-  var instance = null;
-  
   var CoffeeCollider = (function() {
-    function CoffeeCollider() {
-      if (instance) {
-        return instance;
-      }
-      instance = this;
+    function CoffeeCollider(opts) {
+      opts = opts || {};
       this.version    = cc.version;
-      this.impl       = new CoffeeColliderImpl();
+      this.impl       = new CoffeeColliderImpl(opts);
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
       this.compiler   = this.impl.compiler;
@@ -147,11 +142,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.impl.importScripts(slice.call(arguments));
       return this;
     };
+    CoffeeCollider.prototype.getWebAudioComponents = function() {
+      return this.impl.getWebAudioComponents();
+    };
     return CoffeeCollider;
   })();
 
   var CoffeeColliderImpl = (function() {
-    function CoffeeColliderImpl() {
+    function CoffeeColliderImpl(opts) {
       var that = this;
       this.worker = new Worker(cc.coffeeColliderPath);
       this.worker.addEventListener("message", function(e) {
@@ -159,12 +157,11 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       });
       this.compiler = new Compiler();
       
-      this.isConnected = false;
-      this.isPlaying   = false;
+      this.isPlaying = false;
       this.execId = 0;
       this.execCallbacks = {};
 
-      this.sys = new SoundSystem(this);
+      this.sys = new SoundSystem(this, opts);
       this.sampleRate = this.sys.sampleRate;
       this.channels   = this.sys.channels;
       this.strmLength = this.sys.strmLength;
@@ -186,6 +183,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
         syncItems[1] = 0;
       }, false);
     }
+    CoffeeColliderImpl.prototype.init = function() {
+      this.sys.init();
+    };
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -295,11 +295,17 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       };
       xhr.send();
     };
+    CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
+      if (this.sys.api.type === "Web Audio API") {
+        return [ this.sys.api.context, this.sys.api.jsNode ];
+      }
+      return [];
+    };
     return CoffeeColliderImpl;
   })();
   
   commands["/connect"] = function() {
-    this.isConnected = true;
+    this.init();
     // if the server in the local
     this.sendToClient([
       "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
@@ -354,11 +360,11 @@ define('cc/common/soundsystem', function(require, exports, module) {
   var AudioAPI;
   
   var SoundSystem = (function() {
-    function SoundSystem(owner) {
+    function SoundSystem(owner, opts) {
       this.owner = owner;
       this.sampleRate = 44100;
       this.channels   = 2;
-      this.api = new AudioAPI(this);
+      this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
       this.strmLength = 1024;
@@ -369,6 +375,9 @@ define('cc/common/soundsystem', function(require, exports, module) {
       this.syncItems = new Float32Array(5);
       this.isPlaying = false;
     }
+    SoundSystem.prototype.init = function() {
+      this.api.init();
+    };
     SoundSystem.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -392,13 +401,15 @@ define('cc/common/soundsystem', function(require, exports, module) {
   
   if (AudioContext) {
     AudioAPI = (function() {
-      function WebAudioAPI(sys) {
+      function WebAudioAPI(sys, opts) {
         this.sys = sys;
-        this.context = new AudioContext();
+        this.context = opts.AudioContext || new AudioContext();
         this.sampleRate = this.context.sampleRate;
         this.channels   = 2;
+        this.type = "Web Audio API";
+        this.delegate = !!opts.AudioContext;
       }
-      WebAudioAPI.prototype.play = function() {
+      WebAudioAPI.prototype.init = function() {
         var sys = this.sys;
         var onaudioprocess;
         var strmLength  = sys.strmLength;
@@ -419,13 +430,19 @@ define('cc/common/soundsystem', function(require, exports, module) {
         this.bufSrc = this.context.createBufferSource();
         this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
         this.jsNode.onaudioprocess = onaudioprocess;
+      };
+      WebAudioAPI.prototype.play = function() {
         this.bufSrc.noteOn(0);
         this.bufSrc.connect(this.jsNode);
-        this.jsNode.connect(this.context.destination);
+        if (!this.delegate) {
+          this.jsNode.connect(this.context.destination);
+        }
       };
       WebAudioAPI.prototype.pause = function() {
         this.bufSrc.disconnect();
-        this.jsNode.disconnect();
+        if (!this.delegate) {
+          this.jsNode.disconnect();
+        }
       };
       WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
         buffer = this.context.createBuffer(buffer, false);
@@ -457,11 +474,16 @@ define('cc/common/soundsystem', function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.type = "Audio Data API";
       }
+      AudioDataAPI.prototype.init = function() {
+        this.audio = new Audio();
+        this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
+      };
       AudioDataAPI.prototype.play = function() {
         var sys = this.sys;
-        var audio = new Audio();
-        var interleaved = new Float32Array(sys.strmLength * sys.channels);
+        var audio = this.audio;
+        var interleaved = this.interleaved;
         var msec = (sys.strmLength / sys.sampleRate) * 1000;
         var written = 0;
         var start = Date.now();
@@ -500,7 +522,10 @@ define('cc/common/soundsystem', function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.type = "Fallback";
       }
+      FallbackAudioAPI.prototype.init = function() {
+      };
       FallbackAudioAPI.prototype.play = function() {
         if (fallback.play) {
           this.play = fallback.play;
@@ -2625,23 +2650,25 @@ define('cc/client/node', function(require, exports, module) {
   })();
   
   var Synth = (function() {
-    function Synth(def, target, args, addAction) {
+    function Synth(target, addAction, def, args) {
       Node.call(this);
       this.klassName = "Synth";
       this.params = def.specs.params;
+      args = args || {};
       if (target) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
           cc.client.pushCommand([
-            "/s_new", def._defId, that.nodeId, addAction, target.nodeId
+            "/s_new", that.nodeId, addAction, target.nodeId, def._defId
           ]);
+          that._set(args);
         });
       }
     }
     fn.extend(Synth, Node);
-    
-    Synth.prototype.set = fn.sync(function(args) {
+
+    Synth.prototype._set = function(args) {
       var params = this.params;
       var controls = [];
       if (utils.isDict(args)) {
@@ -2687,7 +2714,9 @@ define('cc/client/node', function(require, exports, module) {
           "/n_set", this.nodeId, controls
         ]);
       }
-    });
+    };
+    
+    Synth.prototype.set = fn.sync(Synth.prototype._set);
     
     return Synth;
   })();
@@ -2761,7 +2790,7 @@ define('cc/client/node', function(require, exports, module) {
       } finally {
         ugen.setSynthDef(null);
       }
-
+      // console.log(children);
       var consts = [];
       children.forEach(function(x) {
         if (x.inputs) {
@@ -2776,6 +2805,7 @@ define('cc/client/node', function(require, exports, module) {
       var ugenlist = topoSort(children).filter(function(x) {
         return !(typeof x === "number" || x instanceof ugen.OutputProxy);
       });
+      // console.log(ugenlist);
       var defs = ugenlist.map(function(x) {
         var inputs = [];
         if (x.inputs) {
@@ -2803,6 +2833,7 @@ define('cc/client/node', function(require, exports, module) {
         params: params,
       };
       this.specs = specs;
+      // console.log(specs);
       cc.client.pushCommand([
         "/s_def", this._defId, JSON.stringify(specs)
       ]);
@@ -2812,7 +2843,6 @@ define('cc/client/node', function(require, exports, module) {
     SynthDef.prototype.play = fn(function() {
       var target, args, addAction;
       var i = 0;
-      target = args;
       if (arguments[i] instanceof Node) {
         target = arguments[i++];
       } else {
@@ -2838,15 +2868,15 @@ define('cc/client/node', function(require, exports, module) {
       }
       switch (addAction) {
       case "addToHead":
-        return SynthInterface.head(this, target, args);
+        return SynthInterface.head(target, this, args);
       case "addToTail":
-        return SynthInterface.tail(this, target, args);
+        return SynthInterface.tail(target, this, args);
       case "addBefore":
-        return SynthInterface.before(this, target, args);
+        return SynthInterface.before(target, this, args);
       case "addAfter":
-        return SynthInterface.after(this, target, args);
+        return SynthInterface.after(target, this, args);
       default:
-        return SynthInterface.head(this, target, args);
+        return SynthInterface.head(target, this, args);
       }
     }).multiCall().build();
 
@@ -2866,7 +2896,7 @@ define('cc/client/node', function(require, exports, module) {
       };
       return function(list) {
         var checked = [];
-        list.forEach(function(x) {
+        list.slice().forEach(function(x) {
           if (x instanceof ugen.Out) {
             checked.push(x);
             x.inputs.forEach(function(x) {
@@ -3016,7 +3046,7 @@ define('cc/client/node', function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, 3);
+    return new Synth(node, 3, def, args);
   };
   SynthInterface.before = function() {
     var node, def, args;
@@ -3035,7 +3065,7 @@ define('cc/client/node', function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, 2);
+    return new Synth(node, 2, def, args);
   };
   SynthInterface.head = function() {
     var node, def, args;
@@ -3054,7 +3084,7 @@ define('cc/client/node', function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, 0);
+    return new Synth(node, 0, def, args);
   };
   SynthInterface.tail = function() {
     var node, def, args;
@@ -3073,7 +3103,7 @@ define('cc/client/node', function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, 1);
+    return new Synth(node, 1, def, args);
   };
   SynthInterface.replace = function(node, def, args) {
     if (!(node instanceof Node)) {
@@ -3082,7 +3112,7 @@ define('cc/client/node', function(require, exports, module) {
     if (!(def instanceof SynthDef)) {
       throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
     }
-    return new Synth(def, node, args||{}, 4);
+    return new Synth(node, 4, def, args);
   };
   
   var reset = function() {
@@ -3121,9 +3151,9 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   var addToSynthDef = null;
   
   var UGen = (function() {
-    function UGen(name, tag) {
+    function UGen(name) {
       this.klassName = name;
-      this.tag  = tag || "";
+      this.tag  = "";
       this.rate = 2;
       this.signalRange = 2;
       this.specialIndex = 0;
@@ -3235,11 +3265,28 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   })();
 
   var out_ctor = function(rate) {
-    return function(bus, channelsArray) {
+    function ctor(bus, channelsArray) {
       if (!(bus instanceof UGen || typeof bus === "number")) {
         throw new TypeError("Out: arguments[0] should be an UGen or a number.");
       }
-      this.init.apply(this, [rate, bus].concat(channelsArray));
+      if (!Array.isArray(channelsArray)) {
+        channelsArray = [ channelsArray ];
+      }
+      channelsArray = channelsArray.filter(function(x) {
+        return x !== 0;
+      });
+      if (channelsArray.length) {
+        UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
+      }
+    }
+    return function(bus, channelsArray) {
+      if (Array.isArray(bus)) {
+        bus.forEach(function(bus) {
+          ctor(bus, channelsArray);
+        });
+      } else {
+        ctor(bus, channelsArray);
+      }
       return 0; // Out has no output
     };
   };
@@ -3249,13 +3296,13 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(2),
       multiCall: false,
-      Klass: Out
+      Klass: null
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(1),
       multiCall: false,
-      Klass: Out
+      Klass: null
     }
   };
 
@@ -3293,6 +3340,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     var klass = global[name] = function() {
       return new UGen(name);
     };
+    
     Object.keys(payload).forEach(function(key) {
       var setting   = payload[key];
       var defaults  = setting.defaults + ",tag";
@@ -3301,15 +3349,31 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
       if (multiCall === undefined) {
         multiCall = true;
       }
-      var Klass     = setting.Klass || UGen;
-      klass[key] = fn(function() {
-        var args = slice.call(arguments, 0, arguments.length - 1);
-        var tag  = arguments[arguments.length - 1];
-        return ctor.apply(new Klass(name, tag), args);
-      }).defaults(defaults).multiCall(multiCall).build();
+      if (setting.Klass !== null) {
+        var Klass = setting.Klass || UGen;
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(new Klass(name), args);
+          if (instance !== null && instance !== undefined) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      } else {
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(null, args);
+          if (instance !== null && instance !== undefined) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      }
     });
   };
-
+  
   cc.once("basic_ops.js", function(payload) {
     UnaryOpUGen  = payload.UnaryOpUGen;
     BinaryOpUGen = payload.BinaryOpUGen;
@@ -3474,10 +3538,16 @@ define('cc/client/bop', function(require, exports, module) {
   };
   var setupUGenFunction = function(selector) {
     return function(b) {
-      return new BinaryOpUGen().init(selector, this, b);
+      var a = this;
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return new BinaryOpUGen().init(selector, a, b);
+        });
+      }
+      return new BinaryOpUGen().init(selector, a, b);
     };
   };
-
+  
   var setup = function(selector, func, ugenSelector) {
     ugenSelector = ugenSelector || selector;
     fn.definePrototypeProperty(
@@ -5590,7 +5660,7 @@ define('cc/server/node', function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, defId, node, args, addAction, heap) {
+    function Synth(nodeId, node, addAction, defId, args, heap) {
       Node.call(this, nodeId, heap);
       if (heap) {
         var specs = heap.defs[defId];
@@ -5875,13 +5945,13 @@ define('cc/server/commands', function(require, exports, module) {
     this.defs[defId] = specs;
   };
   commands["/s_new"] = function(msg) {
-    var defId        = msg[1]|0;
-    var nodeId       = msg[2]|0;
-    var addAction    = msg[3]|0;
-    var targetNodeId = msg[4]|0;
+    var nodeId       = msg[1]|0;
+    var addAction    = msg[2]|0;
+    var targetNodeId = msg[3]|0;
+    var defId        = msg[4]|0;
     var target = this.nodes[targetNodeId];
     if (target) {
-      this.nodes[nodeId] = new node.Synth(nodeId, defId, target, {}, addAction, this);
+      this.nodes[nodeId] = new node.Synth(nodeId, target, addAction, defId, {}, this);
     }
   };
   commands["/b_new"] = function(msg) {
