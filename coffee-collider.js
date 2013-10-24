@@ -44,11 +44,15 @@ define('cc/loader', function(require, exports, module) {
   var cc = require("./cc");
 
   if (typeof document !== "undefined") {
-    cc.context = "client";
-    require("./client/installer").install();
+    cc.context = "window";
+    require("./exports/installer").install();
   } else if (typeof WorkerLocation !== "undefined") {
-    cc.context = "server";
+    cc.context = "worker";
+    require("./client/installer").install();
     require("./server/installer").install();
+    cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
+    cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
+    cc.server.connect();
   }
   
   module.exports = {
@@ -66,10 +70,10 @@ define('cc/cc', function(require, exports, module) {
   };
 
 });
-define('cc/client/installer', function(require, exports, module) {
+define('cc/exports/installer', function(require, exports, module) {
 
   var cc = require("../cc");
-  var CoffeeCollider = require("./coffee_collider").CoffeeCollider;
+  var CoffeeCollider = require("./coffeecollider").CoffeeCollider;
 
   if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
@@ -97,150 +101,135 @@ define('cc/client/installer', function(require, exports, module) {
   };
 
 });
-define('cc/client/coffee_collider', function(require, exports, module) {
+define('cc/exports/coffeecollider', function(require, exports, module) {
 
   var cc = require("../cc");
-  var SynthClient = require("./client").SynthClient;
-  var slice = [].slice;
-
+  var SoundSystem = require("../common/soundsystem").SoundSystem;
+  var Compiler = require("./compiler").Compiler;
+  var unpack   = require("../common/pack").unpack;
+  var commands = {};
+  var slice    = [].slice;
+  
+  var instance = null;
+  
   var CoffeeCollider = (function() {
     function CoffeeCollider() {
+      if (instance) {
+        return instance;
+      }
+      instance = this;
       this.version    = cc.version;
-      this.client = new SynthClient();
-      this.sampleRate = this.client.sampleRate;
-      this.channels   = this.client.channels;
-      this.compiler   = this.client.compiler;
+      this.impl       = new CoffeeColliderImpl();
+      this.sampleRate = this.impl.sampleRate;
+      this.channels   = this.impl.channels;
+      this.compiler   = this.impl.compiler;
     }
-    CoffeeCollider.prototype.destroy = function() {
-      if (this.client) {
-        this.client.destroy();
-        delete this.client;
-        delete this.sampleRate;
-        delete this.channels;
-      }
-      return this;
-    };
     CoffeeCollider.prototype.play = function() {
-      if (this.client) {
-        this.client.play();
-      }
+      this.impl.play();
       return this;
     };
     CoffeeCollider.prototype.reset = function() {
-      if (this.client) {
-        this.client.reset();
-      }
+      this.impl.reset();
       return this;
     };
     CoffeeCollider.prototype.pause = function() {
-      if (this.client) {
-        this.client.pause();
-      }
+      this.impl.pause();
       return this;
     };
     CoffeeCollider.prototype.execute = function() {
-      if (this.client) {
-        this.client.execute.apply(this.client, arguments);
-      }
+      this.impl.execute.apply(this.impl, arguments);
       return this;
     };
     CoffeeCollider.prototype.getStream = function() {
-      if (this.client) {
-        return this.client.strm;
-      }
+      return this.impl.strm;
     };
     CoffeeCollider.prototype.importScripts = function() {
-      if (this.client) {
-        this.client.importScripts(slice.call(arguments));
-      }
+      this.impl.importScripts(slice.call(arguments));
       return this;
     };
     return CoffeeCollider;
   })();
 
-  module.exports = {
-    CoffeeCollider: CoffeeCollider
-  };
-
-});
-define('cc/client/client', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var SoundSystem = require("./sound_system").SoundSystem;
-  var Compiler = require("./compiler").Compiler;
-  var unpack = require("../common/pack").unpack;
-
-  var commands = {};
-  
-  var SynthClient = (function() {
-    function SynthClient() {
+  var CoffeeColliderImpl = (function() {
+    function CoffeeColliderImpl() {
       var that = this;
       this.worker = new Worker(cc.coffeeColliderPath);
       this.worker.addEventListener("message", function(e) {
-        var msg = e.data;
-        if (msg instanceof Float32Array) {
-            that.strmList[that.strmListWriteIndex] = msg;
-            that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
-        } else {
-          that.recv(msg);
-        }
+        that.recvFromClient(e.data);
       });
       this.compiler = new Compiler();
       
       this.isConnected = false;
+      this.isPlaying   = false;
       this.execId = 0;
       this.execCallbacks = {};
 
-      this.sys = SoundSystem.getInstance();
-      this.sys.append(this);
-
+      this.sys = new SoundSystem(this);
       this.sampleRate = this.sys.sampleRate;
       this.channels   = this.sys.channels;
       this.strmLength = this.sys.strmLength;
       this.bufLength  = this.sys.bufLength;
-      
-      this.isPlaying = false;
       this.strm = new Float32Array(this.strmLength * this.channels);
+      this.strmList = new Array(8);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      
+      var syncItems = this.syncItems = new Float32Array(5);
+      window.addEventListener("mousemove", function(e) {
+        syncItems[2] = e.pageX / window.innerWidth;
+        syncItems[3] = e.pageY / window.innerHeight;
+      }, false);
+      window.addEventListener("mousedown", function() {
+        syncItems[1] = 1;
+      }, false);
+      window.addEventListener("mouseup", function() {
+        syncItems[1] = 0;
+      }, false);
     }
-    SynthClient.prototype.destroy = function() {
-      this.sys.remove(this);
-      delete this.worker;
-    };
-    SynthClient.prototype.play = function() {
+    CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
         var strm = this.strm;
         for (var i = 0, imax = strm.length; i < imax; ++i) {
           strm[i] = 0;
         }
-        this.strmList = new Array(8);
+        this.strmList.splice(0);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         this.sys.play();
-        this.send(["/play", this.sys.syncCount]);
+        this.sendToClient(["/play"]);
       }
     };
-    SynthClient.prototype.reset = function() {
-      this.send(["/reset"]);
+    CoffeeColliderImpl.prototype.reset = function() {
+      this.execId = 0;
+      this.execCallbacks = {};
+      var strm = this.strm;
+      for (var i = 0, imax = strm.length; i < imax; ++i) {
+        strm[i] = 0;
+      }
+      this.strmList.splice(0);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.sendToClient(["/reset"]);
     };
-    SynthClient.prototype.pause = function() {
+    CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
-        this.isPlaying = false;
+        this.sendToClient(["/pause"]);
         this.sys.pause();
-        this.send(["/pause"]);
+        this.isPlaying = false;
       }
     };
-    SynthClient.prototype.process = function() {
+    CoffeeColliderImpl.prototype.process = function() {
       var strm = this.strmList[this.strmListReadIndex];
       if (strm) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this.strm.set(strm);
       }
+      this.sendToClient(this.syncItems);
     };
-    SynthClient.prototype.execute = function(code) {
+    CoffeeColliderImpl.prototype.execute = function(code) {
       var append, callback;
       var i = 1;
-
       if (typeof arguments[i] === "boolean") {
         append = arguments[i++];
       } else {
@@ -249,42 +238,44 @@ define('cc/client/client', function(require, exports, module) {
       if (typeof arguments[i] === "function") {
         callback = arguments[i++];
       }
-      
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code, append, this.compiler.data, !!callback]);
+        this.sendToClient([
+          "/execute", this.execId, code, append, this.compiler.data, !!callback
+        ]);
         if (callback) {
           this.execCallbacks[this.execId] = callback;
         }
         this.execId += 1;
       }
     };
-    SynthClient.prototype.importScripts = function(list) {
-      this.send(["/importScripts", list]);
+    CoffeeColliderImpl.prototype.importScripts = function(list) {
+      this.sendToClient(["/importScripts", list]);
     };
-    SynthClient.prototype.send = function(msg) {
+    CoffeeColliderImpl.prototype.sendToClient = function(msg) {
       this.worker.postMessage(msg);
     };
-    SynthClient.prototype.recv = function(msg) {
-      if (!msg) {
+    CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.strmList[this.strmListWriteIndex] = msg;
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
         return;
       }
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
       }
     };
-    SynthClient.prototype.sync = function(syncItems) {
-      this.send(syncItems);
-    };
-    SynthClient.prototype.readAudioFile = function(path, callback) {
-      var sys = this.sys;
-      if (!sys.api.decodeAudioFile) {
+    CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
+      var api = this.sys.api;
+      if (!api.decodeAudioFile) {
         callback(null);
         return;
       }
       var decode = function(buffer) {
-        sys.api.decodeAudioFile(buffer, function(buffer) {
+        api.decodeAudioFile(buffer, function(buffer) {
           callback(buffer);
         });
       };
@@ -304,14 +295,17 @@ define('cc/client/client', function(require, exports, module) {
       };
       xhr.send();
     };
-    return SynthClient;
+    return CoffeeColliderImpl;
   })();
   
   commands["/connect"] = function() {
     this.isConnected = true;
-    this.send([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.sys.syncCount
+    // if the server in the local
+    this.sendToClient([
+      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
     ]);
+    // else if using websocket-server
+    // TODO:
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
@@ -329,7 +323,7 @@ define('cc/client/client', function(require, exports, module) {
     var that = this;
     var requestId = msg[2];
     this.readAudioFile(msg[1], function(buffer) {
-      that.send(["/buffer/response", buffer, requestId]);
+      that.sendToClient(["/buffer/response", buffer, requestId]);
     });
   };
   commands["/console/log"] = function(msg) {
@@ -349,128 +343,48 @@ define('cc/client/client', function(require, exports, module) {
   };
   
   module.exports = {
-    SynthClient: SynthClient
+    CoffeeCollider: CoffeeCollider
   };
 
 });
-define('cc/client/sound_system', function(require, exports, module) {
+define('cc/common/soundsystem', function(require, exports, module) {
 
   var cc = require("../cc");
   
   var AudioAPI;
   
   var SoundSystem = (function() {
-    function SoundSystem() {
+    function SoundSystem(owner) {
+      this.owner = owner;
       this.sampleRate = 44100;
       this.channels   = 2;
       this.api = new AudioAPI(this);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
-      this.colliders  = [];
-      this.process    = process0;
       this.strmLength = 1024;
       this.bufLength  = 64;
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.clear = new Float32Array(this.strmLength * this.channels);
       this.syncCount = 0;
-      // syncCount, mouse.button, mouse.pos.x, mouse.pox.y, keyCode
       this.syncItems = new Float32Array(5);
       this.isPlaying = false;
-
-      var syncItems = this.syncItems;
-      window.addEventListener("mousemove", function(e) {
-        syncItems[2] = e.pageX / window.innerWidth;
-        syncItems[3] = e.pageY / window.innerHeight;
-      }, false);
-      window.addEventListener("mousedown", function() {
-        syncItems[1] = 1;
-      }, false);
-      window.addEventListener("mouseup", function() {
-        syncItems[1] = 0;
-      }, false);
     }
-    var instance = null;
-    SoundSystem.getInstance = function() {
-      if (!instance) {
-        instance = new SoundSystem();
-      }
-      return instance;
-    };
-    SoundSystem.prototype.append = function(cc) {
-      var index = this.colliders.indexOf(cc);
-      if (index === -1) {
-        this.colliders.push(cc);
-        if (this.colliders.length === 1) {
-          this.process = process1;
-        } else {
-          this.process = processN;
-        }
-      }
-    };
-    SoundSystem.prototype.remove = function(cc) {
-      var index = this.colliders.indexOf(cc);
-      if (index !== -1) {
-        this.colliders.splice(index, 1);
-      }
-      if (this.colliders.length === 1) {
-        this.process = process1;
-      } else if (this.colliders.length === 0) {
-        this.process = process0;
-      } else {
-        this.process = processN;
-      }
-    };
     SoundSystem.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        this.syncCount = 0;
         this.api.play();
       }
     };
     SoundSystem.prototype.pause = function() {
       if (this.isPlaying) {
-        var flag = this.colliders.every(function(cc) {
-          return !cc.isPlaying;
-        });
-        if (flag) {
-          this.isPlaying = false;
-          this.api.pause();
-        }
+        this.api.pause();
+        this.isPlaying = false;
       }
     };
-
-    var process0 = function() {
-      this.strm.set(this.clear);
+    SoundSystem.prototype.process = function() {
+      this.owner.process();
+      this.strm.set(this.owner.strm);
     };
-    var process1 = function() {
-      var cc = this.colliders[0];
-      this.syncItems[0] = this.syncCount;
-      cc.process();
-      this.strm.set(cc.strm);
-      cc.sync(this.syncItems);
-      this.syncCount++;
-    };
-    var processN = function() {
-      var strm = this.strm;
-      var strmLength = strm.length;
-      var colliders  = this.colliders;
-      var syncItems  = this.syncItems;
-      var cc, tmp;
-      syncItems[0] = this.syncCount;
-      strm.set(this.clear);
-      for (var i = 0, imax = colliders.length; i < imax; ++i) {
-        cc = colliders[i];
-        cc.process();
-        tmp = cc.strm;
-        for (var j = 0; j < strmLength; j += 8) {
-          strm[j  ] += tmp[j  ]; strm[j+1] += tmp[j+1]; strm[j+2] += tmp[j+2]; strm[j+3] += tmp[j+3];
-          strm[j+4] += tmp[j+4]; strm[j+5] += tmp[j+5]; strm[j+6] += tmp[j+6]; strm[j+7] += tmp[j+7];
-        }
-        cc.sync(syncItems);
-      }
-      this.syncCount++;
-    };
-    
     return SoundSystem;
   })();
 
@@ -484,7 +398,6 @@ define('cc/client/sound_system', function(require, exports, module) {
         this.sampleRate = this.context.sampleRate;
         this.channels   = 2;
       }
-
       WebAudioAPI.prototype.play = function() {
         var sys = this.sys;
         var onaudioprocess;
@@ -602,7 +515,6 @@ define('cc/client/sound_system', function(require, exports, module) {
       };
       
       var fallback = {};
-      
       window.addEventListener("load", function() {
         var swfSrc  = cc.rootPath + "coffee-collider-fallback.swf";
         var swfName = swfSrc + "?" + Date.now();
@@ -656,7 +568,6 @@ define('cc/client/sound_system', function(require, exports, module) {
           };
         };
       });
-      
       return FallbackAudioAPI;
     })();
   }
@@ -666,7 +577,7 @@ define('cc/client/sound_system', function(require, exports, module) {
   };
 
 });
-define('cc/client/compiler', function(require, exports, module) {
+define('cc/exports/compiler', function(require, exports, module) {
 
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
@@ -1486,11 +1397,11 @@ define('cc/common/pack', function(require, exports, module) {
   };
 
 });
-define('cc/server/installer', function(require, exports, module) {
+define('cc/client/installer', function(require, exports, module) {
   
   var install = function() {
     require("./object").install();
-    require("./server").install();
+    require("./client").install();
     require("./bop").install();
     require("./uop").install();
     require("./buffer").install();
@@ -1498,15 +1409,14 @@ define('cc/server/installer', function(require, exports, module) {
     require("./sched").install();
     require("./scale").install();
     require("./ugen/installer").install();
-    require("./unit/installer").install();
   };
   
   module.exports = {
     install : install
-    };
+  };
 
 });
-define('cc/server/object', function(require, exports, module) {
+define('cc/client/object', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
@@ -1655,12 +1565,14 @@ define('cc/server/object', function(require, exports, module) {
   };
 
 });
-define('cc/server/cc', function(require, exports, module) {
+define('cc/client/cc', function(require, exports, module) {
 
   var _cc = require("../cc");
   var Emitter = require("../common/emitter").Emitter;
   
-  Emitter.bind(_cc);
+  if (!_cc.emit) {
+    Emitter.bind(_cc);
+  }
   
   module.exports = _cc;
 
@@ -1744,7 +1656,7 @@ define('cc/common/emitter', function(require, exports, module) {
   };
 
 });
-define('cc/server/fn', function(require, exports, module) {
+define('cc/client/fn', function(require, exports, module) {
 
   var cc = require("./cc");
   var utils = require("./utils");
@@ -1862,7 +1774,7 @@ define('cc/server/fn', function(require, exports, module) {
   
   fn.sync = function(func) {
     return function() {
-      cc.server.timeline.push(this, func, slice.call(arguments));
+      cc.client.timeline.push(this, func, slice.call(arguments));
       return this;
     };
   };
@@ -1879,7 +1791,7 @@ define('cc/server/fn', function(require, exports, module) {
   module.exports = fn;
 
 });
-define('cc/server/utils', function(require, exports, module) {
+define('cc/client/utils', function(require, exports, module) {
 
   var isDict = function(obj) {
     return !!(obj && obj.constructor === Object);
@@ -1942,124 +1854,156 @@ define('cc/server/utils', function(require, exports, module) {
   };
 
 });
-define('cc/server/server', function(require, exports, module) {
-
+define('cc/client/client', function(require, exports, module) {
+  
   var cc = require("./cc");
-  var Group    = require("./node").Group;
+  var fn = require("./fn");
+  var pack  = require("../common/pack").pack;
+  var Timer    = require("../common/timer").Timer;
   var Timeline = require("./sched").Timeline;
+  var node     = require("./node");
   var buffer   = require("./buffer");
-  var pack = require("../common/pack").pack;
-  
   var commands = {};
-  var twopi = 2 * Math.PI;
   
-  var SynthServer = (function() {
-    function SynthServer() {
-      this.klassName = "SynthServer";
-      this.sysSyncCount = 0;
-      this.syncItems = new Float32Array(5);
-      this.timeline = new Timeline(this);
-      this.timerId = 0;
+  var SynthClient = (function() {
+    function SynthClient() {
+      this.klassName = "SynthClient";
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      this.userId     = 0;
+      this.timer      = new Timer();
+      this.timeline   = new Timeline(this);
+      this.rootNode   = new node.Group();
+      this.commandList = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
     }
-    SynthServer.prototype.send = function(msg) {
+    SynthClient.prototype.sendToIF = function(msg) {
       postMessage(msg);
     };
-    SynthServer.prototype.recv = function(msg) {
-      if (!msg) {
-        return;
-      }
+    SynthClient.prototype.recvFromIF = function(msg) {
       var func = commands[msg[0]];
       if (func) {
         func.call(this, msg);
       }
     };
-    SynthServer.prototype.reset = function() {
-      buffer.reset();
-      this.timeline.reset();
-      this.rootNode.prevNode = null;
-      this.rootNode.nextNode = null;
-      this.rootNode.headNode = null;
-      this.rootNode.tailNode = null;
+    SynthClient.prototype.sendToServer = function() {
+      // should be overridden
     };
-    SynthServer.prototype.getRate = function(rate) {
-      return this.rates[rate] || this.rates[1];
+    SynthClient.prototype.recvFromServer = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.sendToIF(msg);
+        return;
+      }
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
+      }
     };
-    SynthServer.prototype.requestBuffer = function(path, callback) {
+    SynthClient.prototype.pushCommand = function(cmd) {
+      this.commandList.push(cmd);
+    };
+    SynthClient.prototype.play = function() {
+    };
+    SynthClient.prototype.pause = function() {
+    };
+    SynthClient.prototype.reset = function() {
+    };
+    SynthClient.prototype.requestBuffer = function() {
+    };
+    SynthClient.prototype.process = function() {
+    };
+    return SynthClient;
+  })();
+
+  var WorkerSynthClient = (function() {
+    function WorkerSynthClient() {
+      SynthClient.call(this);
+    }
+    fn.extend(WorkerSynthClient, SynthClient);
+    WorkerSynthClient.prototype.requestBuffer = function(path, callback) {
       if (!(typeof path === "string" && typeof callback === "function")) {
         return;
       }
       var requestId = this.bufferRequestId++;
       this.bufferRequestCallback[requestId] = callback;
-      this.send(["/buffer/request", path, requestId]);
+      this.sendToIF(["/buffer/request", path, requestId]);
     };
-    SynthServer.prototype.onaudioprocess = function() {
-      if (this.syncCount - this.sysSyncCount >= 4) {
+    WorkerSynthClient.prototype.play = function(msg) {
+      if (!this.timer.isRunning) {
+        this.processStart = Date.now();
+        this.processDone  = 0;
+        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
+        this.timer.start(this.process.bind(this), this.processInterval * 0.5);
+        this.timeline.play();
+        this.sendToServer(msg);
+      }
+    };
+    WorkerSynthClient.prototype.pause = function(msg) {
+      if (this.timer.isRunning) {
+        this.timeline.pause();
+        this.timer.stop();
+        this.sendToServer(msg);
+      }
+    };
+    WorkerSynthClient.prototype.reset = function(msg) {
+      buffer.reset();
+      node.reset();
+      this.timeline.reset();
+      this.sendToServer(msg);
+    };
+    WorkerSynthClient.prototype.process = function() {
+      if (this.processDone - 25 > Date.now() - this.processStart) {
         return;
       }
-      var strm = this.strm;
-      var strmLength = this.strmLength;
-      var root = this.rootNode;
-      var bufLength = this.bufLength;
-      var offset = 0;
-      var busBuffer = this.busBuffer;
-      var busClear  = this.busClear;
-      var busOutL  = this.busOutL;
-      var busOutR  = this.busOutR;
+      var userId   = this.userId;
       var timeline = this.timeline;
-      var n = strmLength / bufLength;
+      var server   = cc.server;
+      var n = this.strmLength / this.bufLength;
+      server.preprocess();
       while (n--) {
         timeline.process();
-        busBuffer.set(busClear);
-        root._process(bufLength);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
-        offset += bufLength;
+        this.sendToServer([
+          "/command", userId, [ this.commandList ]
+        ]);
+        this.commandList = [];
+        server.process();
       }
-      this.send(strm);
-      this.syncCount += 1;
+      server.postprocess();
+      this.processDone += this.processInterval;
     };
-    return SynthServer;
+    return WorkerSynthClient;
   })();
 
+  commands["/connect"] = function(msg) {
+    var sampleRate = msg[1]|0;
+    var channels   = msg[2]|0;
+    var strmLength = msg[3]|0;
+    var bufLength  = msg[4]|0;
+    this.userId = msg[5]|0;
+    this.sendToIF([
+      "/connect", sampleRate, channels, strmLength, bufLength
+    ]);
+  };
   commands["/init"] = function(msg) {
     this.sampleRate = msg[1];
     this.channels   = msg[2];
     this.strmLength = msg[3];
     this.bufLength  = msg[4];
-    this.syncCount  = msg[5];
-    this.strm = new Float32Array(this.strmLength * this.channels);
-    this.rates = {};
-    this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
-    this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
-    this.rootNode = new Group();
-    var busLength  = this.bufLength * 128 + 4096;
-    var busBuffer  = new Float32Array(busLength);
-    var bufLength  = this.bufLength;
-    var bufLength4 = this.bufLength << 2;
-    this.busBuffer = busBuffer;
-    this.busClear  = new Float32Array(busLength);
-    this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
-    this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
+    this.sendToServer(msg);
   };
   commands["/play"] = function(msg) {
-    if (this.timerId === 0) {
-      var onaudioprocess = this.onaudioprocess.bind(this);
-      this.timerId = setInterval(onaudioprocess, 10);
-      this.syncCount = msg[1];
-      this.timeline.play();
-    }
+    this.play(msg);
   };
-  commands["/pause"] = function() {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = 0;
-      this.timeline.pause();
-    }
+  commands["/pause"] = function(msg) {
+    this.pause(msg);
   };
-  commands["/reset"] = function() {
-    this.reset();
+  commands["/reset"] = function(msg) {
+    this.reset(msg);
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -2068,12 +2012,12 @@ define('cc/server/server', function(require, exports, module) {
     var data     = msg[4];
     var callback = msg[5];
     if (!append) {
-      this.reset();
+      this.reset(["/reset"]);
     }
     global.DATA = data;
     var result = eval.call(global, code);
     if (callback) {
-      this.send(["/execute", execId, pack(result)]);
+      this.sendToIF(["/execute", execId, pack(result)]);
     }
   };
   commands["/buffer/response"] = function(msg) {
@@ -2088,40 +2032,33 @@ define('cc/server/server', function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-
-  var Rate = (function() {
-    function Rate(sampleRate, bufLength) {
-      this.klassName = "Rate";
-      this.sampleRate = sampleRate;
-      this.sampleDur  = 1 / sampleRate;
-      this.radiansPerSample = twopi / sampleRate;
-      this.bufLength   = bufLength;
-      this.bufDuration = bufLength / sampleRate;
-      this.bufRate = 1 / this.bufDuration;
-      this.slopeFactor = 1 / bufLength;
-      this.filterLoops  = (bufLength / 3)|0;
-      this.filterRemain = (bufLength % 3)|0;
-      if (this.filterLoops === 0) {
-        this.filterSlope = 0;
-      } else {
-        this.filterSlope = 1 / this.filterLoops;
-      }
+  commands["/n_end"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var n = node.get(nodeId);
+    if (n) {
+      n.emit("end");
     }
-    return Rate;
-  })();
+  };
+  commands["/n_done"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var tag    = msg[2];
+    var n = node.get(nodeId);
+    if (n) {
+      n.emit("done", tag);
+    }
+  };
   
   var install = function() {
-    var server = cc.server = new SynthServer();
+    var client = cc.client = new WorkerSynthClient();
     addEventListener("message", function(e) {
       var msg = e.data;
       if (msg instanceof Float32Array) {
-        server.sysSyncCount = msg[0]|0;
-        server.syncItems.set(msg);
+        msg[0] = client.userId;
+        client.sendToServer(msg);
       } else {
-        server.recv(msg);
+        client.recvFromIF(msg);
       }
     });
-    server.send(["/connect"]);
     if (typeof global.console === "undefined") {
       global.console = (function() {
         var console = {};
@@ -2130,7 +2067,7 @@ define('cc/server/server', function(require, exports, module) {
             var args = Array.prototype.slice.call(arguments).map(function(x) {
               return pack(x);
             });
-            server.send(["/console/" + method, args]);
+            client.sendToIF(["/console/" + method, args]);
           };
         });
         return console;
@@ -2139,1240 +2076,39 @@ define('cc/server/server', function(require, exports, module) {
   };
   
   module.exports = {
-    SynthServer: SynthServer,
-    Rate: Rate,
     install: install
   };
 
 });
-define('cc/server/node', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var fn = require("./fn");
-  var utils = require("./utils");
-  var ugen  = require("./ugen/ugen");
-  var Unit    = require("./unit/unit").Unit;
-  var FixNum  = require("./unit/unit").FixNum;
-  var Emitter = require("../common/emitter").Emitter;
-  var slice = [].slice;
+define('cc/common/timer', function(require, exports, module) {
   
-  var graphFunc = {};
-  graphFunc[-1] = function(node) {
-    var prev;
-    if (this instanceof Group) {
-      if (this.headNode === null) {
-        this.headNode = this.tailNode = node;
-      } else {
-        prev = this.headNode.prevNode;
-        if (prev) {
-          prev.nextNode = node;
-        }
-        node.nextNode = this.headNode;
-        this.headNode.prevNode = node;
-        this.headNode = node;
+  var Timer = (function() {
+    function Timer() {
+      this.timerId = 0;
+      this.isRunning = false;
+    }
+    Timer.prototype.start = function(callback, interval) {
+      if (this.timerId) {
+        clearInterval(this.timerId);
       }
-      node.parentNode = this;
-    }
-  };
-  graphFunc[-2] = function(node) {
-    var next;
-    if (this instanceof Group) {
-      if (this.tailNode === null) {
-        this.headNode = this.tailNode = node;
-      } else {
-        next = this.tailNode.nextNode;
-        if (next) {
-          next.prevNode = node;
-        }
-        node.prevNode = this.tailNode;
-        this.tailNode.nextNode = node;
-        this.tailNode = node;
-      }
-      node.parentNode = this;
-    }
-  };
-  graphFunc[-3] = function(node) {
-    var prev = this.prevNode;
-    this.prevNode = node;
-    node.prevNode = prev;
-    if (prev) {
-      prev.nextNode = node;
-    }
-    node.nextNode = this;
-    if (this.parentNode && this.parentNode.headNode === this) {
-      this.parentNode.headNode = node;
-    }
-    node.parentNode = this.parentNode;
-  };
-  graphFunc[-4] = function(node) {
-    var next = this.nextNode;
-    this.nextNode = node;
-    node.nextNode = next;
-    if (next) {
-      next.prevNode = node;
-    }
-    node.prevNode = this;
-    if (this.parentNode && this.parentNode.tailNode === this) {
-      this.parentNode.tailNode = node;
-    }
-    node.parentNode = this.parentNode;
-  };
-  graphFunc[-5] = function(node) {
-    node.nextNode = this.nextNode;
-    node.prevNode = this.prevNode;
-    node.headNode = this.headNode;
-    node.tailNode = this.tailNode;
-    node.parentNode = this.parentNode;
-    if (this.prevNode) {
-      this.prevNode.nextNode = node;
-    }
-    if (this.nextNode) {
-      this.nextNode.prevNode = node;
-    }
-    if (this.parentNode && this.parentNode.headNode === this) {
-      this.parentNode.headNode = node;
-    }
-    if (this.parentNode && this.parentNode.tailNode === this) {
-      this.parentNode.tailNode = node;
-    }
-  };
-
-  var doneAction = {}; // TODO: correct?
-  doneAction[0] = function() {
-    // do nothing when the UGen is finished
-  };
-  doneAction[1] = function() {
-    // pause the enclosing synth, but do not free it
-    this._running = false;
-  };
-  doneAction[2] = function() {
-    // free the enclosing synth
-    free.call(this);
-  };
-  doneAction[3] = function() {
-    // free both this synth and the preceding node
-    var prev = this.prevNode;
-    if (prev) {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[4] = function() {
-    // free both this synth and the following node
-    var next = this.nextNode;
-    free.call(this);
-    if (next) {
-      free.call(next);
-    }
-  };
-  doneAction[5] = function() {
-    // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prevNode;
-    if (prev instanceof Group) {
-      g_freeAll(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[6] = function() {
-    // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.nextNode;
-    free.call(this);
-    if (next) {
-      g_freeAll(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[7] = function() {
-    // free this synth and all preceding nodes in this group
-    var next = this.parentNode.headNode;
-    if (next) {
-      var node = next;
-      while (node && node !== this) {
-        next = node.nextNode;
-        free.call(node);
-        node = next;
-      }
-    }
-    free.call(this);
-  };
-  doneAction[8] = function() {
-    // free this synth and all following nodes in this group
-    var next = this.nextNode;
-    free.call(this);
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.nextNode;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[9] = function() {
-    // free this synth and pause the preceding node
-    var prev = this.prevNode;
-    free.call(this);
-    if (prev) {
-      prev._running = false;
-    }
-  };
-  doneAction[10] = function() {
-    // free this synth and pause the following node
-    var next = this.nextNode;
-    free.call(this);
-    if (next) {
-      next._running = false;
-    }
-  };
-  doneAction[11] = function() {
-    // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prevNode;
-    if (prev instanceof Group) {
-      g_deepFree(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[12] = function() {
-    // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.nextNode;
-    free.call(this);
-    if (next) {
-      g_deepFree(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[13] = function() {
-    // free this synth and all other nodes in this group (before and after)
-    var next = this.parentNode.headNode;
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.nextNode;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[14] = function() {
-    // free the enclosing group and all nodes within it (including this synth)
-    g_deepFree(this);
-  };
-  var free = function() {
-    if (this.prevNode) {
-      this.prevNode.nextNode = this.nextNode;
-    }
-    if (this.nextNode) {
-      this.nextNode.prevNode = this.prevNode;
-    }
-    if (this.parentNode) {
-      if (this.parentNode.headNode === this) {
-        this.parentNode.headNode = this.nextNode;
-      }
-      if (this.parentNode.tailNode === this) {
-        this.parentNode.tailNode = this.prevNode;
-      }
-      this.emit("end");
-    }
-    this.prevNode = null;
-    this.nextNode = null;
-    this.parentNode = null;
-    this.blocking = false;
-  };
-  var g_freeAll = function(node) {
-    var next = node.headNode;
-    free.call(node);
-    node = next;
-    while (node) {
-      next = node.nextNode;
-      free.call(node);
-      node = next;
-    }
-  };
-  var g_deepFree = function(node) {
-    var next = node.headNode;
-    free.call(node);
-    node = next;
-    while (node) {
-      next = node.nextNode;
-      free.call(node);
-      if (node instanceof Group) {
-        g_deepFree(node);
-      }
-      node = next;
-    }
-  };
-  
-  var Node = (function() {
-    function Node() {
-      Emitter.bind(this);
-      this.klassName = "Node";
-      this.nextNode   = null;
-      this.prevNode   = null;
-      this.parentNode = null;
-      this.blocking = true;
-      this._running = true;
-    }
-    fn.extend(Node, cc.Object);
-    Node.prototype.play = fn.sync(function() {
-      this._running = true;
-    });
-    Node.prototype.pause = fn.sync(function() {
-      this._running = false;
-    });
-    Node.prototype.stop = fn.sync(function() {
-      free.call(this);
-    });
-    Node.prototype._doneAction = function(action, tag) {
-      var func = doneAction[action];
-      if (func) {
-        this.emit("done", tag);
-        func.call(this);
-      }
+      this.timerId = setInterval(callback, interval);
+      this.isRunning = true;
     };
-    return Node;
+    Timer.prototype.stop = function() {
+      if (this.timerId) {
+        clearInterval(this.timerId);
+      }
+      this.isRunning = false;
+    };
+    return Timer;
   })();
-
-  var Group = (function() {
-    function Group(node, addAction) {
-      Node.call(this);
-      this.klassName = "Group";
-      this.headNode = null;
-      this.tailNode = null;
-      if (node) {
-        var that = this;
-        var timeline = cc.server.timeline;
-        timeline.push(function() {
-          graphFunc[addAction].call(node, that);
-        });
-      }
-    }
-    fn.extend(Group, Node);
-    
-    Group.prototype._process = function(inNumSamples) {
-      if (this.headNode && this._running) {
-        this.headNode._process(inNumSamples);
-      }
-      if (this.nextNode) {
-        this.nextNode._process(inNumSamples);
-      }
-    };
-    
-    return Group;
-  })();
-  
-  var Synth = (function() {
-    function Synth(specs, node, args, addAction) {
-      Node.call(this);
-      this.klassName = "Synth";
-      if (specs) {
-        build.call(this, specs, args);
-      }
-      if (node) {
-        var that = this;
-        var timeline = cc.server.timeline;
-        timeline.push(function() {
-          graphFunc[addAction].call(node, that);
-        });
-      }
-    }
-    fn.extend(Synth, Node);
-    
-    var build = function(specs, args) {
-      this.specs = specs = JSON.parse(specs);
-
-      var fixNumList = specs.consts.map(function(value) {
-        return new FixNum(value);
-      });
-      var unitList = specs.defs.map(function(spec) {
-        return new Unit(this, spec);
-      }, this);
-      this.params   = specs.params;
-      this.controls = new Float32Array(this.params.values);
-      this.set(args);
-      this.unitList = unitList.filter(function(unit) {
-        var inputs  = unit.inputs;
-        var inRates = unit.inRates;
-        var inSpec  = unit.specs[3];
-        var tag     = unit.specs[5];
-        for (var i = 0, imax = inputs.length; i < imax; ++i) {
-          var i2 = i << 1;
-          if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
-            inRates[i] = 0;
-          } else {
-            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
-            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
-          }
-        }
-        unit.init(tag);
-        return !!unit.process;
-      });
-      return this;
-    };
-    
-    Synth.prototype.set = fn.sync(function(args) {
-      var params = this.params;
-      if (utils.isDict(args)) {
-        Object.keys(args).forEach(function(key) {
-          var value  = args[key];
-          var index  = params.names.indexOf(key);
-          if (index === -1) {
-            return;
-          }
-          index = params.indices[index];
-          var length = params.length[index];
-          if (Array.isArray(value)) {
-            value.forEach(function(value, i) {
-              if (i < length) {
-                if (typeof value === "number" && !isNaN(value)) {
-                  this.controls[index + i] = value;
-                }
-              }
-            }, this);
-          } else if (typeof value === "number" && !isNaN(value)) {
-            this.controls[index] = value;
-          }
-        }, this);
-      } else {
-        slice.call(arguments).forEach(function(value, i) {
-          var index = params.indices[i];
-          var length = params.length[i];
-          if (Array.isArray(value)) {
-            value.forEach(function(value, i) {
-              if (i < length) {
-                if (typeof value === "number" && !isNaN(value)) {
-                  this.controls[index + i] = value;
-                }
-              }
-            }, this);
-          } else if (typeof value === "number" && !isNaN(value)) {
-            this.controls[index] = value;
-          }
-        }, this);
-      }
-    });
-    
-    Synth.prototype._process = function(inNumSamples) {
-      if (this._running) {
-        var unitList = this.unitList;
-        for (var i = 0, imax = unitList.length; i < imax; ++i) {
-          var unit = unitList[i];
-          unit.process(unit.rate.bufLength);
-        }
-      }
-      if (this.nextNode) {
-        this.nextNode._process(inNumSamples);
-      }
-    };
-    
-    return Synth;
-  })();
-  
-  var SynthDef = (function() {
-    function SynthDef(func, args) {
-      this.klassName = "SynthDef";
-      var isVaridArgs = false;
-      if (args) {
-        if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
-          args = unpackArguments(args);
-          if (args) {
-            isVaridArgs = args.vals.every(function(item) {
-              if (typeof item === "number") {
-                return true;
-              } else if (Array.isArray(item)) {
-                return item.every(function(item) {
-                  return typeof item === "number";
-                });
-              }
-              if (item === undefined || item === null) {
-                return true;
-              }
-              return false;
-            });
-          }
-        }
-        if (!isVaridArgs) {
-          throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
-        }
-      } else {
-        args = { keys:[], vals:[] };
-      }
-      
-      var children = [];
-      ugen.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      var params  = { names:[], indices:[], length:[], values:[] };
-      var flatten = [];
-      var i, imax, length;
-      for (i = 0, imax = args.vals.length; i < imax; ++i) {
-        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
-        params.names  .push(args.keys[i]);
-        params.indices.push(flatten.length);
-        params.length .push(length);
-        params.values = params.values.concat(args.vals[i]);
-        flatten = flatten.concat(args.vals[i]);
-      }
-      var reshaped = [];
-      var controls = new ugen.Control(1).init(flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      var saved = controls.slice();
-      for (i = 0; i < imax; ++i) {
-        if (Array.isArray(args.vals[i])) {
-          reshaped.push(saved.splice(0, args.vals[i].length));
-        } else {
-          reshaped.push(saved.shift());
-        }
-      }
-      
-      try {
-        func.apply(null, reshaped);
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        ugen.setSynthDef(null);
-      }
-
-      var consts = [];
-      children.forEach(function(x) {
-        if (x.inputs) {
-          x.inputs.forEach(function(_in) {
-            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
-              consts.push(_in);
-            }
-          });
-        }
-      });
-      consts.sort();
-      var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
-      });
-      var defs = ugenlist.map(function(x) {
-        var inputs = [];
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
-            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
-            inputs.push(index, subindex);
-          });
-        }
-        var outputs;
-        if (x instanceof ugen.MultiOutUGen) {
-          outputs = x.channels.map(function(x) {
-            return x.rate;
-          });
-        } else if (x.numOfOutputs === 1) {
-          outputs = [ x.rate ];
-        } else {
-          outputs = [];
-        }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
-      });
-      var specs = {
-        consts: consts,
-        defs  : defs,
-        params: params,
-      };
-      this.specs = specs;
-      return this;
-    }
-    
-    SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      target = args;
-      if (arguments[i] instanceof Node) {
-        target = arguments[i++];
-      } else {
-        target = cc.server.rootNode;
-      }
-      if (utils.isDict(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      } else {
-        addAction = "addToHead";
-      }
-      if (args && arguments.length === 1) {
-        if (args.target instanceof Node) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
-      switch (addAction) {
-      case "addToHead":
-        return SynthInterface.head(this, target, args);
-      case "addToTail":
-        return SynthInterface.tail(this, target, args);
-      case "addBefore":
-        return SynthInterface.before(this, target, args);
-      case "addAfter":
-        return SynthInterface.after(this, target, args);
-      default:
-        return SynthInterface.head(this, target, args);
-      }
-    }).multiCall().build();
-
-    var topoSort = (function() {
-      var _topoSort = function(x, list, checked) {
-        checked.push(x);
-        var index = list.indexOf(x);
-        if (index !== -1) {
-          list.splice(index, 1);
-        }
-        list.unshift(x);
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            _topoSort(x, list, checked);
-          });
-        }
-      };
-      return function(list) {
-        var checked = [];
-        list.forEach(function(x) {
-          if (x instanceof ugen.Out) {
-            checked.push(x);
-            x.inputs.forEach(function(x) {
-              _topoSort(x, list, checked);
-            });
-          }
-        });
-        list = list.filter(function(x) {
-          return checked.indexOf(x) !== -1;
-        });
-        return list;
-      };
-    })();
-    
-    var splitArguments = function(args) {
-      var result  = [];
-      var begin   = 0;
-      var bracket = 0;
-      var inStr   = null;
-      for (var i = 0, imax = args.length; i < imax; ++i) {
-        var c = args.charAt(i);
-        if (args.charAt(i-1) === "\\") {
-          if (args.charAt(i-2) !== "\\") {
-            continue;
-          }
-        }
-        if (c === "\"" || c === "'") {
-          if (inStr === null) {
-            inStr = c;
-          } else if (inStr === c) {
-            inStr = null;
-          }
-        }
-        if (inStr) {
-          continue;
-        }
-        switch (c) {
-        case ",":
-          if (bracket === 0) {
-            result.push(args.slice(begin, i).trim());
-            begin = i + 1;
-          }
-          break;
-        case "[":
-          bracket += 1;
-          break;
-        case "]":
-          bracket -= 1;
-          break;
-        }
-      }
-      if (begin !== i) {
-        result.push(args.slice(begin, i).trim());
-      }
-      return result;
-    };
-    
-    var unpackArguments = function(args) {
-      var keys = [];
-      var vals = [];
-      if (args) {
-        try {
-          splitArguments(args).forEach(function(items) {
-            var i = items.indexOf("=");
-            var k, v;
-            if (i === -1) {
-              k = items;
-              v = undefined;
-            } else {
-              k = items.substr(0, i).trim();
-              v = JSON.parse(items.substr(i + 1));
-            }
-            keys.push(k);
-            vals.push(v);
-          });
-        } catch (e) {
-          return;
-        }
-      }
-      return { keys:keys, vals:vals };
-    };
-    
-    return SynthDef;
-  })();
-
-  var GroupInterface = function() {
-    return new Group();
-  };
-  GroupInterface.after = function(node) {
-    node = node || cc.server.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.after: arguments[0] is not a Node.");
-    }
-    return new Group(node, -4);
-  };
-  GroupInterface.before = function(node) {
-    node = node || cc.server.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.before: arguments[0] is not a Node.");
-    }
-    return new Group(node, -3);
-  };
-  GroupInterface.head = function(node) {
-    node = node || cc.server.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.head: arguments[0] is not a Group.");
-    }
-    return new Group(node, -1);
-  };
-  GroupInterface.tail = function(node) {
-    node = node || cc.server.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.tail: arguments[0] is not a Group.");
-    }
-    return new Group(node, -2);
-  };
-  GroupInterface.replace = function(node) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.replace: arguments[0] is not a Node.");
-    }
-    return new Group(node, -5);
-  };
-  
-  var SynthInterface = function() {
-    return new Synth();
-  };
-  SynthInterface.def = function(func, args) {
-    if (typeof func !== "function") {
-      throw new TypeError("Synth.def: arguments[0] is not a Function.");
-    }
-    return new SynthDef(func, args);
-  };
-  SynthInterface.after = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.server.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.after: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(JSON.stringify(def.specs), node, args||{}, -4);
-  };
-  SynthInterface.before = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.server.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.before: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(JSON.stringify(def.specs), node, args||{}, -3);
-  };
-  SynthInterface.head = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.server.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.head: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(JSON.stringify(def.specs), node, args||{}, -1);
-  };
-  SynthInterface.tail = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.server.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(JSON.stringify(def.specs), node, args||{}, -2);
-  };
-  SynthInterface.replace = function(node, def, args) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(JSON.stringify(def.specs), node, args||{}, -5);
-  };
-  
-  var install = function() {
-    global.Group = GroupInterface;
-    global.Synth = SynthInterface;
-  };
   
   module.exports = {
-    Node : Node,
-    Group: Group,
-    Synth: Synth,
-    install: install,
+    Timer: Timer
   };
 
 });
-define('cc/server/ugen/ugen', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  var fn = require("../fn");
-  var slice = [].slice;
-
-  var UnaryOpUGen;
-  var BinaryOpUGen;
-  var MulAdd;
-
-  var addToSynthDef = null;
-  
-  var UGen = (function() {
-    function UGen(name, tag) {
-      this.klassName = name;
-      this.tag  = tag || "";
-      this.rate = 2;
-      this.signalRange = 2;
-      this.specialIndex = 0;
-      this.outputIndex  = 0;
-      this.numOfInputs  = 0;
-      this.numOfOutputs = 1;
-      this.inputs = [];
-    }
-    fn.extend(UGen, cc.Object);
-    
-    UGen.prototype.init = function(rate) {
-      this.rate = rate;
-      if (addToSynthDef) {
-        addToSynthDef(this);
-      }
-      this.inputs = slice.call(arguments, 1);
-      this.numOfInputs = this.inputs.length;
-      return this;
-    };
-    
-    UGen.prototype.madd = fn(function(mul, add) {
-      return new MulAdd().init(this, mul, add);
-    }).defaults("mul=1,add=0").multiCall().build();
-    
-    UGen.prototype.range = fn(function(lo, hi) {
-      var mul, add;
-      if (this.signalRange === 2) {
-        mul = (hi - lo) * 0.5;
-        add = mul + lo;
-      } else {
-        mul = (hi - lo);
-        add = lo;
-      }
-      return new MulAdd().init(this, mul, add);
-    }).defaults("lo=0,hi=1").multiCall().build();
-    
-    UGen.prototype.unipolar = fn(function(mul) {
-      return this.range(0, mul);
-    }).defaults("mul=1").multiCall().build();
-    
-    UGen.prototype.bipolar = fn(function(mul) {
-      return this.range(mul.neg(), mul);
-    }).defaults("mul=1").multiCall().build();
-    
-    return UGen;
-  })();
-  
-  var MultiOutUGen = (function() {
-    function MultiOutUGen(name) {
-      UGen.call(this, name || "MultiOutUGen");
-      this.channels = null;
-    }
-    fn.extend(MultiOutUGen, UGen);
-    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
-      var channels = new Array(numChannels);
-      for (var i = 0; i < numChannels; ++i) {
-        channels[i] = new OutputProxy(rate, this, i);
-      }
-      this.channels = channels;
-      this.numOfOutputs = channels.length;
-      this.inputs = this.inputs.map(function(ugen) {
-        if (!(ugen instanceof UGen)) {
-          ugen = +ugen;
-          if (isNaN(ugen)) {
-            ugen = 0;
-          }
-        }
-        return ugen;
-      });
-      this.numOfInputs = this.inputs.length;
-      return (numChannels === 1) ? channels[0] : channels;
-    };
-    return MultiOutUGen;
-  })();
-  
-  var OutputProxy = (function() {
-    function OutputProxy(rate, source, index) {
-      UGen.call(this, "OutputProxy");
-      this.init(rate);
-      this.inputs = [ source ];
-      this.numOfOutputs = 1;
-      this.outputIndex  = index;
-    }
-    fn.extend(OutputProxy, UGen);
-    return OutputProxy;
-  })();
-  
-  var Control = (function() {
-    function Control(rate) {
-      MultiOutUGen.call(this, "Control");
-      this.rate   = rate;
-      this.values = null;
-    }
-    fn.extend(Control, MultiOutUGen);
-    Control.prototype.init = function(list) {
-      UGen.prototype.init.apply(this, [this.rate].concat(list));
-      this.values = list.slice();
-      return this.initOutputs(this.values.length, this.rate);
-    };
-    return Control;
-  })();
-
-  var Out = (function() {
-    function Out() {
-      UGen.call(this, "Out");
-    }
-    fn.extend(Out, UGen);
-    return Out;
-  })();
-
-  var out_ctor = function(rate) {
-    return function(bus, channelsArray) {
-      if (!(bus instanceof UGen || typeof bus === "number")) {
-        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
-      }
-      this.init.apply(this, [rate, bus].concat(channelsArray));
-      return 0; // Out has no output
-    };
-  };
-  
-  var iOut = {
-    ar: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(2),
-      multiCall: false,
-      Klass: Out
-    },
-    kr: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(1),
-      multiCall: false,
-      Klass: Out
-    }
-  };
-
-  var iIn = {
-    ar: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, 2);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: MultiOutUGen
-    },
-    kr: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, 1);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: MultiOutUGen
-    }
-  };
-  
-  var setSynthDef = function(func) {
-    addToSynthDef = func;
-  };
-  
-  var install = function() {
-    register("Out", iOut);
-    register("In" , iIn );
-  };
-  
-  var register = function(name, payload) {
-    var klass = global[name] = function() {
-      return new UGen(name);
-    };
-    Object.keys(payload).forEach(function(key) {
-      var setting   = payload[key];
-      var defaults  = setting.defaults + ",tag";
-      var ctor      = setting.ctor;
-      var multiCall = setting.multiCall;
-      if (multiCall === undefined) {
-        multiCall = true;
-      }
-      var Klass     = setting.Klass || UGen;
-      klass[key] = fn(function() {
-        var args = slice.call(arguments, 0, arguments.length - 1);
-        var tag  = arguments[arguments.length - 1];
-        return ctor.apply(new Klass(name, tag), args);
-      }).defaults(defaults).multiCall(multiCall).build();
-    });
-  };
-
-  cc.once("basic_ops.js", function(payload) {
-    UnaryOpUGen  = payload.UnaryOpUGen;
-    BinaryOpUGen = payload.BinaryOpUGen;
-    MulAdd       = payload.MulAdd;
-  });
-  
-  module.exports = {
-    UGen: UGen,
-    MultiOutUGen: MultiOutUGen,
-    OutputProxy : OutputProxy,
-    Control     : Control,
-    Out         : Out,
-    setSynthDef : setSynthDef,
-    register: register,
-    install: install,
-  };
-
-});
-define('cc/server/unit/unit', function(require, exports, module) {
-
-  var cc = require("../cc");
-    
-  var units = {};
-  
-  var Unit = (function() {
-    function Unit(parent, specs) {
-      this.klassName = "Unit";
-      this.parent = parent;
-      this.specs  = specs;
-      this.name         = specs[0];
-      this.calcRate     = specs[1];
-      this.specialIndex = specs[2];
-      this.numOfInputs  = specs[3].length >> 1;
-      this.numOfOutputs = specs[4].length;
-      this.inputs   = new Array(this.numOfInputs);
-      this.inRates  = new Array(this.numOfInputs);
-      this.outRates = specs[4];
-      this.rate = cc.server.getRate(this.calcRate);
-      var bufLength = this.rate.bufLength;
-      var outs = new Array(this.numOfOutputs);
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i] = new Float32Array(bufLength);
-      }
-      this.outs      = outs;
-      this.bufLength = bufLength;
-      this.done      = false;
-    }
-    Unit.prototype.init = function(tag) {
-      var ctor = units[this.name];
-      if (ctor) {
-        ctor.call(this);
-      } else {
-        console.warn(this.name + "'s ctor is not found.");
-      }
-      this.tag = tag;
-      return this;
-    };
-    Unit.prototype.doneAction = function(action) {
-      if (!this.done) {
-        this.done = true;
-        this.parent._doneAction(action, this.tag);
-      }
-    };
-    return Unit;
-  })();
-  
-  var FixNum = (function() {
-    var map = {};
-    function FixNum(value) {
-      if (map[value]) {
-        return map[value];
-      }
-      this.klassName = "FixNum";
-      this.outs = [ new Float32Array([value]) ];
-      map[value] = this;
-    }
-    FixNum.reset = function() {
-      map = {};
-    };
-    return FixNum;
-  })();
-
-  var Control = function() {
-    var ctor = function() {
-      if (this.numOfOutputs === 1) {
-        this.process = next_1;
-      } else {
-        this.process = next_k;
-      }
-      this.process(1);
-    };
-    var next_1 = function() {
-      this.outs[0][0] = this.parent.controls[this.specialIndex];
-    };
-    var next_k = function() {
-      var controls = this.parent.controls;
-      var outs = this.outs;
-      var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i][0] = controls[i + specialIndex];
-      }
-    };
-    return ctor;
-  };
-  
-  var Out = function() {
-    var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
-      this._bufLength = cc.server.bufLength;
-      if (this.calcRate === 2) {
-        this.process = next_a;
-        this._busOffset = 0;
-      } else {
-        this.process = next_k;
-        this._busOffset = this._bufLength * 128;
-      }
-    };
-    var next_a = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
-      var bufLength = this._bufLength;
-      var offset, _in;
-      var fbusChannel = (inputs[0][0]|0) - 1;
-      for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        offset = (fbusChannel + i) * bufLength;
-        _in = inputs[i];
-        for (var j = 0; j < inNumSamples; j++) {
-          busBuffer[offset + j] += _in[j];
-        }
-      }
-    };
-    var next_k = function() {
-      var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
-      var offset    = this._busOffset + (inputs[0][0]|0) - 1;
-      for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        busBuffer[offset + i] += inputs[i][0];
-      }
-    };
-    return ctor;
-  };
-
-  var In = function() {
-    var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
-      this._bufLength = cc.server.bufLength;
-      if (this.calcRate === 2) {
-        this.process = next_a;
-        this._busOffset = 0;
-      } else {
-        this.process = next_k;
-        this._busOffset = this._bufLength * 128;
-      }
-    };
-    var next_a = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var busBuffer = this._busBuffer;
-      var bufLength = this._bufLength;
-      var offset = (this.inputs[0][0] * bufLength)|0;
-      for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = busBuffer[offset + i];
-      }
-    };
-    var next_k = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var outs  = this.outs[0];
-      var value = this._busBuffer[this._busOffset + (this.inputs[0][0]|0)];
-      for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = value;
-      }
-    };
-    return ctor;
-  };
-  
-  var register = function(name, payload) {
-    units[name] = payload();
-  };
-
-  var install = function() {
-    register("Control", Control);
-    register("Out"    , Out    );
-    register("In"     , In     );
-  };
-  
-  module.exports = {
-    Unit    : Unit,
-    FixNum  : FixNum,
-    Control : Control,
-    register: register,
-    install : install
-  };
-
-});
-define('cc/server/sched', function(require, exports, module) {
+define('cc/client/sched', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
@@ -3385,7 +2121,7 @@ define('cc/server/sched', function(require, exports, module) {
       this.reset();
     }
     Timeline.prototype.play = function() {
-      this.counterIncr = (cc.server.bufLength / cc.server.sampleRate) * 1000;
+      this.counterIncr = (cc.client.bufLength / cc.client.sampleRate) * 1000;
     };
     Timeline.prototype.pause = function() {
     };
@@ -3426,7 +2162,7 @@ define('cc/server/sched', function(require, exports, module) {
       Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
-      this._timeline = timeline || cc.server.timeline;
+      this._timeline = timeline || cc.client.timeline;
       this._context = new TaskContext(this);
       this._queue = [];
       this._bang  = false;
@@ -3807,7 +2543,7 @@ define('cc/server/sched', function(require, exports, module) {
   var install = function() {
     global.Task = TaskInterface;
     global.wait = function() {
-      var globalTask = cc.server.timeline._globalTask;
+      var globalTask = cc.client.timeline._globalTask;
       globalTask._queue.push(TaskWaitToken.create.apply(null, arguments));
     };
   };
@@ -3827,17 +2563,781 @@ define('cc/server/sched', function(require, exports, module) {
   };
 
 });
-define('cc/server/buffer', function(require, exports, module) {
+define('cc/client/node', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var utils = require("./utils");
+  var ugen  = require("./ugen/ugen");
+  var Emitter = require("../common/emitter").Emitter;
+  var slice = [].slice;
+
+  var nodes = {};
+  
+  var Node = (function() {
+    var nodeId = 0;
+    function Node() {
+      Emitter.bind(this);
+      this.klassName = "Node";
+      this.blocking  = true;
+      this.nodeId    = nodeId++;
+      nodes[this.nodeId] = this;
+    }
+    fn.extend(Node, cc.Object);
+    Node.prototype.play = fn.sync(function() {
+      cc.client.pushCommand([
+        "/n_run", this.nodeId, true
+      ]);
+      return this;
+    });
+    Node.prototype.pause = fn.sync(function() {
+      cc.client.pushCommand([
+        "/n_run", this.nodeId, false
+      ]);
+      return this;
+    });
+    Node.prototype.stop = fn.sync(function() {
+      cc.client.pushCommand([
+        "/n_free", this.nodeId
+      ]);
+      return this;
+    });
+    return Node;
+  })();
+
+  var Group = (function() {
+    function Group(target, addAction) {
+      Node.call(this);
+      this.klassName = "Group";
+      if (target) {
+        var that = this;
+        var timeline = cc.client.timeline;
+        timeline.push(function() {
+          cc.client.pushCommand([
+            "/g_new", that.nodeId, addAction, target.nodeId
+          ]);
+        });
+      }
+    }
+    fn.extend(Group, Node);
+    
+    return Group;
+  })();
+  
+  var Synth = (function() {
+    function Synth(def, target, args, addAction) {
+      Node.call(this);
+      this.klassName = "Synth";
+      this.params = def.specs.params;
+      if (target) {
+        var that = this;
+        var timeline = cc.client.timeline;
+        timeline.push(function() {
+          cc.client.pushCommand([
+            "/s_new", def._defId, that.nodeId, addAction, target.nodeId
+          ]);
+        });
+      }
+    }
+    fn.extend(Synth, Node);
+    
+    Synth.prototype.set = fn.sync(function(args) {
+      var params = this.params;
+      var controls = [];
+      if (utils.isDict(args)) {
+        Object.keys(args).forEach(function(key) {
+          var value  = args[key];
+          var index  = params.names.indexOf(key);
+          if (index === -1) {
+            return;
+          }
+          index = params.indices[index];
+          var length = params.length[index];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  controls.push(index + i, value);
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            controls.push(index, value);
+          }
+        }, this);
+      } else {
+        slice.call(arguments).forEach(function(value, i) {
+          var index = params.indices[i];
+          var length = params.length[i];
+          if (Array.isArray(value)) {
+            value.forEach(function(value, i) {
+              if (i < length) {
+                if (typeof value === "number" && !isNaN(value)) {
+                  controls.push(index + i, value);
+                }
+              }
+            }, this);
+          } else if (typeof value === "number" && !isNaN(value)) {
+            controls.push(index, value);
+          }
+        }, this);
+      }
+      if (controls.length) {
+        cc.client.pushCommand([
+          "/n_set", this.nodeId, controls
+        ]);
+      }
+    });
+    
+    return Synth;
+  })();
+
+  var SynthDef = (function() {
+    var defId = 0;
+    function SynthDef(func, args) {
+      this.klassName = "SynthDef";
+      this._defId = defId++;
+      var isVaridArgs = false;
+      if (args) {
+        if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
+          args = unpackArguments(args);
+          if (args) {
+            isVaridArgs = args.vals.every(function(item) {
+              if (typeof item === "number") {
+                return true;
+              } else if (Array.isArray(item)) {
+                return item.every(function(item) {
+                  return typeof item === "number";
+                });
+              }
+              if (item === undefined || item === null) {
+                return true;
+              }
+              return false;
+            });
+          }
+        }
+        if (!isVaridArgs) {
+          throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
+        }
+      } else {
+        args = { keys:[], vals:[] };
+      }
+      
+      var children = [];
+      ugen.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
+      var params  = { names:[], indices:[], length:[], values:[] };
+      var flatten = [];
+      var i, imax, length;
+      for (i = 0, imax = args.vals.length; i < imax; ++i) {
+        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
+        params.names  .push(args.keys[i]);
+        params.indices.push(flatten.length);
+        params.length .push(length);
+        params.values = params.values.concat(args.vals[i]);
+        flatten = flatten.concat(args.vals[i]);
+      }
+      var reshaped = [];
+      var controls = new ugen.Control(1).init(flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      var saved = controls.slice();
+      for (i = 0; i < imax; ++i) {
+        if (Array.isArray(args.vals[i])) {
+          reshaped.push(saved.splice(0, args.vals[i].length));
+        } else {
+          reshaped.push(saved.shift());
+        }
+      }
+      
+      try {
+        func.apply(null, reshaped);
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        ugen.setSynthDef(null);
+      }
+
+      var consts = [];
+      children.forEach(function(x) {
+        if (x.inputs) {
+          x.inputs.forEach(function(_in) {
+            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
+              consts.push(_in);
+            }
+          });
+        }
+      });
+      consts.sort();
+      var ugenlist = topoSort(children).filter(function(x) {
+        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+      });
+      var defs = ugenlist.map(function(x) {
+        var inputs = [];
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
+            inputs.push(index, subindex);
+          });
+        }
+        var outputs;
+        if (x instanceof ugen.MultiOutUGen) {
+          outputs = x.channels.map(function(x) {
+            return x.rate;
+          });
+        } else if (x.numOfOutputs === 1) {
+          outputs = [ x.rate ];
+        } else {
+          outputs = [];
+        }
+        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
+      });
+      var specs = {
+        consts: consts,
+        defs  : defs,
+        params: params,
+      };
+      this.specs = specs;
+      cc.client.pushCommand([
+        "/s_def", this._defId, JSON.stringify(specs)
+      ]);
+      return this;
+    }
+    
+    SynthDef.prototype.play = fn(function() {
+      var target, args, addAction;
+      var i = 0;
+      target = args;
+      if (arguments[i] instanceof Node) {
+        target = arguments[i++];
+      } else {
+        target = cc.client.rootNode;
+      }
+      if (utils.isDict(arguments[i])) {
+        args = arguments[i++];
+      }
+      if (typeof arguments[i] === "string") {
+        addAction = arguments[i];
+      } else {
+        addAction = "addToHead";
+      }
+      if (args && arguments.length === 1) {
+        if (args.target instanceof Node) {
+          target = args.target;
+          delete args.target;
+        }
+        if (typeof args.addAction === "string") {
+          addAction = args.addAction;
+          delete args.addAction;
+        }
+      }
+      switch (addAction) {
+      case "addToHead":
+        return SynthInterface.head(this, target, args);
+      case "addToTail":
+        return SynthInterface.tail(this, target, args);
+      case "addBefore":
+        return SynthInterface.before(this, target, args);
+      case "addAfter":
+        return SynthInterface.after(this, target, args);
+      default:
+        return SynthInterface.head(this, target, args);
+      }
+    }).multiCall().build();
+
+    var topoSort = (function() {
+      var _topoSort = function(x, list, checked) {
+        checked.push(x);
+        var index = list.indexOf(x);
+        if (index !== -1) {
+          list.splice(index, 1);
+        }
+        list.unshift(x);
+        if (x.inputs) {
+          x.inputs.forEach(function(x) {
+            _topoSort(x, list, checked);
+          });
+        }
+      };
+      return function(list) {
+        var checked = [];
+        list.forEach(function(x) {
+          if (x instanceof ugen.Out) {
+            checked.push(x);
+            x.inputs.forEach(function(x) {
+              _topoSort(x, list, checked);
+            });
+          }
+        });
+        list = list.filter(function(x) {
+          return checked.indexOf(x) !== -1;
+        });
+        return list;
+      };
+    })();
+    
+    var splitArguments = function(args) {
+      var result  = [];
+      var begin   = 0;
+      var bracket = 0;
+      var inStr   = null;
+      for (var i = 0, imax = args.length; i < imax; ++i) {
+        var c = args.charAt(i);
+        if (args.charAt(i-1) === "\\") {
+          if (args.charAt(i-2) !== "\\") {
+            continue;
+          }
+        }
+        if (c === "\"" || c === "'") {
+          if (inStr === null) {
+            inStr = c;
+          } else if (inStr === c) {
+            inStr = null;
+          }
+        }
+        if (inStr) {
+          continue;
+        }
+        switch (c) {
+        case ",":
+          if (bracket === 0) {
+            result.push(args.slice(begin, i).trim());
+            begin = i + 1;
+          }
+          break;
+        case "[":
+          bracket += 1;
+          break;
+        case "]":
+          bracket -= 1;
+          break;
+        }
+      }
+      if (begin !== i) {
+        result.push(args.slice(begin, i).trim());
+      }
+      return result;
+    };
+    
+    var unpackArguments = function(args) {
+      var keys = [];
+      var vals = [];
+      if (args) {
+        try {
+          splitArguments(args).forEach(function(items) {
+            var i = items.indexOf("=");
+            var k, v;
+            if (i === -1) {
+              k = items;
+              v = undefined;
+            } else {
+              k = items.substr(0, i).trim();
+              v = JSON.parse(items.substr(i + 1));
+            }
+            keys.push(k);
+            vals.push(v);
+          });
+        } catch (e) {
+          return;
+        }
+      }
+      return { keys:keys, vals:vals };
+    };
+    
+    return SynthDef;
+  })();
+
+  var GroupInterface = function() {
+    return new Group();
+  };
+  GroupInterface.after = function(node) {
+    node = node || cc.client.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.after: arguments[0] is not a Node.");
+    }
+    return new Group(node, 3);
+  };
+  GroupInterface.before = function(node) {
+    node = node || cc.client.rootNode;
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.before: arguments[0] is not a Node.");
+    }
+    return new Group(node, 2);
+  };
+  GroupInterface.head = function(node) {
+    node = node || cc.client.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.head: arguments[0] is not a Group.");
+    }
+    return new Group(node, 0);
+  };
+  GroupInterface.tail = function(node) {
+    node = node || cc.client.rootNode;
+    if (!(node instanceof Group)) {
+      throw new TypeError("Group.tail: arguments[0] is not a Group.");
+    }
+    return new Group(node, 1);
+  };
+  GroupInterface.replace = function(node) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Group.replace: arguments[0] is not a Node.");
+    }
+    return new Group(node, 4);
+  };
+  
+  var SynthInterface = function() {
+    return new Synth();
+  };
+  SynthInterface.def = function(func, args) {
+    if (typeof func !== "function") {
+      throw new TypeError("Synth.def: arguments[0] is not a Function.");
+    }
+    return new SynthDef(func, args);
+  };
+  SynthInterface.after = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.client.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.after: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(def, node, args||{}, 3);
+  };
+  SynthInterface.before = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.client.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.before: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(def, node, args||{}, 2);
+  };
+  SynthInterface.head = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.client.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.head: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(def, node, args||{}, 0);
+  };
+  SynthInterface.tail = function() {
+    var node, def, args;
+    if (arguments[0] instanceof SynthDef) {
+      node = cc.client.rootNode;
+      def  = arguments[0];
+      args = arguments[1] || {};
+    } else if (arguments[1] instanceof SynthDef) {
+      node = arguments[0];
+      def  = arguments[1];
+      args = arguments[2] || {};
+    }
+    if (!(node instanceof Group)) {
+      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(def, node, args||{}, 1);
+  };
+  SynthInterface.replace = function(node, def, args) {
+    if (!(node instanceof Node)) {
+      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
+    }
+    if (!(def instanceof SynthDef)) {
+      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
+    }
+    return new Synth(def, node, args||{}, 4);
+  };
+  
+  var reset = function() {
+    nodes = {};
+  };
+
+  var get = function(nodeId) {
+    return nodes[nodeId];
+  };
+  
+  var install = function() {
+    global.Group = GroupInterface;
+    global.Synth = SynthInterface;
+  };
+  
+  module.exports = {
+    Node : Node,
+    Group: Group,
+    Synth: Synth,
+    get    : get,
+    reset  : reset,
+    install: install,
+  };
+
+});
+define('cc/client/ugen/ugen', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  var fn = require("../fn");
+  var slice = [].slice;
+
+  var UnaryOpUGen;
+  var BinaryOpUGen;
+  var MulAdd;
+
+  var addToSynthDef = null;
+  
+  var UGen = (function() {
+    function UGen(name, tag) {
+      this.klassName = name;
+      this.tag  = tag || "";
+      this.rate = 2;
+      this.signalRange = 2;
+      this.specialIndex = 0;
+      this.outputIndex  = 0;
+      this.numOfInputs  = 0;
+      this.numOfOutputs = 1;
+      this.inputs = [];
+    }
+    fn.extend(UGen, cc.Object);
+    
+    UGen.prototype.init = function(rate) {
+      this.rate = rate;
+      if (addToSynthDef) {
+        addToSynthDef(this);
+      }
+      this.inputs = slice.call(arguments, 1);
+      this.numOfInputs = this.inputs.length;
+      return this;
+    };
+    
+    UGen.prototype.madd = fn(function(mul, add) {
+      return new MulAdd().init(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build();
+    
+    UGen.prototype.range = fn(function(lo, hi) {
+      var mul, add;
+      if (this.signalRange === 2) {
+        mul = (hi - lo) * 0.5;
+        add = mul + lo;
+      } else {
+        mul = (hi - lo);
+        add = lo;
+      }
+      return new MulAdd().init(this, mul, add);
+    }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.unipolar = fn(function(mul) {
+      return this.range(0, mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    UGen.prototype.bipolar = fn(function(mul) {
+      return this.range(mul.neg(), mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    return UGen;
+  })();
+  
+  var MultiOutUGen = (function() {
+    function MultiOutUGen(name) {
+      UGen.call(this, name || "MultiOutUGen");
+      this.channels = null;
+    }
+    fn.extend(MultiOutUGen, UGen);
+    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
+      var channels = new Array(numChannels);
+      for (var i = 0; i < numChannels; ++i) {
+        channels[i] = new OutputProxy(rate, this, i);
+      }
+      this.channels = channels;
+      this.numOfOutputs = channels.length;
+      this.inputs = this.inputs.map(function(ugen) {
+        if (!(ugen instanceof UGen)) {
+          ugen = +ugen;
+          if (isNaN(ugen)) {
+            ugen = 0;
+          }
+        }
+        return ugen;
+      });
+      this.numOfInputs = this.inputs.length;
+      return (numChannels === 1) ? channels[0] : channels;
+    };
+    return MultiOutUGen;
+  })();
+  
+  var OutputProxy = (function() {
+    function OutputProxy(rate, source, index) {
+      UGen.call(this, "OutputProxy");
+      this.init(rate);
+      this.inputs = [ source ];
+      this.numOfOutputs = 1;
+      this.outputIndex  = index;
+    }
+    fn.extend(OutputProxy, UGen);
+    return OutputProxy;
+  })();
+  
+  var Control = (function() {
+    function Control(rate) {
+      MultiOutUGen.call(this, "Control");
+      this.rate   = rate;
+      this.values = null;
+    }
+    fn.extend(Control, MultiOutUGen);
+    Control.prototype.init = function(list) {
+      UGen.prototype.init.apply(this, [this.rate].concat(list));
+      this.values = list.slice();
+      return this.initOutputs(this.values.length, this.rate);
+    };
+    return Control;
+  })();
+
+  var Out = (function() {
+    function Out() {
+      UGen.call(this, "Out");
+    }
+    fn.extend(Out, UGen);
+    return Out;
+  })();
+
+  var out_ctor = function(rate) {
+    return function(bus, channelsArray) {
+      if (!(bus instanceof UGen || typeof bus === "number")) {
+        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
+      }
+      this.init.apply(this, [rate, bus].concat(channelsArray));
+      return 0; // Out has no output
+    };
+  };
+  
+  var iOut = {
+    ar: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: out_ctor(2),
+      multiCall: false,
+      Klass: Out
+    },
+    kr: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: out_ctor(1),
+      multiCall: false,
+      Klass: Out
+    }
+  };
+
+  var iIn = {
+    ar: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 2);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    },
+    kr: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 1);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: MultiOutUGen
+    }
+  };
+  
+  var setSynthDef = function(func) {
+    addToSynthDef = func;
+  };
+  
+  var install = function() {
+    register("Out", iOut);
+    register("In" , iIn );
+  };
+  
+  var register = function(name, payload) {
+    var klass = global[name] = function() {
+      return new UGen(name);
+    };
+    Object.keys(payload).forEach(function(key) {
+      var setting   = payload[key];
+      var defaults  = setting.defaults + ",tag";
+      var ctor      = setting.ctor;
+      var multiCall = setting.multiCall;
+      if (multiCall === undefined) {
+        multiCall = true;
+      }
+      var Klass     = setting.Klass || UGen;
+      klass[key] = fn(function() {
+        var args = slice.call(arguments, 0, arguments.length - 1);
+        var tag  = arguments[arguments.length - 1];
+        return ctor.apply(new Klass(name, tag), args);
+      }).defaults(defaults).multiCall(multiCall).build();
+    });
+  };
+
+  cc.once("basic_ops.js", function(payload) {
+    UnaryOpUGen  = payload.UnaryOpUGen;
+    BinaryOpUGen = payload.BinaryOpUGen;
+    MulAdd       = payload.MulAdd;
+  });
+  
+  module.exports = {
+    UGen: UGen,
+    MultiOutUGen: MultiOutUGen,
+    OutputProxy : OutputProxy,
+    Control     : Control,
+    Out         : Out,
+    setSynthDef : setSynthDef,
+    register: register,
+    install: install,
+  };
+
+});
+define('cc/client/buffer', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
   var Emitter = require("../common/emitter").Emitter;
 
   var bufferCache = {};
-  var bufferStore = {};
-  var bufid = 0;
 
   var Buffer = (function() {
+    var bufId = 0;
     function Buffer() {
       Emitter.bind(this);
       this.klassName = "Buffer";
@@ -3846,8 +3346,10 @@ define('cc/server/buffer', function(require, exports, module) {
       this.numChannels = 0;
       this.sampleRate  = 0;
       this.blocking = true;
-      this._bufid = bufid++;
-      bufferStore[this._bufid] = this;
+      this._bufId = bufId++;
+      cc.client.pushCommand([
+        "/b_new", this._bufId
+      ]);
     }
     fn.extend(Buffer, cc.Object);
     return Buffer;
@@ -3887,6 +3389,9 @@ define('cc/server/buffer', function(require, exports, module) {
     this.sampleRate  = buffer.sampleRate;
     this.blocking = false;
     this.emit("load", this);
+    cc.client.pushCommand([
+      "/b_set", this._bufId, numFrames, buffer.numChannels, buffer.sampleRate, samples
+    ]);
   };
   
   var BufferInterface = function() {
@@ -3899,7 +3404,7 @@ define('cc/server/buffer', function(require, exports, module) {
     if (bufferCache[path]) {
       setBuffer.call(buffer, bufferCache[path], startFrame, numFrames);
     } else {
-      cc.server.requestBuffer(path, function(result) {
+      cc.client.requestBuffer(path, function(result) {
         bufferCache[path] = result;
         setBuffer.call(buffer, result, startFrame, numFrames);
       });
@@ -3911,10 +3416,6 @@ define('cc/server/buffer', function(require, exports, module) {
     bufferCache = {};
   };
   
-  var get = function(id) {
-    return bufferStore[id];
-  };
-  
   var install = function() {
     global.Buffer = BufferInterface;
   };
@@ -3922,12 +3423,11 @@ define('cc/server/buffer', function(require, exports, module) {
   module.exports = {
     Buffer: Buffer,
     reset : reset,
-    get   : get,
     install: install
   };
 
 });
-define('cc/server/bop', function(require, exports, module) {
+define('cc/client/bop', function(require, exports, module) {
 
   var fn = require("./fn");
   var UGen  = require("./ugen/ugen").UGen;
@@ -4014,7 +3514,7 @@ define('cc/server/bop', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/basic_ops', function(require, exports, module) {
+define('cc/client/ugen/basic_ops', function(require, exports, module) {
 
   var cc = require("../cc");
   var fn = require("../fn");
@@ -4369,7 +3869,7 @@ define('cc/server/ugen/basic_ops', function(require, exports, module) {
   };
 
 });
-define('cc/server/uop', function(require, exports, module) {
+define('cc/client/uop', function(require, exports, module) {
 
   var fn = require("./fn");
   var UGen = require("./ugen/ugen").UGen;
@@ -4399,7 +3899,7 @@ define('cc/server/uop', function(require, exports, module) {
   };
 
 });
-define('cc/server/scale', function(require, exports, module) {
+define('cc/client/scale', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
@@ -5228,7 +4728,7 @@ define('cc/server/scale', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/installer', function(require, exports, module) {
+define('cc/client/ugen/installer', function(require, exports, module) {
 
   var install = function() {
     require("./ugen").install();
@@ -5246,7 +4746,7 @@ define('cc/server/ugen/installer', function(require, exports, module) {
   };
  
 });
-define('cc/server/ugen/bufio', function(require, exports, module) {
+define('cc/client/ugen/bufio', function(require, exports, module) {
 
   var ugen = require("./ugen");
   var Buffer = require("../buffer").Buffer;
@@ -5290,7 +4790,7 @@ define('cc/server/ugen/bufio', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/delay', function(require, exports, module) {
+define('cc/client/ugen/delay', function(require, exports, module) {
 
   var ugen = require("./ugen");
 
@@ -5318,7 +4818,7 @@ define('cc/server/ugen/delay', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/line', function(require, exports, module) {
+define('cc/client/ugen/line', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
@@ -5346,7 +4846,7 @@ define('cc/server/ugen/line', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/osc', function(require, exports, module) {
+define('cc/client/ugen/osc', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
@@ -5374,7 +4874,7 @@ define('cc/server/ugen/osc', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/pan', function(require, exports, module) {
+define('cc/client/ugen/pan', function(require, exports, module) {
 
   var ugen = require("./ugen");
   var OutputProxy = ugen.OutputProxy;
@@ -5413,7 +4913,7 @@ define('cc/server/ugen/pan', function(require, exports, module) {
   };
 
 });
-define('cc/server/ugen/ui', function(require, exports, module) {
+define('cc/client/ugen/ui', function(require, exports, module) {
   
   var ugen = require("./ugen");
   
@@ -5450,6 +4950,983 @@ define('cc/server/ugen/ui', function(require, exports, module) {
   };
 
 });
+define('cc/server/installer', function(require, exports, module) {
+  
+  var install = function() {
+    require("./server").install();
+    require("./unit/installer").install();
+  };
+  
+  module.exports = {
+    install : install
+  };
+
+});
+define('cc/server/server', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var Userspace = require("./userspace").Userspace;
+  var commands  = {};
+  
+  var SynthServer = (function() {
+    function SynthServer() {
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      this.userspace = new Userspace();
+      this.processed = 0;
+      this.processStart    = 0;
+      this.processInterval = 0;
+    }
+    SynthServer.prototype.sendToClient = function() {
+      // should be overridden
+    };
+    SynthServer.prototype.recvFromClient = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.userspace.setSyncItems(msg[0], msg);
+        return;
+      }
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
+      }
+    };
+    SynthServer.prototype.connect = function() {
+      // should be overridden
+    };
+    SynthServer.prototype.init = function() {
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.rates = {};
+      this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
+      this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
+      var busLength  = this.bufLength * 128 + 4096;
+      var busBuffer  = new Float32Array(busLength);
+      var bufLength  = this.bufLength;
+      var bufLength4 = this.bufLength << 2;
+      this.busBuffer = busBuffer;
+      this.busClear  = new Float32Array(busLength);
+      this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
+      this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
+    };
+    SynthServer.prototype.getRate = function(rate) {
+      return this.rates[rate] || this.rates[1];
+    };
+    SynthServer.prototype.process = function() {
+      // var strm = this.strm;
+      // var strmLength = this.strmLength;
+      // var root = this.rootNode;
+      // var bufLength = this.bufLength;
+      // var offset = 0;
+      // var busBuffer = this.busBuffer;
+      // var busClear  = this.busClear;
+      // var busOutL  = this.busOutL;
+      // var busOutR  = this.busOutR;
+      // var timeline = this.timeline;
+      // var n = strmLength / bufLength;
+      // while (n--) {
+      //   timeline.process();
+      //   busBuffer.set(busClear);
+      //   root.process(bufLength);
+      //   strm.set(busOutL, offset);
+      //   strm.set(busOutR, offset + strmLength);
+      //   offset += bufLength;
+      // }
+      // this.sendToClient(strm);
+    };
+    return SynthServer;
+  })();
+  
+  var WorkerSynthServer = (function() {
+    function WorkerSynthServer() {
+      SynthServer.call(this);
+      this.offset = 0;
+    }
+    fn.extend(WorkerSynthServer, SynthServer);
+    SynthServer.prototype.connect = function() {
+      this.userspace.append(0);
+      this.sendToClient([
+        "/connect", this.sampleRate, this.channels, this.strmLength, this.bufLength
+      ]);
+    };
+    SynthServer.prototype.preprocess = function() {
+      this.offset = 0;
+    };
+    SynthServer.prototype.process = function() {
+      this.busBuffer.set(this.busClear);
+      this.userspace.process(this.bufLength);
+      this.strm.set(this.busOutL, this.offset);
+      this.strm.set(this.busOutR, this.offset + this.strmLength);
+      this.offset += this.bufLength;
+    };
+    SynthServer.prototype.postprocess = function() {
+      this.sendToClient(this.strm);
+    };
+    
+    return WorkerSynthServer;
+  })();
+  
+  commands["/init"] = function(msg) {
+    this.sampleRate = msg[1]|0;
+    this.channels   = msg[2]|0;
+    this.strmLength = msg[3]|0;
+    this.bufLength  = msg[4]|0;
+    this.init(msg);
+  };
+  commands["/play"] = function(msg) {
+    var userId = msg[1]|0;
+    this.userspace.play(userId);
+  };
+  commands["/pause"] = function(msg) {
+    var userId = msg[1]|0;
+    this.userspace.pause(userId);
+  };
+  commands["/reset"] = function(msg) {
+    var userId = msg[1]|0;
+    this.userspace.reset(userId);
+  };
+  commands["/command"] = function(msg) {
+    var userId   = msg[1]|0;
+    var timeline = msg[2];
+    this.userspace.setTimeline(userId, timeline);
+  };
+  
+  var Rate = (function() {
+    var twopi = 2 * Math.PI;
+    function Rate(sampleRate, bufLength) {
+      this.sampleRate = sampleRate;
+      this.sampleDur  = 1 / sampleRate;
+      this.radiansPerSample = twopi / sampleRate;
+      this.bufLength   = bufLength;
+      this.bufDuration = bufLength / sampleRate;
+      this.bufRate = 1 / this.bufDuration;
+      this.slopeFactor = 1 / bufLength;
+      this.filterLoops  = (bufLength / 3)|0;
+      this.filterRemain = (bufLength % 3)|0;
+      if (this.filterLoops === 0) {
+        this.filterSlope = 0;
+      } else {
+        this.filterSlope = 1 / this.filterLoops;
+      }
+    }
+    return Rate;
+  })();
+  
+  var install = function() {
+    cc.server = new WorkerSynthServer();
+  };
+
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/server/cc', function(require, exports, module) {
+
+  var _cc = require("../cc");
+  var Emitter = require("../common/emitter").Emitter;
+
+  if (!_cc.emit) {
+    Emitter.bind(_cc);
+  }
+  
+  module.exports = _cc;
+
+});
+define('cc/server/fn', function(require, exports, module) {
+  
+  var fn = {};
+  
+  fn.extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  
+  module.exports = fn;
+
+});
+define('cc/server/userspace', function(require, exports, module) {
+
+  var node = require("./node");
+  var commands = require("./commands");
+  
+  var Userspace = (function() {
+    function Userspace() {
+      this.heapMap  = {};
+      this.heapList = [];
+    }
+    Userspace.prototype.append = function(userId) {
+      if (!this.heapMap[userId]) {
+        var heap = new Heap(userId);
+        this.heapMap[userId] = heap;
+        this.heapList.push(heap);
+      }
+    };
+    Userspace.prototype.remove = function(userId) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        this.heapList.splice(this.heapList.indexOf(heap), 1);
+        delete this.heapMap[userId];
+      }
+    };
+    Userspace.prototype.play = function(userId) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        heap.rootNode.running = true;
+      }
+    };
+    Userspace.prototype.pause = function(userId) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        heap.rootNode.running = false;
+      }
+    };
+    Userspace.prototype.reset = function(userId) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        heap.reset();
+      }
+    };
+    Userspace.prototype.setSyncItems = function(userId, syncItems) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        heap.syncItems.set(syncItems);
+      }
+    };
+    Userspace.prototype.setTimeline = function(userId, timeline) {
+      var heap = this.heapMap[userId];
+      if (heap) {
+        heap.timeline = timeline;
+      }
+    };
+    Userspace.prototype.process = function(bufLength) {
+      var list = this.heapList;
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        list[i].process(bufLength);
+      }
+    };
+    return Userspace;
+  })();
+  
+  var Heap = (function() {
+    function Heap(userId) {
+      this.userId = userId;
+      this.timeline = [];
+      this.rootNode = new node.Group(0, 0, 0, this);
+      this.nodes = { 0:this.rootNode };
+      this.fixNums = {};
+      this.defs    = {};
+      this.buffers = {};
+      this.syncItems = new Float32Array(5);
+    }
+    Heap.prototype.reset = function() {
+      this.timeline = [];
+      this.rootNode = new node.Group(0, 0, 0, this);
+      this.nodes = { 0:this.rootNode };
+      this.fixNums = {};
+      this.defs    = {};
+      this.buffers = {};
+    };
+    Heap.prototype.getFixNum = function(value) {
+      var fixNums = this.fixNums;
+      return fixNums[value] || (fixNums[value] = {
+        outs: [ new Float32Array([value]) ]
+      });
+    };
+    Heap.prototype.process = function(bufLength) {
+      var timeline = this.timeline;
+      for (var i = 0, imax = timeline.length; i < imax; ++i) {
+        var commandList = timeline[i];
+        for (var j = 0, jmax = commandList.length; j < jmax; ++j) {
+          var args = commandList[j];
+          var func = commands[args[0]];
+          if (func) {
+            func.call(this, args);
+          }
+        }
+      }
+      this.rootNode.process(bufLength, this);
+    };
+    return Heap;
+  })();
+    
+  module.exports = {
+    Userspace: Userspace
+  };
+
+});
+define('cc/server/node', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+
+  var Unit = require("./unit/unit").Unit;
+  var graphFunc  = {};
+  var doneAction = {};
+  
+  graphFunc[0] = function(node) {
+    var prev;
+    if (this instanceof Group) {
+      if (this.head === null) {
+        this.head = this.tail = node;
+      } else {
+        prev = this.head.prev;
+        if (prev) {
+          prev.next = node;
+        }
+        node.next = this.head;
+        this.head.prev = node;
+        this.head = node;
+      }
+      node.parent = this;
+    }
+  };
+  graphFunc[1] = function(node) {
+    var next;
+    if (this instanceof Group) {
+      if (this.tail === null) {
+        this.head = this.tail = node;
+      } else {
+        next = this.tail.next;
+        if (next) {
+          next.prev = node;
+        }
+        node.prev = this.tail;
+        this.tail.next = node;
+        this.tail = node;
+      }
+      node.parent = this;
+    }
+  };
+  graphFunc[2] = function(node) {
+    var prev = this.prev;
+    this.prev = node;
+    node.prev = prev;
+    if (prev) {
+      prev.next = node;
+    }
+    node.next = this;
+    if (this.parent && this.parent.head === this) {
+      this.parent.head = node;
+    }
+    node.parent = this.parent;
+  };
+  graphFunc[3] = function(node) {
+    var next = this.next;
+    this.next = node;
+    node.next = next;
+    if (next) {
+      next.prev = node;
+    }
+    node.prev = this;
+    if (this.parent && this.parent.tail === this) {
+      this.parent.tail = node;
+    }
+    node.parent = this.parent;
+  };
+  graphFunc[4] = function(node) {
+    node.next = this.next;
+    node.prev = this.prev;
+    node.head = this.head;
+    node.tail = this.tail;
+    node.parent = this.parent;
+    if (this.prev) {
+      this.prev.next = node;
+    }
+    if (this.next) {
+      this.next.prev = node;
+    }
+    if (this.parent && this.parent.head === this) {
+      this.parent.head = node;
+    }
+    if (this.parent && this.parent.tail === this) {
+      this.parent.tail = node;
+    }
+  };
+  
+  doneAction[0] = function() {
+    // do nothing when the UGen is finished
+  };
+  doneAction[1] = function() {
+    // pause the enclosing synth, but do not free it
+    this.running = false;
+  };
+  doneAction[2] = function() {
+    // free the enclosing synth
+    free.call(this);
+  };
+  doneAction[3] = function() {
+    // free both this synth and the preceding node
+    var prev = this.prev;
+    if (prev) {
+      free.call(prev);
+    }
+    free.call(this);
+  };
+  doneAction[4] = function() {
+    // free both this synth and the following node
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      free.call(next);
+    }
+  };
+  doneAction[5] = function() {
+    // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
+    var prev = this.prev;
+    if (prev instanceof Group) {
+      g_freeAll(prev);
+    } else {
+      free.call(prev);
+    }
+    free.call(this);
+  };
+  doneAction[6] = function() {
+    // free this synth; if the following node is a group then do g_freeAll on it, else free it
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      g_freeAll(next);
+    } else {
+      free.call(next);
+    }
+  };
+  doneAction[7] = function() {
+    // free this synth and all preceding nodes in this group
+    var next = this.parent.head;
+    if (next) {
+      var node = next;
+      while (node && node !== this) {
+        next = node.next;
+        free.call(node);
+        node = next;
+      }
+    }
+    free.call(this);
+  };
+  doneAction[8] = function() {
+    // free this synth and all following nodes in this group
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      var node = next;
+      while (node) {
+        next = node.next;
+        free.call(node);
+        node = next;
+      }
+    }
+  };
+  doneAction[9] = function() {
+    // free this synth and pause the preceding node
+    var prev = this.prev;
+    free.call(this);
+    if (prev) {
+      prev.running = false;
+    }
+  };
+  doneAction[10] = function() {
+    // free this synth and pause the following node
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      next.running = false;
+    }
+  };
+  doneAction[11] = function() {
+    // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
+    var prev = this.prev;
+    if (prev instanceof Group) {
+      g_deepFree(prev);
+    } else {
+      free.call(prev);
+    }
+    free.call(this);
+  };
+  doneAction[12] = function() {
+    // free this synth and if the following node is a group then do g_deepFree on it, else free it
+    var next = this.next;
+    free.call(this);
+    if (next) {
+      g_deepFree(next);
+    } else {
+      free.call(next);
+    }
+  };
+  doneAction[13] = function() {
+    // free this synth and all other nodes in this group (before and after)
+    var next = this.parent.head;
+    if (next) {
+      var node = next;
+      while (node) {
+        next = node.next;
+        free.call(node);
+        node = next;
+      }
+    }
+  };
+  doneAction[14] = function() {
+    // free the enclosing group and all nodes within it (including this synth)
+    g_deepFree(this);
+  };
+  var free = function() {
+    if (this.prev) {
+      this.prev.next = this.next;
+    }
+    if (this.next) {
+      this.next.prev = this.prev;
+    }
+    if (this.parent) {
+      if (this.parent.head === this) {
+        this.parent.head = this.next;
+      }
+      if (this.parent.tail === this) {
+        this.parent.tail = this.prev;
+      }
+      cc.server.sendToClient([
+        "/n_end", this.nodeId
+      ], this.heap);
+    }
+    this.prev = null;
+    this.next = null;
+    this.parent = null;
+    this.blocking = false;
+    if (this.heap) {
+      delete this.heap.nodes[this.nodeId];
+    }
+  };
+  var g_freeAll = function(node) {
+    var next = node.head;
+    free.call(node);
+    node = next;
+    while (node) {
+      next = node.next;
+      free.call(node);
+      node = next;
+    }
+  };
+  var g_deepFree = function(node) {
+    var next = node.head;
+    free.call(node);
+    node = next;
+    while (node) {
+      next = node.next;
+      free.call(node);
+      if (node instanceof Group) {
+        g_deepFree(node);
+      }
+      node = next;
+    }
+  };
+  
+  var Node = (function() {
+    function Node(nodeId, heap) {
+      this.nodeId = nodeId|0;
+      this.next   = null;
+      this.prev   = null;
+      this.parent = null;
+      this.running = true;
+      this.heap = heap;
+    }
+    Node.prototype.play = function() {
+      this.running = true;
+    };
+    Node.prototype.pause = function() {
+      this.running = false;
+    };
+    Node.prototype.stop = function() {
+      free.call(this);
+    };
+    Node.prototype.doneAction = function(action, tag) {
+      var func = doneAction[action];
+      if (func) {
+        cc.server.sendToClient([
+          "/n_done", this.nodeId, tag
+        ], this.heap);
+        func.call(this);
+      }
+    };
+    return Node;
+  })();
+
+  var Group = (function() {
+    function Group(nodeId, target, addAction, heap) {
+      Node.call(this, nodeId, heap);
+      this.head = null;
+      this.tail = null;
+      if (target) {
+        graphFunc[addAction].call(target, this);
+      }
+    }
+    fn.extend(Group, Node);
+    
+    Group.prototype.process = function(inNumSamples, heap) {
+      if (this.head && this.running) {
+        this.head.process(inNumSamples, heap);
+      }
+      if (this.next) {
+        this.next.process(inNumSamples, heap);
+      }
+    };
+    
+    return Group;
+  })();
+
+  var Synth = (function() {
+    function Synth(nodeId, defId, node, args, addAction, heap) {
+      Node.call(this, nodeId, heap);
+      if (heap) {
+        var specs = heap.defs[defId];
+        if (specs) {
+          this.build(specs, args, heap);
+        }
+      }
+      if (node) {
+        graphFunc[addAction].call(node, this);
+      }
+    }
+    fn.extend(Synth, Node);
+    
+    Synth.prototype.build = function(specs, args, heap) {
+      this.specs = specs;
+
+      var fixNumList = specs.consts.map(function(value) {
+        return heap.getFixNum(value);
+      });
+      var unitList = specs.defs.map(function(spec) {
+        return new Unit(this, spec);
+      }, this);
+      this.params   = specs.params;
+      this.controls = new Float32Array(this.params.values);
+      args = 0; // TODO:
+      // this.set(args);
+      this.unitList = unitList.filter(function(unit) {
+        var inputs  = unit.inputs;
+        var inRates = unit.inRates;
+        var inSpec  = unit.specs[3];
+        var tag     = unit.specs[5];
+        for (var i = 0, imax = inputs.length; i < imax; ++i) {
+          var i2 = i << 1;
+          if (inSpec[i2] === -1) {
+            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
+            inRates[i] = 0;
+          } else {
+            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
+            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+          }
+        }
+        unit.init(tag);
+        return !!unit.process;
+      });
+      return this;
+    };
+
+    Synth.prototype.set = function(controls) {
+      for (var i = 0, imax = controls.length; i < imax; i += 2) {
+        var index = controls[i    ];
+        var value = controls[i + 1];
+        this.controls[index] = value;
+      }
+    };
+    
+    Synth.prototype.process = function(inNumSamples, heap) {
+      if (this.running && this.unitList) {
+        var unitList = this.unitList;
+        for (var i = 0, imax = unitList.length; i < imax; ++i) {
+          var unit = unitList[i];
+          unit.process(unit.rate.bufLength, heap);
+        }
+      }
+      if (this.next) {
+        this.next.process(inNumSamples, heap);
+      }
+    };
+    
+    return Synth;
+  })();
+  
+  module.exports = {
+    Node : Node,
+    Group: Group,
+    Synth: Synth,
+  };
+
+});
+define('cc/server/unit/unit', function(require, exports, module) {
+
+  var cc = require("../cc");
+    
+  var units = {};
+  
+  var Unit = (function() {
+    function Unit(parent, specs) {
+      this.parent = parent;
+      this.specs  = specs;
+      this.name         = specs[0];
+      this.calcRate     = specs[1];
+      this.specialIndex = specs[2];
+      this.numOfInputs  = specs[3].length >> 1;
+      this.numOfOutputs = specs[4].length;
+      this.inputs   = new Array(this.numOfInputs);
+      this.inRates  = new Array(this.numOfInputs);
+      this.outRates = specs[4];
+      this.rate = cc.server.getRate(this.calcRate);
+      var bufLength = this.rate.bufLength;
+      var outs = new Array(this.numOfOutputs);
+      for (var i = 0, imax = outs.length; i < imax; ++i) {
+        outs[i] = new Float32Array(bufLength);
+      }
+      this.outs      = outs;
+      this.bufLength = bufLength;
+      this.done      = false;
+    }
+    Unit.prototype.init = function(tag) {
+      var ctor = units[this.name];
+      if (ctor) {
+        ctor.call(this);
+      } else {
+        console.warn(this.name + "'s ctor is not found.");
+      }
+      this.tag = tag;
+      return this;
+    };
+    Unit.prototype.doneAction = function(action) {
+      if (!this.done) {
+        this.done = true;
+        this.parent.doneAction(action, this.tag);
+      }
+    };
+    return Unit;
+  })();
+  
+  var Control = function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      this.outs[0][0] = this.parent.controls[this.specialIndex];
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outs = this.outs;
+      var specialIndex = this.specialIndex;
+      for (var i = 0, imax = outs.length; i < imax; ++i) {
+        outs[i][0] = controls[i + specialIndex];
+      }
+    };
+    return ctor;
+  };
+  
+  var Out = function() {
+    var ctor = function() {
+      this._busBuffer = cc.server.busBuffer;
+      this._bufLength = cc.server.bufLength;
+      if (this.calcRate === 2) {
+        this.process = next_a;
+        this._busOffset = 0;
+      } else {
+        this.process = next_k;
+        this._busOffset = this._bufLength * 128;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var bufLength = this._bufLength;
+      var offset, _in;
+      var fbusChannel = (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        offset = (fbusChannel + i) * bufLength;
+        _in = inputs[i];
+        for (var j = 0; j < inNumSamples; j++) {
+          busBuffer[offset + j] += _in[j];
+        }
+      }
+    };
+    var next_k = function() {
+      var inputs = this.inputs;
+      var busBuffer = this._busBuffer;
+      var offset    = this._busOffset + (inputs[0][0]|0) - 1;
+      for (var i = 1, imax = inputs.length; i < imax; ++i) {
+        busBuffer[offset + i] += inputs[i][0];
+      }
+    };
+    return ctor;
+  };
+
+  var In = function() {
+    var ctor = function() {
+      this._busBuffer = cc.server.busBuffer;
+      this._bufLength = cc.server.bufLength;
+      if (this.calcRate === 2) {
+        this.process = next_a;
+        this._busOffset = 0;
+      } else {
+        this.process = next_k;
+        this._busOffset = this._bufLength * 128;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var busBuffer = this._busBuffer;
+      var bufLength = this._bufLength;
+      var offset = (this.inputs[0][0] * bufLength)|0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        outs[i] = busBuffer[offset + i];
+      }
+    };
+    var next_k = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs  = this.outs[0];
+      var value = this._busBuffer[this._busOffset + (this.inputs[0][0]|0)];
+      for (var i = 0; i < inNumSamples; ++i) {
+        outs[i] = value;
+      }
+    };
+    return ctor;
+  };
+  
+  var register = function(name, payload) {
+    units[name] = payload();
+  };
+  
+  var install = function() {
+    register("Control", Control);
+    register("Out"    , Out    );
+    register("In"     , In     );
+  };
+  
+  module.exports = {
+    Unit    : Unit,
+    Control : Control,
+    register: register,
+    install : install
+  };
+
+});
+define('cc/server/commands', function(require, exports, module) {
+  
+  var node   = require("./node");
+  var buffer = require("./buffer");
+  
+  var commands = {};
+  
+  // the 'this.' context is a heap.
+  
+  commands["/n_run"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var flag   = !!msg[2];
+    var target = this.nodes[nodeId];
+    if (target) {
+      target.running = flag;
+    }
+  };
+  commands["/n_free"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var target = this.nodes[nodeId];
+    if (target) {
+      target.doneAction(2);
+    }
+  };
+  commands["/n_set"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var controls = msg[2];
+    var target = this.nodes[nodeId];
+    if (target) {
+      target.set(controls);
+    }
+  };
+  commands["/g_new"] = function(msg) {
+    var nodeId       = msg[1]|0;
+    var addAction    = msg[2]|0;
+    var targetNodeId = msg[3]|0;
+    var target = this.nodes[targetNodeId];
+    if (target) {
+      this.nodes[nodeId] = new node.Group(nodeId, target, addAction, this);
+    }
+  };
+  commands["/s_def"] = function(msg) {
+    var defId = msg[1]|0;
+    var specs = JSON.parse(msg[2]);
+    this.defs[defId] = specs;
+  };
+  commands["/s_new"] = function(msg) {
+    var defId        = msg[1]|0;
+    var nodeId       = msg[2]|0;
+    var addAction    = msg[3]|0;
+    var targetNodeId = msg[4]|0;
+    var target = this.nodes[targetNodeId];
+    if (target) {
+      this.nodes[nodeId] = new node.Synth(nodeId, defId, target, {}, addAction, this);
+    }
+  };
+  commands["/b_new"] = function(msg) {
+    var bufId = msg[1]|0;
+    this.buffers[bufId] = new buffer.Buffer(bufId);
+  };
+  commands["/b_set"] = function(msg) {
+    var bufId       = msg[1]|0;
+    var numFrames   = msg[2]|0;
+    var numChannels = msg[3]|0;
+    var sampleRate  = msg[4]|0;
+    var samples     = msg[5];
+    var buffer = this.buffers[bufId];
+    if (buffer) {
+      buffer.set(numFrames, numChannels, sampleRate, samples);
+    }
+  };
+  
+  module.exports = commands;
+
+});
+define('cc/server/buffer', function(require, exports, module) {
+  
+  var Buffer = (function() {
+    function Buffer(bufId) {
+      this.bufId       = bufId;
+      this.numFrames   = 0;
+      this.numChannels = 0;
+      this.sampleRate  = 0;
+      this.samples     = null;
+    }
+    Buffer.prototype.set = function(numFrames, numChannels, sampleRate, samples) {
+      this.numFrames   = numFrames;
+      this.numChannels = numChannels;
+      this.sampleRate  = sampleRate;
+      this.samples     = samples;
+    };
+    return Buffer;
+  })();
+  
+  module.exports = {
+    Buffer: Buffer
+  };
+
+});
 define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
@@ -5471,7 +5948,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
 define('cc/server/unit/basic_ops', function(require, exports, module) {
 
   var unit = require("./unit");
-  var ops  = require("../ugen/basic_ops");
+  var ops  = require("../../client/ugen/basic_ops");
 
   var UnaryOpUGen = (function() {
     var UNARY_OP_UGEN_MAP = ops.UNARY_OP_UGEN_MAP;
@@ -6643,7 +7120,6 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
 define('cc/server/unit/bufio', function(require, exports, module) {
   
   var unit = require("./unit");
-  var buffer = require("../buffer");
   
   var sc_loop = function(unit, index, hi, loop) {
     if (index >= hi) {
@@ -6680,28 +7156,30 @@ define('cc/server/unit/bufio', function(require, exports, module) {
   
   var PlayBuf = function() {
     var ctor = function() {
-      this._buffer = buffer.get(this.specialIndex);
+      this._buffer = null;
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
       this.process = next_choose;
-      this.process.call(this);
     };
-    var next_choose  = function(inNumSamples) {
-      if (this._buffer.samples !== null) {
-        if (this.inRates[1] === 2) {
-          if (this.inRates[2] === 2) {
-            this.process = next_kk; // aa
+    var next_choose  = function(inNumSamples, heap) {
+      this._buffer = heap.buffers[this.specialIndex];
+      if (this._buffer) {
+        if (this._buffer.samples !== null) {
+          if (this.inRates[1] === 2) {
+            if (this.inRates[2] === 2) {
+              this.process = next_kk; // aa
+            } else {
+              this.process = next_kk; // ak
+            }
           } else {
-            this.process = next_kk; // ak
+            if (this.inRates[2] === 2) {
+              this.process = next_kk; // ka
+            } else {
+              this.process = next_kk; // kk
+            }
           }
-        } else {
-          if (this.inRates[2] === 2) {
-            this.process = next_kk; // ka
-          } else {
-            this.process = next_kk; // kk
-          }
+          this.process.call(this, inNumSamples);
         }
-        this.process.call(this, inNumSamples);
       }
     };
     var next_kk = function(inNumSamples) {
@@ -7467,10 +7945,9 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function() {
+    var next = function(inNumSamples, heap) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -7481,7 +7958,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[2];
+      var y0 = heap ? heap.syncItems[2] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -7499,10 +7976,9 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function() {
+    var next = function(inNumSamples, heap) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -7513,7 +7989,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[3];
+      var y0 = heap ? heap.syncItems[3] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -7534,7 +8010,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function() {
+    var next = function(inNumSamples, heap) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];
@@ -7544,7 +8020,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = this._mouse[1] ? maxval : minval;
+      var y0 = heap ? (heap.syncItems[1] ? maxval : minval) : minval;
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };

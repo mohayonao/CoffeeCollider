@@ -7,15 +7,15 @@
   "AUDIO_BUS_LEN"  : 128,
   "CONTROL_BUS_LEN": 4096,
   "SYNC_ITEM_LEN": 5,
-  "SYNC"   : 0,
+  "USER_ID": 0,
   "BUTTON" : 1,
   "POS_X"  : 2,
   "POS_Y"  : 3,
   "KEYCODE": 4,
-  "FREE"       :  2,
-  "ADD_TO_HEAD": -1,
-  "ADD_TO_TAIL": -2,
-  "ADD_BEFORE" : -3,
-  "ADD_AFTER"  : -4,
-  "REPLACE"    : -5
+  "FREE"       : 2,
+  "ADD_TO_HEAD": 0,
+  "ADD_TO_TAIL": 1,
+  "ADD_BEFORE" : 2,
+  "ADD_AFTER"  : 3,
+  "REPLACE"    : 4
 }

@@ -15,13 +15,13 @@ define(function(require, exports, module) {
   var TaskInterval = sched.TaskInterval;
   var TaskBlock = sched.TaskBlock;
 
-  var MockServer = (function() {
-    function MockServer() {
+  var MockClient = (function() {
+    function MockClient() {
       this.sampleRate = 44100;
       this.bufLength  = 64;
       this.timeline   = new Timeline(this);
     }
-    return MockServer;
+    return MockClient;
   })();
 
   describe("sched.js", function() {
@@ -30,8 +30,8 @@ define(function(require, exports, module) {
       sched.install(register);
     });
     beforeEach(function() {
-      cc.server = new MockServer();
-      timeline  = cc.server.timeline;
+      cc.client = new MockClient();
+      timeline  = cc.client.timeline;
       procN = function(n) {
         for (var i = 0; i < n; i++) {
           timeline.process();

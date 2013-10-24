@@ -7,7 +7,6 @@ define(function(require, exports, module) {
   
   var Unit = (function() {
     function Unit(parent, specs) {
-      this.klassName = "Unit";
       this.parent = parent;
       this.specs  = specs;
       this.name         = specs[0];
@@ -41,28 +40,12 @@ define(function(require, exports, module) {
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent._doneAction(action, this.tag);
+        this.parent.doneAction(action, this.tag);
       }
     };
     return Unit;
   })();
   
-  var FixNum = (function() {
-    var map = {};
-    function FixNum(value) {
-      if (map[value]) {
-        return map[value];
-      }
-      this.klassName = "FixNum";
-      this.outs = [ new Float32Array([value]) ];
-      map[value] = this;
-    }
-    FixNum.reset = function() {
-      map = {};
-    };
-    return FixNum;
-  })();
-
   var Control = function() {
     var ctor = function() {
       if (this.numOfOutputs === 1) {
@@ -160,7 +143,7 @@ define(function(require, exports, module) {
   var register = function(name, payload) {
     units[name] = payload();
   };
-
+  
   var install = function() {
     register("Control", Control);
     register("Out"    , Out    );
@@ -169,7 +152,6 @@ define(function(require, exports, module) {
   
   module.exports = {
     Unit    : Unit,
-    FixNum  : FixNum,
     Control : Control,
     register: register,
     install : install

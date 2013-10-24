@@ -4,11 +4,15 @@ define(function(require, exports, module) {
   var cc = require("./cc");
 
   if (typeof document !== "undefined") {
-    cc.context = "client";
-    require("./client/installer").install();
+    cc.context = "window";
+    require("./exports/installer").install();
   } else if (typeof WorkerLocation !== "undefined") {
-    cc.context = "server";
+    cc.context = "worker";
+    require("./client/installer").install();
     require("./server/installer").install();
+    cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
+    cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
+    cc.server.connect();
   }
   
   module.exports = {

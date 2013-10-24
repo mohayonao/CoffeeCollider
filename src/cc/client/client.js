@@ -1,191 +1,227 @@
 define(function(require, exports, module) {
   "use strict";
-
-  var cc = require("../cc");
-  var SoundSystem = require("./sound_system").SoundSystem;
-  var Compiler = require("./compiler").Compiler;
-  var unpack = require("../common/pack").unpack;
-
+  
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var pack  = require("../common/pack").pack;
+  var Timer    = require("../common/timer").Timer;
+  var Timeline = require("./sched").Timeline;
+  var node     = require("./node");
+  var buffer   = require("./buffer");
   var commands = {};
   
   var SynthClient = (function() {
     function SynthClient() {
-      var that = this;
-      this.worker = new Worker(cc.coffeeColliderPath);
-      this.worker.addEventListener("message", function(e) {
-        var msg = e.data;
-        if (msg instanceof Float32Array) {
-            that.strmList[that.strmListWriteIndex] = msg;
-            that.strmListWriteIndex = (that.strmListWriteIndex + 1) & 7;
-        } else {
-          that.recv(msg);
-        }
-      });
-      this.compiler = new Compiler();
-      
-      this.isConnected = false;
-      this.execId = 0;
-      this.execCallbacks = {};
-
-      this.sys = SoundSystem.getInstance();
-      this.sys.append(this);
-
-      this.sampleRate = this.sys.sampleRate;
-      this.channels   = this.sys.channels;
-      this.strmLength = this.sys.strmLength;
-      this.bufLength  = this.sys.bufLength;
-      
-      this.isPlaying = false;
-      this.strm = new Float32Array(this.strmLength * this.channels);
+      this.klassName = "SynthClient";
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      this.userId     = 0;
+      this.timer      = new Timer();
+      this.timeline   = new Timeline(this);
+      this.rootNode   = new node.Group();
+      this.commandList = [];
+      this.bufferRequestId = 0;
+      this.bufferRequestCallback = {};
     }
-    SynthClient.prototype.destroy = function() {
-      this.sys.remove(this);
-      delete this.worker;
+    SynthClient.prototype.sendToIF = function(msg) {
+      postMessage(msg);
     };
-    SynthClient.prototype.play = function() {
-      if (!this.isPlaying) {
-        this.isPlaying = true;
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
-        }
-        this.strmList = new Array(8);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.sys.play();
-        this.send(["/play", this.sys.syncCount]);
-      }
-    };
-    SynthClient.prototype.reset = function() {
-      this.send(["/reset"]);
-    };
-    SynthClient.prototype.pause = function() {
-      if (this.isPlaying) {
-        this.isPlaying = false;
-        this.sys.pause();
-        this.send(["/pause"]);
-      }
-    };
-    SynthClient.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
-      if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
-        this.strm.set(strm);
-      }
-    };
-    SynthClient.prototype.execute = function(code) {
-      var append, callback;
-      var i = 1;
-
-      if (typeof arguments[i] === "boolean") {
-        append = arguments[i++];
-      } else {
-        append = false;
-      }
-      if (typeof arguments[i] === "function") {
-        callback = arguments[i++];
-      }
-      
-      if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
-        this.send(["/execute", this.execId, code, append, this.compiler.data, !!callback]);
-        if (callback) {
-          this.execCallbacks[this.execId] = callback;
-        }
-        this.execId += 1;
-      }
-    };
-    SynthClient.prototype.importScripts = function(list) {
-      this.send(["/importScripts", list]);
-    };
-    SynthClient.prototype.send = function(msg) {
-      this.worker.postMessage(msg);
-    };
-    SynthClient.prototype.recv = function(msg) {
-      if (!msg) {
-        return;
-      }
+    SynthClient.prototype.recvFromIF = function(msg) {
       var func = commands[msg[0]];
       if (func) {
         func.call(this, msg);
       }
     };
-    SynthClient.prototype.sync = function(syncItems) {
-      this.send(syncItems);
+    SynthClient.prototype.sendToServer = function() {
+      // should be overridden
     };
-    SynthClient.prototype.readAudioFile = function(path, callback) {
-      var sys = this.sys;
-      if (!sys.api.decodeAudioFile) {
-        callback(null);
+    SynthClient.prototype.recvFromServer = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.sendToIF(msg);
         return;
       }
-      var decode = function(buffer) {
-        sys.api.decodeAudioFile(buffer, function(buffer) {
-          callback(buffer);
-        });
-      };
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", path);
-      xhr.responseType = "arraybuffer";
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200 && xhr.response) {
-            if (callback) {
-              decode(xhr.response);
-            }
-          } else {
-            callback(null);
-          }
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
         }
-      };
-      xhr.send();
+      }
+    };
+    SynthClient.prototype.pushCommand = function(cmd) {
+      this.commandList.push(cmd);
+    };
+    SynthClient.prototype.play = function() {
+    };
+    SynthClient.prototype.pause = function() {
+    };
+    SynthClient.prototype.reset = function() {
+    };
+    SynthClient.prototype.requestBuffer = function() {
+    };
+    SynthClient.prototype.process = function() {
     };
     return SynthClient;
   })();
-  
-  commands["/connect"] = function() {
-    this.isConnected = true;
-    this.send([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength, this.sys.syncCount
+
+  var WorkerSynthClient = (function() {
+    function WorkerSynthClient() {
+      SynthClient.call(this);
+    }
+    fn.extend(WorkerSynthClient, SynthClient);
+    WorkerSynthClient.prototype.requestBuffer = function(path, callback) {
+      if (!(typeof path === "string" && typeof callback === "function")) {
+        return;
+      }
+      var requestId = this.bufferRequestId++;
+      this.bufferRequestCallback[requestId] = callback;
+      this.sendToIF(["/buffer/request", path, requestId]);
+    };
+    WorkerSynthClient.prototype.play = function(msg) {
+      if (!this.timer.isRunning) {
+        this.processStart = Date.now();
+        this.processDone  = 0;
+        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
+        this.timer.start(this.process.bind(this), this.processInterval * 0.5);
+        this.timeline.play();
+        this.sendToServer(msg);
+      }
+    };
+    WorkerSynthClient.prototype.pause = function(msg) {
+      if (this.timer.isRunning) {
+        this.timeline.pause();
+        this.timer.stop();
+        this.sendToServer(msg);
+      }
+    };
+    WorkerSynthClient.prototype.reset = function(msg) {
+      buffer.reset();
+      node.reset();
+      this.timeline.reset();
+      this.sendToServer(msg);
+    };
+    WorkerSynthClient.prototype.process = function() {
+      if (this.processDone - 25 > Date.now() - this.processStart) {
+        return;
+      }
+      var userId   = this.userId;
+      var timeline = this.timeline;
+      var server   = cc.server;
+      var n = this.strmLength / this.bufLength;
+      server.preprocess();
+      while (n--) {
+        timeline.process();
+        this.sendToServer([
+          "/command", userId, [ this.commandList ]
+        ]);
+        this.commandList = [];
+        server.process();
+      }
+      server.postprocess();
+      this.processDone += this.processInterval;
+    };
+    return WorkerSynthClient;
+  })();
+
+  commands["/connect"] = function(msg) {
+    var sampleRate = msg[1]|0;
+    var channels   = msg[2]|0;
+    var strmLength = msg[3]|0;
+    var bufLength  = msg[4]|0;
+    this.userId = msg[5]|0;
+    this.sendToIF([
+      "/connect", sampleRate, channels, strmLength, bufLength
     ]);
   };
+  commands["/init"] = function(msg) {
+    this.sampleRate = msg[1];
+    this.channels   = msg[2];
+    this.strmLength = msg[3];
+    this.bufLength  = msg[4];
+    this.sendToServer(msg);
+  };
+  commands["/play"] = function(msg) {
+    this.play(msg);
+  };
+  commands["/pause"] = function(msg) {
+    this.pause(msg);
+  };
+  commands["/reset"] = function(msg) {
+    this.reset(msg);
+  };
   commands["/execute"] = function(msg) {
-    var execId = msg[1];
-    var result = msg[2];
-    var callback = this.execCallbacks[execId];
+    var execId   = msg[1];
+    var code     = msg[2];
+    var append   = msg[3];
+    var data     = msg[4];
+    var callback = msg[5];
+    if (!append) {
+      this.reset(["/reset"]);
+    }
+    global.DATA = data;
+    var result = eval.call(global, code);
     if (callback) {
-      if (result !== undefined) {
-        result = unpack(result);
-      }
-      callback(result);
-      delete this.execCallbacks[execId];
+      this.sendToIF(["/execute", execId, pack(result)]);
     }
   };
-  commands["/buffer/request"] = function(msg) {
-    var that = this;
+  commands["/buffer/response"] = function(msg) {
+    var buffer = msg[1];
     var requestId = msg[2];
-    this.readAudioFile(msg[1], function(buffer) {
-      that.send(["/buffer/response", buffer, requestId]);
+    var callback = this.bufferRequestCallback[requestId];
+    if (callback) {
+      callback(buffer);
+      delete this.bufferRequestCallback[requestId];
+    }
+  };
+  commands["/importScripts"] = function(msg) {
+    importScripts(msg[1]);
+  };
+  commands["/n_end"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var n = node.get(nodeId);
+    if (n) {
+      n.emit("end");
+    }
+  };
+  commands["/n_done"] = function(msg) {
+    var nodeId = msg[1]|0;
+    var tag    = msg[2];
+    var n = node.get(nodeId);
+    if (n) {
+      n.emit("done", tag);
+    }
+  };
+  
+  var install = function() {
+    var client = cc.client = new WorkerSynthClient();
+    addEventListener("message", function(e) {
+      var msg = e.data;
+      if (msg instanceof Float32Array) {
+        msg[C.USER_ID] = client.userId;
+        client.sendToServer(msg);
+      } else {
+        client.recvFromIF(msg);
+      }
     });
-  };
-  commands["/console/log"] = function(msg) {
-    console.log.apply(console, unpack(msg[1]));
-  };
-  commands["/console/debug"] = function(msg) {
-    console.debug.apply(console, unpack(msg[1]));
-  };
-  commands["/console/info"] = function(msg) {
-    console.info.apply(console, unpack(msg[1]));
-  };
-  commands["/console/warn"] = function(msg) {
-    console.warn.apply(console, unpack(msg[1]));
-  };
-  commands["/console/error"] = function(msg) {
-    console.error.apply(console, unpack(msg[1]));
+    if (typeof global.console === "undefined") {
+      global.console = (function() {
+        var console = {};
+        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+          console[method] = function() {
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            client.sendToIF(["/console/" + method, args]);
+          };
+        });
+        return console;
+      })();
+    }
   };
   
   module.exports = {
-    SynthClient: SynthClient
+    install: install
   };
 
 });

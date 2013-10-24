@@ -2,153 +2,138 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var Group    = require("./node").Group;
-  var Timeline = require("./sched").Timeline;
-  var buffer   = require("./buffer");
-  var pack = require("../common/pack").pack;
-  
-  var commands = {};
-  var twopi = 2 * Math.PI;
+  var fn = require("./fn");
+  var Userspace = require("./userspace").Userspace;
+  var commands  = {};
   
   var SynthServer = (function() {
     function SynthServer() {
-      this.klassName = "SynthServer";
-      this.sysSyncCount = 0;
-      this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
-      this.timeline = new Timeline(this);
-      this.timerId = 0;
-      this.bufferRequestId = 0;
-      this.bufferRequestCallback = {};
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      this.userspace = new Userspace();
+      this.processed = 0;
+      this.processStart    = 0;
+      this.processInterval = 0;
     }
-    SynthServer.prototype.send = function(msg) {
-      postMessage(msg);
+    SynthServer.prototype.sendToClient = function() {
+      // should be overridden
     };
-    SynthServer.prototype.recv = function(msg) {
-      if (!msg) {
+    SynthServer.prototype.recvFromClient = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.userspace.setSyncItems(msg[0], msg);
         return;
       }
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
       }
     };
-    SynthServer.prototype.reset = function() {
-      buffer.reset();
-      this.timeline.reset();
-      this.rootNode.prevNode = null;
-      this.rootNode.nextNode = null;
-      this.rootNode.headNode = null;
-      this.rootNode.tailNode = null;
+    SynthServer.prototype.connect = function() {
+      // should be overridden
+    };
+    SynthServer.prototype.init = function() {
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.rates = {};
+      this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
+      this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
+      var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+      var busBuffer  = new Float32Array(busLength);
+      var bufLength  = this.bufLength;
+      var bufLength4 = this.bufLength << 2;
+      this.busBuffer = busBuffer;
+      this.busClear  = new Float32Array(busLength);
+      this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
+      this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[C.CONTROL];
     };
-    SynthServer.prototype.requestBuffer = function(path, callback) {
-      if (!(typeof path === "string" && typeof callback === "function")) {
-        return;
-      }
-      var requestId = this.bufferRequestId++;
-      this.bufferRequestCallback[requestId] = callback;
-      this.send(["/buffer/request", path, requestId]);
-    };
-    SynthServer.prototype.onaudioprocess = function() {
-      if (this.syncCount - this.sysSyncCount >= 4) {
-        return;
-      }
-      var strm = this.strm;
-      var strmLength = this.strmLength;
-      var root = this.rootNode;
-      var bufLength = this.bufLength;
-      var offset = 0;
-      var busBuffer = this.busBuffer;
-      var busClear  = this.busClear;
-      var busOutL  = this.busOutL;
-      var busOutR  = this.busOutR;
-      var timeline = this.timeline;
-      var n = strmLength / bufLength;
-      while (n--) {
-        timeline.process();
-        busBuffer.set(busClear);
-        root._process(bufLength);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
-        offset += bufLength;
-      }
-      this.send(strm);
-      this.syncCount += 1;
+    SynthServer.prototype.process = function() {
+      // var strm = this.strm;
+      // var strmLength = this.strmLength;
+      // var root = this.rootNode;
+      // var bufLength = this.bufLength;
+      // var offset = 0;
+      // var busBuffer = this.busBuffer;
+      // var busClear  = this.busClear;
+      // var busOutL  = this.busOutL;
+      // var busOutR  = this.busOutR;
+      // var timeline = this.timeline;
+      // var n = strmLength / bufLength;
+      // while (n--) {
+      //   timeline.process();
+      //   busBuffer.set(busClear);
+      //   root.process(bufLength);
+      //   strm.set(busOutL, offset);
+      //   strm.set(busOutR, offset + strmLength);
+      //   offset += bufLength;
+      // }
+      // this.sendToClient(strm);
     };
     return SynthServer;
   })();
-
+  
+  var WorkerSynthServer = (function() {
+    function WorkerSynthServer() {
+      SynthServer.call(this);
+      this.offset = 0;
+    }
+    fn.extend(WorkerSynthServer, SynthServer);
+    SynthServer.prototype.connect = function() {
+      this.userspace.append(0);
+      this.sendToClient([
+        "/connect", this.sampleRate, this.channels, this.strmLength, this.bufLength
+      ]);
+    };
+    SynthServer.prototype.preprocess = function() {
+      this.offset = 0;
+    };
+    SynthServer.prototype.process = function() {
+      this.busBuffer.set(this.busClear);
+      this.userspace.process(this.bufLength);
+      this.strm.set(this.busOutL, this.offset);
+      this.strm.set(this.busOutR, this.offset + this.strmLength);
+      this.offset += this.bufLength;
+    };
+    SynthServer.prototype.postprocess = function() {
+      this.sendToClient(this.strm);
+    };
+    
+    return WorkerSynthServer;
+  })();
+  
   commands["/init"] = function(msg) {
-    this.sampleRate = msg[1];
-    this.channels   = msg[2];
-    this.strmLength = msg[3];
-    this.bufLength  = msg[4];
-    this.syncCount  = msg[5];
-    this.strm = new Float32Array(this.strmLength * this.channels);
-    this.rates = {};
-    this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
-    this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
-    this.rootNode = new Group();
-    var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
-    var busBuffer  = new Float32Array(busLength);
-    var bufLength  = this.bufLength;
-    var bufLength4 = this.bufLength << 2;
-    this.busBuffer = busBuffer;
-    this.busClear  = new Float32Array(busLength);
-    this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
-    this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
+    this.sampleRate = msg[1]|0;
+    this.channels   = msg[2]|0;
+    this.strmLength = msg[3]|0;
+    this.bufLength  = msg[4]|0;
+    this.init(msg);
   };
   commands["/play"] = function(msg) {
-    if (this.timerId === 0) {
-      var onaudioprocess = this.onaudioprocess.bind(this);
-      this.timerId = setInterval(onaudioprocess, 10);
-      this.syncCount = msg[1];
-      this.timeline.play();
-    }
+    var userId = msg[1]|0;
+    this.userspace.play(userId);
   };
-  commands["/pause"] = function() {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = 0;
-      this.timeline.pause();
-    }
+  commands["/pause"] = function(msg) {
+    var userId = msg[1]|0;
+    this.userspace.pause(userId);
   };
-  commands["/reset"] = function() {
-    this.reset();
+  commands["/reset"] = function(msg) {
+    var userId = msg[1]|0;
+    this.userspace.reset(userId);
   };
-  commands["/execute"] = function(msg) {
-    var execId   = msg[1];
-    var code     = msg[2];
-    var append   = msg[3];
-    var data     = msg[4];
-    var callback = msg[5];
-    if (!append) {
-      this.reset();
-    }
-    global.DATA = data;
-    var result = eval.call(global, code);
-    if (callback) {
-      this.send(["/execute", execId, pack(result)]);
-    }
+  commands["/command"] = function(msg) {
+    var userId   = msg[1]|0;
+    var timeline = msg[2];
+    this.userspace.setTimeline(userId, timeline);
   };
-  commands["/buffer/response"] = function(msg) {
-    var buffer = msg[1];
-    var requestId = msg[2];
-    var callback = this.bufferRequestCallback[requestId];
-    if (callback) {
-      callback(buffer);
-      delete this.bufferRequestCallback[requestId];
-    }
-  };
-  commands["/importScripts"] = function(msg) {
-    importScripts(msg[1]);
-  };
-
+  
   var Rate = (function() {
+    var twopi = 2 * Math.PI;
     function Rate(sampleRate, bufLength) {
-      this.klassName = "Rate";
       this.sampleRate = sampleRate;
       this.sampleDur  = 1 / sampleRate;
       this.radiansPerSample = twopi / sampleRate;
@@ -168,36 +153,10 @@ define(function(require, exports, module) {
   })();
   
   var install = function() {
-    var server = cc.server = new SynthServer();
-    addEventListener("message", function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        server.sysSyncCount = msg[C.SYNC]|0;
-        server.syncItems.set(msg);
-      } else {
-        server.recv(msg);
-      }
-    });
-    server.send(["/connect"]);
-    if (typeof global.console === "undefined") {
-      global.console = (function() {
-        var console = {};
-        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-          console[method] = function() {
-            var args = Array.prototype.slice.call(arguments).map(function(x) {
-              return pack(x);
-            });
-            server.send(["/console/" + method, args]);
-          };
-        });
-        return console;
-      })();
-    }
+    cc.server = new WorkerSynthServer();
   };
-  
+
   module.exports = {
-    SynthServer: SynthServer,
-    Rate: Rate,
     install: install
   };
 
