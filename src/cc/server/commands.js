@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   
   var commands = {};
   
-  // the 'this.' context is a heap.
+  // the 'this.' context is an instance.
   
   commands["/n_run"] = function(msg) {
     var nodeId = msg[1]|0;

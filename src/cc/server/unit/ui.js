@@ -14,7 +14,7 @@ define(function(require, exports, module) {
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -25,7 +25,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? heap.syncItems[C.POS_X] : 0;
+      var y0 = instance ? instance.syncItems[C.POS_X] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -45,7 +45,7 @@ define(function(require, exports, module) {
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -56,7 +56,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? heap.syncItems[C.POS_Y] : 0;
+      var y0 = instance ? instance.syncItems[C.POS_Y] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -77,7 +77,7 @@ define(function(require, exports, module) {
       this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];
@@ -87,7 +87,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? (heap.syncItems[C.BUTTON] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.syncItems[C.BUTTON] ? maxval : minval) : minval;
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };

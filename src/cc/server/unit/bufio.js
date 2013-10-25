@@ -43,8 +43,8 @@ define(function(require, exports, module) {
       this._trig   = 0;
       this.process = next_choose;
     };
-    var next_choose  = function(inNumSamples, heap) {
-      this._buffer = heap.buffers[this.specialIndex];
+    var next_choose  = function(inNumSamples, instance) {
+      this._buffer = instance.buffers[this.specialIndex];
       if (this._buffer) {
         if (this._buffer.samples !== null) {
           if (this.inRates[1] === C.AUDIO) {

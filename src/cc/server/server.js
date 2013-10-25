@@ -3,10 +3,10 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var extend = require("../common/extend");
-  var pack = require("../common/pack").pack;
-  var Timer    = require("../common/timer").Timer;
-  var Userspace = require("./userspace").Userspace;
-  var commands  = {};
+  var pack  = require("../common/pack").pack;
+  var Timer = require("../common/timer").Timer;
+  var InstanceManager = require("./instance").InstanceManager;
+  var commands = {};
   
   var SynthServer = (function() {
     function SynthServer() {
@@ -14,7 +14,7 @@ define(function(require, exports, module) {
       this.channels   = 2;
       this.strmLength = 1024;
       this.bufLength  = 64;
-      this.userspace = new Userspace();
+      this.instanceManager = new InstanceManager();
       this.timer = new Timer();
       this.processed = 0;
       this.processStart    = 0;
@@ -26,7 +26,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.recvFromClient = function(msg) {
       if (msg instanceof Float32Array) {
-        this.userspace.setSyncItems(msg[0], msg);
+        this.instanceManager.setSyncItems(msg[0], msg);
         return;
       }
       if (msg) {
@@ -60,7 +60,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.play = function(msg) {
       if (!this.timer.isRunning) {
         var userId = msg[1]|0;
-        this.userspace.play(userId);
+        this.instanceManager.play(userId);
         this.processStart = Date.now();
         this.processDone  = 0;
         this.processInterval = (this.strmLength / this.sampleRate) * 1000;
@@ -70,13 +70,13 @@ define(function(require, exports, module) {
     SynthServer.prototype.pause = function(msg) {
       if (this.timer.isRunning) {
         var userId = msg[1]|0;
-        this.userspace.pause(userId);
+        this.instanceManager.pause(userId);
         this.timer.stop();
       }
     };
     SynthServer.prototype.reset = function(msg) {
       var userId = msg[1]|0;
-      this.userspace.reset(userId);
+      this.instanceManager.reset(userId);
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[C.CONTROL];
@@ -87,7 +87,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.command = function(msg) {
       var userId   = msg[1]|0;
       var timeline = msg[2];
-      this.userspace.setTimeline(userId, timeline);
+      this.instanceManager.setTimeline(userId, timeline);
     };
     
     return SynthServer;
@@ -105,7 +105,7 @@ define(function(require, exports, module) {
       postMessage(msg);
     };
     WorkerSynthServer.prototype.connect = function() {
-      this.userspace.append(0);
+      this.instanceManager.append(0);
       this.sendToClient([
         "/connect", this.sampleRate, this.channels, this.strmLength, this.bufLength
       ]);
@@ -117,7 +117,7 @@ define(function(require, exports, module) {
       var strm = this.strm;
       var busBuffer  = this.busBuffer;
       var busClear   = this.busClear;
-      var userspace  = this.userspace;
+      var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
       var busOutL = this.busOutL;
@@ -127,7 +127,7 @@ define(function(require, exports, module) {
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
         busBuffer.set(busClear);
-        userspace.process(bufLength, 0);
+        instanceManager.process(bufLength, 0);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
@@ -155,7 +155,7 @@ define(function(require, exports, module) {
       var strm = this.strm;
       var busBuffer  = this.busBuffer;
       var busClear   = this.busClear;
-      var userspace  = this.userspace;
+      var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
       var busOutL = this.busOutL;
@@ -163,7 +163,7 @@ define(function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         busBuffer.set(busClear);
-        userspace.process(bufLength, i);
+        instanceManager.process(bufLength, i);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;

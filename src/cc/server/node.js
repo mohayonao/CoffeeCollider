@@ -229,14 +229,14 @@ define(function(require, exports, module) {
       }
       cc.server.sendToClient([
         "/n_end", this.nodeId
-      ], this.heap);
+      ], this.instance);
     }
     this.prev = null;
     this.next = null;
     this.parent = null;
     this.blocking = false;
-    if (this.heap) {
-      delete this.heap.nodes[this.nodeId];
+    if (this.instance) {
+      delete this.instance.nodes[this.nodeId];
     }
   };
   var g_freeAll = function(node) {
@@ -264,13 +264,13 @@ define(function(require, exports, module) {
   };
   
   var Node = (function() {
-    function Node(nodeId, heap) {
+    function Node(nodeId, instance) {
       this.nodeId = nodeId|0;
       this.next   = null;
       this.prev   = null;
       this.parent = null;
       this.running = true;
-      this.heap = heap;
+      this.instance = instance;
     }
     Node.prototype.play = function() {
       this.running = true;
@@ -286,7 +286,7 @@ define(function(require, exports, module) {
       if (func) {
         cc.server.sendToClient([
           "/n_done", this.nodeId, tag
-        ], this.heap);
+        ], this.instance);
         func.call(this);
       }
     };
@@ -294,8 +294,8 @@ define(function(require, exports, module) {
   })();
 
   var Group = (function() {
-    function Group(nodeId, target, addAction, heap) {
-      Node.call(this, nodeId, heap);
+    function Group(nodeId, target, addAction, instance) {
+      Node.call(this, nodeId, instance);
       this.head = null;
       this.tail = null;
       if (target) {
@@ -304,12 +304,12 @@ define(function(require, exports, module) {
     }
     extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples, heap) {
+    Group.prototype.process = function(inNumSamples, instance) {
       if (this.head && this.running) {
-        this.head.process(inNumSamples, heap);
+        this.head.process(inNumSamples, instance);
       }
       if (this.next) {
-        this.next.process(inNumSamples, heap);
+        this.next.process(inNumSamples, instance);
       }
     };
     
@@ -317,12 +317,12 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, node, addAction, defId, args, heap) {
-      Node.call(this, nodeId, heap);
-      if (heap) {
-        var specs = heap.defs[defId];
+    function Synth(nodeId, node, addAction, defId, args, instance) {
+      Node.call(this, nodeId, instance);
+      if (instance) {
+        var specs = instance.defs[defId];
         if (specs) {
-          this.build(specs, args, heap);
+          this.build(specs, args, instance);
         }
       }
       if (node) {
@@ -331,11 +331,11 @@ define(function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, args, heap) {
+    Synth.prototype.build = function(specs, args, instance) {
       this.specs = specs;
 
       var fixNumList = specs.consts.map(function(value) {
-        return heap.getFixNum(value);
+        return instance.getFixNum(value);
       });
       var unitList = specs.defs.map(function(spec) {
         return new Unit(this, spec);
@@ -373,16 +373,16 @@ define(function(require, exports, module) {
       }
     };
     
-    Synth.prototype.process = function(inNumSamples, heap) {
+    Synth.prototype.process = function(inNumSamples, instance) {
       if (this.running && this.unitList) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
-          unit.process(unit.rate.bufLength, heap);
+          unit.process(unit.rate.bufLength, instance);
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples, heap);
+        this.next.process(inNumSamples, instance);
       }
     };
     
