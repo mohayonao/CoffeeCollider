@@ -43,7 +43,7 @@ define('cc/loader', function(require, exports, module) {
 
   var cc = require("./cc");
 
-  if (typeof document !== "undefined") {
+  if (typeof Window !== "undefined") {
     var scripts = document.getElementsByTagName("script");
     if (scripts && scripts.length) {
       var m;
@@ -59,24 +59,32 @@ define('cc/loader', function(require, exports, module) {
         }
       }
     }
-    if (cc.coffeeColliderHash !== "#iframe") {
-      cc.context = "window";
-      require("./exports/installer").install();
-    } else {
-      cc.context = "iframe";
+    if (cc.coffeeColliderHash === "#iframe") {
+      cc.opmode  = "iframe";
+      cc.context = "client";
       require("./client/installer").install();
+    } else {
+      cc.opmode  = "worker";
+      cc.context = "exports";
+      require("./exports/installer").install();
     }
-  } else if (typeof WorkerLocation !== "undefined") {
-    cc.context = "worker";
+  } else if (typeof WorkerGlobalScope !== "undefined") {
     if (location.hash === "#iframe") {
+      cc.opmode  = "iframe";
+      cc.context = "server";
       require("./server/installer").install();
     } else {
+      cc.opmode  = "worker";
+      cc.context = "client/server";
       require("./client/installer").install();
       require("./server/installer").install();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
       cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
     }
     cc.server.connect();
+  } else if (typeof global.GLOBAL !== "undefined") {
+    cc.opmode  = "socket";
+    cc.context = "server";
   }
   
   module.exports = {
@@ -91,1393 +99,6 @@ define('cc/cc', function(require, exports, module) {
   module.exports = {
     version: "0",
     Object: CCObject
-  };
-
-});
-define('cc/exports/installer', function(require, exports, module) {
-  
-  var CoffeeCollider = require("./coffeecollider").CoffeeCollider;
-  
-  var install = function() {
-    global.CoffeeCollider = CoffeeCollider;
-  };
-  
-  module.exports = {
-    install: install
-  };
-
-});
-define('cc/exports/coffeecollider', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../common/extend");
-  var Compiler = require("./compiler/coffee").Compiler;
-  var unpack   = require("../common/pack").unpack;
-  var commands = {};
-  var slice    = [].slice;
-  
-  var AudioAPI;
-  
-  var CoffeeCollider = (function() {
-    function CoffeeCollider(opts) {
-      opts = opts || {};
-      this.version    = cc.version;
-      if (opts.iframe) {
-        this.impl = new CoffeeColliderIFrameImpl(opts);
-      } else {
-        this.impl = new CoffeeColliderWorkerImpl(opts);
-      }
-      this.sampleRate = this.impl.sampleRate;
-      this.channels   = this.impl.channels;
-      this.compiler   = this.impl.compiler;
-    }
-    CoffeeCollider.prototype.play = function() {
-      this.impl.play();
-      return this;
-    };
-    CoffeeCollider.prototype.reset = function() {
-      this.impl.reset();
-      return this;
-    };
-    CoffeeCollider.prototype.pause = function() {
-      this.impl.pause();
-      return this;
-    };
-    CoffeeCollider.prototype.execute = function() {
-      this.impl.execute.apply(this.impl, arguments);
-      return this;
-    };
-    CoffeeCollider.prototype.getStream = function() {
-      return this.impl.strm;
-    };
-    CoffeeCollider.prototype.importScripts = function() {
-      this.impl.importScripts(slice.call(arguments));
-      return this;
-    };
-    CoffeeCollider.prototype.getWebAudioComponents = function() {
-      return this.impl.getWebAudioComponents();
-    };
-    return CoffeeCollider;
-  })();
-
-  var CoffeeColliderImpl = (function() {
-    function CoffeeColliderImpl(opts) {
-      this.compiler = new Compiler();
-      
-      this.isPlaying = false;
-      this.execId = 0;
-      this.execCallbacks = {};
-
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.api = new AudioAPI(this, opts);
-      this.sampleRate = this.api.sampleRate;
-      this.channels   = this.api.channels;
-      this.strm  = new Float32Array(0);
-      this.clear = new Float32Array(0);
-      
-      if (opts.mouse !== false) {
-        var syncItems = new Float32Array(5);
-        window.addEventListener("mousemove", function(e) {
-          syncItems[2] = e.pageX / window.innerWidth;
-          syncItems[3] = e.pageY / window.innerHeight;
-        }, false);
-        window.addEventListener("mousedown", function() {
-          syncItems[1] = 1;
-        }, false);
-        window.addEventListener("mouseup", function() {
-          syncItems[1] = 0;
-        }, false);
-        this.syncItems = syncItems;
-      }
-    }
-    CoffeeColliderImpl.prototype.init = function(msg) {
-      var strmLength = msg[3]|0;
-      var bufLength  = msg[4]|0;
-      this.strmLength = strmLength;
-      this.bufLength  = bufLength;
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.clear = new Float32Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.api.init();
-    };
-    CoffeeColliderImpl.prototype.play = function() {
-      if (!this.isPlaying) {
-        this.isPlaying = true;
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
-        }
-        this.strmList.splice(0);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.api.play();
-        this.sendToClient(["/play"]);
-      }
-    };
-    CoffeeColliderImpl.prototype.pause = function() {
-      if (this.isPlaying) {
-        this.sendToClient(["/pause"]);
-        this.api.pause();
-        this.isPlaying = false;
-      }
-    };
-    CoffeeColliderImpl.prototype.reset = function() {
-      this.execId = 0;
-      this.execCallbacks = {};
-      var strm = this.strm;
-      for (var i = 0, imax = strm.length; i < imax; ++i) {
-        strm[i] = 0;
-      }
-      this.strmList.splice(0);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.sendToClient(["/reset"]);
-    };
-    CoffeeColliderImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
-      if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
-        this.strm.set(strm);
-      }
-      if (this.syncItems) {
-        this.sendToClient(this.syncItems);
-      }
-    };
-    CoffeeColliderImpl.prototype.execute = function(code) {
-      var append, callback;
-      var i = 1;
-      if (typeof arguments[i] === "boolean") {
-        append = arguments[i++];
-      } else {
-        append = false;
-      }
-      if (typeof arguments[i] === "function") {
-        callback = arguments[i++];
-      }
-      if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
-        this.sendToClient([
-          "/execute", this.execId, code, append, this.compiler.data, !!callback
-        ]);
-        if (callback) {
-          this.execCallbacks[this.execId] = callback;
-        }
-        this.execId += 1;
-      }
-    };
-    CoffeeColliderImpl.prototype.importScripts = function(list) {
-      this.sendToClient(["/importScripts", list]);
-    };
-    CoffeeColliderImpl.prototype.sendToClient = function(msg) {
-      if (this.client) {
-        this.client.postMessage(msg);
-      }
-    };
-    CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
-      if (msg instanceof Float32Array) {
-        this.strmList[this.strmListWriteIndex] = msg;
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
-        return;
-      }
-      if (msg) {
-        var func = commands[msg[0]];
-        if (func) {
-          func.call(this, msg);
-        }
-      }
-    };
-    CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
-      var api = this.api;
-      if (!api.decodeAudioFile) {
-        callback(null);
-        return;
-      }
-      var decode = function(buffer) {
-        api.decodeAudioFile(buffer, function(buffer) {
-          callback(buffer);
-        });
-      };
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", path);
-      xhr.responseType = "arraybuffer";
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200 && xhr.response) {
-            if (callback) {
-              decode(xhr.response);
-            }
-          } else {
-            callback(null);
-          }
-        }
-      };
-      xhr.send();
-    };
-    CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
-      if (this.api.type === "Web Audio API") {
-        return [ this.api.context, this.api.jsNode ];
-      }
-      return [];
-    };
-    return CoffeeColliderImpl;
-  })();
-
-  var CoffeeColliderWorkerImpl = (function() {
-    function CoffeeColliderWorkerImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
-      var that = this;
-      this.client = new Worker(cc.coffeeColliderPath);
-      this.client.onmessage = function(e) {
-        that.recvFromClient(e.data);
-      };
-    }
-    extend(CoffeeColliderWorkerImpl, CoffeeColliderImpl);
-    return CoffeeColliderWorkerImpl;
-  })();
-
-  var CoffeeColliderIFrameImpl = (function() {
-    function CoffeeColliderIFrameImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
-      var that = this;
-      var iframe = document.createElement("iframe");
-      iframe.style.width  = 0;
-      iframe.style.height = 0;
-      iframe.style.border = 0;
-      document.body.appendChild(iframe);
-
-      this.iframe = iframe;
-      // TODO: want to remove 'allow-same-origin'
-      iframe.sandbox = "allow-scripts allow-same-origin";
-      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#iframe'></script>";
-      var channel = new MessageChannel();
-      iframe.onload = function() {
-        iframe.contentWindow.postMessage(null, [channel.port2], "*");
-      };
-      channel.port1.onmessage = function(e) {
-        that.recvFromClient(e.data);
-      };
-      this.client = channel.port1;
-    }
-    extend(CoffeeColliderIFrameImpl, CoffeeColliderImpl);
-    return CoffeeColliderIFrameImpl;
-  })();
-  
-  commands["/connect"] = function(msg) {
-    this.init(msg);
-    this.sendToClient([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
-    ]);
-  };
-  commands["/execute"] = function(msg) {
-    var execId = msg[1];
-    var result = msg[2];
-    var callback = this.execCallbacks[execId];
-    if (callback) {
-      if (result !== undefined) {
-        result = unpack(result);
-      }
-      callback(result);
-      delete this.execCallbacks[execId];
-    }
-  };
-  commands["/buffer/request"] = function(msg) {
-    var that = this;
-    var requestId = msg[2];
-    this.readAudioFile(msg[1], function(buffer) {
-      that.sendToClient(["/buffer/response", buffer, requestId]);
-    });
-  };
-  require("../common/console").receive(commands);
-  
-  
-  var AudioContext = global.AudioContext || global.webkitAudioContext;
-  
-  if (AudioContext) {
-    AudioAPI = (function() {
-      function WebAudioAPI(sys, opts) {
-        this.sys = sys;
-        this.context = opts.AudioContext || new AudioContext();
-        this.sampleRate = this.context.sampleRate;
-        this.channels   = 2;
-        this.type = "Web Audio API";
-        this.delegate = !!opts.AudioContext;
-      }
-      WebAudioAPI.prototype.init = function() {
-        var sys = this.sys;
-        var onaudioprocess;
-        var strmLength  = sys.strmLength;
-        var strmLength4 = strmLength * 4;
-        var buffer = sys.strm.buffer;
-        if (this.sys.sampleRate === this.sampleRate) {
-          onaudioprocess = function(e) {
-            var outs = e.outputBuffer;
-            sys.process();
-            outs.getChannelData(0).set(new Float32Array(
-              buffer.slice(0, strmLength4)
-            ));
-            outs.getChannelData(1).set(new Float32Array(
-              buffer.slice(strmLength4)
-            ));
-          };
-        }
-        this.bufSrc = this.context.createBufferSource();
-        this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
-        this.jsNode.onaudioprocess = onaudioprocess;
-      };
-      WebAudioAPI.prototype.play = function() {
-        if (!this.bufSrc) {
-          return; // TODO: throw an error
-        }
-        this.bufSrc.noteOn(0);
-        this.bufSrc.connect(this.jsNode);
-        if (!this.delegate) {
-          this.jsNode.connect(this.context.destination);
-        }
-      };
-      WebAudioAPI.prototype.pause = function() {
-        if (!this.bufSrc) {
-          return; // TODO: throw an error
-        }
-        this.bufSrc.disconnect();
-        if (!this.delegate) {
-          this.jsNode.disconnect();
-        }
-      };
-      WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
-        buffer = this.context.createBuffer(buffer, false);
-        var numSamples = buffer.length * buffer.numberOfChannels;
-        var samples = new Float32Array(numSamples);
-        for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
-          samples.set(buffer.getChannelData(i), i * buffer.length);
-        }
-        callback({
-          sampleRate : buffer.sampleRate,
-          numChannels: buffer.numberOfChannels,
-          numFrames  : buffer.length,
-          samples    : samples,
-        });
-      };
-      return WebAudioAPI;
-    })();
-  } else if (typeof Audio === "function" && typeof new Audio().mozSetup === "function") {
-    AudioAPI = (function() {
-      /*global URL:true */
-      var timer = (function() {
-        var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
-        var blob = new Blob([source], {type:"text/javascript"});
-        var path = URL.createObjectURL(blob);
-        return new Worker(path);
-      })();
-      /*global URL:false */
-      function AudioDataAPI(sys) {
-        this.sys = sys;
-        this.sampleRate = 44100;
-        this.channels   = 2;
-        this.type = "Audio Data API";
-      }
-      AudioDataAPI.prototype.init = function() {
-        this.audio = new Audio();
-        this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
-      };
-      AudioDataAPI.prototype.play = function() {
-        if (!this.audio) {
-          return; // TODO: throw an error
-        }
-        var sys = this.sys;
-        var audio = this.audio;
-        var interleaved = this.interleaved;
-        var msec = (sys.strmLength / sys.sampleRate) * 1000;
-        var written = 0;
-        var start = Date.now();
-        var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
-        var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 4);
-
-        var onaudioprocess = function() {
-          if (written > Date.now() - start) {
-            return;
-          }
-          var i = interleaved.length;
-          var j = inL.length;
-          sys.process();
-          while (j--) {
-            interleaved[--i] = inR[j];
-            interleaved[--i] = inL[j];
-          }
-          audio.mozWriteAudio(interleaved);
-          written += msec;
-        };
-
-        audio.mozSetup(sys.channels, sys.sampleRate);
-        timer.onmessage = onaudioprocess;
-        timer.postMessage(msec * 0.8);
-      };
-      AudioDataAPI.prototype.pause = function() {
-        if (!this.audio) {
-          return; // TODO: throw an error
-        }
-        timer.postMessage(0);
-      };
-      return AudioDataAPI;
-    })();
-  }
-
-  if (!AudioAPI) {
-    AudioAPI = (function() {
-      function FallbackAudioAPI(sys) {
-        this.sys = sys;
-        this.sampleRate = 44100;
-        this.channels   = 2;
-        this.type = "Fallback";
-      }
-      FallbackAudioAPI.prototype.init = function() {
-      };
-      FallbackAudioAPI.prototype.play = function() {
-        if (fallback.play) {
-          this.play = fallback.play;
-          this.play();
-        }
-      };
-      FallbackAudioAPI.prototype.pause = function() {
-        if (fallback.pause) {
-          this.pause = fallback.pause;
-          this.pause();
-        }
-      };
-      
-      var fallback = {};
-      window.addEventListener("load", function() {
-        var swfSrc  = cc.rootPath + "coffee-collider-fallback.swf";
-        var swfName = swfSrc + "?" + Date.now();
-        var swfId   = "coffee-collider-fallback";
-        var div = document.createElement("div");
-        div.style.display = "inline";
-        div.width  = 1;
-        div.height = 1;
-        /*jshint quotmark:single */
-        div.innerHTML = '<object id="'+swfId+'" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="1" height="1"><param name="movie" value="'+swfName+'"/><param name="bgcolor" value="#FFFFFF"/><param name="quality" value="high"/><param name="allowScriptAccess" value="always"/></object>';
-        /*jshint quotmark:double */
-        document.body.appendChild(div);
-      
-        window.coffeecollider_flashfallback_init = function() {
-          var swf = document.getElementById(swfId);
-          var timerId = 0;
-          fallback.play = function() {
-            if (timerId === 0) {
-              var sys = this.sys;
-              var msec = (sys.strmLength / sys.sampleRate) * 1000;
-              var written = 0;
-              var start = Date.now();
-              var out   = new Array(sys.strmLength * sys.channels);
-              var len   = out.length;
-              
-              var onaudioprocess = function() {
-                if (written > Date.now() - start) {
-                  return;
-                }
-                sys.process();
-                var _in = sys.strm;
-                for (var i = 0; i < len; ++i) {
-                  var x = (_in[i] * 16384 + 32768)|0;
-                  x = Math.max(16384, Math.min(x, 49152));
-                  out[i] = String.fromCharCode(x);
-                }
-                swf.writeAudio(out.join(""));
-                written += msec;
-              };
-
-              timerId = setInterval(onaudioprocess, msec * 0.8);
-              swf.play();
-            }
-          };
-          fallback.pause = function() {
-            if (timerId !== 0) {
-              swf.pause();
-              clearInterval(timerId);
-              timerId = 0;
-            }
-          };
-        };
-      });
-      return FallbackAudioAPI;
-    })();
-  }
-  
-  module.exports = {
-    CoffeeCollider: CoffeeCollider
-  };
-
-});
-define('cc/common/extend', function(require, exports, module) {
-  
-  var extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
-    /*jshint validthis:true */
-    function ctor() {
-      this.constructor = child;
-    }
-    /*jshint validthis:false */
-    ctor.prototype = parent.prototype;
-    /*jshint newcap:false */
-    child.prototype = new ctor();
-    /*jshint newcap:true */
-    child.__super__ = parent.prototype;
-    return child;
-  };
-  
-  module.exports = extend;
-
-});
-define('cc/exports/compiler/coffee', function(require, exports, module) {
-
-  var CoffeeScript = (function() {
-    if (global.CoffeeScript) {
-      return global.CoffeeScript;
-    }
-    try {
-      return require(["coffee-script"][0]);
-    } catch(e) {}
-  })();
-
-  var timevalue = require("../../common/timevalue").calc;
-
-  // CoffeeScript tags
-  // IDENTIFIER
-  // NUMBER
-  // STRING
-  // REGEX
-  // BOOL
-  // NULL
-  // UNDEFINED
-  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
-  // UNARY           !, ~, new, typeof, delete, do
-  // LOGIC           &&, ||, &, |, ^
-  // SHIFT           <<, >>, >>>
-  // COMPARE         ==, !=, <, >, <=, >=
-  // MATH            *, div, %, 
-  // RELATION        in, of, instanceof
-  // =
-  // +
-  // -
-  // ..
-  // ...
-  // ++
-  // --
-  // (
-  // )
-  // [
-  // ]
-  // {
-  // }
-  // ?
-  // ::
-  // @
-  // THIS
-  // SUPER
-  // INDENT
-  // OUTDENT
-  // RETURN
-  // TERMINATOR
-
-  var TAG   = 0;
-  var VALUE = 1;
-  var _     = {}; // empty location
-  
-  var dumpTokens = function(tokens) {
-    console.log(tokens.map(function(t) {
-      return t[0] + "\t" + t[1];
-    }).join("\n"));
-  };
-  
-  var tab = function(n) {
-    var t = "";
-    while (n--) {
-      t += " ";
-    }
-    return t;
-  };
-
-  var splitCodeAndData = function(text) {
-    var re = /^(\s*)__END__(\s*)$/gm;
-    var m = re.exec(text);
-    if (m === null) {
-      return [ text, "" ];
-    }
-    var code = text.substr(0, m.index - 1);
-    var data = text.substr(m.index + m[0].length + 1);
-    return [ code, data ];
-  };
-  
-  var findOperandHead = function(tokens, index) {
-    var bracket = 0;
-    var indent  = 0;
-    while (0 < index) {
-      var token = tokens[index - 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "PARAM_START":
-          return index;
-        case "CALL_START":
-          bracket -= 1;
-          break;
-        case "(": case "[": case "{":
-          bracket -= 1;
-          /* falls through */
-        case "IDENTIFIER":
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            token = tokens[index - 1];
-            if (token) {
-              if (token[TAG] === "UNARY") {
-                return index - 1;
-              }
-              if (token[VALUE] === "+" || token[VALUE] === "-") {
-                token = tokens[index - 2];
-                if (!token) {
-                  return index - 1;
-                }
-                switch (token[TAG]) {
-                case "INDENT": case "TERMINATOR": case "CALL_START":
-                case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-                case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-                case "[": case "(": case "{": case ",": case "?":
-                  return index - 1;
-                }
-              }
-            }
-            return index;
-          }
-          break;
-        case "}": case "]": case ")": case "PARAM_END": case "CALL_END":
-          bracket += 1;
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          indent -= 1;
-          break;
-        }
-      }
-      index -= 1;
-    }
-    return 0;
-  };
-
-  var findOperandTail = function(tokens, index) {
-    var bracket  = 0;
-    var indent   = 0;
-    var inParams = false;
-    while (index < tokens.length) {
-      var token = tokens[index];
-      if (inParams) {
-        inParams = token[TAG] !== "PARAM_END";
-        index += 1;
-        continue;
-      }
-      switch (token[TAG]) {
-      case "}": case "]": case ")": case "CALL_END":
-        bracket -= 1;
-        break;
-      case "OUTDENT":
-        indent -= 1;
-        break;
-      case "PARAM_START":
-        inParams = true;
-        index += 1;
-        continue;
-      }
-      token = tokens[index + 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          if (indent === 0) {
-            return index - 1;
-          }
-          break;
-        case "IDENTIFIER":
-          token = tokens[index + 1];
-          if (token && token[TAG] === "CALL_START") {
-            bracket += 1;
-            break;
-          }
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "(": case "[": case "{":
-          bracket += 1;
-          break;
-        case "}": case "]": case ")": case "CALL_END":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        }
-      }
-      index += 1;
-    }
-    return tokens.length - 1;
-  };
-
-  var replaceTimeValue = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var token = tokens[i];
-      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
-        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
-        if (typeof time === "number") {
-          token[TAG] = "NUMBER";
-          token[VALUE] = time.toString();
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
-  var replacePi = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var a, b, token = tokens[i];
-      if (token[VALUE] === "pi") {
-        tokens.splice(i, 1);
-        token = tokens[i - 1];
-        if (token && token[TAG] === "NUMBER") {
-          a = i - 1;
-          token = tokens[i - 2];
-          if (token) {
-            switch (token[TAG]) {
-              case "UNARY": case "+": case "-":
-              a -= 1;
-            }
-          }
-          tokens.splice(i, 0, ["MATH", "*", _]);
-          b = i;
-        } else {
-          a = -1;
-          b = i - 1;
-        }
-        tokens.splice(b+1, 0, ["IDENTIFIER", "Math", _]);
-        tokens.splice(b+2, 0, ["."         , "."   , _]);
-        tokens.splice(b+3, 0, ["IDENTIFIER", "PI"  , _]);
-        if (a !== -1) {
-          tokens.splice(b+4, 0, [")", ")", _]);
-          tokens.splice(a, 0, ["(", "(", _]);
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
-  var replacePrecedence = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var token = tokens[i];
-      if (token[TAG] === "MATH") {
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens.splice(b, 0, [")", ")" , _]);
-        tokens.splice(a, 0, ["(", "(" , _]);
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
-  var replaceUnaryOpTable = {
-    "+": "__plus__", "-": "__minus__"
-  };
-
-  var replaceUnaryOp = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var token = tokens[i];
-      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceUnaryOpTable[token[VALUE]];
-        token = tokens[i - 1] || { 0:"TERMINATOR" };
-        switch (token[TAG]) {
-        case "INDENT": case "TERMINATOR": case "CALL_START":
-        case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-        case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
-          var a = findOperandTail(tokens, i);
-          tokens.splice(a+1, 0, ["."         , "."     , _]);
-          tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
-          tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
-          tokens.splice(i, 1);
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-  
-  var replaceBinaryOpTable = {
-    "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
-  };
-  
-  var replaceBinaryOp = function(tokens) {
-    var i = 0;
-    var replaceable = false;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (replaceable) {
-        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceBinaryOpTable[token[VALUE]];
-          var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
-          replaceable = false;
-          continue;
-        }
-      }
-      switch (token[TAG]) {
-      case "INDENT": case "TERMINATOR": case "CALL_START":
-      case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-      case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-      case "[": case "(": case "{": case ",": case "?":
-        replaceable = false;
-        break;
-      default:
-        replaceable = true;
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
-  var replaceCompoundAssignTable = {
-    "+=": "__add__",
-    "-=": "__sub__",
-    "*=": "__mul__",
-    "/=": "__div__",
-    "%=": "__mod__",
-  };
-  
-  var replaceCompoundAssign = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var token = tokens[i];
-      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceCompoundAssignTable[token[VALUE]];
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens[i] = ["=", "=", _];
-        tokens.splice(i+1, 0, ["."         , "."     , _]);
-        tokens.splice(i+2, 0, ["IDENTIFIER", selector, _]);
-        tokens.splice(i+3, 0, ["CALL_START", "("     , _]);
-        tokens.splice(b+3, 0, ["CALL_END"  , ")"     , _]);
-        for (var j = a; j < i; j++) {
-          tokens.splice(i+1, 0, tokens[j]);
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-  
-  var replaceSynthDef = (function() {
-    var getParams = function(tokens, index) {
-      var begin = -1, end = -1;
-      for (var i = index + 1; i < tokens.length; ++i) {
-        if (tokens[i][TAG] === "PARAM_START") {
-          begin = i;
-        } else if (tokens[i][TAG] === "PARAM_END") {
-          end = i;
-          break;
-        }
-      }
-      var replace = "";
-      if (begin !== -1) {
-        replace = tokens.slice(begin+1, end).map(function(t) {
-          return t[VALUE];
-        }).join("").replace(/"/g, "'");
-      }
-      replace = "\"" + replace + "\"";
-      return { begin:begin, end:end, replace:replace };
-    };
-    return function(tokens) {
-      var i = tokens.length - 1;
-      while (0 <= i) {
-        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
-          if (tokens[i - 1][TAG] === ".") {
-            var token = tokens[i];
-            if (token[VALUE] === "def") {
-              token = tokens[i + 1];
-              if (token[TAG] === "CALL_START") {
-                var a = findOperandTail(tokens, i + 2);
-                var params = getParams(tokens, i + 1);
-                tokens.splice(++a, 0, [","     , ","           , _]);
-                tokens.splice(++a, 0, ["STRING", params.replace, _]);
-              }
-            }
-          }
-        }
-        i -= 1;
-      }
-      // dumpTokens(tokens);
-      return tokens;
-    };
-  })();
-
-  var replaceGlobal = function(tokens) {
-    var i = tokens.length - 2;
-    while (i >= 0) {
-      var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
-        var name = token[VALUE];
-        if (!/\d/.test(name.charAt(1))) {
-          name = name.substr(1);
-        }
-        if (name !== "") {
-          token = tokens[i - 1];
-          if (!token || token[TAG] !== ".") {
-            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
-            tokens.splice(i+1, 0, ["."         , "."     , _]);
-            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
-          }
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-  
-  var cleanupParenthesis = function(tokens) {
-    var i = 0;
-    var bracket = 0;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (token[TAG] === "(") {
-        token = tokens[i + 1];
-        if (token && token[TAG] === "(") {
-          bracket = 2;
-          for (var j = i + 2; j < tokens.length; j++) {
-            token = tokens[j][TAG];
-            if (token === "(") {
-              bracket += 1;
-            } if (token === ")") {
-              bracket -= 1;
-              if (bracket === 0) {
-                if (tokens[j - 1][TAG] === ")") {
-                  tokens.splice(j, 1);
-                  tokens.splice(i, 1);
-                  i -= 1;
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
-  var insertReturn = function(tokens) {
-    tokens.splice(0, 0, ["("          , "("     , _]);
-    tokens.splice(1, 0, ["PARAM_START", "("     , _]);
-    tokens.splice(2, 0, ["IDENTIFIER" , "global", _]);
-    tokens.splice(3, 0, ["PARAM_END"  , ")"     , _]);
-    tokens.splice(4, 0, ["->"         , "->"    , _]);
-    tokens.splice(5, 0, ["INDENT"     , 2       , _]);
-    var i = tokens.length - 1;
-    tokens.splice(i++, 0, ["OUTDENT"   , 2       , _]);
-    tokens.splice(i++, 0, [")"         , ")"     , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "call"  , _]);
-    tokens.splice(i++, 0, ["CALL_START", "("     , _]);
-    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
-    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
-    tokens.splice(i++, 0, [","         , ","     , _]);
-    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
-    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
-    tokens.splice(i++, 0, ["CALL_END"  , ")"     , _]);
-    // dumpTokens(tokens);
-    return tokens;
-  };
-  
-  var Compiler = (function() {
-    function Compiler() {
-    }
-    Compiler.prototype.tokens = function(text) {
-      var items = splitCodeAndData(text);
-      var code  = items[0];
-      var data  = items[1];
-      var tokens = CoffeeScript.tokens(code);
-      tokens = replaceTimeValue(tokens);
-      tokens = replacePi(tokens);
-      tokens = replaceUnaryOp(tokens);
-      tokens = replacePrecedence(tokens);
-      tokens = replaceBinaryOp(tokens);
-      tokens = replaceCompoundAssign(tokens);
-      tokens = replaceSynthDef(tokens);
-      tokens = cleanupParenthesis(tokens);
-      tokens = replaceGlobal(tokens);
-      tokens = insertReturn(tokens);
-      this.code = code;
-      this.data = data;
-      return tokens;
-    };
-    Compiler.prototype.compile = function(code) {
-      var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
-    };
-    Compiler.prototype.toString = function(tokens) {
-      var indent = 0;
-      if (typeof tokens === "string") {
-        tokens = this.tokens(tokens);
-      }
-      return tokens.map(function(token) {
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          return "\n" + tab(indent);
-        case "INDENT":
-          indent += token[VALUE]|0;
-          return "\n" + tab(indent);
-        case "OUTDENT":
-          indent -= token[VALUE]|0;
-          return "\n" + tab(indent);
-        case "RETURN":
-          return "return ";
-        case "UNARY":
-          if (token[VALUE].length > 1) {
-            return token[VALUE] + " ";
-          }
-          return token[VALUE];
-        case "{":
-          return "{";
-        case ",": case "RELATION":
-          return token[VALUE] + " ";
-        case "=":
-          return " = ";
-        case "COMPOUND_ASSIGN": case "COMPARE": case "MATH": case "+": case "-":
-          return " " + token[VALUE] + " ";
-        default:
-          return token[VALUE];
-        }
-      }).join("").trim();
-    };
-    return Compiler;
-  })();
-
-  module.exports = {
-    Compiler  : Compiler,
-    dumpTokens: dumpTokens,
-    splitCodeAndData: splitCodeAndData,
-    findOperandHead : findOperandHead,
-    findOperandTail : findOperandTail,
-    replaceTimeValue     : replaceTimeValue,
-    replacePi            : replacePi,
-    replacePrecedence    : replacePrecedence,
-    replaceUnaryOp       : replaceUnaryOp,
-    replaceBinaryOp      : replaceBinaryOp,
-    replaceCompoundAssign: replaceCompoundAssign,
-    replaceSynthDef      : replaceSynthDef,
-    replaceGlobal        : replaceGlobal,
-    cleanupParenthesis   : cleanupParenthesis,
-    insertReturn         : insertReturn,
-  };
-
-});
-define('cc/common/timevalue', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var calc = function(str) {
-    var result = null;
-    var freq;
-    if (str.charAt(0) === "~") {
-      freq = true;
-      str  = str.substr(1);
-    }
-    do {
-      result = hz(str);
-      if (result !== null) {
-        break;
-      }
-      result = time(str);
-      if (result !== null) {
-        break;
-      }
-      result = hhmmss(str);
-      if (result !== null) {
-        break;
-      }
-      result = samples(str);
-      if (result !== null) {
-        break;
-      }
-      result = note(str);
-      if (result !== null) {
-        break;
-      }
-      result = beat(str);
-      if (result !== null) {
-        break;
-      }
-      result = ticks(str);
-    } while (false);
-    
-    if (result !== null) {
-      if (!freq) {
-        return result;
-      }
-      if (result !== 0) {
-        return 1 / result;
-      }
-    }
-    return str;
-  };
-  
-  var hz = function(str) {
-    var m = /^(\d+(?:\.\d+)?)hz$/i.exec(str);
-    if (m) {
-      return +m[1] === 0 ? 0 : 1 / +m[1];
-    }
-    return null;
-  };
-  var time = function(str) {
-    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
-    if (m) {
-      switch (m[2]) {
-      case "min": return +(m[1]||0) * 60;
-      case "sec": return +(m[1]||0);
-      case "m"  : return +(m[1]||0) / 1000;
-      }
-    }
-    return null;
-  };
-
-  var hhmmss = function(str) {
-    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
-    if (m) {
-      var x = 0;
-      x += (m[1]|0) * 3600;
-      x += (m[2]|0) * 60;
-      x += (m[3]|0);
-      x += (((m[4]||"")+"00").substr(0, 3)|0) / 1000;
-      return x;
-    }
-    return null;
-  };
-
-  var samples = function(str) {
-    var m = /^(\d+)samples(?:\/(\d+)hz)?$/i.exec(str);
-    if (m) {
-      return m[1] / ((m[2]|0) || cc.sampleRate);
-    }
-    return null;
-  };
-
-  var calcNote = function(bpm, len, dot) {
-    var x = (60 / bpm) * (4 / len);
-    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
-    return x;
-  };
-  var note = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*l([1-9]\d*)(\.*)$/i.exec(str);
-    if (m) {
-      return calcNote(+m[1], +m[2], m[3].length);
-    }
-    return null;
-  };
-
-  var calcBeat = function(bpm, measure, beat, ticks) {
-    var x = (measure * 4 + beat) * 480 + ticks;
-    return (60 / bpm) * (x / 480);
-  };
-  var beat = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)\.(\d+).(\d{1,3})$/i.exec(str);
-    if (m) {
-      return calcBeat(+m[1], +m[2], +m[3], +m[4]);
-    }
-    return null;
-  };
-
-  var calcTicks = function(bpm, ticks) {
-    return 60 / bpm * ticks / 480;
-  };
-  var ticks = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)ticks$/i.exec(str);
-    if (m) {
-      return calcTicks(+m[1], +m[2]);
-    }
-    return null;
-  };
-  
-  module.exports = {
-    hz     : hz,
-    time   : time,
-    hhmmss : hhmmss,
-    samples: samples,
-    note   : note,
-    beat   : beat,
-    ticks  : ticks,
-    calcNote : calcNote,
-    calcBeat : calcBeat,
-    calcTicks: calcTicks,
-    calc: calc,
-  };
-
-});
-define('cc/common/pack', function(require, exports, module) {
-  
-  var pack = (function() {
-    var _pack = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _pack(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
-              result[key] = _pack(data[key], stack);
-            }
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _pack(data, []);
-    };
-  })();
-
-  var unpack = (function() {
-    var func = function() {};
-    var _unpack = function(data) {
-      if (!data) {
-        return data;
-      }
-      if (typeof data === "string") {
-        if (data === "[Function]") {
-          return func;
-        }
-        return data;
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _unpack(data);
-          });
-        } else {
-          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
-            result = eval.call(null, "new (function " + data.klassName + "(){})");
-            delete data.klassName;
-          } else {
-            result = {};
-          }
-          Object.keys(data).forEach(function(key) {
-            result[key] = _unpack(data[key]);
-          });
-        }
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _unpack(data);
-    };
-  })();
-  
-  module.exports = {
-    pack  : pack,
-    unpack: unpack
-  };
-
-});
-define('cc/common/console', function(require, exports, module) {
-  
-  var unpack = require("./pack").unpack;
-  
-  var receive = function(commands) {
-    commands["/console/log"] = function(msg) {
-      console.log.apply(console, unpack(msg[1]));
-    };
-    commands["/console/debug"] = function(msg) {
-      console.debug.apply(console, unpack(msg[1]));
-    };
-    commands["/console/info"] = function(msg) {
-      console.info.apply(console, unpack(msg[1]));
-    };
-    commands["/console/warn"] = function(msg) {
-      console.warn.apply(console, unpack(msg[1]));
-    };
-    commands["/console/error"] = function(msg) {
-      console.error.apply(console, unpack(msg[1]));
-    };
-  };
-  
-  module.exports = {
-    receive: receive
   };
 
 });
@@ -2056,6 +677,16 @@ define('cc/client/client', function(require, exports, module) {
     return IFrameSynthClient;
   })();
 
+
+  var SocketSynthClient = (function() {
+    function SocketSynthClient() {
+      SynthClient.call(this);
+    }
+    extend(SocketSynthClient, SynthClient);
+    
+    return SocketSynthClient;
+  })();
+  
   commands["/connect"] = function(msg) {
     this.userId = msg[5]|0;
     this.sendToIF(msg);
@@ -2123,24 +754,24 @@ define('cc/client/client', function(require, exports, module) {
     }
   };
   
+  var listener = function(e) {
+    var msg = e.data;
+    if (msg instanceof Float32Array) {
+      msg[0] = cc.client.userId;
+      cc.client.sendToServer(msg);
+    } else {
+      cc.client.recvFromIF(msg);
+    }
+  };
+  
   var install = function() {
     var client;
-    if (cc.context === "iframe") {
+    switch (cc.opmode) {
+    case "socket":
+      client = new SocketSynthClient();
+      break;
+    case "iframe":
       client = new IFrameSynthClient();
-    } else {
-      client = new WorkerSynthClient();
-    }
-    cc.client = client;
-    var listener = function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        msg[0] = client.userId;
-        client.sendToServer(msg);
-      } else {
-        client.recvFromIF(msg);
-      }
-    };
-    if (cc.context === "iframe") {
       window.onmessage = function(e) {
         e.ports[0].onmessage = listener;
         client.sendToIF = function(msg) {
@@ -2148,13 +779,130 @@ define('cc/client/client', function(require, exports, module) {
         };
         window.onmessage = null;
       };
-    } else if (cc.context === "worker") {
+      break;
+    default: // "worker"
+      client = new WorkerSynthClient();
       global.onmessage = listener;
     }
+    cc.client = client;
   };
   
   module.exports = {
     install: install
+  };
+
+});
+define('cc/common/extend', function(require, exports, module) {
+  
+  var extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  
+  module.exports = extend;
+
+});
+define('cc/common/pack', function(require, exports, module) {
+  
+  var pack = (function() {
+    var _pack = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _pack(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            if (key.charAt(0) !== "_") {
+              result[key] = _pack(data[key], stack);
+            }
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _pack(data, []);
+    };
+  })();
+
+  var unpack = (function() {
+    var func = function() {};
+    var _unpack = function(data) {
+      if (!data) {
+        return data;
+      }
+      if (typeof data === "string") {
+        if (data === "[Function]") {
+          return func;
+        }
+        return data;
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _unpack(data);
+          });
+        } else {
+          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+            result = eval.call(null, "new (function " + data.klassName + "(){})");
+            delete data.klassName;
+          } else {
+            result = {};
+          }
+          Object.keys(data).forEach(function(key) {
+            result[key] = _unpack(data[key]);
+          });
+        }
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _unpack(data);
+    };
+  })();
+  
+  module.exports = {
+    pack  : pack,
+    unpack: unpack
   };
 
 });
@@ -3517,6 +2265,33 @@ define('cc/client/buffer', function(require, exports, module) {
     Buffer: Buffer,
     reset : reset,
     install: install
+  };
+
+});
+define('cc/common/console', function(require, exports, module) {
+  
+  var unpack = require("./pack").unpack;
+  
+  var receive = function(commands) {
+    commands["/console/log"] = function(msg) {
+      console.log.apply(console, unpack(msg[1]));
+    };
+    commands["/console/debug"] = function(msg) {
+      console.debug.apply(console, unpack(msg[1]));
+    };
+    commands["/console/info"] = function(msg) {
+      console.info.apply(console, unpack(msg[1]));
+    };
+    commands["/console/warn"] = function(msg) {
+      console.warn.apply(console, unpack(msg[1]));
+    };
+    commands["/console/error"] = function(msg) {
+      console.error.apply(console, unpack(msg[1]));
+    };
+  };
+  
+  module.exports = {
+    receive: receive
   };
 
 });
@@ -5050,6 +3825,1272 @@ define('cc/client/ugen/ui', function(require, exports, module) {
   };
 
 });
+define('cc/exports/installer', function(require, exports, module) {
+  
+  var CoffeeCollider = require("./coffeecollider").CoffeeCollider;
+  
+  var install = function() {
+    global.CoffeeCollider = CoffeeCollider;
+  };
+  
+  module.exports = {
+    install: install
+  };
+
+});
+define('cc/exports/coffeecollider', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../common/extend");
+  var Compiler = require("./compiler/coffee").Compiler;
+  var unpack   = require("../common/pack").unpack;
+  var commands = {};
+  var slice    = [].slice;
+  
+  var AudioAPI;
+  
+  var CoffeeCollider = (function() {
+    function CoffeeCollider(opts) {
+      opts = opts || {};
+      this.version    = cc.version;
+      if (opts.socket) {
+        this.impl = new CoffeeColliderSocketImpl(opts);
+      } else if (opts.iframe) {
+        this.impl = new CoffeeColliderIFrameImpl(opts);
+      } else {
+        this.impl = new CoffeeColliderWorkerImpl(opts);
+      }
+      this.sampleRate = this.impl.sampleRate;
+      this.channels   = this.impl.channels;
+      this.compiler   = this.impl.compiler;
+    }
+    
+    CoffeeCollider.prototype.play = function() {
+      this.impl.play();
+      return this;
+    };
+    CoffeeCollider.prototype.reset = function() {
+      this.impl.reset();
+      return this;
+    };
+    CoffeeCollider.prototype.pause = function() {
+      this.impl.pause();
+      return this;
+    };
+    CoffeeCollider.prototype.execute = function() {
+      this.impl.execute.apply(this.impl, arguments);
+      return this;
+    };
+    CoffeeCollider.prototype.getStream = function() {
+      return this.impl.strm;
+    };
+    CoffeeCollider.prototype.importScripts = function() {
+      this.impl.importScripts(slice.call(arguments));
+      return this;
+    };
+    CoffeeCollider.prototype.getWebAudioComponents = function() {
+      return this.impl.getWebAudioComponents();
+    };
+    
+    return CoffeeCollider;
+  })();
+
+  var CoffeeColliderImpl = (function() {
+    function CoffeeColliderImpl(opts) {
+      this.compiler = new Compiler();
+      
+      this.isPlaying = false;
+      this.execId = 0;
+      this.execCallbacks = {};
+
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.api = new AudioAPI(this, opts);
+      this.sampleRate = this.api.sampleRate;
+      this.channels   = this.api.channels;
+      this.strm  = new Float32Array(0);
+      this.clear = new Float32Array(0);
+      
+      if (opts.mouse !== false) {
+        var syncItems = new Float32Array(5);
+        window.addEventListener("mousemove", function(e) {
+          syncItems[2] = e.pageX / window.innerWidth;
+          syncItems[3] = e.pageY / window.innerHeight;
+        }, false);
+        window.addEventListener("mousedown", function() {
+          syncItems[1] = 1;
+        }, false);
+        window.addEventListener("mouseup", function() {
+          syncItems[1] = 0;
+        }, false);
+        this.syncItems = syncItems;
+      }
+    }
+    
+    CoffeeColliderImpl.prototype.init = function(msg) {
+      var strmLength = msg[3]|0;
+      var bufLength  = msg[4]|0;
+      this.strmLength = strmLength;
+      this.bufLength  = bufLength;
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.strmList = new Array(8);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.api.init();
+    };
+    CoffeeColliderImpl.prototype.play = function() {
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList.splice(0);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        this.api.play();
+        this.sendToClient(["/play"]);
+      }
+    };
+    CoffeeColliderImpl.prototype.pause = function() {
+      if (this.isPlaying) {
+        this.sendToClient(["/pause"]);
+        this.api.pause();
+        this.isPlaying = false;
+      }
+    };
+    CoffeeColliderImpl.prototype.reset = function() {
+      this.execId = 0;
+      this.execCallbacks = {};
+      var strm = this.strm;
+      for (var i = 0, imax = strm.length; i < imax; ++i) {
+        strm[i] = 0;
+      }
+      this.strmList.splice(0);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.sendToClient(["/reset"]);
+    };
+    CoffeeColliderImpl.prototype.process = function() {
+      var strm = this.strmList[this.strmListReadIndex];
+      if (strm) {
+        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strm.set(strm);
+      }
+      if (this.syncItems) {
+        this.sendToClient(this.syncItems);
+      }
+    };
+    CoffeeColliderImpl.prototype.execute = function(code) {
+      var append, callback;
+      var i = 1;
+      if (typeof arguments[i] === "boolean") {
+        append = arguments[i++];
+      } else {
+        append = false;
+      }
+      if (typeof arguments[i] === "function") {
+        callback = arguments[i++];
+      }
+      if (typeof code === "string") {
+        code = this.compiler.compile(code.trim());
+        this.sendToClient([
+          "/execute", this.execId, code, append, this.compiler.data, !!callback
+        ]);
+        if (callback) {
+          this.execCallbacks[this.execId] = callback;
+        }
+        this.execId += 1;
+      }
+    };
+    CoffeeColliderImpl.prototype.importScripts = function(list) {
+      this.sendToClient(["/importScripts", list]);
+    };
+    CoffeeColliderImpl.prototype.sendToClient = function(msg) {
+      if (this.client) {
+        this.client.postMessage(msg);
+      }
+    };
+    CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
+      if (msg instanceof Float32Array) {
+        this.strmList[this.strmListWriteIndex] = msg;
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        return;
+      }
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
+      }
+    };
+    CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
+      var api = this.api;
+      if (!api.decodeAudioFile) {
+        callback(null);
+        return;
+      }
+      var decode = function(buffer) {
+        api.decodeAudioFile(buffer, function(buffer) {
+          callback(buffer);
+        });
+      };
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path);
+      xhr.responseType = "arraybuffer";
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200 && xhr.response) {
+            if (callback) {
+              decode(xhr.response);
+            }
+          } else {
+            callback(null);
+          }
+        }
+      };
+      xhr.send();
+    };
+    CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
+      if (this.api.type === "Web Audio API") {
+        return [ this.api.context, this.api.jsNode ];
+      }
+      return [];
+    };
+    
+    return CoffeeColliderImpl;
+  })();
+  
+  
+  var CoffeeColliderWorkerImpl = (function() {
+    function CoffeeColliderWorkerImpl(opts) {
+      CoffeeColliderImpl.call(this, opts);
+      var that = this;
+      this.client = new Worker(cc.coffeeColliderPath);
+      this.client.onmessage = function(e) {
+        that.recvFromClient(e.data);
+      };
+    }
+    extend(CoffeeColliderWorkerImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderWorkerImpl;
+  })();
+  
+  
+  var CoffeeColliderIFrameImpl = (function() {
+    function CoffeeColliderIFrameImpl(opts) {
+      CoffeeColliderImpl.call(this, opts);
+      var that = this;
+      var iframe = document.createElement("iframe");
+      iframe.style.width  = 0;
+      iframe.style.height = 0;
+      iframe.style.border = 0;
+      document.body.appendChild(iframe);
+
+      this.iframe = iframe;
+      // TODO: want to remove 'allow-same-origin'
+      iframe.sandbox = "allow-scripts allow-same-origin";
+      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#iframe'></script>";
+      var channel = new MessageChannel();
+      iframe.onload = function() {
+        iframe.contentWindow.postMessage(null, [channel.port2], "*");
+      };
+      channel.port1.onmessage = function(e) {
+        that.recvFromClient(e.data);
+      };
+      this.client = channel.port1;
+    }
+    extend(CoffeeColliderIFrameImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderIFrameImpl;
+  })();
+
+
+  var CoffeeColliderSocketImpl = (function() {
+    function CoffeeColliderSocketImpl() {
+      // TODO: implements
+    }
+    extend(CoffeeColliderSocketImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderSocketImpl;
+  })();
+  
+  commands["/connect"] = function(msg) {
+    this.init(msg);
+    this.sendToClient([
+      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
+    ]);
+  };
+  commands["/execute"] = function(msg) {
+    var execId = msg[1];
+    var result = msg[2];
+    var callback = this.execCallbacks[execId];
+    if (callback) {
+      if (result !== undefined) {
+        result = unpack(result);
+      }
+      callback(result);
+      delete this.execCallbacks[execId];
+    }
+  };
+  commands["/buffer/request"] = function(msg) {
+    var that = this;
+    var requestId = msg[2];
+    this.readAudioFile(msg[1], function(buffer) {
+      that.sendToClient(["/buffer/response", buffer, requestId]);
+    });
+  };
+  require("../common/console").receive(commands);
+  
+  
+  var AudioContext = global.AudioContext || global.webkitAudioContext;
+  
+  if (AudioContext) {
+    AudioAPI = (function() {
+      function WebAudioAPI(sys, opts) {
+        this.sys = sys;
+        this.context = opts.AudioContext || new AudioContext();
+        this.sampleRate = this.context.sampleRate;
+        this.channels   = 2;
+        this.type = "Web Audio API";
+        this.delegate = !!opts.AudioContext;
+      }
+      WebAudioAPI.prototype.init = function() {
+        var sys = this.sys;
+        var onaudioprocess;
+        var strmLength  = sys.strmLength;
+        var strmLength4 = strmLength * 4;
+        var buffer = sys.strm.buffer;
+        if (this.sys.sampleRate === this.sampleRate) {
+          onaudioprocess = function(e) {
+            var outs = e.outputBuffer;
+            sys.process();
+            outs.getChannelData(0).set(new Float32Array(
+              buffer.slice(0, strmLength4)
+            ));
+            outs.getChannelData(1).set(new Float32Array(
+              buffer.slice(strmLength4)
+            ));
+          };
+        }
+        this.bufSrc = this.context.createBufferSource();
+        this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
+        this.jsNode.onaudioprocess = onaudioprocess;
+      };
+      WebAudioAPI.prototype.play = function() {
+        if (!this.bufSrc) {
+          return; // TODO: throw an error
+        }
+        this.bufSrc.noteOn(0);
+        this.bufSrc.connect(this.jsNode);
+        if (!this.delegate) {
+          this.jsNode.connect(this.context.destination);
+        }
+      };
+      WebAudioAPI.prototype.pause = function() {
+        if (!this.bufSrc) {
+          return; // TODO: throw an error
+        }
+        this.bufSrc.disconnect();
+        if (!this.delegate) {
+          this.jsNode.disconnect();
+        }
+      };
+      WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
+        buffer = this.context.createBuffer(buffer, false);
+        var numSamples = buffer.length * buffer.numberOfChannels;
+        var samples = new Float32Array(numSamples);
+        for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
+          samples.set(buffer.getChannelData(i), i * buffer.length);
+        }
+        callback({
+          sampleRate : buffer.sampleRate,
+          numChannels: buffer.numberOfChannels,
+          numFrames  : buffer.length,
+          samples    : samples,
+        });
+      };
+      return WebAudioAPI;
+    })();
+  } else if (typeof Audio === "function" && typeof new Audio().mozSetup === "function") {
+    AudioAPI = (function() {
+      /*global URL:true */
+      var timer = (function() {
+        var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
+        var blob = new Blob([source], {type:"text/javascript"});
+        var path = URL.createObjectURL(blob);
+        return new Worker(path);
+      })();
+      /*global URL:false */
+      function AudioDataAPI(sys) {
+        this.sys = sys;
+        this.sampleRate = 44100;
+        this.channels   = 2;
+        this.type = "Audio Data API";
+      }
+      AudioDataAPI.prototype.init = function() {
+        this.audio = new Audio();
+        this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
+      };
+      AudioDataAPI.prototype.play = function() {
+        if (!this.audio) {
+          return; // TODO: throw an error
+        }
+        var sys = this.sys;
+        var audio = this.audio;
+        var interleaved = this.interleaved;
+        var msec = (sys.strmLength / sys.sampleRate) * 1000;
+        var written = 0;
+        var start = Date.now();
+        var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
+        var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 4);
+
+        var onaudioprocess = function() {
+          if (written > Date.now() - start) {
+            return;
+          }
+          var i = interleaved.length;
+          var j = inL.length;
+          sys.process();
+          while (j--) {
+            interleaved[--i] = inR[j];
+            interleaved[--i] = inL[j];
+          }
+          audio.mozWriteAudio(interleaved);
+          written += msec;
+        };
+
+        audio.mozSetup(sys.channels, sys.sampleRate);
+        timer.onmessage = onaudioprocess;
+        timer.postMessage(msec * 0.8);
+      };
+      AudioDataAPI.prototype.pause = function() {
+        if (!this.audio) {
+          return; // TODO: throw an error
+        }
+        timer.postMessage(0);
+      };
+      return AudioDataAPI;
+    })();
+  }
+
+  if (!AudioAPI) {
+    AudioAPI = (function() {
+      function FallbackAudioAPI(sys) {
+        this.sys = sys;
+        this.sampleRate = 44100;
+        this.channels   = 2;
+        this.type = "Fallback";
+      }
+      FallbackAudioAPI.prototype.init = function() {
+      };
+      FallbackAudioAPI.prototype.play = function() {
+        if (fallback.play) {
+          this.play = fallback.play;
+          this.play();
+        }
+      };
+      FallbackAudioAPI.prototype.pause = function() {
+        if (fallback.pause) {
+          this.pause = fallback.pause;
+          this.pause();
+        }
+      };
+      
+      var fallback = {};
+      window.addEventListener("load", function() {
+        var swfSrc  = cc.rootPath + "coffee-collider-fallback.swf";
+        var swfName = swfSrc + "?" + Date.now();
+        var swfId   = "coffee-collider-fallback";
+        var div = document.createElement("div");
+        div.style.display = "inline";
+        div.width  = 1;
+        div.height = 1;
+        /*jshint quotmark:single */
+        div.innerHTML = '<object id="'+swfId+'" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="1" height="1"><param name="movie" value="'+swfName+'"/><param name="bgcolor" value="#FFFFFF"/><param name="quality" value="high"/><param name="allowScriptAccess" value="always"/></object>';
+        /*jshint quotmark:double */
+        document.body.appendChild(div);
+      
+        window.coffeecollider_flashfallback_init = function() {
+          var swf = document.getElementById(swfId);
+          var timerId = 0;
+          fallback.play = function() {
+            if (timerId === 0) {
+              var sys = this.sys;
+              var msec = (sys.strmLength / sys.sampleRate) * 1000;
+              var written = 0;
+              var start = Date.now();
+              var out   = new Array(sys.strmLength * sys.channels);
+              var len   = out.length;
+              
+              var onaudioprocess = function() {
+                if (written > Date.now() - start) {
+                  return;
+                }
+                sys.process();
+                var _in = sys.strm;
+                for (var i = 0; i < len; ++i) {
+                  var x = (_in[i] * 16384 + 32768)|0;
+                  x = Math.max(16384, Math.min(x, 49152));
+                  out[i] = String.fromCharCode(x);
+                }
+                swf.writeAudio(out.join(""));
+                written += msec;
+              };
+
+              timerId = setInterval(onaudioprocess, msec * 0.8);
+              swf.play();
+            }
+          };
+          fallback.pause = function() {
+            if (timerId !== 0) {
+              swf.pause();
+              clearInterval(timerId);
+              timerId = 0;
+            }
+          };
+        };
+      });
+      return FallbackAudioAPI;
+    })();
+  }
+  
+  module.exports = {
+    CoffeeCollider: CoffeeCollider
+  };
+
+});
+define('cc/exports/compiler/coffee', function(require, exports, module) {
+
+  var CoffeeScript = (function() {
+    if (global.CoffeeScript) {
+      return global.CoffeeScript;
+    }
+    try {
+      return require(["coffee-script"][0]);
+    } catch(e) {}
+  })();
+
+  var timevalue = require("../../common/timevalue").calc;
+
+  // CoffeeScript tags
+  // IDENTIFIER
+  // NUMBER
+  // STRING
+  // REGEX
+  // BOOL
+  // NULL
+  // UNDEFINED
+  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
+  // UNARY           !, ~, new, typeof, delete, do
+  // LOGIC           &&, ||, &, |, ^
+  // SHIFT           <<, >>, >>>
+  // COMPARE         ==, !=, <, >, <=, >=
+  // MATH            *, div, %, 
+  // RELATION        in, of, instanceof
+  // =
+  // +
+  // -
+  // ..
+  // ...
+  // ++
+  // --
+  // (
+  // )
+  // [
+  // ]
+  // {
+  // }
+  // ?
+  // ::
+  // @
+  // THIS
+  // SUPER
+  // INDENT
+  // OUTDENT
+  // RETURN
+  // TERMINATOR
+
+  var TAG   = 0;
+  var VALUE = 1;
+  var _     = {}; // empty location
+  
+  var dumpTokens = function(tokens) {
+    console.log(tokens.map(function(t) {
+      return t[0] + "\t" + t[1];
+    }).join("\n"));
+  };
+  
+  var tab = function(n) {
+    var t = "";
+    while (n--) {
+      t += " ";
+    }
+    return t;
+  };
+
+  var splitCodeAndData = function(text) {
+    var re = /^(\s*)__END__(\s*)$/gm;
+    var m = re.exec(text);
+    if (m === null) {
+      return [ text, "" ];
+    }
+    var code = text.substr(0, m.index - 1);
+    var data = text.substr(m.index + m[0].length + 1);
+    return [ code, data ];
+  };
+  
+  var findOperandHead = function(tokens, index) {
+    var bracket = 0;
+    var indent  = 0;
+    while (0 < index) {
+      var token = tokens[index - 1];
+      if (!token || token[TAG] !== ".") {
+        token = tokens[index];
+        switch (token[TAG]) {
+        case "PARAM_START":
+          return index;
+        case "CALL_START":
+          bracket -= 1;
+          break;
+        case "(": case "[": case "{":
+          bracket -= 1;
+          /* falls through */
+        case "IDENTIFIER":
+        case "NUMBER": case "STRING": case "BOOL":
+        case "REGEX": case "NULL": case "UNDEFINED":
+          if (indent === 0 && bracket === 0) {
+            token = tokens[index - 1];
+            if (token) {
+              if (token[TAG] === "UNARY") {
+                return index - 1;
+              }
+              if (token[VALUE] === "+" || token[VALUE] === "-") {
+                token = tokens[index - 2];
+                if (!token) {
+                  return index - 1;
+                }
+                switch (token[TAG]) {
+                case "INDENT": case "TERMINATOR": case "CALL_START":
+                case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
+                case "SHIFT": case "COMPARE": case "=": case "..": case "...":
+                case "[": case "(": case "{": case ",": case "?":
+                  return index - 1;
+                }
+              }
+            }
+            return index;
+          }
+          break;
+        case "}": case "]": case ")": case "PARAM_END": case "CALL_END":
+          bracket += 1;
+          break;
+        case "INDENT":
+          indent += 1;
+          break;
+        case "OUTDENT":
+          indent -= 1;
+          break;
+        }
+      }
+      index -= 1;
+    }
+    return 0;
+  };
+
+  var findOperandTail = function(tokens, index) {
+    var bracket  = 0;
+    var indent   = 0;
+    var inParams = false;
+    while (index < tokens.length) {
+      var token = tokens[index];
+      if (inParams) {
+        inParams = token[TAG] !== "PARAM_END";
+        index += 1;
+        continue;
+      }
+      switch (token[TAG]) {
+      case "}": case "]": case ")": case "CALL_END":
+        bracket -= 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        break;
+      case "PARAM_START":
+        inParams = true;
+        index += 1;
+        continue;
+      }
+      token = tokens[index + 1];
+      if (!token || token[TAG] !== ".") {
+        token = tokens[index];
+        switch (token[TAG]) {
+        case "TERMINATOR":
+          if (indent === 0) {
+            return index - 1;
+          }
+          break;
+        case "IDENTIFIER":
+          token = tokens[index + 1];
+          if (token && token[TAG] === "CALL_START") {
+            bracket += 1;
+            break;
+          }
+          if (indent === 0 && bracket === 0) {
+            return index;
+          }
+          break;
+        case "NUMBER": case "STRING": case "BOOL":
+        case "REGEX": case "NULL": case "UNDEFINED":
+          if (indent === 0 && bracket === 0) {
+            return index;
+          }
+          break;
+        case "(": case "[": case "{":
+          bracket += 1;
+          break;
+        case "}": case "]": case ")": case "CALL_END":
+          if (indent === 0 && bracket === 0) {
+            return index;
+          }
+          break;
+        case "INDENT":
+          indent += 1;
+          break;
+        case "OUTDENT":
+          if (indent === 0 && bracket === 0) {
+            return index;
+          }
+          break;
+        }
+      }
+      index += 1;
+    }
+    return tokens.length - 1;
+  };
+
+  var replaceTimeValue = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
+        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
+        if (typeof time === "number") {
+          token[TAG] = "NUMBER";
+          token[VALUE] = time.toString();
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var replacePi = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var a, b, token = tokens[i];
+      if (token[VALUE] === "pi") {
+        tokens.splice(i, 1);
+        token = tokens[i - 1];
+        if (token && token[TAG] === "NUMBER") {
+          a = i - 1;
+          token = tokens[i - 2];
+          if (token) {
+            switch (token[TAG]) {
+              case "UNARY": case "+": case "-":
+              a -= 1;
+            }
+          }
+          tokens.splice(i, 0, ["MATH", "*", _]);
+          b = i;
+        } else {
+          a = -1;
+          b = i - 1;
+        }
+        tokens.splice(b+1, 0, ["IDENTIFIER", "Math", _]);
+        tokens.splice(b+2, 0, ["."         , "."   , _]);
+        tokens.splice(b+3, 0, ["IDENTIFIER", "PI"  , _]);
+        if (a !== -1) {
+          tokens.splice(b+4, 0, [")", ")", _]);
+          tokens.splice(a, 0, ["(", "(", _]);
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var replacePrecedence = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH") {
+        var a = findOperandHead(tokens, i);
+        var b = findOperandTail(tokens, i) + 1;
+        tokens.splice(b, 0, [")", ")" , _]);
+        tokens.splice(a, 0, ["(", "(" , _]);
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var replaceUnaryOpTable = {
+    "+": "__plus__", "-": "__minus__"
+  };
+
+  var replaceUnaryOp = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceUnaryOpTable[token[VALUE]];
+        token = tokens[i - 1] || { 0:"TERMINATOR" };
+        switch (token[TAG]) {
+        case "INDENT": case "TERMINATOR": case "CALL_START":
+        case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
+        case "SHIFT": case "COMPARE": case "=": case "..": case "...":
+        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
+          var a = findOperandTail(tokens, i);
+          tokens.splice(a+1, 0, ["."         , "."     , _]);
+          tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
+          tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
+          tokens.splice(i, 1);
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
+  var replaceBinaryOpTable = {
+    "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
+  };
+  
+  var replaceBinaryOp = function(tokens) {
+    var i = 0;
+    var replaceable = false;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (replaceable) {
+        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
+          var selector = replaceBinaryOpTable[token[VALUE]];
+          var b = findOperandTail(tokens, i) + 1;
+          tokens.splice(i++, 1, ["."         , "."     , _]);
+          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
+          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
+          replaceable = false;
+          continue;
+        }
+      }
+      switch (token[TAG]) {
+      case "INDENT": case "TERMINATOR": case "CALL_START":
+      case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
+      case "SHIFT": case "COMPARE": case "=": case "..": case "...":
+      case "[": case "(": case "{": case ",": case "?":
+        replaceable = false;
+        break;
+      default:
+        replaceable = true;
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var replaceCompoundAssignTable = {
+    "+=": "__add__",
+    "-=": "__sub__",
+    "*=": "__mul__",
+    "/=": "__div__",
+    "%=": "__mod__",
+  };
+  
+  var replaceCompoundAssign = function(tokens) {
+    var i = tokens.length - 1;
+    while (0 <= i) {
+      var token = tokens[i];
+      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
+        var selector = replaceCompoundAssignTable[token[VALUE]];
+        var a = findOperandHead(tokens, i);
+        var b = findOperandTail(tokens, i) + 1;
+        tokens[i] = ["=", "=", _];
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 0, ["IDENTIFIER", selector, _]);
+        tokens.splice(i+3, 0, ["CALL_START", "("     , _]);
+        tokens.splice(b+3, 0, ["CALL_END"  , ")"     , _]);
+        for (var j = a; j < i; j++) {
+          tokens.splice(i+1, 0, tokens[j]);
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
+  var replaceSynthDef = (function() {
+    var getParams = function(tokens, index) {
+      var begin = -1, end = -1;
+      for (var i = index + 1; i < tokens.length; ++i) {
+        if (tokens[i][TAG] === "PARAM_START") {
+          begin = i;
+        } else if (tokens[i][TAG] === "PARAM_END") {
+          end = i;
+          break;
+        }
+      }
+      var replace = "";
+      if (begin !== -1) {
+        replace = tokens.slice(begin+1, end).map(function(t) {
+          return t[VALUE];
+        }).join("").replace(/"/g, "'");
+      }
+      replace = "\"" + replace + "\"";
+      return { begin:begin, end:end, replace:replace };
+    };
+    return function(tokens) {
+      var i = tokens.length - 1;
+      while (0 <= i) {
+        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
+          if (tokens[i - 1][TAG] === ".") {
+            var token = tokens[i];
+            if (token[VALUE] === "def") {
+              token = tokens[i + 1];
+              if (token[TAG] === "CALL_START") {
+                var a = findOperandTail(tokens, i + 2);
+                var params = getParams(tokens, i + 1);
+                tokens.splice(++a, 0, [","     , ","           , _]);
+                tokens.splice(++a, 0, ["STRING", params.replace, _]);
+              }
+            }
+          }
+        }
+        i -= 1;
+      }
+      // dumpTokens(tokens);
+      return tokens;
+    };
+  })();
+
+  var replaceGlobal = function(tokens) {
+    var i = tokens.length - 2;
+    while (i >= 0) {
+      var token = tokens[i];
+      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
+        var name = token[VALUE];
+        if (!/\d/.test(name.charAt(1))) {
+          name = name.substr(1);
+        }
+        if (name !== "") {
+          token = tokens[i - 1];
+          if (!token || token[TAG] !== ".") {
+            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
+            tokens.splice(i+1, 0, ["."         , "."     , _]);
+            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+          }
+        }
+      }
+      i -= 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
+  var cleanupParenthesis = function(tokens) {
+    var i = 0;
+    var bracket = 0;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (token[TAG] === "(") {
+        token = tokens[i + 1];
+        if (token && token[TAG] === "(") {
+          bracket = 2;
+          for (var j = i + 2; j < tokens.length; j++) {
+            token = tokens[j][TAG];
+            if (token === "(") {
+              bracket += 1;
+            } if (token === ")") {
+              bracket -= 1;
+              if (bracket === 0) {
+                if (tokens[j - 1][TAG] === ")") {
+                  tokens.splice(j, 1);
+                  tokens.splice(i, 1);
+                  i -= 1;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+
+  var insertReturn = function(tokens) {
+    tokens.splice(0, 0, ["("          , "("     , _]);
+    tokens.splice(1, 0, ["PARAM_START", "("     , _]);
+    tokens.splice(2, 0, ["IDENTIFIER" , "global", _]);
+    tokens.splice(3, 0, ["PARAM_END"  , ")"     , _]);
+    tokens.splice(4, 0, ["->"         , "->"    , _]);
+    tokens.splice(5, 0, ["INDENT"     , 2       , _]);
+    var i = tokens.length - 1;
+    tokens.splice(i++, 0, ["OUTDENT"   , 2       , _]);
+    tokens.splice(i++, 0, [")"         , ")"     , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "call"  , _]);
+    tokens.splice(i++, 0, ["CALL_START", "("     , _]);
+    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
+    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
+    tokens.splice(i++, 0, [","         , ","     , _]);
+    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
+    tokens.splice(i++, 0, ["."         , "."     , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
+    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
+    tokens.splice(i++, 0, ["CALL_END"  , ")"     , _]);
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
+  var Compiler = (function() {
+    function Compiler() {
+    }
+    Compiler.prototype.tokens = function(text) {
+      var items = splitCodeAndData(text);
+      var code  = items[0];
+      var data  = items[1];
+      var tokens = CoffeeScript.tokens(code);
+      tokens = replaceTimeValue(tokens);
+      tokens = replacePi(tokens);
+      tokens = replaceUnaryOp(tokens);
+      tokens = replacePrecedence(tokens);
+      tokens = replaceBinaryOp(tokens);
+      tokens = replaceCompoundAssign(tokens);
+      tokens = replaceSynthDef(tokens);
+      tokens = cleanupParenthesis(tokens);
+      tokens = replaceGlobal(tokens);
+      tokens = insertReturn(tokens);
+      this.code = code;
+      this.data = data;
+      return tokens;
+    };
+    Compiler.prototype.compile = function(code) {
+      var tokens = this.tokens(code);
+      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
+    };
+    Compiler.prototype.toString = function(tokens) {
+      var indent = 0;
+      if (typeof tokens === "string") {
+        tokens = this.tokens(tokens);
+      }
+      return tokens.map(function(token) {
+        switch (token[TAG]) {
+        case "TERMINATOR":
+          return "\n" + tab(indent);
+        case "INDENT":
+          indent += token[VALUE]|0;
+          return "\n" + tab(indent);
+        case "OUTDENT":
+          indent -= token[VALUE]|0;
+          return "\n" + tab(indent);
+        case "RETURN":
+          return "return ";
+        case "UNARY":
+          if (token[VALUE].length > 1) {
+            return token[VALUE] + " ";
+          }
+          return token[VALUE];
+        case "{":
+          return "{";
+        case ",": case "RELATION":
+          return token[VALUE] + " ";
+        case "=":
+          return " = ";
+        case "COMPOUND_ASSIGN": case "COMPARE": case "MATH": case "+": case "-":
+          return " " + token[VALUE] + " ";
+        default:
+          return token[VALUE];
+        }
+      }).join("").trim();
+    };
+    return Compiler;
+  })();
+
+  module.exports = {
+    Compiler  : Compiler,
+    dumpTokens: dumpTokens,
+    splitCodeAndData: splitCodeAndData,
+    findOperandHead : findOperandHead,
+    findOperandTail : findOperandTail,
+    replaceTimeValue     : replaceTimeValue,
+    replacePi            : replacePi,
+    replacePrecedence    : replacePrecedence,
+    replaceUnaryOp       : replaceUnaryOp,
+    replaceBinaryOp      : replaceBinaryOp,
+    replaceCompoundAssign: replaceCompoundAssign,
+    replaceSynthDef      : replaceSynthDef,
+    replaceGlobal        : replaceGlobal,
+    cleanupParenthesis   : cleanupParenthesis,
+    insertReturn         : insertReturn,
+  };
+
+});
+define('cc/common/timevalue', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var calc = function(str) {
+    var result = null;
+    var freq;
+    if (str.charAt(0) === "~") {
+      freq = true;
+      str  = str.substr(1);
+    }
+    do {
+      result = hz(str);
+      if (result !== null) {
+        break;
+      }
+      result = time(str);
+      if (result !== null) {
+        break;
+      }
+      result = hhmmss(str);
+      if (result !== null) {
+        break;
+      }
+      result = samples(str);
+      if (result !== null) {
+        break;
+      }
+      result = note(str);
+      if (result !== null) {
+        break;
+      }
+      result = beat(str);
+      if (result !== null) {
+        break;
+      }
+      result = ticks(str);
+    } while (false);
+    
+    if (result !== null) {
+      if (!freq) {
+        return result;
+      }
+      if (result !== 0) {
+        return 1 / result;
+      }
+    }
+    return str;
+  };
+  
+  var hz = function(str) {
+    var m = /^(\d+(?:\.\d+)?)hz$/i.exec(str);
+    if (m) {
+      return +m[1] === 0 ? 0 : 1 / +m[1];
+    }
+    return null;
+  };
+  var time = function(str) {
+    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
+    if (m) {
+      switch (m[2]) {
+      case "min": return +(m[1]||0) * 60;
+      case "sec": return +(m[1]||0);
+      case "m"  : return +(m[1]||0) / 1000;
+      }
+    }
+    return null;
+  };
+
+  var hhmmss = function(str) {
+    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
+    if (m) {
+      var x = 0;
+      x += (m[1]|0) * 3600;
+      x += (m[2]|0) * 60;
+      x += (m[3]|0);
+      x += (((m[4]||"")+"00").substr(0, 3)|0) / 1000;
+      return x;
+    }
+    return null;
+  };
+
+  var samples = function(str) {
+    var m = /^(\d+)samples(?:\/(\d+)hz)?$/i.exec(str);
+    if (m) {
+      return m[1] / ((m[2]|0) || cc.sampleRate);
+    }
+    return null;
+  };
+
+  var calcNote = function(bpm, len, dot) {
+    var x = (60 / bpm) * (4 / len);
+    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
+    return x;
+  };
+  var note = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*l([1-9]\d*)(\.*)$/i.exec(str);
+    if (m) {
+      return calcNote(+m[1], +m[2], m[3].length);
+    }
+    return null;
+  };
+
+  var calcBeat = function(bpm, measure, beat, ticks) {
+    var x = (measure * 4 + beat) * 480 + ticks;
+    return (60 / bpm) * (x / 480);
+  };
+  var beat = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)\.(\d+).(\d{1,3})$/i.exec(str);
+    if (m) {
+      return calcBeat(+m[1], +m[2], +m[3], +m[4]);
+    }
+    return null;
+  };
+
+  var calcTicks = function(bpm, ticks) {
+    return 60 / bpm * ticks / 480;
+  };
+  var ticks = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)ticks$/i.exec(str);
+    if (m) {
+      return calcTicks(+m[1], +m[2]);
+    }
+    return null;
+  };
+  
+  module.exports = {
+    hz     : hz,
+    time   : time,
+    hhmmss : hhmmss,
+    samples: samples,
+    note   : note,
+    beat   : beat,
+    ticks  : ticks,
+    calcNote : calcNote,
+    calcBeat : calcBeat,
+    calcTicks: calcTicks,
+    calc: calc,
+  };
+
+});
 define('cc/server/installer', function(require, exports, module) {
   
   var install = function() {
@@ -5238,6 +5279,16 @@ define('cc/server/server', function(require, exports, module) {
     
     return IFrameSynthServer;
   })();
+
+
+  var SocketSynthServer = (function() {
+    function SocketSynthServer() {
+      SynthServer.call(this);
+    }
+    extend(SocketSynthServer, SynthServer);
+    
+    return SocketSynthServer;
+  })();
   
   commands["/init"] = function(msg) {
     this.init(msg);
@@ -5279,30 +5330,34 @@ define('cc/server/server', function(require, exports, module) {
   
   var install = function() {
     var server;
-    if (cc.context === "worker") {
-      if (location.hash === "#iframe") {
-        server = new IFrameSynthServer();
-        global.onmessage = function(e) {
-          server.recvFromClient(e.data);
-        };
-      } else {
-        server = new WorkerSynthServer();
-      }
-      cc.server = server;
-      if (typeof global.console === "undefined") {
-        global.console = (function() {
-          var console = {};
-          ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-            console[method] = function() {
-              var args = Array.prototype.slice.call(arguments).map(function(x) {
-                return pack(x);
-              });
-              server.sendToClient(["/console/" + method, args]);
-            };
-          });
-          return console;
-        })();
-      }
+    switch (cc.opmode) {
+    case "socket":
+      server = new SocketSynthServer();
+      break;
+    case "iframe":
+      server = new IFrameSynthServer();
+      global.onmessage = function(e) {
+        server.recvFromClient(e.data);
+      };
+      break;
+    default: // "worker"
+      server = new WorkerSynthServer();
+    }
+    cc.server = server;
+    
+    if (typeof global.console === "undefined") {
+      global.console = (function() {
+        var console = {};
+        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+          console[method] = function() {
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            server.sendToClient(["/console/" + method, args]);
+          };
+        });
+        return console;
+      })();
     }
   };
   

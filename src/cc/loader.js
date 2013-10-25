@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
 
-  if (typeof document !== "undefined") {
+  if (typeof Window !== "undefined") {
     var scripts = document.getElementsByTagName("script");
     if (scripts && scripts.length) {
       var m;
@@ -19,24 +19,32 @@ define(function(require, exports, module) {
         }
       }
     }
-    if (cc.coffeeColliderHash !== "#iframe") {
-      cc.context = "window";
-      require("./exports/installer").install();
-    } else {
-      cc.context = "iframe";
+    if (cc.coffeeColliderHash === "#iframe") {
+      cc.opmode  = "iframe";
+      cc.context = "client";
       require("./client/installer").install();
+    } else {
+      cc.opmode  = "worker";
+      cc.context = "exports";
+      require("./exports/installer").install();
     }
-  } else if (typeof WorkerLocation !== "undefined") {
-    cc.context = "worker";
+  } else if (typeof WorkerGlobalScope !== "undefined") {
     if (location.hash === "#iframe") {
+      cc.opmode  = "iframe";
+      cc.context = "server";
       require("./server/installer").install();
     } else {
+      cc.opmode  = "worker";
+      cc.context = "client/server";
       require("./client/installer").install();
       require("./server/installer").install();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
       cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
     }
     cc.server.connect();
+  } else if (typeof global.GLOBAL !== "undefined") {
+    cc.opmode  = "socket";
+    cc.context = "server";
   }
   
   module.exports = {

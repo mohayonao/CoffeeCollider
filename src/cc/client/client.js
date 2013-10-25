@@ -136,6 +136,16 @@ define(function(require, exports, module) {
     return IFrameSynthClient;
   })();
 
+
+  var SocketSynthClient = (function() {
+    function SocketSynthClient() {
+      SynthClient.call(this);
+    }
+    extend(SocketSynthClient, SynthClient);
+    
+    return SocketSynthClient;
+  })();
+  
   commands["/connect"] = function(msg) {
     this.userId = msg[5]|0;
     this.sendToIF(msg);
@@ -203,24 +213,24 @@ define(function(require, exports, module) {
     }
   };
   
+  var listener = function(e) {
+    var msg = e.data;
+    if (msg instanceof Float32Array) {
+      msg[C.USER_ID] = cc.client.userId;
+      cc.client.sendToServer(msg);
+    } else {
+      cc.client.recvFromIF(msg);
+    }
+  };
+  
   var install = function() {
     var client;
-    if (cc.context === "iframe") {
+    switch (cc.opmode) {
+    case "socket":
+      client = new SocketSynthClient();
+      break;
+    case "iframe":
       client = new IFrameSynthClient();
-    } else {
-      client = new WorkerSynthClient();
-    }
-    cc.client = client;
-    var listener = function(e) {
-      var msg = e.data;
-      if (msg instanceof Float32Array) {
-        msg[C.USER_ID] = client.userId;
-        client.sendToServer(msg);
-      } else {
-        client.recvFromIF(msg);
-      }
-    };
-    if (cc.context === "iframe") {
       window.onmessage = function(e) {
         e.ports[0].onmessage = listener;
         client.sendToIF = function(msg) {
@@ -228,9 +238,12 @@ define(function(require, exports, module) {
         };
         window.onmessage = null;
       };
-    } else if (cc.context === "worker") {
+      break;
+    default: // "worker"
+      client = new WorkerSynthClient();
       global.onmessage = listener;
     }
+    cc.client = client;
   };
   
   module.exports = {

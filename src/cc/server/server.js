@@ -175,6 +175,16 @@ define(function(require, exports, module) {
     
     return IFrameSynthServer;
   })();
+
+
+  var SocketSynthServer = (function() {
+    function SocketSynthServer() {
+      SynthServer.call(this);
+    }
+    extend(SocketSynthServer, SynthServer);
+    
+    return SocketSynthServer;
+  })();
   
   commands["/init"] = function(msg) {
     this.init(msg);
@@ -216,30 +226,34 @@ define(function(require, exports, module) {
   
   var install = function() {
     var server;
-    if (cc.context === "worker") {
-      if (location.hash === "#iframe") {
-        server = new IFrameSynthServer();
-        global.onmessage = function(e) {
-          server.recvFromClient(e.data);
-        };
-      } else {
-        server = new WorkerSynthServer();
-      }
-      cc.server = server;
-      if (typeof global.console === "undefined") {
-        global.console = (function() {
-          var console = {};
-          ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-            console[method] = function() {
-              var args = Array.prototype.slice.call(arguments).map(function(x) {
-                return pack(x);
-              });
-              server.sendToClient(["/console/" + method, args]);
-            };
-          });
-          return console;
-        })();
-      }
+    switch (cc.opmode) {
+    case "socket":
+      server = new SocketSynthServer();
+      break;
+    case "iframe":
+      server = new IFrameSynthServer();
+      global.onmessage = function(e) {
+        server.recvFromClient(e.data);
+      };
+      break;
+    default: // "worker"
+      server = new WorkerSynthServer();
+    }
+    cc.server = server;
+    
+    if (typeof global.console === "undefined") {
+      global.console = (function() {
+        var console = {};
+        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+          console[method] = function() {
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            server.sendToClient(["/console/" + method, args]);
+          };
+        });
+        return console;
+      })();
     }
   };
   

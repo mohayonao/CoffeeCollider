@@ -14,7 +14,9 @@ define(function(require, exports, module) {
     function CoffeeCollider(opts) {
       opts = opts || {};
       this.version    = cc.version;
-      if (opts.iframe) {
+      if (opts.socket) {
+        this.impl = new CoffeeColliderSocketImpl(opts);
+      } else if (opts.iframe) {
         this.impl = new CoffeeColliderIFrameImpl(opts);
       } else {
         this.impl = new CoffeeColliderWorkerImpl(opts);
@@ -23,6 +25,7 @@ define(function(require, exports, module) {
       this.channels   = this.impl.channels;
       this.compiler   = this.impl.compiler;
     }
+    
     CoffeeCollider.prototype.play = function() {
       this.impl.play();
       return this;
@@ -49,6 +52,7 @@ define(function(require, exports, module) {
     CoffeeCollider.prototype.getWebAudioComponents = function() {
       return this.impl.getWebAudioComponents();
     };
+    
     return CoffeeCollider;
   })();
 
@@ -83,6 +87,7 @@ define(function(require, exports, module) {
         this.syncItems = syncItems;
       }
     }
+    
     CoffeeColliderImpl.prototype.init = function(msg) {
       var strmLength = msg[3]|0;
       var bufLength  = msg[4]|0;
@@ -214,9 +219,11 @@ define(function(require, exports, module) {
       }
       return [];
     };
+    
     return CoffeeColliderImpl;
   })();
-
+  
+  
   var CoffeeColliderWorkerImpl = (function() {
     function CoffeeColliderWorkerImpl(opts) {
       CoffeeColliderImpl.call(this, opts);
@@ -227,9 +234,11 @@ define(function(require, exports, module) {
       };
     }
     extend(CoffeeColliderWorkerImpl, CoffeeColliderImpl);
+    
     return CoffeeColliderWorkerImpl;
   })();
-
+  
+  
   var CoffeeColliderIFrameImpl = (function() {
     function CoffeeColliderIFrameImpl(opts) {
       CoffeeColliderImpl.call(this, opts);
@@ -254,7 +263,18 @@ define(function(require, exports, module) {
       this.client = channel.port1;
     }
     extend(CoffeeColliderIFrameImpl, CoffeeColliderImpl);
+    
     return CoffeeColliderIFrameImpl;
+  })();
+
+
+  var CoffeeColliderSocketImpl = (function() {
+    function CoffeeColliderSocketImpl() {
+      // TODO: implements
+    }
+    extend(CoffeeColliderSocketImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderSocketImpl;
   })();
   
   commands["/connect"] = function(msg) {
