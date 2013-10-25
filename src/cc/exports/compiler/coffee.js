@@ -10,7 +10,7 @@ define(function(require, exports, module) {
     } catch(e) {}
   })();
 
-  var timevalue = require("../common/timevalue").calc;
+  var timevalue = require("../../common/timevalue").calc;
 
   // CoffeeScript tags
   // IDENTIFIER

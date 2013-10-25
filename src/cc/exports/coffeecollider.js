@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var SoundSystem = require("../common/soundsystem").SoundSystem;
-  var Compiler = require("./compiler").Compiler;
+  var Compiler = require("./compiler/coffee").Compiler;
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;

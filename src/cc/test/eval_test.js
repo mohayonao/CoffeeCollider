@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var fs = require("fs");
   var assert = require("chai").assert;
-  var Compiler = require("../exports/compiler").Compiler;
+  var Compiler = require("../exports/compiler/coffee").Compiler;
   var object = require("../client/object");
   var uop = require("../client/uop");
   var bop = require("../client/bop");

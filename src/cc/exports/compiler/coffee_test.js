@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var compiler = require("./compiler");
+  var compiler = require("./coffee");
 
   Array.prototype.erode = function() {
     return this.map(function(token) {
