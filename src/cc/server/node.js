@@ -2,8 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var fn = require("./fn");
-
+  var extend = require("../common/extend");
+  
   var Unit = require("./unit/unit").Unit;
   var graphFunc  = {};
   var doneAction = {};
@@ -302,7 +302,7 @@ define(function(require, exports, module) {
         graphFunc[addAction].call(target, this);
       }
     }
-    fn.extend(Group, Node);
+    extend(Group, Node);
     
     Group.prototype.process = function(inNumSamples, heap) {
       if (this.head && this.running) {
@@ -329,7 +329,7 @@ define(function(require, exports, module) {
         graphFunc[addAction].call(node, this);
       }
     }
-    fn.extend(Synth, Node);
+    extend(Synth, Node);
     
     Synth.prototype.build = function(specs, args, heap) {
       this.specs = specs;

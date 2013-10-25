@@ -5,16 +5,6 @@ define(function(require, exports, module) {
   var fn = require("./fn");
 
   describe("fn.js", function() {
-    var Foo = (function() {
-      function Foo() {}
-      return Foo;
-    })();
-    var Bar = (function() {
-      function Bar() {}
-      fn.extend(Bar, Foo);
-      return Bar;
-    })();
-    
     describe("Fn", function() {
       it("defaults", function() {
         var madd = fn(function(val, mul, add) {
@@ -36,9 +26,6 @@ define(function(require, exports, module) {
         }).defaults("val=0,mul=1,add=0").multiCall().build();
         assert.deepEqual(madd(10, [1, 2]), [10, 20]);
       });
-    });
-    it("extend", function() {
-      assert.instanceOf(new Bar(), Foo);
     });
   });
   

@@ -2,9 +2,8 @@ define(function(require, exports, module) {
   "use strict";
   
   var cc = require("./cc");
-  var fn = require("./fn");
-  var pack  = require("../common/pack").pack;
-  var Timer    = require("../common/timer").Timer;
+  var extend = require("../common/extend");
+  var pack   = require("../common/pack").pack;
   var Timeline = require("./sched").Timeline;
   var node     = require("./node");
   var buffer   = require("./buffer");
@@ -13,25 +12,28 @@ define(function(require, exports, module) {
   var SynthClient = (function() {
     function SynthClient() {
       this.klassName = "SynthClient";
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.strmLength = 1024;
-      this.bufLength  = 64;
+      this.sampleRate = 0;
+      this.channels   = 0;
+      this.strmLength = 0;
+      this.bufLength  = 0;
       this.userId     = 0;
-      this.timer      = new Timer();
       this.timeline   = new Timeline(this);
       this.rootNode   = new node.Group();
       this.commandList = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
+      this.phase = 0;
     }
-    SynthClient.prototype.sendToIF = function(msg) {
-      postMessage(msg);
+    
+    SynthClient.prototype.sendToIF = function() {
+      // should be overridden
     };
     SynthClient.prototype.recvFromIF = function(msg) {
       var func = commands[msg[0]];
       if (func) {
         func.call(this, msg);
+      } else {
+        this.sendToServer(msg);
       }
     };
     SynthClient.prototype.sendToServer = function() {
@@ -46,31 +48,28 @@ define(function(require, exports, module) {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
+        } else {
+          this.sendToIF(msg);
         }
       }
     };
     SynthClient.prototype.pushCommand = function(cmd) {
       this.commandList.push(cmd);
     };
-    SynthClient.prototype.play = function() {
+    SynthClient.prototype.play = function(msg) {
+      this.timeline.play();
+      this.sendToServer(msg);
     };
-    SynthClient.prototype.pause = function() {
+    SynthClient.prototype.pause = function(msg) {
+      this.sendToServer(msg);
     };
-    SynthClient.prototype.reset = function() {
+    SynthClient.prototype.reset = function(msg) {
+      buffer.reset();
+      node.reset();
+      this.timeline.reset();
+      this.sendToServer(msg);
     };
-    SynthClient.prototype.requestBuffer = function() {
-    };
-    SynthClient.prototype.process = function() {
-    };
-    return SynthClient;
-  })();
-
-  var WorkerSynthClient = (function() {
-    function WorkerSynthClient() {
-      SynthClient.call(this);
-    }
-    fn.extend(WorkerSynthClient, SynthClient);
-    WorkerSynthClient.prototype.requestBuffer = function(path, callback) {
+    SynthClient.prototype.requestBuffer = function(path, callback) {
       if (!(typeof path === "string" && typeof callback === "function")) {
         return;
       }
@@ -78,67 +77,74 @@ define(function(require, exports, module) {
       this.bufferRequestCallback[requestId] = callback;
       this.sendToIF(["/buffer/request", path, requestId]);
     };
-    WorkerSynthClient.prototype.play = function(msg) {
-      if (!this.timer.isRunning) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
-        this.timer.start(this.process.bind(this), this.processInterval * 0.5);
-        this.timeline.play();
-        this.sendToServer(msg);
-      }
+    SynthClient.prototype.process = function() {
+      // should be overridden
     };
-    WorkerSynthClient.prototype.pause = function(msg) {
-      if (this.timer.isRunning) {
-        this.timeline.pause();
-        this.timer.stop();
-        this.sendToServer(msg);
-      }
-    };
-    WorkerSynthClient.prototype.reset = function(msg) {
-      buffer.reset();
-      node.reset();
-      this.timeline.reset();
-      this.sendToServer(msg);
+    
+    return SynthClient;
+  })();
+  
+  
+  var WorkerSynthClient = (function() {
+    function WorkerSynthClient() {
+      SynthClient.call(this);
+    }
+    extend(WorkerSynthClient, SynthClient);
+    
+    WorkerSynthClient.prototype.sendToIF = function(msg) {
+      postMessage(msg);
     };
     WorkerSynthClient.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
-        return;
-      }
-      var userId   = this.userId;
+      this.timeline.process();
+      this.sendToServer([
+        "/command", this.userId, [ this.commandList.splice(0) ]
+      ]);
+    };
+    
+    return WorkerSynthClient;
+  })();
+  
+  
+  var IFrameSynthClient = (function() {
+    function IFrameSynthClient() {
+      SynthClient.call(this);
+      var that = this;
+      this.server = new Worker(cc.coffeeColliderPath);
+      this.server.onmessage = function(e) {
+        that.recvFromServer(e.data);
+      };
+      require("../common/console").receive(commands);
+    }
+    extend(IFrameSynthClient, SynthClient);
+    
+    IFrameSynthClient.prototype.sendToServer = function(msg) {
+      this.server.postMessage(msg);
+    };
+    IFrameSynthClient.prototype.process = function() {
       var timeline = this.timeline;
-      var server   = cc.server;
       var n = this.strmLength / this.bufLength;
-      server.preprocess();
+      var list = [];
       while (n--) {
         timeline.process();
-        this.sendToServer([
-          "/command", userId, [ this.commandList ]
-        ]);
-        this.commandList = [];
-        server.process();
+        list.push(this.commandList.splice(0));
       }
-      server.postprocess();
-      this.processDone += this.processInterval;
+      this.sendToServer([
+        "/command", this.userId, list
+      ]);
     };
-    return WorkerSynthClient;
+    
+    return IFrameSynthClient;
   })();
 
   commands["/connect"] = function(msg) {
-    var sampleRate = msg[1]|0;
-    var channels   = msg[2]|0;
-    var strmLength = msg[3]|0;
-    var bufLength  = msg[4]|0;
     this.userId = msg[5]|0;
-    this.sendToIF([
-      "/connect", sampleRate, channels, strmLength, bufLength
-    ]);
+    this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
-    this.sampleRate = msg[1];
-    this.channels   = msg[2];
-    this.strmLength = msg[3];
-    this.bufLength  = msg[4];
+    this.sampleRate = msg[1]|0;
+    this.channels   = msg[2]|0;
+    this.strmLength = msg[3]|0;
+    this.bufLength  = msg[4]|0;
     this.sendToServer(msg);
   };
   commands["/play"] = function(msg) {
@@ -149,6 +155,9 @@ define(function(require, exports, module) {
   };
   commands["/reset"] = function(msg) {
     this.reset(msg);
+  };
+  commands["/process"] = function() {
+    this.process();
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -177,6 +186,7 @@ define(function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
+  
   commands["/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = node.get(nodeId);
@@ -194,8 +204,14 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    var client = cc.client = new WorkerSynthClient();
-    addEventListener("message", function(e) {
+    var client;
+    if (cc.context === "iframe") {
+      client = new IFrameSynthClient();
+    } else {
+      client = new WorkerSynthClient();
+    }
+    cc.client = client;
+    var listener = function(e) {
       var msg = e.data;
       if (msg instanceof Float32Array) {
         msg[C.USER_ID] = client.userId;
@@ -203,20 +219,17 @@ define(function(require, exports, module) {
       } else {
         client.recvFromIF(msg);
       }
-    });
-    if (typeof global.console === "undefined") {
-      global.console = (function() {
-        var console = {};
-        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-          console[method] = function() {
-            var args = Array.prototype.slice.call(arguments).map(function(x) {
-              return pack(x);
-            });
-            client.sendToIF(["/console/" + method, args]);
-          };
-        });
-        return console;
-      })();
+    };
+    if (cc.context === "iframe") {
+      window.onmessage = function(e) {
+        e.ports[0].onmessage = listener;
+        client.sendToIF = function(msg) {
+          e.ports[0].postMessage(msg);
+        };
+        window.onmessage = null;
+      };
+    } else if (cc.context === "worker") {
+      global.onmessage = listener;
     }
   };
   

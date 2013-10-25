@@ -96,25 +96,6 @@ define(function(require, exports, module) {
     };
   })();
   
-  fn.extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
-    /*jshint validthis:true */
-    function ctor() {
-      this.constructor = child;
-    }
-    /*jshint validthis:false */
-    ctor.prototype = parent.prototype;
-    /*jshint newcap:false */
-    child.prototype = new ctor();
-    /*jshint newcap:true */
-    child.__super__ = parent.prototype;
-    return child;
-  };
-  
   fn.sync = function(func) {
     return function() {
       cc.client.timeline.push(this, func, slice.call(arguments));

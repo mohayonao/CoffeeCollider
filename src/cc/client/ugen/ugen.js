@@ -3,6 +3,7 @@ define(function(require, exports, module) {
   
   var cc = require("../cc");
   var fn = require("../fn");
+  var extend = require("../../common/extend");
   var slice = [].slice;
 
   var UnaryOpUGen;
@@ -23,7 +24,7 @@ define(function(require, exports, module) {
       this.numOfOutputs = 1;
       this.inputs = [];
     }
-    fn.extend(UGen, cc.Object);
+    extend(UGen, cc.Object);
     
     UGen.prototype.init = function(rate) {
       this.rate = rate;
@@ -67,7 +68,7 @@ define(function(require, exports, module) {
       UGen.call(this, name || "MultiOutUGen");
       this.channels = null;
     }
-    fn.extend(MultiOutUGen, UGen);
+    extend(MultiOutUGen, UGen);
     MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
       var channels = new Array(numChannels);
       for (var i = 0; i < numChannels; ++i) {
@@ -98,7 +99,7 @@ define(function(require, exports, module) {
       this.numOfOutputs = 1;
       this.outputIndex  = index;
     }
-    fn.extend(OutputProxy, UGen);
+    extend(OutputProxy, UGen);
     return OutputProxy;
   })();
   
@@ -108,7 +109,7 @@ define(function(require, exports, module) {
       this.rate   = rate;
       this.values = null;
     }
-    fn.extend(Control, MultiOutUGen);
+    extend(Control, MultiOutUGen);
     Control.prototype.init = function(list) {
       UGen.prototype.init.apply(this, [this.rate].concat(list));
       this.values = list.slice();
@@ -121,7 +122,7 @@ define(function(require, exports, module) {
     function Out() {
       UGen.call(this, "Out");
     }
-    fn.extend(Out, UGen);
+    extend(Out, UGen);
     return Out;
   })();
 

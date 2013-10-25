@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var extend = require("../common/extend");
   var utils = require("./utils");
   var ugen  = require("./ugen/ugen");
   var Emitter = require("../common/emitter").Emitter;
@@ -19,7 +20,7 @@ define(function(require, exports, module) {
       this.nodeId    = nodeId++;
       nodes[this.nodeId] = this;
     }
-    fn.extend(Node, cc.Object);
+    extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
       cc.client.pushCommand([
         "/n_run", this.nodeId, true
@@ -55,7 +56,7 @@ define(function(require, exports, module) {
         });
       }
     }
-    fn.extend(Group, Node);
+    extend(Group, Node);
     
     return Group;
   })();
@@ -77,7 +78,7 @@ define(function(require, exports, module) {
         });
       }
     }
-    fn.extend(Synth, Node);
+    extend(Synth, Node);
 
     Synth.prototype._set = function(args) {
       var params = this.params;

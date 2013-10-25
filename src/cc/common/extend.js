@@ -1,9 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var fn = {};
-  
-  fn.extend = function(child, parent) {
+  var extend = function(child, parent) {
     for (var key in parent) {
       if (parent.hasOwnProperty(key)) {
         child[key] = parent[key];
@@ -22,6 +20,6 @@ define(function(require, exports, module) {
     return child;
   };
   
-  module.exports = fn;
+  module.exports = extend;
 
 });

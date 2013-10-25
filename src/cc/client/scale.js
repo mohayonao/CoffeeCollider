@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var extend = require("../common/extend");
   
   var ratiomidi = function(list) {
     return list.map(function(x) {
@@ -24,7 +25,7 @@ define(function(require, exports, module) {
       this._octaveRatio = octaveRatio;
       this.name = name;
     }
-    fn.extend(Tuning, cc.Object);
+    extend(Tuning, cc.Object);
     Tuning.prototype.semitones = function() {
       return this._tuning.slice();
     };
@@ -314,7 +315,7 @@ define(function(require, exports, module) {
       this.name = name;
       this.tuning(tuning);
     }
-    fn.extend(Scale, cc.Object);
+    extend(Scale, cc.Object);
     Scale.prototype.tuning = function(inTuning) {
       if (arguments.length === 0) {
         return this._tuning;

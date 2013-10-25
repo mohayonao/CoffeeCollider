@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var extend = require("../common/extend");
   var Emitter = require("../common/emitter").Emitter;
 
   var bufferCache = {};
@@ -22,7 +23,7 @@ define(function(require, exports, module) {
         "/b_new", this._bufId
       ]);
     }
-    fn.extend(Buffer, cc.Object);
+    extend(Buffer, cc.Object);
     return Buffer;
   })();
   

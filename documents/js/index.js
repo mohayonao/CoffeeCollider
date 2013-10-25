@@ -75,12 +75,12 @@ window.onload = function() {
     var calcY = function(val) {
       return val * 0.45 * canvas.height + (canvas.height * 0.5);
     };
-
-    var strm = cc.getStream();
+    
     var prevt = 0;
     return function(t) {
       if (isPlaying) {
         if (t - prevt > 60) {
+          var strm = cc.getStream();
           var len  = strm.length * 0.5;
           var imax = 256;
           var dx   = canvas.width / imax;

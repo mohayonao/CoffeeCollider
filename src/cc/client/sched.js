@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var extend = require("../common/extend");
   var Emitter = require("../common/emitter").Emitter;
   var slice = [].slice;
 
@@ -61,7 +62,7 @@ define(function(require, exports, module) {
       this._prev  = null;
       this._next  = null;
     }
-    fn.extend(Task, cc.Object);
+    extend(Task, cc.Object);
     
     Task.prototype.play = fn.sync(function() {
       var that = this;
@@ -258,7 +259,7 @@ define(function(require, exports, module) {
       Task.call(this, timeline);
       this.klassName = "GlobalTask";
     }
-    fn.extend(GlobalTask, Task);
+    extend(GlobalTask, Task);
     GlobalTask.prototype.play  = function() {};
     GlobalTask.prototype.pause = function() {};
     GlobalTask.prototype.stop  = function() {};
@@ -270,7 +271,7 @@ define(function(require, exports, module) {
       Task.call(this);
       this.func = func;
     }
-    fn.extend(TaskLoop, Task);
+    extend(TaskLoop, Task);
 
     TaskLoop.prototype._execute = function() {
       this.func.call(this._context, this._index);
@@ -286,7 +287,7 @@ define(function(require, exports, module) {
     function TaskLoop(func) {
       TaskDo.call(this, func);
     }
-    fn.extend(TaskLoop, TaskDo);
+    extend(TaskLoop, TaskDo);
 
     TaskLoop.prototype._done = function() {
       this._bang = true;
@@ -301,7 +302,7 @@ define(function(require, exports, module) {
       this.list = list;
       this.func = func;
     }
-    fn.extend(TaskEach, Task);
+    extend(TaskEach, Task);
 
     TaskEach.prototype._execute = function() {
       if (this._index < this.list.length) {
@@ -329,7 +330,7 @@ define(function(require, exports, module) {
       this.func = func;
       this._queue.push(delay);
     }
-    fn.extend(TaskTimeout, Task);
+    extend(TaskTimeout, Task);
     
     TaskTimeout.prototype._execute = function() {
       this.func.call(this._context, this._index);
@@ -349,7 +350,7 @@ define(function(require, exports, module) {
     function TaskInterval(delay, func) {
       TaskTimeout.call(this, delay, func);
     }
-    fn.extend(TaskInterval, TaskTimeout);
+    extend(TaskInterval, TaskTimeout);
 
     TaskInterval.prototype._done = function() {
       this._bang = true;

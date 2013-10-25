@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var fn = require("../fn");
+  var extend = require("../../common/extend");
   var utils = require("../utils");
   var UGen  = require("./ugen").UGen;
 
@@ -21,7 +21,7 @@ define(function(require, exports, module) {
     function UnaryOpUGen() {
       UGen.call(this, "UnaryOpUGen");
     }
-    fn.extend(UnaryOpUGen, UGen);
+    extend(UnaryOpUGen, UGen);
 
     UnaryOpUGen.prototype.init = function(selector, a) {
       var index = UNARY_OP_UGEN_MAP.indexOf(selector);
@@ -46,7 +46,7 @@ define(function(require, exports, module) {
     function BinaryOpUGen() {
       UGen.call(this, "BinaryOpUGen");
     }
-    fn.extend(BinaryOpUGen, UGen);
+    extend(BinaryOpUGen, UGen);
 
     BinaryOpUGen.prototype.init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
@@ -117,7 +117,7 @@ define(function(require, exports, module) {
     function MulAdd() {
       UGen.call(this, "MulAdd");
     }
-    fn.extend(MulAdd, UGen);
+    extend(MulAdd, UGen);
 
     MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd;
@@ -182,7 +182,7 @@ define(function(require, exports, module) {
     function Sum3() {
       UGen.call(this, "Sum3");
     }
-    fn.extend(Sum3, UGen);
+    extend(Sum3, UGen);
     
     Sum3.prototype.init = function(in0, in1, in2) {
       if (in0 === 0) {
@@ -208,7 +208,7 @@ define(function(require, exports, module) {
     function Sum4() {
       UGen.call(this, "Sum4");
     }
-    fn.extend(Sum4, UGen);
+    extend(Sum4, UGen);
     
     Sum4.prototype.init = function(in0, in1, in2, in3) {
       if (in0 === 0) {

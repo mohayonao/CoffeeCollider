@@ -9,6 +9,7 @@ define(function(require, exports, module) {
       this.heapMap  = {};
       this.heapList = [];
     }
+    
     Userspace.prototype.append = function(userId) {
       if (!this.heapMap[userId]) {
         var heap = new Heap(userId);
@@ -53,12 +54,25 @@ define(function(require, exports, module) {
         heap.timeline = timeline;
       }
     };
-    Userspace.prototype.process = function(bufLength) {
+    Userspace.prototype.preprocess = function() {
       var list = this.heapList;
       for (var i = 0, imax = list.length; i < imax; ++i) {
-        list[i].process(bufLength);
+        list[i].preprocess();
       }
     };
+    Userspace.prototype.process = function(bufLength, index) {
+      var list = this.heapList;
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        list[i].process(bufLength, index);
+      }
+    };
+    Userspace.prototype.postprocess = function() {
+      var list = this.heapList;
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        list[i].postprocess();
+      }
+    };
+    
     return Userspace;
   })();
   
@@ -73,6 +87,7 @@ define(function(require, exports, module) {
       this.buffers = {};
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
     }
+    
     Heap.prototype.reset = function() {
       this.timeline = [];
       this.rootNode = new node.Group(0, 0, 0, this);
@@ -87,20 +102,20 @@ define(function(require, exports, module) {
         outs: [ new Float32Array([value]) ]
       });
     };
-    Heap.prototype.process = function(bufLength) {
-      var timeline = this.timeline;
-      for (var i = 0, imax = timeline.length; i < imax; ++i) {
-        var commandList = timeline[i];
-        for (var j = 0, jmax = commandList.length; j < jmax; ++j) {
-          var args = commandList[j];
+    Heap.prototype.process = function(bufLength, index) {
+      var commandList = this.timeline[index];
+      if (commandList) {
+        for (var i = 0, imax = commandList.length; i < imax; ++i) {
+          var args = commandList[i];
           var func = commands[args[0]];
           if (func) {
             func.call(this, args);
           }
         }
+        this.rootNode.process(bufLength, this);
       }
-      this.rootNode.process(bufLength, this);
     };
+    
     return Heap;
   })();
     
