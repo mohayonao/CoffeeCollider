@@ -71,7 +71,6 @@ define(function(require, exports, module) {
   
   var Out = function() {
     var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
         this.process = next_a;
@@ -81,10 +80,10 @@ define(function(require, exports, module) {
         this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
       }
     };
-    var next_a = function(inNumSamples) {
+    var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
+      var bus    = instance.bus;
       var bufLength = this._bufLength;
       var offset, _in;
       var fbusChannel = (inputs[0][0]|0) - 1;
@@ -92,16 +91,16 @@ define(function(require, exports, module) {
         offset = (fbusChannel + i) * bufLength;
         _in = inputs[i];
         for (var j = 0; j < inNumSamples; j++) {
-          busBuffer[offset + j] += _in[j];
+          bus[offset + j] += _in[j];
         }
       }
     };
-    var next_k = function() {
+    var next_k = function(inNumSamples, instance) {
       var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
+      var bus    = instance.bus;
       var offset    = this._busOffset + (inputs[0][0]|0) - 1;
       for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        busBuffer[offset + i] += inputs[i][0];
+        bus[offset + i] += inputs[i][0];
       }
     };
     return ctor;
@@ -109,7 +108,6 @@ define(function(require, exports, module) {
 
   var In = function() {
     var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
         this.process = next_a;
@@ -119,20 +117,20 @@ define(function(require, exports, module) {
         this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
       }
     };
-    var next_a = function(inNumSamples) {
+    var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
-      var busBuffer = this._busBuffer;
+      var bus  = instance.bus;
       var bufLength = this._bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = busBuffer[offset + i];
+        outs[i] = bus[offset + i];
       }
     };
-    var next_k = function(inNumSamples) {
+    var next_k = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var outs  = this.outs[0];
-      var value = this._busBuffer[this._busOffset + (this.inputs[0][0]|0)];
+      var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
         outs[i] = value;
       }

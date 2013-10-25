@@ -48,14 +48,7 @@ define(function(require, exports, module) {
       this.rates = {};
       this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
       this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
-      var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
-      var busBuffer  = new Float32Array(busLength);
-      var bufLength  = this.bufLength;
-      var bufLength4 = this.bufLength << 2;
-      this.busBuffer = busBuffer;
-      this.busClear  = new Float32Array(busLength);
-      this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
-      this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
+      this.instanceManager.init(this);
     };
     SynthServer.prototype.play = function(msg) {
       if (!this.timer.isRunning) {
@@ -105,7 +98,6 @@ define(function(require, exports, module) {
       postMessage(msg);
     };
     WorkerSynthServer.prototype.connect = function() {
-      this.instanceManager.append(0);
       this.sendToClient([
         "/connect", this.sampleRate, this.channels, this.strmLength, this.bufLength
       ]);
@@ -115,18 +107,15 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var busBuffer  = this.busBuffer;
-      var busClear   = this.busClear;
       var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
       var client = cc.client;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
-        busBuffer.set(busClear);
         instanceManager.process(bufLength, 0);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
@@ -153,16 +142,13 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var busBuffer  = this.busBuffer;
-      var busClear   = this.busClear;
       var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        busBuffer.set(busClear);
         instanceManager.process(bufLength, i);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
