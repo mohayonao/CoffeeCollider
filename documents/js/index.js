@@ -6,9 +6,25 @@ window.onload = function() {
   var $exec = document.getElementById("exec");
   var $link = document.getElementById("link");
   var $play = document.getElementById("play");
-  var $ctrl = document.getElementById("ctrl");
-
-  var cc = window.cc = new CoffeeCollider();
+  
+  var config = {};
+  location.search.substr(1).split("&").forEach(function(kv) {
+    var items = kv.split("=");
+    if (items[0] != "") {
+      var key   = items[0];
+      var value = items[1];
+      if (value == "false") {
+        value = false;
+      } else if (value == "true" || value == undefined) {
+        value = true;
+      } else if (!isNaN(+value)) {
+        value = +value;
+      }
+      config[key] = value;
+    }
+  });
+  
+  var cc = window.cc = new CoffeeCollider(config);
   var isPlaying = false;
   var prevCode  = null;
   
@@ -89,4 +105,5 @@ window.onload = function() {
   if (hash.indexOf(srcFragment) === 0) {
     $code.value = hash.substr(srcFragment.length);
   }
+
 };
