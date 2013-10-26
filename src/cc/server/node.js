@@ -227,9 +227,14 @@ define(function(require, exports, module) {
       if (this.parent.tail === this) {
         this.parent.tail = this.prev;
       }
+
+      var userId;
+      if (this.instance) {
+        userId = this.instance.userId;
+      }
       cc.server.sendToClient([
         "/n_end", this.nodeId
-      ], this.instance);
+      ], userId);
     }
     this.prev = null;
     this.next = null;
@@ -284,10 +289,14 @@ define(function(require, exports, module) {
     Node.prototype.doneAction = function(action, tag) {
       var func = doneAction[action];
       if (func) {
+        func.call(this);
+        var userId;
+        if (this.instance) {
+          userId = this.instance.userId;
+        }
         cc.server.sendToClient([
           "/n_done", this.nodeId, tag
-        ], this.instance);
-        func.call(this);
+        ], userId);
       }
     };
     return Node;
