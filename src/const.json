@@ -14,7 +14,7 @@
   "SOCKET_STRM_LENGTH":  4096,
   "SOCKET_BUF_LENGTH" :   128,
 
-  "DO_NOTHING": 1,
+  "DO_NOTHING": 0,
 
   "SCALAR" : 0,
   "CONTROL": 1,

@@ -2,7 +2,8 @@
   "name": "CoffeeCollider",
   "version": 0,
   "dependencies": {
-    "ws": "~0.4.31"
+    "ws": "~0.4.31",
+    "speaker": "0.0.10"
   },
   "devDependencies": {
     "coffee-script": "~1.6.3",

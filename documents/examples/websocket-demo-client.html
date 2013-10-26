@@ -74,7 +74,7 @@
 
         var ws_host = location.href.replace(/^https?/, "ws");
         var cc = new CoffeeCollider({
-          socket: ws_host + "socket"
+          socket: ws_host + "socket", speaker:false
         }).on("message", function(msg) {
           switch (msg.type) {
           case "init":

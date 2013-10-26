@@ -30,7 +30,7 @@ app.on("request", function(req, res) {
   }
 }).listen(process.env.PORT||8888, function() {
   var sessions = {};
-  ccserver.init({server:app, path:"/socket"});
+  ccserver.init({server:app, path:"/socket", speaker:true});
   ccserver.on("open", function(userId) {
     sessions[userId] = "";
     ccserver.send({

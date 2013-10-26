@@ -192,6 +192,7 @@ define(function(require, exports, module) {
     if (global.require) {
       WebSocketServer = global.require("ws").Server;
     }
+    var AudioAPI = require("../common/audioapi").AudioAPI;
     function SocketSynthServer() {
       SynthServer.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
@@ -208,6 +209,12 @@ define(function(require, exports, module) {
       var that = this;
       var _userId = 0;
       var exports = this.exports;
+      if (typeof opts.speaker !== "undefined") {
+        if (opts.speaker) {
+          this.api = new AudioAPI(this);
+        }
+        delete opts.speaker;
+      }
       this.socket = new WebSocketServer(opts);
       this.socket.on("connection", function(ws) {
         var userId = _userId++;
@@ -274,6 +281,41 @@ define(function(require, exports, module) {
         }
       }
     };
+    SocketSynthServer.prototype.play = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.play(userId);
+      if (this.api) {
+        this._strm = new Float32Array(this.strmLength * this.channels);
+        this.strmList = new Array(8);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        if (!this.api.isPlaying) {
+          this.api.play();
+        }
+      }
+      if (!this.timer.isRunning) {
+        this.processStart = Date.now();
+        this.processDone  = 0;
+        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
+        this.timer.start(this.process.bind(this), 10);
+      }
+    };
+    SocketSynthServer.prototype.pause = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.pause(userId);
+      if (this.api) {
+        if (this.api.isPlaying) {
+          if (!this.instanceManager.isRunning()) {
+            this.api.pause();
+          }
+        }
+      }
+      if (this.timer.isRunning) {
+        if (!this.instanceManager.isRunning()) {
+          this.timer.stop();
+        }
+      }
+    };
     SocketSynthServer.prototype.process = function() {
       if (this.processDone - 25 > Date.now() - this.processStart) {
         return;
@@ -294,6 +336,18 @@ define(function(require, exports, module) {
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
       this.processDone += this.processInterval;
+
+      if (this.api) {
+        this.strmList[this.strmListWriteIndex] = new Float32Array(strm);
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+      }
+    };
+    SocketSynthServer.prototype._process = function() {
+      var strm = this.strmList[this.strmListReadIndex];
+      if (strm) {
+        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this._strm.set(strm);
+      }
     };
     
     return SocketSynthServer;
