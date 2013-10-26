@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CoffeeCollider Streamer</title>
+    <style>
+      * {
+       -webkit-box-sizing: border-box;
+       -moz-box-sizing   : border-box;
+       -ms-box-sizing    : border-box;
+        box-sizing        : border-box;
+      }
+      #code {
+        width:100%; height:120px;
+        font-family: Monaco,Consolas,'Lucida Console',monospace;
+        font-size: 16px;
+      }
+      button {
+        width: 80px;
+      }
+      ul {
+        list-style: none;
+        margin:0; padding:0;
+      }
+      li {
+        margin: 5px;
+        padding: 5px;
+        border-radius: 4px;
+        color: #302833;
+        background: #f3f3f3;
+      }
+      li div {
+        font-size: 10px;
+        font-weight: bold;
+        color: #9ea1a3;
+      }
+      li pre {
+        margin: 0;
+        font-family: Monaco,Consolas,'Lucida Console',monospace;
+        font-size: 12px;
+        color: #1e50a2;
+      }
+      #canvas {
+        position: absolute;
+        bottom : 0;
+        left: 0;
+        width: 100%;
+        height: 120px;
+        background: white;
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CoffeeCollider Streamer</h1>
+    <textarea id="code"></textarea>
+    <div>
+      <button id="conn">Connect</button>
+      <button id="submit" disabled>Submit</button>
+    </div>
+    <ul id="list"></ul>
+    <canvas id="canvas"></canvas>
+    <script src="coffee-script.js"></script>
+    <script src="coffee-collider.js"></script>
+    <script>
+      window.onload = function() {
+        "use strict";
+        var myUserId  = null;
+        
+        var $code   = document.getElementById("code");
+        var $conn   = document.getElementById("conn");
+        var $submit = document.getElementById("submit");
+        var $list   = document.getElementById("list");
+
+        var ws_host = location.href.replace(/^https?/, "ws");
+        var cc = new CoffeeCollider({
+          socket: ws_host + "socket"
+        }).on("message", function(msg) {
+          switch (msg.type) {
+          case "init":
+            myUserId = msg.userId;
+            msg.list.forEach(function(items) {
+              appendCode(items[0], items[1]);
+            });
+            break;
+          case "open":
+            appendCode(msg.userId, ""); 
+            break;
+          case "close":
+            console.log("client.html-close:", msg.userId);
+            removeCode(msg.userId);
+            break;
+          case "code":
+            appendCode(msg.userId, msg.payload); 
+            break;
+          }
+        });
+
+        var isPlaying = false;
+        $conn.addEventListener("click", function() {
+          isPlaying = !isPlaying;
+          if (isPlaying) {
+            cc.socket.open();
+            cc.play();
+            $submit.removeAttribute("disabled");
+            $conn.innerText = "Disconnect";
+            requestAnimationFrame(animate);
+          } else {
+            cc.socket.close();
+            cc.pause();
+            removeCode(myUserId);
+            $submit.setAttribute("disabled");
+            $conn.innerText = "Connect";
+            $list.innerHTML = "";
+          }
+        });
+
+        $submit.addEventListener("click", function() {
+          var code = $code.value.trim();
+          if (code === "") {
+            return;
+          }
+          cc.execute(code, function() {
+            cc.socket.send({type:"code",payload:code});
+          });
+        });
+        
+        var userElems = {};
+        var appendCode = function(userId, code) {
+          var elem = userElems[userId];
+          if (!elem) {
+            var $li  = document.createElement("li");
+            var $div = document.createElement("div");
+            $div.innerText = "user " + ("00000000" + userId).substr(-8);
+            var $pre = document.createElement("pre");
+            $li.appendChild($div);
+            $li.appendChild($pre);
+            $list.appendChild($li);
+            if (userId == myUserId) {
+              $div.style.color = "#e60033";
+            }
+            elem = userElems[userId] = { container:$li, text:$pre };
+          }
+          elem.text.innerText = code.trim();
+        };
+        var removeCode = function(userId) {
+          var elem = userElems[userId];
+          if (elem) {
+            $list.removeChild(elem.container);
+          }
+        };
+
+        var animate = (function() {
+          var canvas = document.getElementById("canvas");
+          canvas.width  = 1024;
+          canvas.height = 120;
+      
+          var context = canvas.getContext("2d");
+          context.fillStyle   = "#ffffff";
+          context.strokeStyle = "#2980b9";
+          context.lineWidth   = 8;
+          context.lineJoin    = "round";
+          var calcY = function(val) {
+            return val * 0.45 * canvas.height + (canvas.height * 0.5);
+          };
+      
+          var prevt = 0;
+          return function(t) {
+            if (isPlaying) {
+              if (t - prevt > 60) {
+                var strm = cc.getStream();
+                var len  = strm.length * 0.5;
+                var imax = 256;
+                var dx   = canvas.width / imax;
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.beginPath();
+                context.moveTo(0, calcY((strm[0]+strm[len])*0.5));
+                for (var i = 0; i < imax; i++) {
+                  context.lineTo(i * dx, calcY((strm[i]+strm[i+len])*0.5));
+                }
+                context.lineTo(canvas.width, calcY((strm[imax-1]+strm[len+imax-1])*0.5));
+                context.stroke();
+                prevt = t;
+              }
+              requestAnimationFrame(animate);
+            } else {
+              context.fillRect(0, 0, canvas.width, canvas.height);
+            }
+          };
+        })();
+      };
+    </script>
+  </body>
+</html>

@@ -2,10 +2,11 @@
   "name": "CoffeeCollider",
   "version": 0,
   "dependencies": {
-    "coffee-script": "~1.6.3",
-    "amd-loader": "0.0.5"
+    "ws": "~0.4.31"
   },
   "devDependencies": {
+    "coffee-script": "~1.6.3",
+    "amd-loader": "0.0.5",
     "mocha": "~1.13.0",
     "chai": "~1.8.0",
     "dryice": "~0.4.10",

@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var extend = require("../common/extend");
   var Compiler = require("./compiler/coffee").Compiler;
+  var Emitter  = require("../common/emitter").Emitter;
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;
@@ -12,14 +13,27 @@ define(function(require, exports, module) {
   
   var CoffeeCollider = (function() {
     function CoffeeCollider(opts) {
+      Emitter.bind(this);
       opts = opts || {};
-      this.version    = cc.version;
+      this.version = cc.version;
       if (opts.socket) {
-        this.impl = new CoffeeColliderSocketImpl(opts);
+        var impl  = new CoffeeColliderSocketImpl(this, opts);
+        this.impl = impl;
+        this.socket = {
+          open: function() {
+            impl.sendToClient([ "/socket-open" ]);
+          },
+          close: function() {
+            impl.sendToClient([ "/socket-close" ]);
+          },
+          send: function(msg) {
+            impl.sendToClient([ "/message", msg ]);
+          }
+        };
       } else if (opts.iframe) {
-        this.impl = new CoffeeColliderIFrameImpl(opts);
+        this.impl = new CoffeeColliderIFrameImpl(this, opts);
       } else {
-        this.impl = new CoffeeColliderWorkerImpl(opts);
+        this.impl = new CoffeeColliderWorkerImpl(this, opts);
       }
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
@@ -30,12 +44,12 @@ define(function(require, exports, module) {
       this.impl.play();
       return this;
     };
-    CoffeeCollider.prototype.reset = function() {
-      this.impl.reset();
-      return this;
-    };
     CoffeeCollider.prototype.pause = function() {
       this.impl.pause();
+      return this;
+    };
+    CoffeeCollider.prototype.reset = function() {
+      this.impl.reset();
       return this;
     };
     CoffeeCollider.prototype.execute = function() {
@@ -57,7 +71,8 @@ define(function(require, exports, module) {
   })();
 
   var CoffeeColliderImpl = (function() {
-    function CoffeeColliderImpl(opts) {
+    function CoffeeColliderImpl(exports, opts) {
+      this.exports  = exports;
       this.compiler = new Compiler();
       
       this.isPlaying = false;
@@ -69,8 +84,12 @@ define(function(require, exports, module) {
       this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
-      this.strm  = new Float32Array(0);
-      this.clear = new Float32Array(0);
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.strmList = new Array(8);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.api.init();
       
       if (opts.mouse !== false) {
         var syncItems = new Float32Array(C.SYNC_ITEM_LEN);
@@ -88,18 +107,6 @@ define(function(require, exports, module) {
       }
     }
     
-    CoffeeColliderImpl.prototype.init = function(msg) {
-      var strmLength = msg[3]|0;
-      var bufLength  = msg[4]|0;
-      this.strmLength = strmLength;
-      this.bufLength  = bufLength;
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.clear = new Float32Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.api.init();
-    };
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -225,8 +232,10 @@ define(function(require, exports, module) {
   
   
   var CoffeeColliderWorkerImpl = (function() {
-    function CoffeeColliderWorkerImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
+    function CoffeeColliderWorkerImpl(exports, opts) {
+      this.strmLength = C.WORKER_STRM_LENGTH;
+      this.bufLength  = C.WORKER_BUF_LENGTH;
+      CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
       this.client = new Worker(cc.coffeeColliderPath);
       this.client.onmessage = function(e) {
@@ -240,8 +249,10 @@ define(function(require, exports, module) {
   
   
   var CoffeeColliderIFrameImpl = (function() {
-    function CoffeeColliderIFrameImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
+    function CoffeeColliderIFrameImpl(exports, opts) {
+      this.strmLength = C.IFRAME_STRM_LENGTH;
+      this.bufLength  = C.IFRAME_BUF_LENGTH;
+      CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
       var iframe = document.createElement("iframe");
       iframe.style.width  = 0;
@@ -269,18 +280,38 @@ define(function(require, exports, module) {
 
 
   var CoffeeColliderSocketImpl = (function() {
-    function CoffeeColliderSocketImpl() {
-      // TODO: implements
+    function CoffeeColliderSocketImpl(exports, opts) {
+      this.strmLength = C.SOCKET_STRM_LENGTH;
+      this.bufLength  = C.SOCKET_BUF_LENGTH;
+      CoffeeColliderImpl.call(this, exports, opts);
+      var that = this;
+      var iframe = document.createElement("iframe");
+      iframe.style.width  = 0;
+      iframe.style.height = 0;
+      iframe.style.border = 0;
+      document.body.appendChild(iframe);
+
+      this.iframe = iframe;
+      // TODO: want to remove 'allow-same-origin'
+      iframe.sandbox = "allow-scripts allow-same-origin";
+      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
+      var channel = new MessageChannel();
+      iframe.onload = function() {
+        iframe.contentWindow.postMessage(opts.socket, [channel.port2], "*");
+      };
+      channel.port1.onmessage = function(e) {
+        that.recvFromClient(e.data);
+      };
+      this.client = channel.port1;
     }
     extend(CoffeeColliderSocketImpl, CoffeeColliderImpl);
     
     return CoffeeColliderSocketImpl;
   })();
   
-  commands["/connect"] = function(msg) {
-    this.init(msg);
+  commands["/connect"] = function() {
     this.sendToClient([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
+      "/init", this.sampleRate, this.channels
     ]);
   };
   commands["/execute"] = function(msg) {
@@ -301,6 +332,9 @@ define(function(require, exports, module) {
     this.readAudioFile(msg[1], function(buffer) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
+  };
+  commands["/message"] = function(msg) {
+    this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);
   

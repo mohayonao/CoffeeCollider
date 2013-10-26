@@ -1,7 +1,6 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc   = require("./cc");
   var node = require("./node");
   var commands = require("./commands");
   
@@ -9,20 +8,25 @@ define(function(require, exports, module) {
     function InstanceManager() {
       this.map  = {};
       this.list = [];
-      this.root = null;
+      this.server = null;
       this.process = process0;
     }
 
     InstanceManager.prototype.init = function(server) {
-      var busLength = server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
-      var bufLength  = cc.server.bufLength;
-      var bufLength4 = cc.server.bufLength << 2;
-      this.busClear = new Float32Array(busLength);
-      this.root     = this.append(0);
-      this.busOut    = this.root.bus;
+      if (this.server) {
+        return;
+      }
+      var busLength  = server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+      var bufLength  = server.bufLength;
+      var bufLength4 = server.bufLength << 2;
+      this.server    = server;
+      this.busClear  = new Float32Array(busLength);
+      this.map       = {};
+      this.list      = [];
+      this.busOut    = new Float32Array(busLength);
       this.busOutLen = server.bufLength << 1;
-      this.busOutL  = new Float32Array(this.root.bus.buffer, 0         , bufLength);
-      this.busOutR  = new Float32Array(this.root.bus.buffer, bufLength4, bufLength);
+      this.busOutL  = new Float32Array(this.busOut.buffer, 0         , bufLength);
+      this.busOutR  = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
     };
     InstanceManager.prototype.append = function(userId) {
       if (!this.map[userId]) {
@@ -52,13 +56,13 @@ define(function(require, exports, module) {
     InstanceManager.prototype.play = function(userId) {
       var instance = this.map[userId];
       if (instance) {
-        instance.rootNode.running = true;
+        instance.play();
       }
     };
     InstanceManager.prototype.pause = function(userId) {
       var instance = this.map[userId];
       if (instance) {
-        instance.rootNode.running = false;
+        instance.pause();
       }
     };
     InstanceManager.prototype.reset = function(userId) {
@@ -66,6 +70,11 @@ define(function(require, exports, module) {
       if (instance) {
         instance.reset();
       }
+    };
+    InstanceManager.prototype.isRunning = function() {
+      return this.list.some(function(instance) {
+        return instance.rootNode.running;
+      });
     };
     InstanceManager.prototype.setSyncItems = function(userId, syncItems) {
       var instance = this.map[userId];
@@ -79,25 +88,27 @@ define(function(require, exports, module) {
         instance.timeline = timeline;
       }
     };
+    
     var process0 = function() {
+      this.busOut.set(this.busClear);
     };
     var process1 = function(bufLength, index) {
       this.list[0].process(bufLength, index);
+      this.busOut.set(this.list[0].bus);
     };
     var processN = function(bufLength, index) {
       var list = this.list;
       var busOut    = this.busOut;
       var busOutLen = this.busOutLen;
       var instance;
+      busOut.set(this.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
         instance = list[i];
         instance.process(bufLength, index);
-        if (i > 0) {
-          var inBus = instance.bus;
-          var inAmp = instance.busAmp;
-          for (var j = busOutLen; j--; ) {
-            busOut[j] += inBus[j] * inAmp;
-          }
+        var inBus = instance.bus;
+        var inAmp = instance.busAmp;
+        for (var j = busOutLen; j--; ) {
+          busOut[j] += inBus[j] * inAmp;
         }
       }
     };
@@ -108,7 +119,7 @@ define(function(require, exports, module) {
   
   var Instance = (function() {
     function Instance(manager, userId) {
-      var busLength = cc.server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+      var busLength = manager.server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
       this.manager = manager;
       this.userId  = userId|0;
       this.bus     = new Float32Array(busLength);
@@ -116,7 +127,7 @@ define(function(require, exports, module) {
       
       this.busIndex = 0;
       this.busAmp   = 0.8;
-      this.timeline = [];
+      this.timeline = C.DO_NOTHING;
       this.rootNode = new node.Group(0, 0, 0, this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
@@ -124,12 +135,21 @@ define(function(require, exports, module) {
       this.buffers = {};
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
     }
-    
+
+    Instance.prototype.play = function() {
+      this.rootNode.running = true;
+      this.bus.set(this.busClear);
+    };
+    Instance.prototype.pause = function() {
+      this.rootNode.running = false;
+      this.bus.set(this.busClear);
+      this.timeline = C.DO_NOTHING;
+    };
     Instance.prototype.reset = function() {
       if (this.manager.busClear) {
         this.bus.set(this.manager.busClear);
       }
-      this.timeline = [];
+      this.timeline = C.DO_NOTHING;
       this.rootNode = new node.Group(0, 0, 0, this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
@@ -143,8 +163,8 @@ define(function(require, exports, module) {
       });
     };
     Instance.prototype.process = function(bufLength, index) {
-      var commandList = this.timeline[index];
-      if (commandList) {
+      if (this.timeline !== C.DO_NOTHING) {
+        var commandList = this.timeline[index];
         for (var i = 0, imax = commandList.length; i < imax; ++i) {
           var args = commandList[i];
           var func = commands[args[0]];
@@ -152,9 +172,9 @@ define(function(require, exports, module) {
             func.call(this, args);
           }
         }
-        this.bus.set(this.busClear);
-        this.rootNode.process(bufLength, this);
       }
+      this.bus.set(this.busClear);
+      this.rootNode.process(bufLength, this);
     };
     
     return Instance;

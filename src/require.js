@@ -36,4 +36,7 @@ var normalizeModule = function(parentId, moduleName) {
   }
   return moduleName;
 };
+if (typeof require === "function") {
+  global.require = require;
+}
 var define = _define;

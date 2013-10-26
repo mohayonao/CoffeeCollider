@@ -23,6 +23,10 @@ define(function(require, exports, module) {
       cc.opmode  = "iframe";
       cc.context = "client";
       require("./client/installer").install();
+    } else if (cc.coffeeColliderHash === "#socket") {
+      cc.opmode  = "socket";
+      cc.context = "client";
+      require("./client/installer").install();
     } else {
       cc.opmode  = "worker";
       cc.context = "exports";
@@ -45,9 +49,8 @@ define(function(require, exports, module) {
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";
+    require("./server/installer").install();
+    module.exports = cc.server.exports;
   }
-  
-  module.exports = {
-  };
 
 });

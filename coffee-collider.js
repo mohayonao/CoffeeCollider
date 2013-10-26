@@ -38,6 +38,9 @@ var normalizeModule = function(parentId, moduleName) {
   }
   return moduleName;
 };
+if (typeof require === "function") {
+  global.require = require;
+}
 var define = _define;
 define('cc/loader', function(require, exports, module) {
 
@@ -63,6 +66,10 @@ define('cc/loader', function(require, exports, module) {
       cc.opmode  = "iframe";
       cc.context = "client";
       require("./client/installer").install();
+    } else if (cc.coffeeColliderHash === "#socket") {
+      cc.opmode  = "socket";
+      cc.context = "client";
+      require("./client/installer").install();
     } else {
       cc.opmode  = "worker";
       cc.context = "exports";
@@ -85,10 +92,9 @@ define('cc/loader', function(require, exports, module) {
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";
+    require("./server/installer").install();
+    module.exports = cc.server.exports;
   }
-  
-  module.exports = {
-  };
 
 });
 define('cc/cc', function(require, exports, module) {
@@ -557,7 +563,6 @@ define('cc/client/client', function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.userId     = 0;
       this.timeline   = new Timeline(this);
       this.rootNode   = new node.Group();
       this.commandList = [];
@@ -629,6 +634,10 @@ define('cc/client/client', function(require, exports, module) {
   var WorkerSynthClient = (function() {
     function WorkerSynthClient() {
       SynthClient.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
     }
     extend(WorkerSynthClient, SynthClient);
     
@@ -638,7 +647,7 @@ define('cc/client/client', function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       this.sendToServer([
-        "/command", this.userId, [ this.commandList.splice(0) ]
+        "/command", [this.commandList.splice(0)]
       ]);
     };
     
@@ -650,6 +659,10 @@ define('cc/client/client', function(require, exports, module) {
     function IFrameSynthClient() {
       SynthClient.call(this);
       var that = this;
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 2048;
+      this.bufLength  = 128;
       this.server = new Worker(cc.coffeeColliderPath);
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
@@ -665,13 +678,16 @@ define('cc/client/client', function(require, exports, module) {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
       var list = [];
+      var numOfCommands = 0;
       while (n--) {
         timeline.process();
+        numOfCommands += this.commandList.length;
         list.push(this.commandList.splice(0));
       }
-      this.sendToServer([
-        "/command", this.userId, list
-      ]);
+      if (numOfCommands === 0) {
+        list = 1;
+      }
+      this.sendToServer(["/command", list]);
     };
     
     return IFrameSynthClient;
@@ -681,21 +697,87 @@ define('cc/client/client', function(require, exports, module) {
   var SocketSynthClient = (function() {
     function SocketSynthClient() {
       SynthClient.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 4096;
+      this.bufLength  = 128;
+      this.socketPath = null;
     }
     extend(SocketSynthClient, SynthClient);
+
+    SocketSynthClient.prototype.openSocket = function() {
+      var that = this;
+      var socket   = this.socket = new WebSocket(this.socketPath);
+      var pendings = [];
+      socket.binaryType = "arraybuffer";
+      socket.onopen = function() {
+        pendings.forEach(function(msg) {
+          socket.send(msg);
+        });
+        pendings = [];
+      };
+      socket.onmessage = function(e) {
+        // receive a message from the socket-server
+        var msg = e.data;
+        if (typeof msg !== "string") {
+          that.sendToIF(new Float32Array(msg));
+          return;
+        }
+        msg = JSON.parse(msg);
+        if (msg.cc) {
+          that.recvFromServer(msg.cc);
+        } else {
+          that.sendToIF(["/message", msg]);
+        }
+      };
+      socket.onclose = function() {
+      };
+      socket.onerror = function() {
+      };
+      this.sendToServer = function(msg) {
+        if (msg instanceof Float32Array) {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(msg.buffer);
+          }
+          return;
+        } else {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(msg));
+          } else {
+            pendings.push(JSON.stringify(msg));
+          }
+        }
+      };
+    };
+    SocketSynthClient.prototype.closeSocket = function() {
+      this.socket.close();
+      this.socket = null;
+    };
+    SocketSynthClient.prototype.process = function() {
+      var timeline = this.timeline;
+      var n = this.strmLength / this.bufLength;
+      var list = [];
+      var numOfCommands = 0;
+      while (n--) {
+        timeline.process();
+        numOfCommands += this.commandList.length;
+        list.push(this.commandList.splice(0));
+      }
+      if (numOfCommands === 0) {
+        list = 1;
+      }
+      this.sendToServer(["/command", list]);
+    };
     
     return SocketSynthClient;
   })();
   
   commands["/connect"] = function(msg) {
-    this.userId = msg[5]|0;
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
     this.sampleRate = msg[1]|0;
     this.channels   = msg[2]|0;
-    this.strmLength = msg[3]|0;
-    this.bufLength  = msg[4]|0;
     this.sendToServer(msg);
   };
   commands["/play"] = function(msg) {
@@ -709,6 +791,16 @@ define('cc/client/client', function(require, exports, module) {
   };
   commands["/process"] = function() {
     this.process();
+  };
+  commands["/message"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToServer(msg);
+  };
+  commands["/socket-open"] = function() {
+    this.openSocket();
+  };
+  commands["/socket-close"] = function() {
+    this.closeSocket();
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -757,7 +849,6 @@ define('cc/client/client', function(require, exports, module) {
   var listener = function(e) {
     var msg = e.data;
     if (msg instanceof Float32Array) {
-      msg[0] = cc.client.userId;
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);
@@ -769,6 +860,14 @@ define('cc/client/client', function(require, exports, module) {
     switch (cc.opmode) {
     case "socket":
       client = new SocketSynthClient();
+      window.onmessage = function(e) {
+        e.ports[0].onmessage = listener;
+        client.sendToIF = function(msg) {
+          e.ports[0].postMessage(msg);
+        };
+        client.socketPath = e.data;
+        window.onmessage = null;
+      };
       break;
     case "iframe":
       client = new IFrameSynthClient();
@@ -3843,6 +3942,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   var cc = require("../cc");
   var extend = require("../common/extend");
   var Compiler = require("./compiler/coffee").Compiler;
+  var Emitter  = require("../common/emitter").Emitter;
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;
@@ -3851,14 +3951,27 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   
   var CoffeeCollider = (function() {
     function CoffeeCollider(opts) {
+      Emitter.bind(this);
       opts = opts || {};
-      this.version    = cc.version;
+      this.version = cc.version;
       if (opts.socket) {
-        this.impl = new CoffeeColliderSocketImpl(opts);
+        var impl  = new CoffeeColliderSocketImpl(this, opts);
+        this.impl = impl;
+        this.socket = {
+          open: function() {
+            impl.sendToClient([ "/socket-open" ]);
+          },
+          close: function() {
+            impl.sendToClient([ "/socket-close" ]);
+          },
+          send: function(msg) {
+            impl.sendToClient([ "/message", msg ]);
+          }
+        };
       } else if (opts.iframe) {
-        this.impl = new CoffeeColliderIFrameImpl(opts);
+        this.impl = new CoffeeColliderIFrameImpl(this, opts);
       } else {
-        this.impl = new CoffeeColliderWorkerImpl(opts);
+        this.impl = new CoffeeColliderWorkerImpl(this, opts);
       }
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
@@ -3869,12 +3982,12 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.impl.play();
       return this;
     };
-    CoffeeCollider.prototype.reset = function() {
-      this.impl.reset();
-      return this;
-    };
     CoffeeCollider.prototype.pause = function() {
       this.impl.pause();
+      return this;
+    };
+    CoffeeCollider.prototype.reset = function() {
+      this.impl.reset();
       return this;
     };
     CoffeeCollider.prototype.execute = function() {
@@ -3896,7 +4009,8 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   })();
 
   var CoffeeColliderImpl = (function() {
-    function CoffeeColliderImpl(opts) {
+    function CoffeeColliderImpl(exports, opts) {
+      this.exports  = exports;
       this.compiler = new Compiler();
       
       this.isPlaying = false;
@@ -3908,8 +4022,12 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
-      this.strm  = new Float32Array(0);
-      this.clear = new Float32Array(0);
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.strmList = new Array(8);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.api.init();
       
       if (opts.mouse !== false) {
         var syncItems = new Float32Array(5);
@@ -3927,18 +4045,6 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       }
     }
     
-    CoffeeColliderImpl.prototype.init = function(msg) {
-      var strmLength = msg[3]|0;
-      var bufLength  = msg[4]|0;
-      this.strmLength = strmLength;
-      this.bufLength  = bufLength;
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.clear = new Float32Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.api.init();
-    };
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
@@ -4064,8 +4170,10 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   
   
   var CoffeeColliderWorkerImpl = (function() {
-    function CoffeeColliderWorkerImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
+    function CoffeeColliderWorkerImpl(exports, opts) {
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
       this.client = new Worker(cc.coffeeColliderPath);
       this.client.onmessage = function(e) {
@@ -4079,8 +4187,10 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   
   
   var CoffeeColliderIFrameImpl = (function() {
-    function CoffeeColliderIFrameImpl(opts) {
-      CoffeeColliderImpl.call(this, opts);
+    function CoffeeColliderIFrameImpl(exports, opts) {
+      this.strmLength = 2048;
+      this.bufLength  = 128;
+      CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
       var iframe = document.createElement("iframe");
       iframe.style.width  = 0;
@@ -4108,18 +4218,38 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
 
 
   var CoffeeColliderSocketImpl = (function() {
-    function CoffeeColliderSocketImpl() {
-      // TODO: implements
+    function CoffeeColliderSocketImpl(exports, opts) {
+      this.strmLength = 4096;
+      this.bufLength  = 128;
+      CoffeeColliderImpl.call(this, exports, opts);
+      var that = this;
+      var iframe = document.createElement("iframe");
+      iframe.style.width  = 0;
+      iframe.style.height = 0;
+      iframe.style.border = 0;
+      document.body.appendChild(iframe);
+
+      this.iframe = iframe;
+      // TODO: want to remove 'allow-same-origin'
+      iframe.sandbox = "allow-scripts allow-same-origin";
+      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
+      var channel = new MessageChannel();
+      iframe.onload = function() {
+        iframe.contentWindow.postMessage(opts.socket, [channel.port2], "*");
+      };
+      channel.port1.onmessage = function(e) {
+        that.recvFromClient(e.data);
+      };
+      this.client = channel.port1;
     }
     extend(CoffeeColliderSocketImpl, CoffeeColliderImpl);
     
     return CoffeeColliderSocketImpl;
   })();
   
-  commands["/connect"] = function(msg) {
-    this.init(msg);
+  commands["/connect"] = function() {
     this.sendToClient([
-      "/init", this.sampleRate, this.channels, this.strmLength, this.bufLength
+      "/init", this.sampleRate, this.channels
     ]);
   };
   commands["/execute"] = function(msg) {
@@ -4140,6 +4270,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     this.readAudioFile(msg[1], function(buffer) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
+  };
+  commands["/message"] = function(msg) {
+    this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);
   
@@ -5107,18 +5240,20 @@ define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
   var extend = require("../common/extend");
-  var pack = require("../common/pack").pack;
-  var Timer    = require("../common/timer").Timer;
-  var Userspace = require("./userspace").Userspace;
-  var commands  = {};
+  var pack  = require("../common/pack").pack;
+  var Timer = require("../common/timer").Timer;
+  var Emitter = require("../common/emitter").Emitter;
+  var InstanceManager = require("./instance").InstanceManager;
+  var commands = {};
   
   var SynthServer = (function() {
     function SynthServer() {
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.strmLength = 1024;
-      this.bufLength  = 64;
-      this.userspace = new Userspace();
+      this.sampleRate = 0;
+      this.channels   = 0;
+      this.strmLength = 0;
+      this.bufLength  = 0;
+      this.instanceManager = new InstanceManager();
+      this.strm = null;
       this.timer = new Timer();
       this.processed = 0;
       this.processStart    = 0;
@@ -5128,15 +5263,16 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.sendToClient = function() {
       // should be overridden
     };
-    SynthServer.prototype.recvFromClient = function(msg) {
+    SynthServer.prototype.recvFromClient = function(msg, userId) {
+      userId = userId|0;
       if (msg instanceof Float32Array) {
-        this.userspace.setSyncItems(msg[0], msg);
+        this.instanceManager.setSyncItems(userId, msg);
         return;
       }
       if (msg) {
         var func = commands[msg[0]];
         if (func) {
-          func.call(this, msg);
+          func.call(this, msg, userId);
         }
       }
     };
@@ -5144,43 +5280,41 @@ define('cc/server/server', function(require, exports, module) {
       // should be overridden
     };
     SynthServer.prototype.init = function(msg) {
-      this.sampleRate = msg[1]|0;
-      this.channels   = msg[2]|0;
-      this.strmLength = msg[3]|0;
-      this.bufLength  = msg[4]|0;
+      if (this.strm) {
+        return;
+      }
+      if (msg) {
+        this.sampleRate = msg[1]|0;
+        this.channels   = msg[2]|0;
+      }
       this.strm  = new Float32Array(this.strmLength * this.channels);
       this.rates = {};
       this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
       this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
-      var busLength  = this.bufLength * 128 + 4096;
-      var busBuffer  = new Float32Array(busLength);
-      var bufLength  = this.bufLength;
-      var bufLength4 = this.bufLength << 2;
-      this.busBuffer = busBuffer;
-      this.busClear  = new Float32Array(busLength);
-      this.busOutL   = new Float32Array(busBuffer.buffer, 0         , bufLength);
-      this.busOutR   = new Float32Array(busBuffer.buffer, bufLength4, bufLength);
+      this.instanceManager.init(this);
     };
-    SynthServer.prototype.play = function(msg) {
+    SynthServer.prototype.play = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.play(userId);
       if (!this.timer.isRunning) {
-        var userId = msg[1]|0;
-        this.userspace.play(userId);
         this.processStart = Date.now();
         this.processDone  = 0;
         this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
     };
-    SynthServer.prototype.pause = function(msg) {
+    SynthServer.prototype.pause = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.pause(userId);
       if (this.timer.isRunning) {
-        var userId = msg[1]|0;
-        this.userspace.pause(userId);
-        this.timer.stop();
+        if (!this.instanceManager.isRunning()) {
+          this.timer.stop();
+        }
       }
     };
-    SynthServer.prototype.reset = function(msg) {
-      var userId = msg[1]|0;
-      this.userspace.reset(userId);
+    SynthServer.prototype.reset = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.reset(userId);
     };
     SynthServer.prototype.getRate = function(rate) {
       return this.rates[rate] || this.rates[1];
@@ -5188,10 +5322,10 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.process = function() {
       // should be overridden
     };
-    SynthServer.prototype.command = function(msg) {
-      var userId   = msg[1]|0;
-      var timeline = msg[2];
-      this.userspace.setTimeline(userId, timeline);
+    SynthServer.prototype.command = function(msg, userId) {
+      userId = userId|0;
+      var timeline = msg[1];
+      this.instanceManager.setTimeline(userId, timeline);
     };
     
     return SynthServer;
@@ -5201,6 +5335,10 @@ define('cc/server/server', function(require, exports, module) {
   var WorkerSynthServer = (function() {
     function WorkerSynthServer() {
       SynthServer.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 1024;
+      this.bufLength  = 64;
       this.offset = 0;
     }
     extend(WorkerSynthServer, SynthServer);
@@ -5209,9 +5347,8 @@ define('cc/server/server', function(require, exports, module) {
       postMessage(msg);
     };
     WorkerSynthServer.prototype.connect = function() {
-      this.userspace.append(0);
       this.sendToClient([
-        "/connect", this.sampleRate, this.channels, this.strmLength, this.bufLength
+        "/connect", this.sampleRate, this.channels
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
@@ -5219,19 +5356,16 @@ define('cc/server/server', function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var busBuffer  = this.busBuffer;
-      var busClear   = this.busClear;
-      var userspace  = this.userspace;
+      var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
       var client = cc.client;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
-        busBuffer.set(busClear);
-        userspace.process(bufLength, 0);
+        instanceManager.process(bufLength, 0);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
@@ -5247,6 +5381,8 @@ define('cc/server/server', function(require, exports, module) {
   var IFrameSynthServer = (function() {
     function IFrameSynthServer() {
       WorkerSynthServer.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
       this.strmLength = 2048;
       this.bufLength  = 128;
     }
@@ -5257,17 +5393,14 @@ define('cc/server/server', function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var busBuffer  = this.busBuffer;
-      var busClear   = this.busClear;
-      var userspace  = this.userspace;
+      var instanceManager = this.instanceManager;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = this.busOutL;
-      var busOutR = this.busOutR;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        busBuffer.set(busClear);
-        userspace.process(bufLength, i);
+        instanceManager.process(bufLength, i);
         strm.set(busOutL, offset);
         strm.set(busOutR, offset + strmLength);
         offset += bufLength;
@@ -5282,28 +5415,149 @@ define('cc/server/server', function(require, exports, module) {
 
 
   var SocketSynthServer = (function() {
+    var WebSocketServer;
+    if (global.require) {
+      WebSocketServer = global.require("ws").Server;
+    }
     function SocketSynthServer() {
       SynthServer.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 4096;
+      this.bufLength  = 128;
+      this.list = [];
+      this.map  = {};
+      this.exports = null; // bind after
+      this.init();
     }
     extend(SocketSynthServer, SynthServer);
     
+    SocketSynthServer.prototype.connect = function(opts) {
+      var that = this;
+      var _userId = 0;
+      var exports = this.exports;
+      this.socket = new WebSocketServer(opts);
+      this.socket.on("connection", function(ws) {
+        var userId = _userId++;
+        that.list.push(ws);
+        that.map[userId] = ws;
+        that.instanceManager.append(userId);
+        ws.on("message", function(msg) {
+          // receive a message from the client
+          if (typeof msg !== "string") {
+            var f32 = new Float32Array(5);
+            for (var i = 0; i < 5; ++i) {
+              f32[i] = msg.readFloatLE(i * 4);
+            }
+            msg = f32;
+          } else {
+            msg = JSON.parse(msg);
+          }
+          that.recvFromClient(msg, userId);
+        });
+        ws.on("close", function() {
+          if (that.map[userId]) {
+            that.pause([], userId);
+            that.instanceManager.remove(userId);
+            that.list.splice(that.list.indexOf(ws), 1);
+            delete that.map[userId];
+          }
+          exports.emit("close", userId);
+        });
+        ws.on("error", function(e) {
+          exports.emit("error", userId, e);
+        });
+        exports.emit("open", userId);
+      });
+      return this;
+    };
+    SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
+      if (msg instanceof Float32Array) {
+        this.list.forEach(function(ws) {
+          if (ws.readyState === 1) {
+            ws.send(msg.buffer, {binary:true, mask:false});
+          }
+        });
+      } else {
+        if (!without_cc && !msg.cc) {
+          msg = {cc:msg};
+        }
+        msg = JSON.stringify(msg);
+        if (userId === undefined) {
+          this.list.forEach(function(ws) {
+            if (ws.readyState === 1) {
+              ws.send(msg);
+            }
+          });
+        } else {
+          var ws = this.map[userId];
+          if (ws && ws.readyState === 1) {
+            ws.send(msg);
+          }
+        }
+      }
+    };
+    SocketSynthServer.prototype.process = function() {
+      if (this.processDone - 25 > Date.now() - this.processStart) {
+        return;
+      }
+      var strm = this.strm;
+      var instanceManager = this.instanceManager;
+      var strmLength = this.strmLength;
+      var bufLength  = this.bufLength;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
+      var offset = 0;
+      for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
+        instanceManager.process(bufLength, i);
+        strm.set(busOutL, offset);
+        strm.set(busOutR, offset + strmLength);
+        offset += bufLength;
+      }
+      this.sendToClient(strm);
+      this.sendToClient(["/process"]);
+      this.processDone += this.processInterval;
+    };
+    
     return SocketSynthServer;
   })();
+
+  var SocketSynthServerExports = (function() {
+    function SocketSynthServerExports(server) {
+      Emitter.bind(this);
+      this.server = server;
+    }
+    SocketSynthServerExports.prototype.connect = function(opts) {
+      this.server.connect(opts);
+    };
+    SocketSynthServerExports.prototype.send = function(msg, userId) {
+      this.server.sendToClient(msg, userId, true);
+    };
+    return SocketSynthServerExports;
+  })();
   
-  commands["/init"] = function(msg) {
-    this.init(msg);
+  commands["/init"] = function(msg, userId) {
+    this.init(msg, userId);
   };
-  commands["/play"] = function(msg) {
-    this.play(msg);
+  commands["/play"] = function(msg, userId) {
+    this.play(msg, userId);
   };
-  commands["/pause"] = function(msg) {
-    this.pause(msg);
+  commands["/pause"] = function(msg, userId) {
+    this.pause(msg, userId);
   };
-  commands["/reset"] = function(msg) {
-    this.reset(msg);
+  commands["/reset"] = function(msg, userId) {
+    this.reset(msg, userId);
   };
-  commands["/command"] = function(msg) {
-    this.command(msg);
+  commands["/command"] = function(msg, userId) {
+    this.command(msg, userId);
+  };
+  commands["/message"] = function(msg, userId) {
+    // receive a message from the client-interface via the client
+    if (this.exports) {
+      msg = msg[1];
+      msg.userId = userId;
+      this.exports.emit("message", msg);
+    }
   };
   
   var Rate = (function() {
@@ -5333,11 +5587,12 @@ define('cc/server/server', function(require, exports, module) {
     switch (cc.opmode) {
     case "socket":
       server = new SocketSynthServer();
+      server.exports = new SocketSynthServerExports(server);
       break;
     case "iframe":
       server = new IFrameSynthServer();
       global.onmessage = function(e) {
-        server.recvFromClient(e.data);
+        server.recvFromClient(e.data, 0);
       };
       break;
     default: // "worker"
@@ -5406,112 +5661,172 @@ define('cc/common/timer', function(require, exports, module) {
   };
 
 });
-define('cc/server/userspace', function(require, exports, module) {
+define('cc/server/instance', function(require, exports, module) {
 
   var node = require("./node");
   var commands = require("./commands");
   
-  var Userspace = (function() {
-    function Userspace() {
-      this.heapMap  = {};
-      this.heapList = [];
+  var InstanceManager = (function() {
+    function InstanceManager() {
+      this.map  = {};
+      this.list = [];
+      this.server = null;
+      this.process = process0;
     }
+
+    InstanceManager.prototype.init = function(server) {
+      if (this.server) {
+        return;
+      }
+      var busLength  = server.bufLength * 128 + 4096;
+      var bufLength  = server.bufLength;
+      var bufLength4 = server.bufLength << 2;
+      this.server    = server;
+      this.busClear  = new Float32Array(busLength);
+      this.map       = {};
+      this.list      = [];
+      this.busOut    = new Float32Array(busLength);
+      this.busOutLen = server.bufLength << 1;
+      this.busOutL  = new Float32Array(this.busOut.buffer, 0         , bufLength);
+      this.busOutR  = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
+    };
+    InstanceManager.prototype.append = function(userId) {
+      if (!this.map[userId]) {
+        var instance = new Instance(this, userId);
+        this.map[userId] = instance;
+        this.list.push(instance);
+        if (this.list.length === 1) {
+          this.process = process1;
+        } else {
+          this.process = processN;
+        }
+      }
+      return this.map[userId];
+    };
+    InstanceManager.prototype.remove = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        this.list.splice(this.list.indexOf(instance), 1);
+        delete this.map[userId];
+        if (this.list.length === 1) {
+          this.process = process1;
+        } else if (this.list.length === 0) {
+          this.process = process0;
+        }
+      }
+    };
+    InstanceManager.prototype.play = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.play();
+      }
+    };
+    InstanceManager.prototype.pause = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.pause();
+      }
+    };
+    InstanceManager.prototype.reset = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.reset();
+      }
+    };
+    InstanceManager.prototype.isRunning = function() {
+      return this.list.some(function(instance) {
+        return instance.rootNode.running;
+      });
+    };
+    InstanceManager.prototype.setSyncItems = function(userId, syncItems) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.syncItems.set(syncItems);
+      }
+    };
+    InstanceManager.prototype.setTimeline = function(userId, timeline) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.timeline = timeline;
+      }
+    };
     
-    Userspace.prototype.append = function(userId) {
-      if (!this.heapMap[userId]) {
-        var heap = new Heap(userId);
-        this.heapMap[userId] = heap;
-        this.heapList.push(heap);
-      }
+    var process0 = function() {
+      this.busOut.set(this.busClear);
     };
-    Userspace.prototype.remove = function(userId) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        this.heapList.splice(this.heapList.indexOf(heap), 1);
-        delete this.heapMap[userId];
-      }
+    var process1 = function(bufLength, index) {
+      this.list[0].process(bufLength, index);
+      this.busOut.set(this.list[0].bus);
     };
-    Userspace.prototype.play = function(userId) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        heap.rootNode.running = true;
-      }
-    };
-    Userspace.prototype.pause = function(userId) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        heap.rootNode.running = false;
-      }
-    };
-    Userspace.prototype.reset = function(userId) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        heap.reset();
-      }
-    };
-    Userspace.prototype.setSyncItems = function(userId, syncItems) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        heap.syncItems.set(syncItems);
-      }
-    };
-    Userspace.prototype.setTimeline = function(userId, timeline) {
-      var heap = this.heapMap[userId];
-      if (heap) {
-        heap.timeline = timeline;
-      }
-    };
-    Userspace.prototype.preprocess = function() {
-      var list = this.heapList;
+    var processN = function(bufLength, index) {
+      var list = this.list;
+      var busOut    = this.busOut;
+      var busOutLen = this.busOutLen;
+      var instance;
+      busOut.set(this.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
-        list[i].preprocess();
-      }
-    };
-    Userspace.prototype.process = function(bufLength, index) {
-      var list = this.heapList;
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        list[i].process(bufLength, index);
-      }
-    };
-    Userspace.prototype.postprocess = function() {
-      var list = this.heapList;
-      for (var i = 0, imax = list.length; i < imax; ++i) {
-        list[i].postprocess();
+        instance = list[i];
+        instance.process(bufLength, index);
+        var inBus = instance.bus;
+        var inAmp = instance.busAmp;
+        for (var j = busOutLen; j--; ) {
+          busOut[j] += inBus[j] * inAmp;
+        }
       }
     };
     
-    return Userspace;
+    return InstanceManager;
   })();
   
-  var Heap = (function() {
-    function Heap(userId) {
-      this.userId = userId;
-      this.timeline = [];
+  
+  var Instance = (function() {
+    function Instance(manager, userId) {
+      var busLength = manager.server.bufLength * 128 + 4096;
+      this.manager = manager;
+      this.userId  = userId|0;
+      this.bus     = new Float32Array(busLength);
+      this.busClear = manager.busClear;
+      
+      this.busIndex = 0;
+      this.busAmp   = 0.8;
+      this.timeline = 1;
       this.rootNode = new node.Group(0, 0, 0, this);
-      this.nodes = { 0:this.rootNode };
+      this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
       this.syncItems = new Float32Array(5);
     }
-    
-    Heap.prototype.reset = function() {
-      this.timeline = [];
+
+    Instance.prototype.play = function() {
+      this.rootNode.running = true;
+      this.bus.set(this.busClear);
+    };
+    Instance.prototype.pause = function() {
+      this.rootNode.running = false;
+      this.bus.set(this.busClear);
+      this.timeline = 1;
+    };
+    Instance.prototype.reset = function() {
+      if (this.manager.busClear) {
+        this.bus.set(this.manager.busClear);
+      }
+      this.timeline = 1;
       this.rootNode = new node.Group(0, 0, 0, this);
-      this.nodes = { 0:this.rootNode };
+      this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
     };
-    Heap.prototype.getFixNum = function(value) {
+    Instance.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;
       return fixNums[value] || (fixNums[value] = {
         outs: [ new Float32Array([value]) ]
       });
     };
-    Heap.prototype.process = function(bufLength, index) {
-      var commandList = this.timeline[index];
-      if (commandList) {
+    Instance.prototype.process = function(bufLength, index) {
+      if (this.timeline !== 1) {
+        var commandList = this.timeline[index];
         for (var i = 0, imax = commandList.length; i < imax; ++i) {
           var args = commandList[i];
           var func = commands[args[0]];
@@ -5519,15 +5834,16 @@ define('cc/server/userspace', function(require, exports, module) {
             func.call(this, args);
           }
         }
-        this.rootNode.process(bufLength, this);
       }
+      this.bus.set(this.busClear);
+      this.rootNode.process(bufLength, this);
     };
     
-    return Heap;
+    return Instance;
   })();
-    
+  
   module.exports = {
-    Userspace: Userspace
+    InstanceManager: InstanceManager
   };
 
 });
@@ -5761,14 +6077,14 @@ define('cc/server/node', function(require, exports, module) {
       }
       cc.server.sendToClient([
         "/n_end", this.nodeId
-      ], this.heap);
+      ], this.instance);
     }
     this.prev = null;
     this.next = null;
     this.parent = null;
     this.blocking = false;
-    if (this.heap) {
-      delete this.heap.nodes[this.nodeId];
+    if (this.instance) {
+      delete this.instance.nodes[this.nodeId];
     }
   };
   var g_freeAll = function(node) {
@@ -5796,13 +6112,13 @@ define('cc/server/node', function(require, exports, module) {
   };
   
   var Node = (function() {
-    function Node(nodeId, heap) {
+    function Node(nodeId, instance) {
       this.nodeId = nodeId|0;
       this.next   = null;
       this.prev   = null;
       this.parent = null;
       this.running = true;
-      this.heap = heap;
+      this.instance = instance;
     }
     Node.prototype.play = function() {
       this.running = true;
@@ -5818,7 +6134,7 @@ define('cc/server/node', function(require, exports, module) {
       if (func) {
         cc.server.sendToClient([
           "/n_done", this.nodeId, tag
-        ], this.heap);
+        ], this.instance);
         func.call(this);
       }
     };
@@ -5826,8 +6142,8 @@ define('cc/server/node', function(require, exports, module) {
   })();
 
   var Group = (function() {
-    function Group(nodeId, target, addAction, heap) {
-      Node.call(this, nodeId, heap);
+    function Group(nodeId, target, addAction, instance) {
+      Node.call(this, nodeId, instance);
       this.head = null;
       this.tail = null;
       if (target) {
@@ -5836,12 +6152,12 @@ define('cc/server/node', function(require, exports, module) {
     }
     extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples, heap) {
+    Group.prototype.process = function(inNumSamples, instance) {
       if (this.head && this.running) {
-        this.head.process(inNumSamples, heap);
+        this.head.process(inNumSamples, instance);
       }
       if (this.next) {
-        this.next.process(inNumSamples, heap);
+        this.next.process(inNumSamples, instance);
       }
     };
     
@@ -5849,12 +6165,12 @@ define('cc/server/node', function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, node, addAction, defId, args, heap) {
-      Node.call(this, nodeId, heap);
-      if (heap) {
-        var specs = heap.defs[defId];
+    function Synth(nodeId, node, addAction, defId, args, instance) {
+      Node.call(this, nodeId, instance);
+      if (instance) {
+        var specs = instance.defs[defId];
         if (specs) {
-          this.build(specs, args, heap);
+          this.build(specs, args, instance);
         }
       }
       if (node) {
@@ -5863,11 +6179,11 @@ define('cc/server/node', function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, args, heap) {
+    Synth.prototype.build = function(specs, args, instance) {
       this.specs = specs;
 
       var fixNumList = specs.consts.map(function(value) {
-        return heap.getFixNum(value);
+        return instance.getFixNum(value);
       });
       var unitList = specs.defs.map(function(spec) {
         return new Unit(this, spec);
@@ -5905,16 +6221,16 @@ define('cc/server/node', function(require, exports, module) {
       }
     };
     
-    Synth.prototype.process = function(inNumSamples, heap) {
+    Synth.prototype.process = function(inNumSamples, instance) {
       if (this.running && this.unitList) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
-          unit.process(unit.rate.bufLength, heap);
+          unit.process(unit.rate.bufLength, instance);
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples, heap);
+        this.next.process(inNumSamples, instance);
       }
     };
     
@@ -6000,7 +6316,6 @@ define('cc/server/unit/unit', function(require, exports, module) {
   
   var Out = function() {
     var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === 2) {
         this.process = next_a;
@@ -6010,10 +6325,10 @@ define('cc/server/unit/unit', function(require, exports, module) {
         this._busOffset = this._bufLength * 128;
       }
     };
-    var next_a = function(inNumSamples) {
+    var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
+      var bus    = instance.bus;
       var bufLength = this._bufLength;
       var offset, _in;
       var fbusChannel = (inputs[0][0]|0) - 1;
@@ -6021,16 +6336,16 @@ define('cc/server/unit/unit', function(require, exports, module) {
         offset = (fbusChannel + i) * bufLength;
         _in = inputs[i];
         for (var j = 0; j < inNumSamples; j++) {
-          busBuffer[offset + j] += _in[j];
+          bus[offset + j] += _in[j];
         }
       }
     };
-    var next_k = function() {
+    var next_k = function(inNumSamples, instance) {
       var inputs = this.inputs;
-      var busBuffer = this._busBuffer;
+      var bus    = instance.bus;
       var offset    = this._busOffset + (inputs[0][0]|0) - 1;
       for (var i = 1, imax = inputs.length; i < imax; ++i) {
-        busBuffer[offset + i] += inputs[i][0];
+        bus[offset + i] += inputs[i][0];
       }
     };
     return ctor;
@@ -6038,7 +6353,6 @@ define('cc/server/unit/unit', function(require, exports, module) {
 
   var In = function() {
     var ctor = function() {
-      this._busBuffer = cc.server.busBuffer;
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === 2) {
         this.process = next_a;
@@ -6048,20 +6362,20 @@ define('cc/server/unit/unit', function(require, exports, module) {
         this._busOffset = this._bufLength * 128;
       }
     };
-    var next_a = function(inNumSamples) {
+    var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
-      var busBuffer = this._busBuffer;
+      var bus  = instance.bus;
       var bufLength = this._bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = busBuffer[offset + i];
+        outs[i] = bus[offset + i];
       }
     };
-    var next_k = function(inNumSamples) {
+    var next_k = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
       var outs  = this.outs[0];
-      var value = this._busBuffer[this._busOffset + (this.inputs[0][0]|0)];
+      var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
         outs[i] = value;
       }
@@ -6094,7 +6408,7 @@ define('cc/server/commands', function(require, exports, module) {
   
   var commands = {};
   
-  // the 'this.' context is a heap.
+  // the 'this.' context is an instance.
   
   commands["/n_run"] = function(msg) {
     var nodeId = msg[1]|0;
@@ -7420,8 +7734,8 @@ define('cc/server/unit/bufio', function(require, exports, module) {
       this._trig   = 0;
       this.process = next_choose;
     };
-    var next_choose  = function(inNumSamples, heap) {
-      this._buffer = heap.buffers[this.specialIndex];
+    var next_choose  = function(inNumSamples, instance) {
+      this._buffer = instance.buffers[this.specialIndex];
       if (this._buffer) {
         if (this._buffer.samples !== null) {
           if (this.inRates[1] === 2) {
@@ -8206,7 +8520,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -8217,7 +8531,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? heap.syncItems[2] : 0;
+      var y0 = instance ? instance.syncItems[2] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -8237,7 +8551,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -8248,7 +8562,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? heap.syncItems[3] : 0;
+      var y0 = instance ? instance.syncItems[3] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -8269,7 +8583,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function(inNumSamples, heap) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];
@@ -8279,7 +8593,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = heap ? (heap.syncItems[1] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.syncItems[1] ? maxval : minval) : minval;
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
@@ -8295,5 +8609,8 @@ define('cc/server/unit/ui', function(require, exports, module) {
   };
 
 });
-_require("cc/cc", "cc/loader");
+var exports = _require("cc/cc", "cc/loader");
+if (typeof module !== "undefined") {
+  module.exports = exports;
+}
 })(this.self||global);

@@ -16,7 +16,6 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.userId     = 0;
       this.timeline   = new Timeline(this);
       this.rootNode   = new node.Group();
       this.commandList = [];
@@ -88,6 +87,10 @@ define(function(require, exports, module) {
   var WorkerSynthClient = (function() {
     function WorkerSynthClient() {
       SynthClient.call(this);
+      this.sampleRate = C.WORKER_SAMPLERATE;
+      this.channels   = C.WORKER_CHANNELS;
+      this.strmLength = C.WORKER_STRM_LENGTH;
+      this.bufLength  = C.WORKER_BUF_LENGTH;
     }
     extend(WorkerSynthClient, SynthClient);
     
@@ -97,7 +100,7 @@ define(function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       this.sendToServer([
-        "/command", this.userId, [ this.commandList.splice(0) ]
+        "/command", [this.commandList.splice(0)]
       ]);
     };
     
@@ -109,6 +112,10 @@ define(function(require, exports, module) {
     function IFrameSynthClient() {
       SynthClient.call(this);
       var that = this;
+      this.sampleRate = C.IFRAME_SAMPLERATE;
+      this.channels   = C.IFRAME_CHANNELS;
+      this.strmLength = C.IFRAME_STRM_LENGTH;
+      this.bufLength  = C.IFRAME_BUF_LENGTH;
       this.server = new Worker(cc.coffeeColliderPath);
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
@@ -124,13 +131,16 @@ define(function(require, exports, module) {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
       var list = [];
+      var numOfCommands = 0;
       while (n--) {
         timeline.process();
+        numOfCommands += this.commandList.length;
         list.push(this.commandList.splice(0));
       }
-      this.sendToServer([
-        "/command", this.userId, list
-      ]);
+      if (numOfCommands === 0) {
+        list = C.DO_NOTHING;
+      }
+      this.sendToServer(["/command", list]);
     };
     
     return IFrameSynthClient;
@@ -140,21 +150,87 @@ define(function(require, exports, module) {
   var SocketSynthClient = (function() {
     function SocketSynthClient() {
       SynthClient.call(this);
+      this.sampleRate = C.SOCKET_SAMPLERATE;
+      this.channels   = C.SOCKET_CHANNELS;
+      this.strmLength = C.SOCKET_STRM_LENGTH;
+      this.bufLength  = C.SOCKET_BUF_LENGTH;
+      this.socketPath = null;
     }
     extend(SocketSynthClient, SynthClient);
+
+    SocketSynthClient.prototype.openSocket = function() {
+      var that = this;
+      var socket   = this.socket = new WebSocket(this.socketPath);
+      var pendings = [];
+      socket.binaryType = "arraybuffer";
+      socket.onopen = function() {
+        pendings.forEach(function(msg) {
+          socket.send(msg);
+        });
+        pendings = [];
+      };
+      socket.onmessage = function(e) {
+        // receive a message from the socket-server
+        var msg = e.data;
+        if (typeof msg !== "string") {
+          that.sendToIF(new Float32Array(msg));
+          return;
+        }
+        msg = JSON.parse(msg);
+        if (msg.cc) {
+          that.recvFromServer(msg.cc);
+        } else {
+          that.sendToIF(["/message", msg]);
+        }
+      };
+      socket.onclose = function() {
+      };
+      socket.onerror = function() {
+      };
+      this.sendToServer = function(msg) {
+        if (msg instanceof Float32Array) {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(msg.buffer);
+          }
+          return;
+        } else {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(msg));
+          } else {
+            pendings.push(JSON.stringify(msg));
+          }
+        }
+      };
+    };
+    SocketSynthClient.prototype.closeSocket = function() {
+      this.socket.close();
+      this.socket = null;
+    };
+    SocketSynthClient.prototype.process = function() {
+      var timeline = this.timeline;
+      var n = this.strmLength / this.bufLength;
+      var list = [];
+      var numOfCommands = 0;
+      while (n--) {
+        timeline.process();
+        numOfCommands += this.commandList.length;
+        list.push(this.commandList.splice(0));
+      }
+      if (numOfCommands === 0) {
+        list = C.DO_NOTHING;
+      }
+      this.sendToServer(["/command", list]);
+    };
     
     return SocketSynthClient;
   })();
   
   commands["/connect"] = function(msg) {
-    this.userId = msg[5]|0;
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
     this.sampleRate = msg[1]|0;
     this.channels   = msg[2]|0;
-    this.strmLength = msg[3]|0;
-    this.bufLength  = msg[4]|0;
     this.sendToServer(msg);
   };
   commands["/play"] = function(msg) {
@@ -168,6 +244,16 @@ define(function(require, exports, module) {
   };
   commands["/process"] = function() {
     this.process();
+  };
+  commands["/message"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToServer(msg);
+  };
+  commands["/socket-open"] = function() {
+    this.openSocket();
+  };
+  commands["/socket-close"] = function() {
+    this.closeSocket();
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -216,7 +302,6 @@ define(function(require, exports, module) {
   var listener = function(e) {
     var msg = e.data;
     if (msg instanceof Float32Array) {
-      msg[C.USER_ID] = cc.client.userId;
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);
@@ -228,6 +313,14 @@ define(function(require, exports, module) {
     switch (cc.opmode) {
     case "socket":
       client = new SocketSynthClient();
+      window.onmessage = function(e) {
+        e.ports[0].onmessage = listener;
+        client.sendToIF = function(msg) {
+          e.ports[0].postMessage(msg);
+        };
+        client.socketPath = e.data;
+        window.onmessage = null;
+      };
       break;
     case "iframe":
       client = new IFrameSynthClient();
