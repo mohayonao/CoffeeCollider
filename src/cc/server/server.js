@@ -29,7 +29,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Uint16Array) {
         this.instanceManager.setSyncItems(userId, msg);
         return;
       }
@@ -50,7 +50,7 @@ define(function(require, exports, module) {
           this.sampleRate = msg[1]|0;
           this.channels   = msg[2]|0;
         }
-        this.strm  = new Float32Array(this.strmLength * this.channels);
+        this.strm  = new Int16Array(this.strmLength * this.channels);
         this.rates = {};
         this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
         this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
@@ -131,8 +131,11 @@ define(function(require, exports, module) {
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
         instanceManager.process(bufLength, 0);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -174,8 +177,11 @@ define(function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instanceManager.process(bufLength, i);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -224,11 +230,11 @@ define(function(require, exports, module) {
         ws.on("message", function(msg) {
           // receive a message from the client
           if (typeof msg !== "string") {
-            var f32 = new Float32Array(C.SYNC_ITEM_LEN);
+            var ui16 = new Uint16Array(C.SYNC_ITEM_LEN);
             for (var i = 0; i < C.SYNC_ITEM_LEN; ++i) {
-              f32[i] = msg.readFloatLE(i * 4);
+              ui16[i] = msg.readUInt16LE(i * 2);
             }
-            msg = f32;
+            msg = ui16;
           } else {
             msg = JSON.parse(msg);
           }
@@ -256,7 +262,7 @@ define(function(require, exports, module) {
     SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Int16Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
             ws.send(msg.buffer, {binary:true, mask:false});
@@ -285,7 +291,7 @@ define(function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (this.api) {
-        this._strm = new Float32Array(this.strmLength * this.channels);
+        this._strm = new Int16Array(this.strmLength * this.channels);
         this.strmList = new Array(8);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
@@ -329,8 +335,11 @@ define(function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instanceManager.process(bufLength, i);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -338,7 +347,7 @@ define(function(require, exports, module) {
       this.processDone += this.processInterval;
 
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Float32Array(strm);
+        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
       }
     };

@@ -73,7 +73,7 @@ window.onload = function() {
     context.lineWidth   = 8;
     context.lineJoin    = "round";
     var calcY = function(val) {
-      return val * 0.45 * canvas.height + (canvas.height * 0.5);
+      return val * 0.00002 * canvas.height + (canvas.height * 0.5);
     };
     
     var prevt = 0;

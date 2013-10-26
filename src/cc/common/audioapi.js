@@ -20,20 +20,20 @@ define(function(require, exports, module) {
         WebAudioAPI.prototype.init = function() {
           var sys = this.sys;
           var onaudioprocess;
-          var strmLength  = sys.strmLength;
-          var strmLength4 = strmLength * 4;
-          var buffer = sys.strm.buffer;
+          var strm = sys.strm;
+          var strmLength = sys.strmLength;
           if (this.sys.speaker) {
             if (this.sys.sampleRate === this.sampleRate) {
               onaudioprocess = function(e) {
                 var outs = e.outputBuffer;
+                var outL = outs.getChannelData(0);
+                var outR = outs.getChannelData(1);
+                var i = strmLength, j = strmLength << 1;
                 sys.process();
-                outs.getChannelData(0).set(new Float32Array(
-                  buffer.slice(0, strmLength4)
-                ));
-                outs.getChannelData(1).set(new Float32Array(
-                  buffer.slice(strmLength4)
-                ));
+                while (j--, i--) {
+                  outL[i] = strm[i] * 0.000030517578125;
+                  outR[i] = strm[j] * 0.000030517578125;
+                }
               };
             }
           } else {
@@ -110,8 +110,8 @@ define(function(require, exports, module) {
           var msec = (sys.strmLength / sys.sampleRate) * 1000;
           var written = 0;
           var start = Date.now();
-          var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
-          var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 4);
+          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
+          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
             if (written > Date.now() - start) {
@@ -121,8 +121,8 @@ define(function(require, exports, module) {
             var j = inL.length;
             sys.process();
             while (j--) {
-              interleaved[--i] = inR[j];
-              interleaved[--i] = inL[j];
+              interleaved[--i] = inR[j] * 0.000030517578125;
+              interleaved[--i] = inL[j] * 0.000030517578125;
             }
             audio.mozWriteAudio(interleaved);
             written += msec;
@@ -198,9 +198,7 @@ define(function(require, exports, module) {
                   sys.process();
                   var _in = sys.strm;
                   for (var i = 0; i < len; ++i) {
-                    var x = (_in[i] * 16384 + 32768)|0;
-                    x = Math.max(16384, Math.min(x, 49152));
-                    out[i] = String.fromCharCode(x);
+                    out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
                   }
                   swf.writeAudio(out.join(""));
                   written += msec;
@@ -246,17 +244,16 @@ define(function(require, exports, module) {
           var strm = sys._strm;
           var strmLength = sys.strmLength;
           var buf  = new Buffer(n);
-          var x, i, j = 0;
+          var x, i, j, k = 0;
           n = (n >> 2) / sys.strmLength;
+          x = strm;
           while (n--) {
             sys._process();
-            for (i = 0; i < strmLength; ++i) {
-              x = Math.max(-32768, Math.min((strm[i] * 32768)|0, 32767));
-              buf.writeInt16LE(x, j);
-              j += 2;
-              x = Math.max(-32768, Math.min((strm[i + strmLength] * 32768)|0, 32767));
-              buf.writeInt16LE(x, j);
-              j += 2;
+            for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
+              buf.writeInt16LE(strm[i], k);
+              k += 2;
+              buf.writeInt16LE(strm[j], k);
+              k += 2;
             }
           }
           this.push(buf);

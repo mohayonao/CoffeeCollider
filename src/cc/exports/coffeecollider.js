@@ -71,6 +71,7 @@ define(function(require, exports, module) {
 
   var CoffeeColliderImpl = (function() {
     function CoffeeColliderImpl(exports, opts) {
+      var that = this;
       this.exports  = exports;
       this.compiler = new Compiler();
       
@@ -83,25 +84,32 @@ define(function(require, exports, module) {
       this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.strm  = new Int16Array(this.strmLength * this.channels);
+      this.clear = new Int16Array(this.strmLength * this.channels);
       this.strmList = new Array(8);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.speaker = opts.speaker !== false;
       this.api.init();
-      
+
+      var syncItems = new Uint16Array(C.SYNC_ITEM_LEN);
       if (opts.mouse !== false) {
-        var syncItems = new Float32Array(C.SYNC_ITEM_LEN);
         window.addEventListener("mousemove", function(e) {
-          syncItems[C.POS_X] = e.pageX / window.innerWidth;
-          syncItems[C.POS_Y] = e.pageY / window.innerHeight;
+          var x = e.pageX / window.innerWidth;
+          var y = e.pageY / window.innerHeight;
+          x = Math.max(0, Math.min(x * 65535, 65535));
+          y = Math.max(0, Math.min(y * 65535, 65535));
+          syncItems[C.POS_X] = x;
+          syncItems[C.POS_Y] = y;
+          that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[C.BUTTON] = 1;
+          syncItems[C.BUTTON] = 65535;
+          that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mouseup", function() {
           syncItems[C.BUTTON] = 0;
+          that.syncItemsChanged = true;
         }, false);
         this.syncItems = syncItems;
       }
@@ -146,8 +154,9 @@ define(function(require, exports, module) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this.strm.set(strm);
       }
-      if (this.syncItems) {
+      if (this.syncItemsChanged) {
         this.sendToClient(this.syncItems);
+        this.syncItemsChanged = false;
       }
     };
     CoffeeColliderImpl.prototype.execute = function(code) {
@@ -181,7 +190,7 @@ define(function(require, exports, module) {
       }
     };
     CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Int16Array) {
         this.strmList[this.strmListWriteIndex] = msg;
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
         return;

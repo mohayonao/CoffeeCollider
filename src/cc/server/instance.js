@@ -79,7 +79,7 @@ define(function(require, exports, module) {
     InstanceManager.prototype.setSyncItems = function(userId, syncItems) {
       var instance = this.map[userId];
       if (instance) {
-        instance.syncItems.set(syncItems);
+        instance.setSyncItems(syncItems);
       }
     };
     InstanceManager.prototype.setTimeline = function(userId, timeline) {
@@ -155,6 +155,12 @@ define(function(require, exports, module) {
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
+    };
+    Instance.prototype.setSyncItems = function(_syncItems) {
+      var syncItems = this.syncItems;
+      for (var i = C.SYNC_ITEM_LEN; i--; ) {
+        syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
+      }
     };
     Instance.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;

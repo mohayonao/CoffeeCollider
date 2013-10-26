@@ -39,7 +39,7 @@ define(function(require, exports, module) {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Uint16Array) {
         this.sendToIF(msg);
         return;
       }
@@ -173,7 +173,7 @@ define(function(require, exports, module) {
         // receive a message from the socket-server
         var msg = e.data;
         if (typeof msg !== "string") {
-          that.sendToIF(new Float32Array(msg));
+          that.sendToIF(new Int16Array(msg));
           return;
         }
         msg = JSON.parse(msg);
@@ -188,11 +188,10 @@ define(function(require, exports, module) {
       socket.onerror = function() {
       };
       this.sendToServer = function(msg) {
-        if (msg instanceof Float32Array) {
+        if (msg instanceof Int16Array) {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(msg.buffer);
           }
-          return;
         } else {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify(msg));
@@ -301,7 +300,7 @@ define(function(require, exports, module) {
   
   var listener = function(e) {
     var msg = e.data;
-    if (msg instanceof Float32Array) {
+    if (msg instanceof Int16Array) {
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);

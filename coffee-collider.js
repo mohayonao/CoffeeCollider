@@ -587,7 +587,7 @@ define('cc/client/client', function(require, exports, module) {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Uint16Array) {
         this.sendToIF(msg);
         return;
       }
@@ -721,7 +721,7 @@ define('cc/client/client', function(require, exports, module) {
         // receive a message from the socket-server
         var msg = e.data;
         if (typeof msg !== "string") {
-          that.sendToIF(new Float32Array(msg));
+          that.sendToIF(new Int16Array(msg));
           return;
         }
         msg = JSON.parse(msg);
@@ -736,11 +736,10 @@ define('cc/client/client', function(require, exports, module) {
       socket.onerror = function() {
       };
       this.sendToServer = function(msg) {
-        if (msg instanceof Float32Array) {
+        if (msg instanceof Int16Array) {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(msg.buffer);
           }
-          return;
         } else {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify(msg));
@@ -849,7 +848,7 @@ define('cc/client/client', function(require, exports, module) {
   
   var listener = function(e) {
     var msg = e.data;
-    if (msg instanceof Float32Array) {
+    if (msg instanceof Int16Array) {
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);
@@ -4010,6 +4009,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
 
   var CoffeeColliderImpl = (function() {
     function CoffeeColliderImpl(exports, opts) {
+      var that = this;
       this.exports  = exports;
       this.compiler = new Compiler();
       
@@ -4022,25 +4022,32 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.api = new AudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.clear = new Float32Array(this.strmLength * this.channels);
+      this.strm  = new Int16Array(this.strmLength * this.channels);
+      this.clear = new Int16Array(this.strmLength * this.channels);
       this.strmList = new Array(8);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.speaker = opts.speaker !== false;
       this.api.init();
-      
+
+      var syncItems = new Uint16Array(5);
       if (opts.mouse !== false) {
-        var syncItems = new Float32Array(5);
         window.addEventListener("mousemove", function(e) {
-          syncItems[2] = e.pageX / window.innerWidth;
-          syncItems[3] = e.pageY / window.innerHeight;
+          var x = e.pageX / window.innerWidth;
+          var y = e.pageY / window.innerHeight;
+          x = Math.max(0, Math.min(x * 65535, 65535));
+          y = Math.max(0, Math.min(y * 65535, 65535));
+          syncItems[2] = x;
+          syncItems[3] = y;
+          that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[1] = 1;
+          syncItems[1] = 65535;
+          that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mouseup", function() {
           syncItems[1] = 0;
+          that.syncItemsChanged = true;
         }, false);
         this.syncItems = syncItems;
       }
@@ -4085,8 +4092,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this.strm.set(strm);
       }
-      if (this.syncItems) {
+      if (this.syncItemsChanged) {
         this.sendToClient(this.syncItems);
+        this.syncItemsChanged = false;
       }
     };
     CoffeeColliderImpl.prototype.execute = function(code) {
@@ -4120,7 +4128,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       }
     };
     CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Int16Array) {
         this.strmList[this.strmListWriteIndex] = msg;
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
         return;
@@ -5032,20 +5040,20 @@ define('cc/common/audioapi', function(require, exports, module) {
         WebAudioAPI.prototype.init = function() {
           var sys = this.sys;
           var onaudioprocess;
-          var strmLength  = sys.strmLength;
-          var strmLength4 = strmLength * 4;
-          var buffer = sys.strm.buffer;
+          var strm = sys.strm;
+          var strmLength = sys.strmLength;
           if (this.sys.speaker) {
             if (this.sys.sampleRate === this.sampleRate) {
               onaudioprocess = function(e) {
                 var outs = e.outputBuffer;
+                var outL = outs.getChannelData(0);
+                var outR = outs.getChannelData(1);
+                var i = strmLength, j = strmLength << 1;
                 sys.process();
-                outs.getChannelData(0).set(new Float32Array(
-                  buffer.slice(0, strmLength4)
-                ));
-                outs.getChannelData(1).set(new Float32Array(
-                  buffer.slice(strmLength4)
-                ));
+                while (j--, i--) {
+                  outL[i] = strm[i] * 0.000030517578125;
+                  outR[i] = strm[j] * 0.000030517578125;
+                }
               };
             }
           } else {
@@ -5122,8 +5130,8 @@ define('cc/common/audioapi', function(require, exports, module) {
           var msec = (sys.strmLength / sys.sampleRate) * 1000;
           var written = 0;
           var start = Date.now();
-          var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
-          var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 4);
+          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
+          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
             if (written > Date.now() - start) {
@@ -5133,8 +5141,8 @@ define('cc/common/audioapi', function(require, exports, module) {
             var j = inL.length;
             sys.process();
             while (j--) {
-              interleaved[--i] = inR[j];
-              interleaved[--i] = inL[j];
+              interleaved[--i] = inR[j] * 0.000030517578125;
+              interleaved[--i] = inL[j] * 0.000030517578125;
             }
             audio.mozWriteAudio(interleaved);
             written += msec;
@@ -5210,9 +5218,7 @@ define('cc/common/audioapi', function(require, exports, module) {
                   sys.process();
                   var _in = sys.strm;
                   for (var i = 0; i < len; ++i) {
-                    var x = (_in[i] * 16384 + 32768)|0;
-                    x = Math.max(16384, Math.min(x, 49152));
-                    out[i] = String.fromCharCode(x);
+                    out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
                   }
                   swf.writeAudio(out.join(""));
                   written += msec;
@@ -5258,17 +5264,16 @@ define('cc/common/audioapi', function(require, exports, module) {
           var strm = sys._strm;
           var strmLength = sys.strmLength;
           var buf  = new Buffer(n);
-          var x, i, j = 0;
+          var x, i, j, k = 0;
           n = (n >> 2) / sys.strmLength;
+          x = strm;
           while (n--) {
             sys._process();
-            for (i = 0; i < strmLength; ++i) {
-              x = Math.max(-32768, Math.min((strm[i] * 32768)|0, 32767));
-              buf.writeInt16LE(x, j);
-              j += 2;
-              x = Math.max(-32768, Math.min((strm[i + strmLength] * 32768)|0, 32767));
-              buf.writeInt16LE(x, j);
-              j += 2;
+            for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
+              buf.writeInt16LE(strm[i], k);
+              k += 2;
+              buf.writeInt16LE(strm[j], k);
+              k += 2;
             }
           }
           this.push(buf);
@@ -5333,7 +5338,7 @@ define('cc/server/server', function(require, exports, module) {
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Uint16Array) {
         this.instanceManager.setSyncItems(userId, msg);
         return;
       }
@@ -5354,7 +5359,7 @@ define('cc/server/server', function(require, exports, module) {
           this.sampleRate = msg[1]|0;
           this.channels   = msg[2]|0;
         }
-        this.strm  = new Float32Array(this.strmLength * this.channels);
+        this.strm  = new Int16Array(this.strmLength * this.channels);
         this.rates = {};
         this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
         this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
@@ -5435,8 +5440,11 @@ define('cc/server/server', function(require, exports, module) {
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
         instanceManager.process(bufLength, 0);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -5478,8 +5486,11 @@ define('cc/server/server', function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instanceManager.process(bufLength, i);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -5528,11 +5539,11 @@ define('cc/server/server', function(require, exports, module) {
         ws.on("message", function(msg) {
           // receive a message from the client
           if (typeof msg !== "string") {
-            var f32 = new Float32Array(5);
+            var ui16 = new Uint16Array(5);
             for (var i = 0; i < 5; ++i) {
-              f32[i] = msg.readFloatLE(i * 4);
+              ui16[i] = msg.readUInt16LE(i * 2);
             }
-            msg = f32;
+            msg = ui16;
           } else {
             msg = JSON.parse(msg);
           }
@@ -5560,7 +5571,7 @@ define('cc/server/server', function(require, exports, module) {
     SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
-      if (msg instanceof Float32Array) {
+      if (msg instanceof Int16Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
             ws.send(msg.buffer, {binary:true, mask:false});
@@ -5589,7 +5600,7 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (this.api) {
-        this._strm = new Float32Array(this.strmLength * this.channels);
+        this._strm = new Int16Array(this.strmLength * this.channels);
         this.strmList = new Array(8);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
@@ -5633,8 +5644,11 @@ define('cc/server/server', function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instanceManager.process(bufLength, i);
-        strm.set(busOutL, offset);
-        strm.set(busOutR, offset + strmLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
         offset += bufLength;
       }
       this.sendToClient(strm);
@@ -5642,7 +5656,7 @@ define('cc/server/server', function(require, exports, module) {
       this.processDone += this.processInterval;
 
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Float32Array(strm);
+        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
       }
     };
@@ -5878,7 +5892,7 @@ define('cc/server/instance', function(require, exports, module) {
     InstanceManager.prototype.setSyncItems = function(userId, syncItems) {
       var instance = this.map[userId];
       if (instance) {
-        instance.syncItems.set(syncItems);
+        instance.setSyncItems(syncItems);
       }
     };
     InstanceManager.prototype.setTimeline = function(userId, timeline) {
@@ -5954,6 +5968,12 @@ define('cc/server/instance', function(require, exports, module) {
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
+    };
+    Instance.prototype.setSyncItems = function(_syncItems) {
+      var syncItems = this.syncItems;
+      for (var i = 5; i--; ) {
+        syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
+      }
     };
     Instance.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;
