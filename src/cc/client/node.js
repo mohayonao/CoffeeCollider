@@ -22,19 +22,19 @@ define(function(require, exports, module) {
     }
     extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_run", this.nodeId, true
       ]);
       return this;
     });
     Node.prototype.pause = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
     });
     Node.prototype.stop = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
       return this;
@@ -50,7 +50,7 @@ define(function(require, exports, module) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
-          cc.client.pushCommand([
+          cc.client.pushToTimeline([
             "/g_new", that.nodeId, addAction, target.nodeId
           ]);
         });
@@ -71,7 +71,7 @@ define(function(require, exports, module) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
-          cc.client.pushCommand([
+          cc.client.pushToTimeline([
             "/s_new", that.nodeId, addAction, target.nodeId, def._defId
           ]);
           that._set(args);
@@ -122,7 +122,7 @@ define(function(require, exports, module) {
         }, this);
       }
       if (controls.length) {
-        cc.client.pushCommand([
+        cc.client.pushToTimeline([
           "/n_set", this.nodeId, controls
         ]);
       }
@@ -246,7 +246,7 @@ define(function(require, exports, module) {
       };
       this.specs = specs;
       // console.log(specs);
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/s_def", this._defId, JSON.stringify(specs)
       ]);
       return this;

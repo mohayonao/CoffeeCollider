@@ -19,7 +19,7 @@ define(function(require, exports, module) {
       this.sampleRate  = 0;
       this.blocking = true;
       this._bufId = bufId++;
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/b_new", this._bufId
       ]);
     }
@@ -61,7 +61,7 @@ define(function(require, exports, module) {
     this.sampleRate  = buffer.sampleRate;
     this.blocking = false;
     this.emit("load", this);
-    cc.client.pushCommand([
+    cc.client.pushToTimeline([
       "/b_set", this._bufId, numFrames, buffer.numChannels, buffer.sampleRate, samples
     ]);
   };

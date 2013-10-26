@@ -16,9 +16,9 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.timeline   = new Timeline(this);
       this.rootNode   = new node.Group();
-      this.commandList = [];
+      this.timeline   = new Timeline(this);
+      this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
       this.phase = 0;
@@ -52,8 +52,8 @@ define(function(require, exports, module) {
         }
       }
     };
-    SynthClient.prototype.pushCommand = function(cmd) {
-      this.commandList.push(cmd);
+    SynthClient.prototype.pushToTimeline = function(cmd) {
+      this.timelineResult.push(cmd);
     };
     SynthClient.prototype.play = function(msg) {
       this.timeline.play();
@@ -100,7 +100,7 @@ define(function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       this.sendToServer([
-        "/command", [this.commandList.splice(0)]
+        "/command", [this.timelineResult.splice(0)]
       ]);
     };
     
@@ -134,8 +134,8 @@ define(function(require, exports, module) {
       var numOfCommands = 0;
       while (n--) {
         timeline.process();
-        numOfCommands += this.commandList.length;
-        list.push(this.commandList.splice(0));
+        numOfCommands += this.timelineResult.length;
+        list.push(this.timelineResult.splice(0));
       }
       if (numOfCommands === 0) {
         list = C.DO_NOTHING;
@@ -213,8 +213,8 @@ define(function(require, exports, module) {
       var numOfCommands = 0;
       while (n--) {
         timeline.process();
-        numOfCommands += this.commandList.length;
-        list.push(this.commandList.splice(0));
+        numOfCommands += this.timelineResult.length;
+        list.push(this.timelineResult.splice(0));
       }
       if (numOfCommands === 0) {
         list = C.DO_NOTHING;

@@ -564,9 +564,9 @@ define('cc/client/client', function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.timeline   = new Timeline(this);
       this.rootNode   = new node.Group();
-      this.commandList = [];
+      this.timeline   = new Timeline(this);
+      this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
       this.phase = 0;
@@ -600,8 +600,8 @@ define('cc/client/client', function(require, exports, module) {
         }
       }
     };
-    SynthClient.prototype.pushCommand = function(cmd) {
-      this.commandList.push(cmd);
+    SynthClient.prototype.pushToTimeline = function(cmd) {
+      this.timelineResult.push(cmd);
     };
     SynthClient.prototype.play = function(msg) {
       this.timeline.play();
@@ -648,7 +648,7 @@ define('cc/client/client', function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       this.sendToServer([
-        "/command", [this.commandList.splice(0)]
+        "/command", [this.timelineResult.splice(0)]
       ]);
     };
     
@@ -682,8 +682,8 @@ define('cc/client/client', function(require, exports, module) {
       var numOfCommands = 0;
       while (n--) {
         timeline.process();
-        numOfCommands += this.commandList.length;
-        list.push(this.commandList.splice(0));
+        numOfCommands += this.timelineResult.length;
+        list.push(this.timelineResult.splice(0));
       }
       if (numOfCommands === 0) {
         list = 0;
@@ -761,8 +761,8 @@ define('cc/client/client', function(require, exports, module) {
       var numOfCommands = 0;
       while (n--) {
         timeline.process();
-        numOfCommands += this.commandList.length;
-        list.push(this.commandList.splice(0));
+        numOfCommands += this.timelineResult.length;
+        list.push(this.timelineResult.splice(0));
       }
       if (numOfCommands === 0) {
         list = 0;
@@ -1485,19 +1485,19 @@ define('cc/client/node', function(require, exports, module) {
     }
     extend(Node, cc.Object);
     Node.prototype.play = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_run", this.nodeId, true
       ]);
       return this;
     });
     Node.prototype.pause = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
     });
     Node.prototype.stop = fn.sync(function() {
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
       return this;
@@ -1513,7 +1513,7 @@ define('cc/client/node', function(require, exports, module) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
-          cc.client.pushCommand([
+          cc.client.pushToTimeline([
             "/g_new", that.nodeId, addAction, target.nodeId
           ]);
         });
@@ -1534,7 +1534,7 @@ define('cc/client/node', function(require, exports, module) {
         var that = this;
         var timeline = cc.client.timeline;
         timeline.push(function() {
-          cc.client.pushCommand([
+          cc.client.pushToTimeline([
             "/s_new", that.nodeId, addAction, target.nodeId, def._defId
           ]);
           that._set(args);
@@ -1585,7 +1585,7 @@ define('cc/client/node', function(require, exports, module) {
         }, this);
       }
       if (controls.length) {
-        cc.client.pushCommand([
+        cc.client.pushToTimeline([
           "/n_set", this.nodeId, controls
         ]);
       }
@@ -1709,7 +1709,7 @@ define('cc/client/node', function(require, exports, module) {
       };
       this.specs = specs;
       // console.log(specs);
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/s_def", this._defId, JSON.stringify(specs)
       ]);
       return this;
@@ -2288,7 +2288,7 @@ define('cc/client/buffer', function(require, exports, module) {
       this.sampleRate  = 0;
       this.blocking = true;
       this._bufId = bufId++;
-      cc.client.pushCommand([
+      cc.client.pushToTimeline([
         "/b_new", this._bufId
       ]);
     }
@@ -2330,7 +2330,7 @@ define('cc/client/buffer', function(require, exports, module) {
     this.sampleRate  = buffer.sampleRate;
     this.blocking = false;
     this.emit("load", this);
-    cc.client.pushCommand([
+    cc.client.pushToTimeline([
       "/b_set", this._bufId, numFrames, buffer.numChannels, buffer.sampleRate, samples
     ]);
   };
@@ -5963,9 +5963,9 @@ define('cc/server/instance', function(require, exports, module) {
     };
     Instance.prototype.process = function(bufLength, index) {
       if (this.timeline !== 0) {
-        var commandList = this.timeline[index];
-        for (var i = 0, imax = commandList.length; i < imax; ++i) {
-          var args = commandList[i];
+        var timelineResult = this.timeline[index];
+        for (var i = 0, imax = timelineResult.length; i < imax; ++i) {
+          var args = timelineResult[i];
           var func = commands[args[0]];
           if (func) {
             func.call(this, args);

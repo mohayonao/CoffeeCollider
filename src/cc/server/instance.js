@@ -164,9 +164,9 @@ define(function(require, exports, module) {
     };
     Instance.prototype.process = function(bufLength, index) {
       if (this.timeline !== C.DO_NOTHING) {
-        var commandList = this.timeline[index];
-        for (var i = 0, imax = commandList.length; i < imax; ++i) {
-          var args = commandList[i];
+        var timelineResult = this.timeline[index];
+        for (var i = 0, imax = timelineResult.length; i < imax; ++i) {
+          var args = timelineResult[i];
           var func = commands[args[0]];
           if (func) {
             func.call(this, args);
