@@ -21,10 +21,11 @@ define(function(require, exports, module) {
       this.processed = 0;
       this.processStart    = 0;
       this.processInterval = 0;
+      this.initialized = false;
     }
     
     SynthServer.prototype.sendToClient = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
@@ -40,21 +41,22 @@ define(function(require, exports, module) {
       }
     };
     SynthServer.prototype.connect = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.init = function(msg) {
-      if (this.strm) {
-        return;
+      if (!this.initialized) {
+        this.initialized = true;
+        if (msg) {
+          this.sampleRate = msg[1]|0;
+          this.channels   = msg[2]|0;
+        }
+        this.strm  = new Float32Array(this.strmLength * this.channels);
+        this.rates = {};
+        this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
+        this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
+        this.instanceManager.init(this);
+        this.instanceManager.append(0);
       }
-      if (msg) {
-        this.sampleRate = msg[1]|0;
-        this.channels   = msg[2]|0;
-      }
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.rates = {};
-      this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
-      this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
-      this.instanceManager.init(this);
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
@@ -83,7 +85,7 @@ define(function(require, exports, module) {
       return this.rates[rate] || this.rates[C.CONTROL];
     };
     SynthServer.prototype.process = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.command = function(msg, userId) {
       userId = userId|0;
@@ -111,7 +113,7 @@ define(function(require, exports, module) {
     };
     WorkerSynthServer.prototype.connect = function() {
       this.sendToClient([
-        "/connect", this.sampleRate, this.channels
+        "/connected", this.sampleRate, this.channels
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
@@ -151,6 +153,14 @@ define(function(require, exports, module) {
     }
     extend(IFrameSynthServer, WorkerSynthServer);
     
+    IFrameSynthServer.prototype.sendToClient = function(msg) {
+      postMessage(msg);
+    };
+    IFrameSynthServer.prototype.connect = function() {
+      this.sendToClient([
+        "/connected", this.sampleRate, this.channels
+      ]);
+    };
     IFrameSynthServer.prototype.process = function() {
       if (this.processDone - 25 > Date.now() - this.processStart) {
         return;
@@ -191,11 +201,10 @@ define(function(require, exports, module) {
       this.list = [];
       this.map  = {};
       this.exports = null; // bind after
-      this.init();
     }
     extend(SocketSynthServer, SynthServer);
     
-    SocketSynthServer.prototype.connect = function(opts) {
+    SocketSynthServer.prototype._init = function(opts) {
       var that = this;
       var _userId = 0;
       var exports = this.exports;
@@ -230,9 +239,14 @@ define(function(require, exports, module) {
         ws.on("error", function(e) {
           exports.emit("error", userId, e);
         });
+        that.sendToClient([
+          "/connected", that.sampleRate, that.channels
+        ], userId);
         exports.emit("open", userId);
       });
-      return this;
+      this.init();
+    };
+    SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
       if (msg instanceof Float32Array) {
@@ -290,11 +304,13 @@ define(function(require, exports, module) {
       Emitter.bind(this);
       this.server = server;
     }
-    SocketSynthServerExports.prototype.connect = function(opts) {
-      this.server.connect(opts);
+    SocketSynthServerExports.prototype.init = function(opts) {
+      this.server._init(opts);
+      return this;
     };
     SocketSynthServerExports.prototype.send = function(msg, userId) {
       this.server.sendToClient(msg, userId, true);
+      return this;
     };
     return SocketSynthServerExports;
   })();

@@ -292,8 +292,7 @@ define(function(require, exports, module) {
       document.body.appendChild(iframe);
 
       this.iframe = iframe;
-      // TODO: want to remove 'allow-same-origin'
-      iframe.sandbox = "allow-scripts allow-same-origin";
+      iframe.sandbox = "allow-scripts";
       iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
       var channel = new MessageChannel();
       iframe.onload = function() {
@@ -309,7 +308,7 @@ define(function(require, exports, module) {
     return CoffeeColliderSocketImpl;
   })();
   
-  commands["/connect"] = function() {
+  commands["/connected"] = function() {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);

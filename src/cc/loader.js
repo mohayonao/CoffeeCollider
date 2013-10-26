@@ -37,6 +37,7 @@ define(function(require, exports, module) {
       cc.opmode  = "iframe";
       cc.context = "server";
       require("./server/installer").install();
+      cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "client/server";
@@ -44,8 +45,8 @@ define(function(require, exports, module) {
       require("./server/installer").install();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
       cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
+      cc.server.connect();
     }
-    cc.server.connect();
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";

@@ -25,7 +25,7 @@ define(function(require, exports, module) {
     }
     
     SynthClient.prototype.sendToIF = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
       var func = commands[msg[0]];
@@ -36,7 +36,7 @@ define(function(require, exports, module) {
       }
     };
     SynthClient.prototype.sendToServer = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
       if (msg instanceof Float32Array) {
@@ -77,7 +77,7 @@ define(function(require, exports, module) {
       this.sendToIF(["/buffer/request", path, requestId]);
     };
     SynthClient.prototype.process = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     
     return SynthClient;
@@ -225,7 +225,7 @@ define(function(require, exports, module) {
     return SocketSynthClient;
   })();
   
-  commands["/connect"] = function(msg) {
+  commands["/connected"] = function(msg) {
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {

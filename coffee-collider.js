@@ -80,6 +80,7 @@ define('cc/loader', function(require, exports, module) {
       cc.opmode  = "iframe";
       cc.context = "server";
       require("./server/installer").install();
+      cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "client/server";
@@ -87,8 +88,8 @@ define('cc/loader', function(require, exports, module) {
       require("./server/installer").install();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
       cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
+      cc.server.connect();
     }
-    cc.server.connect();
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";
@@ -572,7 +573,7 @@ define('cc/client/client', function(require, exports, module) {
     }
     
     SynthClient.prototype.sendToIF = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
       var func = commands[msg[0]];
@@ -583,7 +584,7 @@ define('cc/client/client', function(require, exports, module) {
       }
     };
     SynthClient.prototype.sendToServer = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
       if (msg instanceof Float32Array) {
@@ -624,7 +625,7 @@ define('cc/client/client', function(require, exports, module) {
       this.sendToIF(["/buffer/request", path, requestId]);
     };
     SynthClient.prototype.process = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     
     return SynthClient;
@@ -772,7 +773,7 @@ define('cc/client/client', function(require, exports, module) {
     return SocketSynthClient;
   })();
   
-  commands["/connect"] = function(msg) {
+  commands["/connected"] = function(msg) {
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
@@ -4230,8 +4231,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       document.body.appendChild(iframe);
 
       this.iframe = iframe;
-      // TODO: want to remove 'allow-same-origin'
-      iframe.sandbox = "allow-scripts allow-same-origin";
+      iframe.sandbox = "allow-scripts";
       iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
       var channel = new MessageChannel();
       iframe.onload = function() {
@@ -4247,7 +4247,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     return CoffeeColliderSocketImpl;
   })();
   
-  commands["/connect"] = function() {
+  commands["/connected"] = function() {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);
@@ -5258,10 +5258,11 @@ define('cc/server/server', function(require, exports, module) {
       this.processed = 0;
       this.processStart    = 0;
       this.processInterval = 0;
+      this.initialized = false;
     }
     
     SynthServer.prototype.sendToClient = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
@@ -5277,21 +5278,22 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.connect = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.init = function(msg) {
-      if (this.strm) {
-        return;
+      if (!this.initialized) {
+        this.initialized = true;
+        if (msg) {
+          this.sampleRate = msg[1]|0;
+          this.channels   = msg[2]|0;
+        }
+        this.strm  = new Float32Array(this.strmLength * this.channels);
+        this.rates = {};
+        this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
+        this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
+        this.instanceManager.init(this);
+        this.instanceManager.append(0);
       }
-      if (msg) {
-        this.sampleRate = msg[1]|0;
-        this.channels   = msg[2]|0;
-      }
-      this.strm  = new Float32Array(this.strmLength * this.channels);
-      this.rates = {};
-      this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
-      this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
-      this.instanceManager.init(this);
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
@@ -5320,7 +5322,7 @@ define('cc/server/server', function(require, exports, module) {
       return this.rates[rate] || this.rates[1];
     };
     SynthServer.prototype.process = function() {
-      // should be overridden
+      throw "should be overridden";
     };
     SynthServer.prototype.command = function(msg, userId) {
       userId = userId|0;
@@ -5348,7 +5350,7 @@ define('cc/server/server', function(require, exports, module) {
     };
     WorkerSynthServer.prototype.connect = function() {
       this.sendToClient([
-        "/connect", this.sampleRate, this.channels
+        "/connected", this.sampleRate, this.channels
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
@@ -5388,6 +5390,14 @@ define('cc/server/server', function(require, exports, module) {
     }
     extend(IFrameSynthServer, WorkerSynthServer);
     
+    IFrameSynthServer.prototype.sendToClient = function(msg) {
+      postMessage(msg);
+    };
+    IFrameSynthServer.prototype.connect = function() {
+      this.sendToClient([
+        "/connected", this.sampleRate, this.channels
+      ]);
+    };
     IFrameSynthServer.prototype.process = function() {
       if (this.processDone - 25 > Date.now() - this.processStart) {
         return;
@@ -5428,11 +5438,10 @@ define('cc/server/server', function(require, exports, module) {
       this.list = [];
       this.map  = {};
       this.exports = null; // bind after
-      this.init();
     }
     extend(SocketSynthServer, SynthServer);
     
-    SocketSynthServer.prototype.connect = function(opts) {
+    SocketSynthServer.prototype._init = function(opts) {
       var that = this;
       var _userId = 0;
       var exports = this.exports;
@@ -5467,9 +5476,14 @@ define('cc/server/server', function(require, exports, module) {
         ws.on("error", function(e) {
           exports.emit("error", userId, e);
         });
+        that.sendToClient([
+          "/connected", that.sampleRate, that.channels
+        ], userId);
         exports.emit("open", userId);
       });
-      return this;
+      this.init();
+    };
+    SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
       if (msg instanceof Float32Array) {
@@ -5527,11 +5541,13 @@ define('cc/server/server', function(require, exports, module) {
       Emitter.bind(this);
       this.server = server;
     }
-    SocketSynthServerExports.prototype.connect = function(opts) {
-      this.server.connect(opts);
+    SocketSynthServerExports.prototype.init = function(opts) {
+      this.server._init(opts);
+      return this;
     };
     SocketSynthServerExports.prototype.send = function(msg, userId) {
       this.server.sendToClient(msg, userId, true);
+      return this;
     };
     return SocketSynthServerExports;
   })();
