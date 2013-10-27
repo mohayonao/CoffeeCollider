@@ -216,8 +216,8 @@ define(function(require, exports, module) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new Klass(name), args);
-          if (instance !== null && instance !== undefined) {
+          var instance = ctor.apply(new Klass(name, tag), args);
+          if (instance instanceof UGen) {
             instance.tag = tag || "";
           }
           return instance;
@@ -227,7 +227,7 @@ define(function(require, exports, module) {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
-          if (instance !== null && instance !== undefined) {
+          if (instance instanceof UGen) {
             instance.tag = tag || "";
           }
           return instance;

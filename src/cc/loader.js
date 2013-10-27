@@ -32,7 +32,7 @@ define(function(require, exports, module) {
       cc.context = "exports";
       require("./exports/installer").install();
     }
-  } else if (typeof WorkerGlobalScope !== "undefined") {
+  } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "server";
