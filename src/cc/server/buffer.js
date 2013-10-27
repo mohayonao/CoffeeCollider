@@ -50,7 +50,6 @@ define(function(require, exports, module) {
           this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4);
           this.frames = bufSrc.frames - startFrame;
         } else {
-          var len = 
           this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4, frames);
           this.frames = frames;
         }
