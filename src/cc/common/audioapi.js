@@ -66,10 +66,19 @@ define(function(require, exports, module) {
         };
         WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
           buffer = this.context.createBuffer(buffer, false);
-          var numSamples = buffer.length * buffer.numberOfChannels;
+          var bufLength   = buffer.length;
+          var numChannels = buffer.numberOfChannels;
+          var numSamples  = bufLength * numChannels;
           var samples = new Float32Array(numSamples);
-          for (var i = 0, imax = buffer.numberOfChannels; i < imax; ++i) {
-            samples.set(buffer.getChannelData(i), i * buffer.length);
+          var i, j, k = 0;
+          var channelData = new Array(numChannels);
+          for (j = 0; j < numChannels; ++j) {
+            channelData[j] = buffer.getChannelData(j);
+          }
+          for (i = 0; i < bufLength; ++i) {
+            for (j = 0; j < numChannels; ++j) {
+              samples[k++] = channelData[j][i];
+            }
           }
           callback({
             sampleRate : buffer.sampleRate,

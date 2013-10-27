@@ -72,12 +72,12 @@ define(function(require, exports, module) {
       var rate  = this.inputs[1][0];
       var trig  = this.inputs[2][0];
       var loop  = this.inputs[4][0];
-      var samples     = buf.samples;
-      var numChannels = buf.numChannels;
-      var numFrames   = buf.numFrames;
-      var index0, index1, index2, index3, frac, a, b, c, d, offset;
+      var samples  = buf.samples;
+      var channels = buf.channels;
+      var frames   = buf.frames;
+      var index0, index1, index2, index3, frac, a, b, c, d;
 
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       if (trig > 0 && this._trig <= 0) {
         this.done = false;
         phase = this.inputs[3][0];
@@ -113,11 +113,10 @@ define(function(require, exports, module) {
         }
         frac = phase - (phase|0);
         for (var j = 0, jmax = outs.length; j < jmax; ++j) {
-          offset = numFrames * (j % numChannels);
-          a = samples[index0 + offset];
-          b = samples[index1 + offset];
-          c = samples[index2 + offset];
-          d = samples[index3 + offset];
+          a = samples[index0 * channels + j];
+          b = samples[index1 * channels + j];
+          c = samples[index2 * channels + j];
+          d = samples[index3 * channels + j];
           outs[j][i] = cubicinterp(frac, a, b, c, d);
         }
         phase += rate;

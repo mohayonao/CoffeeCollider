@@ -16,6 +16,11 @@
 
   "DO_NOTHING": 0,
 
+  "BINARY_CMD_SET_SYNC"  : 0,
+  "BINARY_CMD_SET_BUFSRC": 1,
+
+  "BUFSRC_HEADER_SIZE": 16,
+
   "SCALAR" : 0,
   "CONTROL": 1,
   "AUDIO"  : 2,
@@ -24,7 +29,6 @@
   "AUDIO_BUS_LEN"  : 128,
   "CONTROL_BUS_LEN": 4096,
   "SYNC_ITEM_LEN": 5,
-  "USER_ID": 0,
   "BUTTON" : 1,
   "POS_X"  : 2,
   "POS_Y"  : 3,

@@ -6,18 +6,20 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   var Emitter = require("../common/emitter").Emitter;
 
-  var bufferCache = {};
+  var bufSrcId = 0;
+  var bufferSrcCache = {};
 
   var AudioBuffer = (function() {
     var bufId = 0;
     function AudioBuffer() {
       Emitter.bind(this);
       this.klassName = "Buffer";
-      this.samples     = null;
-      this.numFrames   = 0;
-      this.numChannels = 0;
-      this.sampleRate  = 0;
-      this.blocking = true;
+      // TODO: set below parameters
+      this.frames     = 0;
+      this.channels   = 0;
+      this.sampleRate = 0;
+      
+      this.blocking   = true;
       this._bufId = bufId++;
       cc.client.pushToTimeline([
         "/b_new", this._bufId
@@ -27,42 +29,45 @@ define(function(require, exports, module) {
     return AudioBuffer;
   })();
   
-  var setBuffer = function(buffer, startFrame, numFrames) {
-    if (!buffer) {
-      throw new Error("Buffer failed to decode an audio file.");
-    }
-    startFrame = Math.max( 0, Math.min(startFrame|0, buffer.numFrames));
-    numFrames  = Math.max(-1, Math.min(numFrames |0, buffer.numFrames - startFrame));
-    var samples, x, i, imax;
-    if (startFrame === 0) {
-      if (numFrames === -1) {
-        samples   = buffer.samples;
-        numFrames = buffer.numFrames;
-      } else {
-        samples = new Float32Array(numFrames * buffer.numChannels);
-        for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
-          x = i * buffer.numFrames;
-          samples.set(buffer.samples.subarray(x, x + numFrames));
-        }
-      }
-    } else {
-      if (numFrames === -1) {
-        numFrames = buffer.numFrames - startFrame;
-      }
-      samples = new Float32Array(numFrames * buffer.numChannels);
-      for (i = 0, imax = buffer.numChannels; i < imax; ++i) {
-        x = i * buffer.numFrames + startFrame;
-        samples.set(buffer.samples.subarray(x, x + numFrames));
-      }
-    }
-    this.samples    = samples;
-    this.numFrames  = numFrames;
-    this.numChannels = buffer.numChannels;
-    this.sampleRate  = buffer.sampleRate;
-    this.blocking = false;
-    this.emit("load", this);
+  var newBufferSource = function(path, buffer) {
+    // binary data format
+    //  0 command
+    //  1
+    //  2 bufSrcId
+    //  3
+    //  4 (not use)
+    //  5
+    //  6 channels
+    //  7
+    //  8 sampleRate
+    //  9
+    // 10
+    // 11
+    // 12 numFrames
+    // 13
+    // 14
+    // 15
+    // 16.. samples
+    var uint8 = new Uint8Array(C.BUFSRC_HEADER_SIZE + buffer.samples.length * 4);
+    var int16 = new Uint16Array(uint8.buffer);
+    var int32 = new Uint32Array(uint8.buffer);
+    var f32   = new Float32Array(uint8.buffer);
+    var _bufSrcId = bufSrcId++;
+    int16[0] = C.BINARY_CMD_SET_BUFSRC;
+    int16[1] = _bufSrcId;
+    int16[3] = buffer.numChannels;
+    int32[2] = buffer.sampleRate;
+    int32[3] = buffer.numFrames;
+    f32.set(buffer.samples, 4);
+    cc.client.sendToServer(uint8);
+    bufferSrcCache[path] = _bufSrcId;
+    delete buffer.samples;
+    return _bufSrcId;
+  };
+  
+  var bindBufferSource = function(bufSrcId, startFrame, numFrames) {
     cc.client.pushToTimeline([
-      "/b_set", this._bufId, numFrames, buffer.numChannels, buffer.sampleRate, samples
+      "/b_bind", this._bufId, bufSrcId, startFrame, numFrames
     ]);
   };
   
@@ -72,20 +77,22 @@ define(function(require, exports, module) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: arguments[0] should be a string.");
     }
+    var bufSrcId = bufferSrcCache[path];
     var buffer = new AudioBuffer();
-    if (bufferCache[path]) {
-      setBuffer.call(buffer, bufferCache[path], startFrame, numFrames);
+    if (typeof bufSrcId === "number") {
+      bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
     } else {
       cc.client.requestBuffer(path, function(result) {
-        bufferCache[path] = result;
-        setBuffer.call(buffer, result, startFrame, numFrames);
+        var bufSrcId = newBufferSource(path, result);
+        bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
       });
     }
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
-
+  
   var reset = function() {
-    bufferCache = {};
+    bufferSrcCache = {};
+    bufSrcId = 0;
   };
   
   var install = function() {
@@ -93,7 +100,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    AudioBuffer: AudioBuffer,
+    AudioBuffer : AudioBuffer,
     reset : reset,
     install: install
   };

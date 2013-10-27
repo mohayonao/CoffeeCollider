@@ -76,17 +76,17 @@ define(function(require, exports, module) {
         return instance.rootNode.running;
       });
     };
-    InstanceManager.prototype.setSyncItems = function(userId, syncItems) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.setSyncItems(syncItems);
-      }
-    };
     InstanceManager.prototype.setTimeline = function(userId, timeline) {
       var instance = this.map[userId];
       if (instance) {
         instance.timeline = timeline;
         instance.timelineIndex = 0;
+      }
+    };
+    InstanceManager.prototype.doBinayCommand = function(userId, binary) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.doBinayCommand(binary);
       }
     };
     
@@ -135,6 +135,7 @@ define(function(require, exports, module) {
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
+      this.bufSrc  = {};
       this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
     }
 
@@ -157,11 +158,12 @@ define(function(require, exports, module) {
       this.fixNums = {};
       this.defs    = {};
       this.buffers = {};
+      this.bufSrc  = {};
     };
-    Instance.prototype.setSyncItems = function(_syncItems) {
-      var syncItems = this.syncItems;
-      for (var i = C.SYNC_ITEM_LEN; i--; ) {
-        syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
+    Instance.prototype.doBinayCommand = function(binary) {
+      var func  = commands[(binary[1] << 8) + binary[0]];
+      if (func) {
+        func.call(this, binary);
       }
     };
     Instance.prototype.getFixNum = function(value) {

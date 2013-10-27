@@ -60,16 +60,43 @@ define(function(require, exports, module) {
     var bufId = msg[1]|0;
     this.buffers[bufId] = new buffer.AudioBuffer(bufId);
   };
-  commands["/b_set"] = function(msg) {
-    var bufId       = msg[1]|0;
-    var numFrames   = msg[2]|0;
-    var numChannels = msg[3]|0;
-    var sampleRate  = msg[4]|0;
-    var samples     = msg[5];
+  commands["/b_bind"] = function(msg) {
+    var bufId      = msg[1]|0;
+    var bufSrcId   = msg[2]|0;
+    var startFrame = msg[3]|0;
+    var frames     = msg[4]|0;
     var buffer = this.buffers[bufId];
+    var bufSrc = this.bufSrc[bufSrcId];
     if (buffer) {
-      buffer.set(numFrames, numChannels, sampleRate, samples);
+      if (bufSrc) {
+        buffer.bindBufferSource(bufSrc, startFrame, frames);
+      } else {
+        bufSrc = new buffer.BufferSource(bufSrcId);
+        bufSrc.pendings.push([buffer, startFrame, frames]);
+        this.bufSrc[bufSrcId] = bufSrc;
+      }
     }
+  };
+  
+  commands[C.BINARY_CMD_SET_SYNC] = function(binay) {
+    var  syncItems = this.syncItems;
+    var _syncItems = new Uint16Array(binay.buffer);
+    for (var i = C.SYNC_ITEM_LEN; i--; ) {
+      syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
+    }
+  };
+  commands[C.BINARY_CMD_SET_BUFSRC] = function(binary) {
+    var bufSrcId = (binary[3] << 8) + binary[2];
+    var channels = (binary[7] << 8) + binary[6];
+    var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
+    var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
+    var samples = new Float32Array(binary.buffer.slice(16));
+    var bufSrc = this.bufSrc[bufSrcId];
+    if (!bufSrc) {
+      bufSrc = new buffer.BufferSource(bufSrcId);
+    }
+    bufSrc.set(channels, sampleRate, frames, samples);
+    this.bufSrc[bufSrcId] = bufSrc;
   };
   
   module.exports = commands;

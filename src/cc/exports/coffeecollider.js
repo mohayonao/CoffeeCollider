@@ -111,8 +111,9 @@ define(function(require, exports, module) {
           syncItems[C.BUTTON] = 0;
           that.syncItemsChanged = true;
         }, false);
-        this.syncItems = syncItems;
       }
+      this.syncItems = syncItems;
+      this.syncItemsBinary = new Uint8Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
@@ -155,7 +156,7 @@ define(function(require, exports, module) {
         this.strm.set(strm);
       }
       if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItems);
+        this.sendToClient(this.syncItemsBinary);
         this.syncItemsChanged = false;
       }
     };

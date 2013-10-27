@@ -15,10 +15,7 @@ define(function(require, exports, module) {
       }
       numChannels = Math.max(0, numChannels|0);
       this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
-      this.specialIndex = buffer._bufid;
-      if (buffer.samples !== null) {
-        numChannels = buffer.numChannels;
-      }
+      this.specialIndex = buffer._bufId;
       return this.initOutputs(numChannels, this.rate);
     };
   };

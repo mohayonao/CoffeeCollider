@@ -29,8 +29,8 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
-      if (msg instanceof Uint16Array) {
-        this.instanceManager.setSyncItems(userId, msg);
+      if (msg instanceof Uint8Array) {
+        this.instanceManager.doBinayCommand(userId, msg);
         return;
       }
       if (msg) {
@@ -230,11 +230,13 @@ define(function(require, exports, module) {
         ws.on("message", function(msg) {
           // receive a message from the client
           if (typeof msg !== "string") {
-            var ui16 = new Uint16Array(C.SYNC_ITEM_LEN);
-            for (var i = 0; i < C.SYNC_ITEM_LEN; ++i) {
-              ui16[i] = msg.readUInt16LE(i * 2);
-            }
-            msg = ui16;
+            // TODO: receive binary
+            // var ui16 = new Uint16Array(C.SYNC_ITEM_LEN);
+            // for (var i = 0; i < C.SYNC_ITEM_LEN; ++i) {
+            //   ui16[i] = msg.readUInt16LE(i * 2);
+            // }
+            // msg = ui16;
+            return;
           } else {
             msg = JSON.parse(msg);
           }

@@ -190,7 +190,7 @@ define(function(require, exports, module) {
       socket.onerror = function() {
       };
       this.sendToServer = function(msg) {
-        if (msg instanceof Int16Array) {
+        if (msg instanceof Uint8Array) {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(msg.buffer);
           }
