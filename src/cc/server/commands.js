@@ -50,9 +50,10 @@ define(function(require, exports, module) {
     var addAction    = msg[2]|0;
     var targetNodeId = msg[3]|0;
     var defId        = msg[4]|0;
+    var controls     = msg[5];
     var target = this.nodes[targetNodeId];
     if (target) {
-      this.nodes[nodeId] = new node.Synth(nodeId, target, addAction, defId, {}, this);
+      this.nodes[nodeId] = new node.Synth(nodeId, target, addAction, defId, controls, this);
     }
   };
   commands["/b_new"] = function(msg) {

@@ -326,12 +326,12 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, node, addAction, defId, args, instance) {
+    function Synth(nodeId, node, addAction, defId, controls, instance) {
       Node.call(this, nodeId, instance);
       if (instance) {
         var specs = instance.defs[defId];
         if (specs) {
-          this.build(specs, args, instance);
+          this.build(specs, controls, instance);
         }
       }
       if (node) {
@@ -340,7 +340,7 @@ define(function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, args, instance) {
+    Synth.prototype.build = function(specs, controls, instance) {
       this.specs = specs;
 
       var fixNumList = specs.consts.map(function(value) {
@@ -351,8 +351,7 @@ define(function(require, exports, module) {
       }, this);
       this.params   = specs.params;
       this.controls = new Float32Array(this.params.values);
-      args = 0; // TODO:
-      // this.set(args);
+      this.set(controls);
       this.unitList = unitList.filter(function(unit) {
         var inputs  = unit.inputs;
         var inRates = unit.inRates;

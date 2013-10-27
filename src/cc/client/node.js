@@ -7,7 +7,6 @@ define(function(require, exports, module) {
   var utils = require("./utils");
   var ugen  = require("./ugen/ugen");
   var Emitter = require("../common/emitter").Emitter;
-  var slice = [].slice;
 
   var nodes = {};
   
@@ -66,22 +65,20 @@ define(function(require, exports, module) {
       Node.call(this);
       this.klassName = "Synth";
       this.params = def.specs.params;
-      args = args || {};
       if (target) {
         var that = this;
         var timeline = cc.client.timeline;
+        var controls = args2controls(args, this.params);
         timeline.push(function() {
           cc.client.pushToTimeline([
-            "/s_new", that.nodeId, addAction, target.nodeId, def._defId
+            "/s_new", that.nodeId, addAction, target.nodeId, def._defId, controls
           ]);
-          that._set(args);
         });
       }
     }
     extend(Synth, Node);
 
-    Synth.prototype._set = function(args) {
-      var params = this.params;
+    var args2controls = function(args, params) {
       var controls = [];
       if (utils.isDict(args)) {
         Object.keys(args).forEach(function(key) {
@@ -99,28 +96,17 @@ define(function(require, exports, module) {
                   controls.push(index + i, value);
                 }
               }
-            }, this);
+            });
           } else if (typeof value === "number" && !isNaN(value)) {
             controls.push(index, value);
           }
-        }, this);
-      } else {
-        slice.call(arguments).forEach(function(value, i) {
-          var index = params.indices[i];
-          var length = params.length[i];
-          if (Array.isArray(value)) {
-            value.forEach(function(value, i) {
-              if (i < length) {
-                if (typeof value === "number" && !isNaN(value)) {
-                  controls.push(index + i, value);
-                }
-              }
-            }, this);
-          } else if (typeof value === "number" && !isNaN(value)) {
-            controls.push(index, value);
-          }
-        }, this);
+        });
       }
+      return controls;
+    };
+
+    Synth.prototype._set = function(args) {
+      var controls = args2controls(args, this.params);
       if (controls.length) {
         cc.client.pushToTimeline([
           "/n_set", this.nodeId, controls
