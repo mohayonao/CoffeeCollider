@@ -8,9 +8,9 @@ define(function(require, exports, module) {
 
   var bufferCache = {};
 
-  var Buffer = (function() {
+  var AudioBuffer = (function() {
     var bufId = 0;
-    function Buffer() {
+    function AudioBuffer() {
       Emitter.bind(this);
       this.klassName = "Buffer";
       this.samples     = null;
@@ -23,8 +23,8 @@ define(function(require, exports, module) {
         "/b_new", this._bufId
       ]);
     }
-    extend(Buffer, cc.Object);
-    return Buffer;
+    extend(AudioBuffer, cc.Object);
+    return AudioBuffer;
   })();
   
   var setBuffer = function(buffer, startFrame, numFrames) {
@@ -72,7 +72,7 @@ define(function(require, exports, module) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: arguments[0] should be a string.");
     }
-    var buffer = new Buffer();
+    var buffer = new AudioBuffer();
     if (bufferCache[path]) {
       setBuffer.call(buffer, bufferCache[path], startFrame, numFrames);
     } else {
@@ -93,7 +93,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    Buffer: Buffer,
+    AudioBuffer: AudioBuffer,
     reset : reset,
     install: install
   };

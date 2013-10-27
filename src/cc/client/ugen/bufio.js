@@ -2,7 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var ugen = require("./ugen");
-  var Buffer = require("../buffer").Buffer;
+  var AudioBuffer = require("../buffer").AudioBuffer;
   var slice = [].slice;
   
   var playBuf_ctor = function(rate) {
@@ -10,7 +10,7 @@ define(function(require, exports, module) {
       if (typeof numChannels !== "number") {
         throw new TypeError("Buffer: arguments[0] should be an integer.");
       }
-      if (!(buffer instanceof Buffer)) {
+      if (!(buffer instanceof AudioBuffer)) {
         throw new TypeError("Buffer: arguments[1] should be a buffer.");
       }
       numChannels = Math.max(0, numChannels|0);

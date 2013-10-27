@@ -58,7 +58,7 @@ define(function(require, exports, module) {
   };
   commands["/b_new"] = function(msg) {
     var bufId = msg[1]|0;
-    this.buffers[bufId] = new buffer.Buffer(bufId);
+    this.buffers[bufId] = new buffer.AudioBuffer(bufId);
   };
   commands["/b_set"] = function(msg) {
     var bufId       = msg[1]|0;
