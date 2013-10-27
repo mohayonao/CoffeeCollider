@@ -124,13 +124,15 @@ define(function(require, exports, module) {
         this.strmListWriteIndex = 0;
         this.api.play();
         this.sendToClient(["/play"]);
+        this.exports.emit("play");
       }
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
-        this.sendToClient(["/pause"]);
-        this.api.pause();
         this.isPlaying = false;
+        this.api.pause();
+        this.sendToClient(["/pause"]);
+        this.exports.emit("pause");
       }
     };
     CoffeeColliderImpl.prototype.reset = function() {
@@ -144,6 +146,7 @@ define(function(require, exports, module) {
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.sendToClient(["/reset"]);
+      this.exports.emit("reset");
     };
     CoffeeColliderImpl.prototype.process = function() {
       var strm = this.strmList[this.strmListReadIndex];
@@ -318,6 +321,7 @@ define(function(require, exports, module) {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);
+    this.exports.emit("connected");
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
