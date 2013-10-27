@@ -1,11 +1,11 @@
-window.onload = function() {
+$(function() {
   "use strict";
   
   var srcFragment = "try:";
-  var $code = document.getElementById("code");
-  var $exec = document.getElementById("exec");
-  var $link = document.getElementById("link");
-  var $play = document.getElementById("play");
+  var $code = $("#code");
+  var $exec = $("#exec");
+  var $link = $("#link");
+  var $play = $("#play");
   
   var config = {};
   location.search.substr(1).split("&").forEach(function(kv) {
@@ -26,13 +26,13 @@ window.onload = function() {
   
   var cc = window.cc = new CoffeeCollider(config);
   var viewer = new WaveViewer(cc, document.getElementById("canvas"), {
-    fillStyle:"#ecf0f1", strokeStyle:"#2980b9", lineWidth:8
+    width:200, height:100, fillStyle:"#2c3e50", strokeStyle:"#f1c40f", lineWidth:2
   });
   var isPlaying = false;
   var prevCode  = null;
   
-  $exec.addEventListener("click", function(e) {
-    var code = $code.value.trim();
+  $exec.on("click", function(e) {
+    var code = $code.val().trim();
     if (e.shiftKey) {
       console.log(cc.compiler.toString(code));
     } else {
@@ -43,32 +43,42 @@ window.onload = function() {
       });
       prevCode = code;
     }
-  }, false);
+  });
 
-  $link.addEventListener("click", function() {
-    var code = $code.value.trim();
+  $link.on("click", function() {
+    var code = $code.val().trim();
     window.location = "#" + srcFragment + encodeURIComponent(code);
-  }, false);
+  });
+
+  $("a", "#example-list").each(function(i, a) {
+    var $a = $(a);
+    $a.on("click", function() {
+      $.get("./documents/examples/" + $(this).attr("data-path")).then(function(res) {
+        $code.val(res);
+      });
+      return false;
+    });
+  });
   
-  $play.addEventListener("click", function() {
+  $play.on("click", function() {
     isPlaying = !isPlaying;
     if (isPlaying) {
-      if (prevCode !== $code.value.trim()) {
+      if (prevCode !== $code.val().trim()) {
         $exec.click();
       }
       cc.play();
       viewer.start();
-      $play.className = "btn btn-danger";
+      $play.addClass("btn-danger");
     } else {
       cc.pause();
       viewer.stop();
-      $play.className = "btn";
+      $play.removeClass("btn-danger");
     }
-  }, false);
+  });
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {
-    $code.value = hash.substr(srcFragment.length);
+    $code.val(hash.substr(srcFragment.length));
   }
 
-};
+});
