@@ -72,24 +72,24 @@ button {
 #panel .desc {
     font-size: 14px;
 }
-#examples {
+.block {
     margin-top: 25px;
 }
-#examples h3 {
+h3 {
     margin: 0;
 }
-#examples ul {
+ul {
     margin: 0;
     padding: 0;
     list-style: none;
 }
-#examples ul li {
+ul li {
     margin: 5px 0;
 }
-#examples ul li:before {
+ul li:before {
     content: "- ";
 }
-#examples ul li a {
+ul li a {
     color: #ecf0f1;
 }
 #canvas {
