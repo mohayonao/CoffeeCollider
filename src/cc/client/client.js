@@ -99,9 +99,11 @@ define(function(require, exports, module) {
     };
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
-      this.sendToServer([
-        "/command", [this.timelineResult.splice(0)]
-      ]);
+      var timelineResult = this.timelineResult.splice(0);
+      if (timelineResult.length === 0) {
+        timelineResult = C.DO_NOTHING;
+      }
+      this.sendToServer(["/command", timelineResult]);
     };
     
     return WorkerSynthClient;
@@ -135,7 +137,7 @@ define(function(require, exports, module) {
       while (n--) {
         timeline.process();
         numOfCommands += this.timelineResult.length;
-        list.push(this.timelineResult.splice(0));
+        list = list.concat(this.timelineResult.splice(0), C.DO_NOTHING);
       }
       if (numOfCommands === 0) {
         list = C.DO_NOTHING;
@@ -213,7 +215,7 @@ define(function(require, exports, module) {
       while (n--) {
         timeline.process();
         numOfCommands += this.timelineResult.length;
-        list.push(this.timelineResult.splice(0));
+        list = list.concat(this.timelineResult.splice(0), C.DO_NOTHING);
       }
       if (numOfCommands === 0) {
         list = C.DO_NOTHING;

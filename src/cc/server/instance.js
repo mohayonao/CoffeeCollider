@@ -86,6 +86,7 @@ define(function(require, exports, module) {
       var instance = this.map[userId];
       if (instance) {
         instance.timeline = timeline;
+        instance.timelineIndex = 0;
       }
     };
     
@@ -128,6 +129,7 @@ define(function(require, exports, module) {
       this.busIndex = 0;
       this.busAmp   = 0.8;
       this.timeline = C.DO_NOTHING;
+      this.timelineIndex = 0;
       this.rootNode = new node.Group(0, 0, 0, this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
@@ -168,16 +170,23 @@ define(function(require, exports, module) {
         outs: [ new Float32Array([value]) ]
       });
     };
-    Instance.prototype.process = function(bufLength, index) {
-      if (this.timeline !== C.DO_NOTHING) {
-        var timelineResult = this.timeline[index];
-        for (var i = 0, imax = timelineResult.length; i < imax; ++i) {
-          var args = timelineResult[i];
+    Instance.prototype.process = function(bufLength) {
+      if (this.timeline) {
+        var timeline = this.timeline;
+        var timelineLength = timeline.length;
+        var index = this.timelineIndex;
+        while (index < timelineLength) {
+          var args = timeline[index];
+          if (!args) {
+            break;
+          }
           var func = commands[args[0]];
           if (func) {
             func.call(this, args);
           }
+          index++;
         }
+        this.timelineIndex = index + 1;
       }
       this.bus.set(this.busClear);
       this.rootNode.process(bufLength, this);

@@ -130,7 +130,7 @@ define(function(require, exports, module) {
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         client.process();
-        instanceManager.process(bufLength, 0);
+        instanceManager.process(bufLength);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
@@ -176,7 +176,7 @@ define(function(require, exports, module) {
       var busOutR = instanceManager.busOutR;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        instanceManager.process(bufLength, i);
+        instanceManager.process(bufLength);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
@@ -334,7 +334,7 @@ define(function(require, exports, module) {
       var busOutR = instanceManager.busOutR;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        instanceManager.process(bufLength, i);
+        instanceManager.process(bufLength);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
