@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack   = require("../common/pack").pack;
+  var timer  = require("../common/timer");
   var Timeline = require("./sched").Timeline;
   var node     = require("./node");
   var buffer   = require("./buffer");
@@ -65,6 +66,7 @@ define(function(require, exports, module) {
     SynthClient.prototype.reset = function(msg) {
       buffer.reset();
       node.reset();
+      timer.reset();
       this.timeline.reset();
       this.sendToServer(msg);
     };
@@ -328,6 +330,7 @@ define(function(require, exports, module) {
       client = new WorkerSynthClient();
       global.onmessage = listener;
     }
+    timer.init();
     cc.client = client;
   };
   
