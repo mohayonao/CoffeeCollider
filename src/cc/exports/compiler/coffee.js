@@ -513,16 +513,18 @@ define(function(require, exports, module) {
       var code  = items[0];
       var data  = items[1];
       var tokens = CoffeeScript.tokens(code);
-      tokens = replaceTimeValue(tokens);
-      tokens = replacePi(tokens);
-      tokens = replaceUnaryOp(tokens);
-      tokens = replacePrecedence(tokens);
-      tokens = replaceBinaryOp(tokens);
-      tokens = replaceCompoundAssign(tokens);
-      tokens = replaceSynthDef(tokens);
-      tokens = cleanupParenthesis(tokens);
-      tokens = replaceGlobal(tokens);
-      tokens = insertReturn(tokens);
+      if (tokens.length) {
+        tokens = replaceTimeValue(tokens);
+        tokens = replacePi(tokens);
+        tokens = replaceUnaryOp(tokens);
+        tokens = replacePrecedence(tokens);
+        tokens = replaceBinaryOp(tokens);
+        tokens = replaceCompoundAssign(tokens);
+        tokens = replaceSynthDef(tokens);
+        tokens = cleanupParenthesis(tokens);
+        tokens = replaceGlobal(tokens);
+        tokens = insertReturn(tokens);
+      }
       this.code = code;
       this.data = data;
       return tokens;
