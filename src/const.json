@@ -30,7 +30,7 @@
   "CONTROL_BUS_LEN": 4096,
   
   "SYNC_ITEM_LEN": 12,
-  "BUTTON" : 2,
+  "BUTTON" : 3,
   "POS_X"  : 1,
   "POS_Y"  : 2,
   
