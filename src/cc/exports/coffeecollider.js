@@ -29,10 +29,13 @@ define(function(require, exports, module) {
             impl.sendToClient([ "/message", msg ]);
           }
         };
+        cc.opmode = "socket";
       } else if (opts.iframe) {
         this.impl = new CoffeeColliderIFrameImpl(this, opts);
+        cc.opmode = "iframe";
       } else {
         this.impl = new CoffeeColliderWorkerImpl(this, opts);
+        cc.opmode = "worker";
       }
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;

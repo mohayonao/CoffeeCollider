@@ -3,19 +3,16 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
 
-  if (typeof Window !== "undefined") {
+  if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
     if (scripts && scripts.length) {
-      var m;
       for (var i = 0; i < scripts.length; i++) {
-        if (!cc.coffeeColliderPath) {
-          m = /^(.*\/)coffee-collider(?:-min)?\.js(\#.*)?$/.exec(scripts[i].src);
-          if (m) {
-            cc.rootPath = m[1];
-            cc.coffeeColliderPath = m[0];
-            cc.coffeeColliderHash = m[2];
-            break;
-          }
+        var m = /^(.*\/)coffee-collider(?:-min)?\.js(\#.*)?$/.exec(scripts[i].src);
+        if (m) {
+          cc.rootPath = m[1];
+          cc.coffeeColliderPath = m[0];
+          cc.coffeeColliderHash = m[2];
+          break;
         }
       }
     }
@@ -28,7 +25,7 @@ define(function(require, exports, module) {
       cc.context = "client";
       require("./client/installer").install();
     } else {
-      cc.opmode  = "worker";
+      cc.opmode  = "exports";
       cc.context = "exports";
       require("./exports/installer").install();
     }
