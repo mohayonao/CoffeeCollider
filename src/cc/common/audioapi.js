@@ -42,15 +42,21 @@ define(function(require, exports, module) {
             };
           }
           this.bufSrc = this.context.createBufferSource();
-          this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
+          if (this.context.createScriptProcessor) {
+            this.jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
+          } else {
+            this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
+          }
           this.jsNode.onaudioprocess = onaudioprocess;
         };
         WebAudioAPI.prototype.play = function() {
           if (!this.bufSrc) {
             return; // TODO: throw an error
           }
-          this.bufSrc.noteOn(0);
-          this.bufSrc.connect(this.jsNode);
+          if (this.bufSrc.noteOn) {
+            this.bufSrc.noteOn(0);
+            this.bufSrc.connect(this.jsNode);
+          }
           if (!this.delegate) {
             this.jsNode.connect(this.context.destination);
           }
