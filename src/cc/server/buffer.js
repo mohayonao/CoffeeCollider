@@ -42,21 +42,16 @@ define(function(require, exports, module) {
           this.samples = bufSrc.samples;
           this.frames  = bufSrc.frames;
         } else {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(C.BUFSRC_HEADER_SIZE, frames * 4)
-          );
+          this.samples = new Float32Array(bufSrc.samples.buffer, 0, frames);
           this.frames = frames;
         }
       } else {
         if (frames === -1) {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(C.BUFSRC_HEADER_SIZE + startFrame * 4)
-          );
+          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4);
           this.frames = bufSrc.frames - startFrame;
         } else {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(C.BUFSRC_HEADER_SIZE + startFrame * 4, (startFrame + frames) * 4)
-          );
+          var len = 
+          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4, frames);
           this.frames = frames;
         }
       }

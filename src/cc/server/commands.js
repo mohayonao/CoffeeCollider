@@ -86,7 +86,7 @@ define(function(require, exports, module) {
     var channels = (binary[7] << 8) + binary[6];
     var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
     var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
-    var samples = new Float32Array(binary.buffer.slice(16));
+    var samples = new Float32Array(binary.subarray(16).buffer);
     var bufSrc = this.bufSrc[bufSrcId];
     if (!bufSrc) {
       bufSrc = new buffer.BufferSource(bufSrcId);
