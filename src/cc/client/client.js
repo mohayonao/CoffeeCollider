@@ -29,18 +29,18 @@ define(function(require, exports, module) {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
-      } else {
-        this.sendToServer(msg);
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
       }
     };
     SynthClient.prototype.sendToServer = function() {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Uint16Array) {
+      if (msg instanceof Int16Array) {
         this.sendToIF(msg);
         return;
       }
@@ -48,8 +48,6 @@ define(function(require, exports, module) {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
-        } else {
-          this.sendToIF(msg);
         }
       }
     };
@@ -102,7 +100,7 @@ define(function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       var timelineResult = this.timelineResult.splice(0);
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return WorkerSynthClient;
@@ -138,7 +136,7 @@ define(function(require, exports, module) {
           this.timelineResult.splice(0), C.DO_NOTHING
         );
       }
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return IFrameSynthClient;
@@ -178,7 +176,7 @@ define(function(require, exports, module) {
         if (msg.cc) {
           that.recvFromServer(msg.cc);
         } else {
-          that.sendToIF(["/message", msg]);
+          that.sendToIF(["/messaged", msg]);
         }
       };
       socket.onclose = function() {
@@ -213,7 +211,7 @@ define(function(require, exports, module) {
           this.timelineResult.splice(0), C.DO_NOTHING
         );
       }
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return SocketSynthClient;
@@ -243,10 +241,10 @@ define(function(require, exports, module) {
     // receive a message from the client-interface
     this.sendToServer(msg);
   };
-  commands["/socket-open"] = function() {
+  commands["/socket/open"] = function() {
     this.openSocket();
   };
-  commands["/socket-close"] = function() {
+  commands["/socket/close"] = function() {
     this.closeSocket();
   };
   commands["/execute"] = function(msg) {
@@ -261,7 +259,7 @@ define(function(require, exports, module) {
     global.DATA = data;
     var result = eval.call(global, code);
     if (callback) {
-      this.sendToIF(["/execute", execId, pack(result)]);
+      this.sendToIF(["/executed", execId, pack(result)]);
     }
   };
   commands["/buffer/response"] = function(msg) {
@@ -276,15 +274,14 @@ define(function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-  
-  commands["/n_end"] = function(msg) {
+  commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = node.get(nodeId);
     if (n) {
       n.emit("end");
     }
   };
-  commands["/n_done"] = function(msg) {
+  commands["/emit/n_done"] = function(msg) {
     var nodeId = msg[1]|0;
     var tag    = msg[2];
     var n = node.get(nodeId);
@@ -295,7 +292,7 @@ define(function(require, exports, module) {
   
   var listener = function(e) {
     var msg = e.data;
-    if (msg instanceof Int16Array) {
+    if (msg instanceof Uint8Array) {
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);

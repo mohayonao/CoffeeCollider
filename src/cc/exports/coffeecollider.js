@@ -20,10 +20,10 @@ define(function(require, exports, module) {
         this.impl = impl;
         this.socket = {
           open: function() {
-            impl.sendToClient([ "/socket-open" ]);
+            impl.sendToClient([ "/socket/open" ]);
           },
           close: function() {
-            impl.sendToClient([ "/socket-close" ]);
+            impl.sendToClient([ "/socket/close" ]);
           },
           send: function(msg) {
             impl.sendToClient([ "/message", msg ]);
@@ -326,7 +326,7 @@ define(function(require, exports, module) {
     ]);
     this.exports.emit("connected");
   };
-  commands["/execute"] = function(msg) {
+  commands["/executed"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
     var callback = this.execCallbacks[execId];
@@ -345,7 +345,7 @@ define(function(require, exports, module) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
   };
-  commands["/message"] = function(msg) {
+  commands["/messaged"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);

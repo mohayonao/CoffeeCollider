@@ -46,19 +46,16 @@ define('cc/loader', function(require, exports, module) {
 
   var cc = require("./cc");
 
-  if (typeof Window !== "undefined") {
+  if (typeof document !== "undefined") {
     var scripts = document.getElementsByTagName("script");
     if (scripts && scripts.length) {
-      var m;
       for (var i = 0; i < scripts.length; i++) {
-        if (!cc.coffeeColliderPath) {
-          m = /^(.*\/)coffee-collider(?:-min)?\.js(\#.*)?$/.exec(scripts[i].src);
-          if (m) {
-            cc.rootPath = m[1];
-            cc.coffeeColliderPath = m[0];
-            cc.coffeeColliderHash = m[2];
-            break;
-          }
+        var m = /^(.*\/)coffee-collider(?:-min)?\.js(\#.*)?$/.exec(scripts[i].src);
+        if (m) {
+          cc.rootPath = m[1];
+          cc.coffeeColliderPath = m[0];
+          cc.coffeeColliderHash = m[2];
+          break;
         }
       }
     }
@@ -71,7 +68,7 @@ define('cc/loader', function(require, exports, module) {
       cc.context = "client";
       require("./client/installer").install();
     } else {
-      cc.opmode  = "worker";
+      cc.opmode  = "exports";
       cc.context = "exports";
       require("./exports/installer").install();
     }
@@ -577,18 +574,18 @@ define('cc/client/client', function(require, exports, module) {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
-      var func = commands[msg[0]];
-      if (func) {
-        func.call(this, msg);
-      } else {
-        this.sendToServer(msg);
+      if (msg) {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        }
       }
     };
     SynthClient.prototype.sendToServer = function() {
       throw "should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Uint16Array) {
+      if (msg instanceof Int16Array) {
         this.sendToIF(msg);
         return;
       }
@@ -596,8 +593,6 @@ define('cc/client/client', function(require, exports, module) {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
-        } else {
-          this.sendToIF(msg);
         }
       }
     };
@@ -650,7 +645,7 @@ define('cc/client/client', function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       var timelineResult = this.timelineResult.splice(0);
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return WorkerSynthClient;
@@ -686,7 +681,7 @@ define('cc/client/client', function(require, exports, module) {
           this.timelineResult.splice(0), 0
         );
       }
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return IFrameSynthClient;
@@ -726,7 +721,7 @@ define('cc/client/client', function(require, exports, module) {
         if (msg.cc) {
           that.recvFromServer(msg.cc);
         } else {
-          that.sendToIF(["/message", msg]);
+          that.sendToIF(["/messaged", msg]);
         }
       };
       socket.onclose = function() {
@@ -761,7 +756,7 @@ define('cc/client/client', function(require, exports, module) {
           this.timelineResult.splice(0), 0
         );
       }
-      this.sendToServer(["/command", timelineResult]);
+      this.sendToServer(["/processed", timelineResult]);
     };
     
     return SocketSynthClient;
@@ -791,10 +786,10 @@ define('cc/client/client', function(require, exports, module) {
     // receive a message from the client-interface
     this.sendToServer(msg);
   };
-  commands["/socket-open"] = function() {
+  commands["/socket/open"] = function() {
     this.openSocket();
   };
-  commands["/socket-close"] = function() {
+  commands["/socket/close"] = function() {
     this.closeSocket();
   };
   commands["/execute"] = function(msg) {
@@ -809,7 +804,7 @@ define('cc/client/client', function(require, exports, module) {
     global.DATA = data;
     var result = eval.call(global, code);
     if (callback) {
-      this.sendToIF(["/execute", execId, pack(result)]);
+      this.sendToIF(["/executed", execId, pack(result)]);
     }
   };
   commands["/buffer/response"] = function(msg) {
@@ -824,15 +819,14 @@ define('cc/client/client', function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-  
-  commands["/n_end"] = function(msg) {
+  commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = node.get(nodeId);
     if (n) {
       n.emit("end");
     }
   };
-  commands["/n_done"] = function(msg) {
+  commands["/emit/n_done"] = function(msg) {
     var nodeId = msg[1]|0;
     var tag    = msg[2];
     var n = node.get(nodeId);
@@ -843,7 +837,7 @@ define('cc/client/client', function(require, exports, module) {
   
   var listener = function(e) {
     var msg = e.data;
-    if (msg instanceof Int16Array) {
+    if (msg instanceof Uint8Array) {
       cc.client.sendToServer(msg);
     } else {
       cc.client.recvFromIF(msg);
@@ -4055,19 +4049,22 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
         this.impl = impl;
         this.socket = {
           open: function() {
-            impl.sendToClient([ "/socket-open" ]);
+            impl.sendToClient([ "/socket/open" ]);
           },
           close: function() {
-            impl.sendToClient([ "/socket-close" ]);
+            impl.sendToClient([ "/socket/close" ]);
           },
           send: function(msg) {
             impl.sendToClient([ "/message", msg ]);
           }
         };
+        cc.opmode = "socket";
       } else if (opts.iframe) {
         this.impl = new CoffeeColliderIFrameImpl(this, opts);
+        cc.opmode = "iframe";
       } else {
         this.impl = new CoffeeColliderWorkerImpl(this, opts);
+        cc.opmode = "worker";
       }
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
@@ -4358,7 +4355,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     ]);
     this.exports.emit("connected");
   };
-  commands["/execute"] = function(msg) {
+  commands["/executed"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
     var callback = this.execCallbacks[execId];
@@ -4377,7 +4374,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
   };
-  commands["/message"] = function(msg) {
+  commands["/messaged"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);
@@ -5511,10 +5508,10 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.process = function() {
       throw "should be overridden";
     };
-    SynthServer.prototype.command = function(msg, userId) {
+    SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
-      this.instanceManager.setTimeline(userId, timeline);
+      this.instanceManager.pushToTimeline(userId, timeline);
     };
     
     return SynthServer;
@@ -5810,8 +5807,8 @@ define('cc/server/server', function(require, exports, module) {
   commands["/reset"] = function(msg, userId) {
     this.reset(msg, userId);
   };
-  commands["/command"] = function(msg, userId) {
-    this.command(msg, userId);
+  commands["/processed"] = function(msg, userId) {
+    this.pushToTimeline(msg, userId);
   };
   commands["/message"] = function(msg, userId) {
     // receive a message from the client-interface via the client
@@ -5972,7 +5969,7 @@ define('cc/server/instance', function(require, exports, module) {
         return instance.rootNode.running;
       });
     };
-    InstanceManager.prototype.setTimeline = function(userId, timeline) {
+    InstanceManager.prototype.pushToTimeline = function(userId, timeline) {
       var instance = this.map[userId];
       if (instance) {
         instance.timeline = instance.timeline.concat(timeline);
@@ -6326,7 +6323,7 @@ define('cc/server/node', function(require, exports, module) {
         userId = this.instance.userId;
       }
       cc.server.sendToClient([
-        "/n_end", this.nodeId
+        "/emit/n_end", this.nodeId
       ], userId);
     }
     this.prev = null;
@@ -6388,7 +6385,7 @@ define('cc/server/node', function(require, exports, module) {
           userId = this.instance.userId;
         }
         cc.server.sendToClient([
-          "/n_done", this.nodeId, tag
+          "/emit/n_done", this.nodeId, tag
         ], userId);
       }
     };

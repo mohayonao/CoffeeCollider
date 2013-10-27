@@ -87,10 +87,10 @@ define(function(require, exports, module) {
     SynthServer.prototype.process = function() {
       throw "should be overridden";
     };
-    SynthServer.prototype.command = function(msg, userId) {
+    SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
-      this.instanceManager.setTimeline(userId, timeline);
+      this.instanceManager.pushToTimeline(userId, timeline);
     };
     
     return SynthServer;
@@ -386,8 +386,8 @@ define(function(require, exports, module) {
   commands["/reset"] = function(msg, userId) {
     this.reset(msg, userId);
   };
-  commands["/command"] = function(msg, userId) {
-    this.command(msg, userId);
+  commands["/processed"] = function(msg, userId) {
+    this.pushToTimeline(msg, userId);
   };
   commands["/message"] = function(msg, userId) {
     // receive a message from the client-interface via the client

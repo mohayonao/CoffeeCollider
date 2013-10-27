@@ -233,7 +233,7 @@ define(function(require, exports, module) {
         userId = this.instance.userId;
       }
       cc.server.sendToClient([
-        "/n_end", this.nodeId
+        "/emit/n_end", this.nodeId
       ], userId);
     }
     this.prev = null;
@@ -295,7 +295,7 @@ define(function(require, exports, module) {
           userId = this.instance.userId;
         }
         cc.server.sendToClient([
-          "/n_done", this.nodeId, tag
+          "/emit/n_done", this.nodeId, tag
         ], userId);
       }
     };

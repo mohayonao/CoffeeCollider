@@ -76,7 +76,7 @@ define(function(require, exports, module) {
         return instance.rootNode.running;
       });
     };
-    InstanceManager.prototype.setTimeline = function(userId, timeline) {
+    InstanceManager.prototype.pushToTimeline = function(userId, timeline) {
       var instance = this.map[userId];
       if (instance) {
         instance.timeline = instance.timeline.concat(timeline);
