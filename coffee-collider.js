@@ -75,7 +75,7 @@ define('cc/loader', function(require, exports, module) {
       cc.context = "exports";
       require("./exports/installer").install();
     }
-  } else if (typeof WorkerGlobalScope !== "undefined") {
+  } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "server";
@@ -552,6 +552,7 @@ define('cc/client/client', function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack   = require("../common/pack").pack;
+  var timer  = require("../common/timer");
   var Timeline = require("./sched").Timeline;
   var node     = require("./node");
   var buffer   = require("./buffer");
@@ -613,6 +614,7 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.reset = function(msg) {
       buffer.reset();
       node.reset();
+      timer.reset();
       this.timeline.reset();
       this.sendToServer(msg);
     };
@@ -648,9 +650,6 @@ define('cc/client/client', function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       var timelineResult = this.timelineResult.splice(0);
-      if (timelineResult.length === 0) {
-        timelineResult = 0;
-      }
       this.sendToServer(["/command", timelineResult]);
     };
     
@@ -680,17 +679,14 @@ define('cc/client/client', function(require, exports, module) {
     IFrameSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
-      var list = [];
-      var numOfCommands = 0;
+      var timelineResult = [];
       while (n--) {
         timeline.process();
-        numOfCommands += this.timelineResult.length;
-        list = list.concat(this.timelineResult.splice(0), 0);
+        timelineResult = timelineResult.concat(
+          this.timelineResult.splice(0), 0
+        );
       }
-      if (numOfCommands === 0) {
-        list = 0;
-      }
-      this.sendToServer(["/command", list]);
+      this.sendToServer(["/command", timelineResult]);
     };
     
     return IFrameSynthClient;
@@ -758,17 +754,14 @@ define('cc/client/client', function(require, exports, module) {
     SocketSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
-      var list = [];
-      var numOfCommands = 0;
+      var timelineResult = [];
       while (n--) {
         timeline.process();
-        numOfCommands += this.timelineResult.length;
-        list = list.concat(this.timelineResult.splice(0), 0);
+        timelineResult = timelineResult.concat(
+          this.timelineResult.splice(0), 0
+        );
       }
-      if (numOfCommands === 0) {
-        list = 0;
-      }
-      this.sendToServer(["/command", list]);
+      this.sendToServer(["/command", timelineResult]);
     };
     
     return SocketSynthClient;
@@ -885,6 +878,7 @@ define('cc/client/client', function(require, exports, module) {
       client = new WorkerSynthClient();
       global.onmessage = listener;
     }
+    timer.init();
     cc.client = client;
   };
   
@@ -1004,6 +998,115 @@ define('cc/common/pack', function(require, exports, module) {
   module.exports = {
     pack  : pack,
     unpack: unpack
+  };
+
+});
+define('cc/common/timer', function(require, exports, module) {
+  
+  var NativeTimer = (function() {
+    function NativeTimer() {
+      this.timerId = 0;
+      this.isRunning = false;
+    }
+    NativeTimer.prototype.start = function(callback, interval) {
+      if (this.timerId) {
+        clearInterval(this.timerId);
+      }
+      this.timerId = setInterval(callback, interval);
+      this.isRunning = true;
+    };
+    NativeTimer.prototype.stop = function() {
+      if (this.timerId) {
+        clearInterval(this.timerId);
+      }
+      this.isRunning = false;
+    };
+    return NativeTimer;
+  })();
+
+  var WorkerTimer = (function() {
+    if (typeof Worker === "undefined") {
+      return;
+    }
+    /*global URL:true */
+    var worker_path = (function() {
+      try {
+        var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
+        var blob = new Blob([source], {type:"text/javascript"});
+        var path = URL.createObjectURL(blob);
+        new Worker(path);
+        return path;
+      } catch (e) {}
+    })();
+    /*global URL:false */
+    if (!worker_path) {
+      return;
+    }
+    function WorkerTimer() {
+      this.worker = new Worker(worker_path);
+      this.isRunning = false;
+    }
+    WorkerTimer.prototype.start = function(callback, interval) {
+      this.worker.onmessage = callback;
+      this.worker.postMessage(interval);
+      this.isRunning = true;
+    };
+    WorkerTimer.prototype.stop = function() {
+      this.worker.postMessage(0);
+      this.worker.onmessage = null;
+      this.isRunning = false;
+    };
+    
+    return WorkerTimer;
+  })();
+
+  var setIntervalCache = [];
+  var setTimeoutCache  = [];
+  var _setInterval = setInterval;
+  var _setTimeout  = setTimeout;
+  var _clearInterval = clearInterval;
+  var _clearTimeout  = clearTimeout;
+  
+  var init = function() {
+    global.setInterval = function(func, delay) {
+      var id = _setInterval(func, delay);
+      setIntervalCache.push(id);
+      return id;
+    };
+    global.clearInterval = function(id) {
+      _clearInterval(id);
+      var index = setIntervalCache.indexOf(id);
+      if (index !== -1) {
+        setIntervalCache.splice(index, 1);
+      }
+    };
+    global.setTimeout = function(func, delay) {
+      var id = _setTimeout(func, delay);
+      setTimeoutCache.push(id);
+      return id;
+    };
+    global.clearTimeout = function(id) {
+      _clearTimeout(id);
+      var index = setTimeoutCache.indexOf(id);
+      if (index !== -1) {
+        setTimeoutCache.splice(index, 1);
+      }
+    };
+  };
+  
+  var reset = function() {
+    setIntervalCache.splice(0).forEach(function(id) {
+      clearInterval(id);
+    });
+    setTimeoutCache.splice(0).forEach(function(id) {
+      clearTimeout(id);
+    });
+  };
+  
+  module.exports = {
+    Timer: WorkerTimer || NativeTimer,
+    init : init,
+    reset: reset
   };
 
 });
@@ -2217,8 +2320,8 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new Klass(name), args);
-          if (instance !== null && instance !== undefined) {
+          var instance = ctor.apply(new Klass(name, tag), args);
+          if (instance instanceof UGen) {
             instance.tag = tag || "";
           }
           return instance;
@@ -2228,7 +2331,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
-          if (instance !== null && instance !== undefined) {
+          if (instance instanceof UGen) {
             instance.tag = tag || "";
           }
           return instance;
@@ -2339,8 +2442,10 @@ define('cc/client/buffer', function(require, exports, module) {
       bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
     } else {
       cc.client.requestBuffer(path, function(result) {
-        var bufSrcId = newBufferSource(path, result);
-        bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
+        if (result) {
+          var bufSrcId = newBufferSource(path, result);
+          bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
+        }
       });
     }
     return buffer;
@@ -4022,28 +4127,24 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.speaker = opts.speaker !== false;
       this.api.init();
 
-      var syncItems = new Uint16Array(5);
+      var syncItems = new Uint8Array(12);
       if (opts.mouse !== false) {
+        var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
-          var x = e.pageX / window.innerWidth;
-          var y = e.pageY / window.innerHeight;
-          x = Math.max(0, Math.min(x * 65535, 65535));
-          y = Math.max(0, Math.min(y * 65535, 65535));
-          syncItems[2] = x;
-          syncItems[3] = y;
+          f32_syncItems[1] = e.pageX / window.innerWidth;
+          f32_syncItems[2] = e.pageY / window.innerHeight;
           that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[1] = 65535;
+          syncItems[3] = 1;
           that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mouseup", function() {
-          syncItems[1] = 0;
+          syncItems[3] = 0;
           that.syncItemsChanged = true;
         }, false);
       }
       this.syncItems = syncItems;
-      this.syncItemsBinary = new Uint8Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
@@ -4058,13 +4159,15 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
         this.strmListWriteIndex = 0;
         this.api.play();
         this.sendToClient(["/play"]);
+        this.exports.emit("play");
       }
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
-        this.sendToClient(["/pause"]);
-        this.api.pause();
         this.isPlaying = false;
+        this.api.pause();
+        this.sendToClient(["/pause"]);
+        this.exports.emit("pause");
       }
     };
     CoffeeColliderImpl.prototype.reset = function() {
@@ -4078,6 +4181,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.sendToClient(["/reset"]);
+      this.exports.emit("reset");
     };
     CoffeeColliderImpl.prototype.process = function() {
       var strm = this.strmList[this.strmListReadIndex];
@@ -4086,7 +4190,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
         this.strm.set(strm);
       }
       if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItemsBinary);
+        this.sendToClient(this.syncItems);
         this.syncItemsChanged = false;
       }
     };
@@ -4252,6 +4356,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);
+    this.exports.emit("connected");
   };
   commands["/execute"] = function(msg) {
     var execId = msg[1];
@@ -4796,16 +4901,18 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       var code  = items[0];
       var data  = items[1];
       var tokens = CoffeeScript.tokens(code);
-      tokens = replaceTimeValue(tokens);
-      tokens = replacePi(tokens);
-      tokens = replaceUnaryOp(tokens);
-      tokens = replacePrecedence(tokens);
-      tokens = replaceBinaryOp(tokens);
-      tokens = replaceCompoundAssign(tokens);
-      tokens = replaceSynthDef(tokens);
-      tokens = cleanupParenthesis(tokens);
-      tokens = replaceGlobal(tokens);
-      tokens = insertReturn(tokens);
+      if (tokens.length) {
+        tokens = replaceTimeValue(tokens);
+        tokens = replacePi(tokens);
+        tokens = replaceUnaryOp(tokens);
+        tokens = replacePrecedence(tokens);
+        tokens = replaceBinaryOp(tokens);
+        tokens = replaceCompoundAssign(tokens);
+        tokens = replaceSynthDef(tokens);
+        tokens = cleanupParenthesis(tokens);
+        tokens = replaceGlobal(tokens);
+        tokens = insertReturn(tokens);
+      }
       this.code = code;
       this.data = data;
       return tokens;
@@ -5541,13 +5648,7 @@ define('cc/server/server', function(require, exports, module) {
         ws.on("message", function(msg) {
           // receive a message from the client
           if (typeof msg !== "string") {
-            // TODO: receive binary
-            // var ui16 = new Uint16Array(5);
-            // for (var i = 0; i < 5; ++i) {
-            //   ui16[i] = msg.readUInt16LE(i * 2);
-            // }
-            // msg = ui16;
-            return;
+            msg = new Uint8Array(msg);
           } else {
             msg = JSON.parse(msg);
           }
@@ -5788,34 +5889,6 @@ define('cc/server/cc', function(require, exports, module) {
   module.exports = _cc;
 
 });
-define('cc/common/timer', function(require, exports, module) {
-  
-  var Timer = (function() {
-    function Timer() {
-      this.timerId = 0;
-      this.isRunning = false;
-    }
-    Timer.prototype.start = function(callback, interval) {
-      if (this.timerId) {
-        clearInterval(this.timerId);
-      }
-      this.timerId = setInterval(callback, interval);
-      this.isRunning = true;
-    };
-    Timer.prototype.stop = function() {
-      if (this.timerId) {
-        clearInterval(this.timerId);
-      }
-      this.isRunning = false;
-    };
-    return Timer;
-  })();
-  
-  module.exports = {
-    Timer: Timer
-  };
-
-});
 define('cc/server/instance', function(require, exports, module) {
 
   var node = require("./node");
@@ -5896,8 +5969,7 @@ define('cc/server/instance', function(require, exports, module) {
     InstanceManager.prototype.setTimeline = function(userId, timeline) {
       var instance = this.map[userId];
       if (instance) {
-        instance.timeline = timeline;
-        instance.timelineIndex = 0;
+        instance.timeline = instance.timeline.concat(timeline);
       }
     };
     InstanceManager.prototype.doBinayCommand = function(userId, binary) {
@@ -5945,7 +6017,7 @@ define('cc/server/instance', function(require, exports, module) {
       
       this.busIndex = 0;
       this.busAmp   = 0.8;
-      this.timeline = 0;
+      this.timeline = [];
       this.timelineIndex = 0;
       this.rootNode = new node.Group(0, 0, 0, this);
       this.nodes   = { 0:this.rootNode };
@@ -5953,7 +6025,9 @@ define('cc/server/instance', function(require, exports, module) {
       this.defs    = {};
       this.buffers = {};
       this.bufSrc  = {};
-      this.syncItems = new Float32Array(5);
+      this.syncItems     = new Uint8Array(12);
+      this.i16_syncItems = new Int16Array(this.syncItems.buffer);
+      this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
 
     Instance.prototype.play = function() {
@@ -5963,13 +6037,13 @@ define('cc/server/instance', function(require, exports, module) {
     Instance.prototype.pause = function() {
       this.rootNode.running = false;
       this.bus.set(this.busClear);
-      this.timeline = 0;
+      this.timeline = [];
     };
     Instance.prototype.reset = function() {
       if (this.manager.busClear) {
         this.bus.set(this.manager.busClear);
       }
-      this.timeline = 0;
+      this.timeline = [];
       this.rootNode = new node.Group(0, 0, 0, this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
@@ -5990,23 +6064,16 @@ define('cc/server/instance', function(require, exports, module) {
       });
     };
     Instance.prototype.process = function(bufLength) {
-      if (this.timeline) {
-        var timeline = this.timeline;
-        var timelineLength = timeline.length;
-        var index = this.timelineIndex;
-        while (index < timelineLength) {
-          var args = timeline[index];
-          if (!args) {
-            break;
-          }
-          var func = commands[args[0]];
-          if (func) {
-            func.call(this, args);
-          }
-          index++;
+      var timeline = this.timeline;
+      var args;
+      
+      while ((args = timeline.shift())) {
+        var func = commands[args[0]];
+        if (func) {
+          func.call(this, args);
         }
-        this.timelineIndex = index + 1;
       }
+      
       this.bus.set(this.busClear);
       this.rootNode.process(bufLength, this);
     };
@@ -6661,18 +6728,14 @@ define('cc/server/commands', function(require, exports, module) {
   };
   
   commands[0] = function(binay) {
-    var  syncItems = this.syncItems;
-    var _syncItems = new Uint16Array(binay.buffer);
-    for (var i = 5; i--; ) {
-      syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
-    }
+    this.syncItems.set(binay);
   };
   commands[1] = function(binary) {
     var bufSrcId = (binary[3] << 8) + binary[2];
     var channels = (binary[7] << 8) + binary[6];
     var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
     var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
-    var samples = new Float32Array(binary.buffer.slice(16));
+    var samples = new Float32Array(binary.subarray(16).buffer);
     var bufSrc = this.bufSrc[bufSrcId];
     if (!bufSrc) {
       bufSrc = new buffer.BufferSource(bufSrcId);
@@ -6727,21 +6790,15 @@ define('cc/server/buffer', function(require, exports, module) {
           this.samples = bufSrc.samples;
           this.frames  = bufSrc.frames;
         } else {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(16, frames * 4)
-          );
+          this.samples = new Float32Array(bufSrc.samples.buffer, 0, frames);
           this.frames = frames;
         }
       } else {
         if (frames === -1) {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(16 + startFrame * 4)
-          );
+          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4);
           this.frames = bufSrc.frames - startFrame;
         } else {
-          this.samples = new Float32Array(
-            bufSrc.samples.buffer.slice(16 + startFrame * 4, (startFrame + frames) * 4)
-          );
+          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4, frames);
           this.frames = frames;
         }
       }
@@ -8787,7 +8844,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.syncItems[2] : 0;
+      var y0 = instance ? instance.f32_syncItems[1] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -8818,7 +8875,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.syncItems[3] : 0;
+      var y0 = instance ? instance.f32_syncItems[2] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -8849,7 +8906,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? (instance.syncItems[1] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.syncItems[3] ? maxval : minval) : minval;
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
