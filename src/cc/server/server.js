@@ -230,13 +230,7 @@ define(function(require, exports, module) {
         ws.on("message", function(msg) {
           // receive a message from the client
           if (typeof msg !== "string") {
-            // TODO: receive binary
-            // var ui16 = new Uint16Array(C.SYNC_ITEM_LEN);
-            // for (var i = 0; i < C.SYNC_ITEM_LEN; ++i) {
-            //   ui16[i] = msg.readUInt16LE(i * 2);
-            // }
-            // msg = ui16;
-            return;
+            msg = new Uint8Array(msg);
           } else {
             msg = JSON.parse(msg);
           }
