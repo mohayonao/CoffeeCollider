@@ -92,19 +92,16 @@ define(function(require, exports, module) {
       this.speaker = opts.speaker !== false;
       this.api.init();
 
-      var syncItems = new Uint16Array(C.SYNC_ITEM_LEN);
+      var syncItems = new Uint8Array(C.SYNC_ITEM_LEN);
       if (opts.mouse !== false) {
+        var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
-          var x = e.pageX / window.innerWidth;
-          var y = e.pageY / window.innerHeight;
-          x = Math.max(0, Math.min(x * 65535, 65535));
-          y = Math.max(0, Math.min(y * 65535, 65535));
-          syncItems[C.POS_X] = x;
-          syncItems[C.POS_Y] = y;
+          f32_syncItems[C.POS_X] = e.pageX / window.innerWidth;
+          f32_syncItems[C.POS_Y] = e.pageY / window.innerHeight;
           that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[C.BUTTON] = 65535;
+          syncItems[C.BUTTON] = 1;
           that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mouseup", function() {
@@ -113,7 +110,6 @@ define(function(require, exports, module) {
         }, false);
       }
       this.syncItems = syncItems;
-      this.syncItemsBinary = new Uint8Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
@@ -156,7 +152,7 @@ define(function(require, exports, module) {
         this.strm.set(strm);
       }
       if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItemsBinary);
+        this.sendToClient(this.syncItems);
         this.syncItemsChanged = false;
       }
     };

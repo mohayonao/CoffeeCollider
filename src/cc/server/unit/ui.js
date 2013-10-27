@@ -25,7 +25,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.syncItems[C.POS_X] : 0;
+      var y0 = instance ? instance.f32_syncItems[C.POS_X] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -56,7 +56,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.syncItems[C.POS_Y] : 0;
+      var y0 = instance ? instance.f32_syncItems[C.POS_Y] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {

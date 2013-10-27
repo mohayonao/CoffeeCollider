@@ -135,7 +135,9 @@ define(function(require, exports, module) {
       this.defs    = {};
       this.buffers = {};
       this.bufSrc  = {};
-      this.syncItems = new Float32Array(C.SYNC_ITEM_LEN);
+      this.syncItems     = new Uint8Array(C.SYNC_ITEM_LEN);
+      this.i16_syncItems = new Int16Array(this.syncItems.buffer);
+      this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
 
     Instance.prototype.play = function() {

@@ -79,11 +79,7 @@ define(function(require, exports, module) {
   };
   
   commands[C.BINARY_CMD_SET_SYNC] = function(binay) {
-    var  syncItems = this.syncItems;
-    var _syncItems = new Uint16Array(binay.buffer);
-    for (var i = C.SYNC_ITEM_LEN; i--; ) {
-      syncItems[i] = (_syncItems[i] - 32768) * 0.000030517578125;
-    }
+    this.syncItems.set(binay);
   };
   commands[C.BINARY_CMD_SET_BUFSRC] = function(binary) {
     var bufSrcId = (binary[3] << 8) + binary[2];

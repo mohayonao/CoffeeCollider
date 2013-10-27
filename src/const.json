@@ -28,11 +28,12 @@
   "BIPOLAR" : 2,
   "AUDIO_BUS_LEN"  : 128,
   "CONTROL_BUS_LEN": 4096,
-  "SYNC_ITEM_LEN": 5,
-  "BUTTON" : 1,
-  "POS_X"  : 2,
-  "POS_Y"  : 3,
-  "KEYCODE": 4,
+  
+  "SYNC_ITEM_LEN": 12,
+  "BUTTON" : 2,
+  "POS_X"  : 1,
+  "POS_Y"  : 2,
+  
   "FREE"       : 2,
   "ADD_TO_HEAD": 0,
   "ADD_TO_TAIL": 1,
