@@ -25,6 +25,9 @@ window.onload = function() {
   });
   
   var cc = window.cc = new CoffeeCollider(config);
+  var viewer = new WaveViewer(cc, document.getElementById("canvas"), {
+    fillStyle:"#ecf0f1", strokeStyle:"#2980b9", lineWidth:8
+  });
   var isPlaying = false;
   var prevCode  = null;
   
@@ -54,53 +57,15 @@ window.onload = function() {
         $exec.click();
       }
       cc.play();
+      viewer.start();
       $play.className = "btn btn-danger";
-      requestAnimationFrame(animate);
     } else {
-      $play.className = "btn";
       cc.pause();
+      viewer.stop();
+      $play.className = "btn";
     }
   }, false);
   
-  var animate = (function() {
-    var canvas = document.getElementById("canvas");
-    canvas.width  = 1024;
-    canvas.height = 120;
-    
-    var context = canvas.getContext("2d");
-    context.fillStyle   = "#ecf0f1";
-    context.strokeStyle = "#2980b9";
-    context.lineWidth   = 8;
-    context.lineJoin    = "round";
-    var calcY = function(val) {
-      return val * 0.00002 * canvas.height + (canvas.height * 0.5);
-    };
-    
-    var prevt = 0;
-    return function(t) {
-      if (isPlaying) {
-        if (t - prevt > 60) {
-          var strm = cc.getStream();
-          var len  = strm.length * 0.5;
-          var imax = 256;
-          var dx   = canvas.width / imax;
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          context.beginPath();
-          context.moveTo(0, calcY((strm[0]+strm[len])*0.5));
-          for (var i = 0; i < imax; i++) {
-            context.lineTo(i * dx, calcY((strm[i]+strm[i+len])*0.5));
-          }
-          context.lineTo(canvas.width, calcY((strm[imax-1]+strm[len+imax-1])*0.5));
-          context.stroke();
-          prevt = t;
-        }
-        requestAnimationFrame(animate);
-      } else {
-        context.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    }
-  })();
-
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {
     $code.value = hash.substr(srcFragment.length);

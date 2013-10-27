@@ -3,14 +3,19 @@ var http = require("http");
 var ccserver = require("../../coffee-collider");
 
 var app = http.createServer();
+var speaker = true;
 
 app.on("request", function(req, res) {
   switch (req.url) {
   case "/":
     res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(fs.readFileSync(
+    var html = fs.readFileSync(
       __dirname + "/websocket-demo-client.html", "utf-8"
-    ), "utf-8");
+    );
+    if (!speaker) {
+      html = html.replace("speaker:false", "speaker:true");
+    }
+    res.end(html, "utf-8");
     break;
   case "/coffee-script.js":
     res.writeHead(200, { "Content-Type": "application/javascript" });
@@ -24,13 +29,19 @@ app.on("request", function(req, res) {
       __dirname + "/../../coffee-collider.js", "utf-8"
     ), "utf-8");
     break;
+  case "/waveviewer.js":
+    res.writeHead(200, { "Content-Type": "application/javascript" });
+    res.end(fs.readFileSync(
+      __dirname + "/../js/waveviewer.js", "utf-8"
+    ), "utf-8");
+    break;
   default:
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 NOT FOUND");
   }
 }).listen(process.env.PORT||8888, function() {
   var sessions = {};
-  ccserver.init({server:app, path:"/socket", speaker:true});
+  ccserver.init({server:app, path:"/socket", speaker:speaker});
   ccserver.on("open", function(userId) {
     sessions[userId] = "";
     ccserver.send({

@@ -62,6 +62,7 @@
     <canvas id="canvas"></canvas>
     <script src="coffee-script.js"></script>
     <script src="coffee-collider.js"></script>
+    <script src="waveviewer.js"></script>
     <script>
       window.onload = function() {
         "use strict";
@@ -95,7 +96,8 @@
             break;
           }
         });
-
+        var viewer = new WaveViewer(cc, document.getElementById("canvas"));
+        
         var isPlaying = false;
         $conn.addEventListener("click", function() {
           isPlaying = !isPlaying;
@@ -104,7 +106,7 @@
             cc.play();
             $submit.removeAttribute("disabled");
             $conn.innerText = "Disconnect";
-            requestAnimationFrame(animate);
+            viewer.start();
           } else {
             cc.socket.close();
             cc.pause();
@@ -112,6 +114,7 @@
             $submit.setAttribute("disabled");
             $conn.innerText = "Connect";
             $list.innerHTML = "";
+            viewer.stop();
           }
         });
 
@@ -149,45 +152,6 @@
             $list.removeChild(elem.container);
           }
         };
-
-        var animate = (function() {
-          var canvas = document.getElementById("canvas");
-          canvas.width  = 1024;
-          canvas.height = 120;
-      
-          var context = canvas.getContext("2d");
-          context.fillStyle   = "#ffffff";
-          context.strokeStyle = "#2980b9";
-          context.lineWidth   = 8;
-          context.lineJoin    = "round";
-          var calcY = function(val) {
-            return val * 0.45 * canvas.height + (canvas.height * 0.5);
-          };
-      
-          var prevt = 0;
-          return function(t) {
-            if (isPlaying) {
-              if (t - prevt > 60) {
-                var strm = cc.getStream();
-                var len  = strm.length * 0.5;
-                var imax = 256;
-                var dx   = canvas.width / imax;
-                context.fillRect(0, 0, canvas.width, canvas.height);
-                context.beginPath();
-                context.moveTo(0, calcY((strm[0]+strm[len])*0.5));
-                for (var i = 0; i < imax; i++) {
-                  context.lineTo(i * dx, calcY((strm[i]+strm[i+len])*0.5));
-                }
-                context.lineTo(canvas.width, calcY((strm[imax-1]+strm[len+imax-1])*0.5));
-                context.stroke();
-                prevt = t;
-              }
-              requestAnimationFrame(animate);
-            } else {
-              context.fillRect(0, 0, canvas.width, canvas.height);
-            }
-          };
-        })();
       };
     </script>
   </body>
