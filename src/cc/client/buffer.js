@@ -83,8 +83,10 @@ define(function(require, exports, module) {
       bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
     } else {
       cc.client.requestBuffer(path, function(result) {
-        var bufSrcId = newBufferSource(path, result);
-        bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
+        if (result) {
+          var bufSrcId = newBufferSource(path, result);
+          bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
+        }
       });
     }
     return buffer;

@@ -100,9 +100,6 @@ define(function(require, exports, module) {
     WorkerSynthClient.prototype.process = function() {
       this.timeline.process();
       var timelineResult = this.timelineResult.splice(0);
-      if (timelineResult.length === 0) {
-        timelineResult = C.DO_NOTHING;
-      }
       this.sendToServer(["/command", timelineResult]);
     };
     
@@ -132,17 +129,14 @@ define(function(require, exports, module) {
     IFrameSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
-      var list = [];
-      var numOfCommands = 0;
+      var timelineResult = [];
       while (n--) {
         timeline.process();
-        numOfCommands += this.timelineResult.length;
-        list = list.concat(this.timelineResult.splice(0), C.DO_NOTHING);
+        timelineResult = timelineResult.concat(
+          this.timelineResult.splice(0), C.DO_NOTHING
+        );
       }
-      if (numOfCommands === 0) {
-        list = C.DO_NOTHING;
-      }
-      this.sendToServer(["/command", list]);
+      this.sendToServer(["/command", timelineResult]);
     };
     
     return IFrameSynthClient;
@@ -210,17 +204,14 @@ define(function(require, exports, module) {
     SocketSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
-      var list = [];
-      var numOfCommands = 0;
+      var timelineResult = [];
       while (n--) {
         timeline.process();
-        numOfCommands += this.timelineResult.length;
-        list = list.concat(this.timelineResult.splice(0), C.DO_NOTHING);
+        timelineResult = timelineResult.concat(
+          this.timelineResult.splice(0), C.DO_NOTHING
+        );
       }
-      if (numOfCommands === 0) {
-        list = C.DO_NOTHING;
-      }
-      this.sendToServer(["/command", list]);
+      this.sendToServer(["/command", timelineResult]);
     };
     
     return SocketSynthClient;
