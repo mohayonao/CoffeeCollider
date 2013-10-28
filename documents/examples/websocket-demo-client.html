@@ -40,6 +40,9 @@
         font-family: Monaco,Consolas,'Lucida Console',monospace;
         font-size: 16px;
       }
+      #examples {
+        width: 220px;
+      }
       
       ul {
         list-style: none;
@@ -80,25 +83,30 @@
         <div>
           <button id="submit">Submit</button>
           <button id="reset">Reset</button>
+          <select id="examples">
+            <option value="">choose an example code</option>
+            <option value="sine.coffee">sine.coffee</option>
+            <option value="task.coffee">task.coffee</option>
+            <option value="mouse.coffee">mouse.coffee</option>
+          </select>
+          <button id="load">Load</button>
         </div>
       </div>
       <div id="right">
         <ul id="list"></ul>
       </div>
     </div>
+    <script src="jquery.js"></script>
     <script src="coffee-script.js"></script>
     <script src="coffee-collider.js"></script>
     <script src="waveviewer.js"></script>
     <script>
-      window.onload = function() {
+      $(function() {
         "use strict";
         var myUserId  = null;
         
-        var $code   = document.getElementById("code");
-        var $conn   = document.getElementById("conn");
-        var $submit = document.getElementById("submit");
-        var $reset  = document.getElementById("reset");
-        var $list   = document.getElementById("list");
+        var $code = $("#code");
+        var $list = $("#list");
 
         var ws_host = location.href.replace(/^https?/, "ws");
         var cc = new CoffeeCollider({
@@ -128,25 +136,25 @@
         });
         
         var isPlaying = false;
-        $conn.addEventListener("click", function() {
+        $("#conn").on("click", function() {
           isPlaying = !isPlaying;
           if (isPlaying) {
             cc.socket.open();
             cc.play();
-            $conn.innerText = "Disconnect";
+            $(this).text("Disconnect");
             viewer.start();
           } else {
             cc.socket.close();
             cc.pause();
             removeCode(myUserId);
-            $conn.innerText = "Connect";
-            $list.innerHTML = "";
+            $(this).text("Connect");
+            $list.empty();
             viewer.stop();
           }
         });
 
-        $submit.addEventListener("click", function() {
-          var code = $code.value.trim();
+        $("#submit").on("click", function() {
+          var code = $code.val().trim();
           if (!isPlaying || code === "") {
             return;
           }
@@ -154,7 +162,7 @@
             cc.socket.send({type:"code",payload:code});
           });
         });
-        $reset.addEventListener("click", function() {
+        $("#reset").on("click", function() {
           if (!isPlaying) {
             return;
           }
@@ -162,32 +170,40 @@
             cc.socket.send({type:"code",payload:""});
           });
         });
+        $("#load").on("click", function() {
+          var path = $("#examples").val();
+          if (path) {
+            $.get(path).then(function(result) {
+              $code.val(result);
+            });
+          }
+        });
         
         var userElems = {};
         var appendCode = function(userId, code) {
           var elem = userElems[userId];
           if (!elem) {
-            var $li  = document.createElement("li");
-            var $div = document.createElement("div");
-            $div.innerText = "user " + ("00000000" + userId).substr(-8);
-            var $pre = document.createElement("pre");
-            $li.appendChild($div);
-            $li.appendChild($pre);
-            $list.appendChild($li);
+            var $li  = $("<li>");
+            var $div = $("<div>");
+            $div.text("user " + ("00000000" + userId).substr(-8));
+            var $pre = $("<pre>");
+            $li.append($div);
+            $li.append($pre);
+            $list.append($li);
             if (userId == myUserId) {
-              $div.style.color = "#e60033";
+              $div.css("color", "#e60033");
             }
             elem = userElems[userId] = { container:$li, text:$pre };
           }
-          elem.text.innerText = code.trim();
+          elem.text.text(code.trim());
         };
         var removeCode = function(userId) {
           var elem = userElems[userId];
           if (elem) {
-            $list.removeChild(elem.container);
+            elem.container.remove();
           }
         };
-      };
+      });
     </script>
   </body>
 </html>

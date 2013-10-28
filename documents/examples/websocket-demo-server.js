@@ -23,6 +23,12 @@ app.on("request", function(req, res) {
       __dirname + "/../vendor/coffee-script.js", "utf-8"
     ), "utf-8");
     break;
+  case "/jquery.js":
+    res.writeHead(200, { "Content-Type": "application/javascript" });
+    res.end(fs.readFileSync(
+      __dirname + "/../vendor/jquery-2.0.0.min.js", "utf-8"
+    ), "utf-8");
+    break;
   case "/coffee-collider.js":
     res.writeHead(200, { "Content-Type": "application/javascript" });
     res.end(fs.readFileSync(
@@ -36,6 +42,15 @@ app.on("request", function(req, res) {
     ), "utf-8");
     break;
   default:
+    if (/\.coffee$/.test(req.url)) {
+      if (fs.existsSync(__dirname + "/" + req.url)) {
+        res.writeHead(200, { "Content-Type": "application/coffeescript" });
+        res.end(fs.readFileSync(
+          __dirname + "/" + req.url, "utf-8"
+        ), "utf-8");
+        return;
+      }
+    }
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("404 NOT FOUND");
   }
