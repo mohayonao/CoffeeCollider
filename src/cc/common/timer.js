@@ -1,28 +1,33 @@
 define(function(require, exports, module) {
   "use strict";
-  
-  var _setInterval = setInterval;
-  var _setTimeout  = setTimeout;
+
+  // save native timer functions
+  var _setInterval   = setInterval;
   var _clearInterval = clearInterval;
+  var _setTimeout    = setTimeout;
   var _clearTimeout  = clearTimeout;
   
   var NativeTimer = (function() {
     function NativeTimer() {
-      this.timerId = 0;
-      this.isRunning = false;
+      this._timerId = 0;
     }
     NativeTimer.prototype.start = function(callback, interval) {
-      if (this.timerId) {
-        _clearInterval(this.timerId);
+      if (this._timerId) {
+        _clearInterval(this._timerId);
       }
-      this.timerId = _setInterval(callback, interval);
-      this.isRunning = true;
+      this._timerId = 0;
+      if (typeof callback === "function" && typeof interval === "number") {
+        this._timerId = _setInterval(callback, interval);
+      }
     };
     NativeTimer.prototype.stop = function() {
-      if (this.timerId) {
-        _clearInterval(this.timerId);
+      if (this._timerId) {
+        _clearInterval(this._timerId);
       }
-      this.isRunning = false;
+      this._timerId = 0;
+    };
+    NativeTimer.prototype.isRunning = function() {
+      return !!this._timerId;
     };
     return NativeTimer;
   })();
@@ -46,66 +51,80 @@ define(function(require, exports, module) {
       return;
     }
     function WorkerTimer() {
-      this.worker = new Worker(worker_path);
-      this.isRunning = false;
+      this._worker = new Worker(worker_path);
+      this._worker.onmessage = null;
     }
     WorkerTimer.prototype.start = function(callback, interval) {
-      this.worker.onmessage = callback;
-      this.worker.postMessage(interval);
-      this.isRunning = true;
+      if (this._worker.onmessage) {
+        this._worker.postMessage(0);
+      }
+      this._worker.onmessage = null;
+      if (typeof callback === "function" && typeof interval === "number") {
+        this._worker.onmessage = callback;
+        this._worker.postMessage(interval);
+      }
     };
     WorkerTimer.prototype.stop = function() {
-      this.worker.postMessage(0);
-      this.worker.onmessage = null;
-      this.isRunning = false;
+      if (this._worker.onmessage) {
+        this._worker.postMessage(0);
+      }
+      this._worker.onmessage = null;
     };
-    
+    NativeTimer.prototype.isRunning = function() {
+      return !!this._worker.onmessage;
+    };
     return WorkerTimer;
   })();
 
-  var setIntervalCache = [];
-  var setTimeoutCache  = [];
-  
-  var init = function() {
+  var timerIdCache = [];
+  var replaceNativeTimerFunctions = function() {
     global.setInterval = function(func, delay) {
       var id = _setInterval(func, delay);
-      setIntervalCache.push(id);
+      timerIdCache.push(id);
       return id;
     };
     global.clearInterval = function(id) {
       _clearInterval(id);
-      var index = setIntervalCache.indexOf(id);
+      var index = timerIdCache.indexOf(id);
       if (index !== -1) {
-        setIntervalCache.splice(index, 1);
+        timerIdCache.splice(index, 1);
       }
     };
     global.setTimeout = function(func, delay) {
       var id = _setTimeout(func, delay);
-      setTimeoutCache.push(id);
+      timerIdCache.push(id);
       return id;
     };
     global.clearTimeout = function(id) {
       _clearTimeout(id);
-      var index = setTimeoutCache.indexOf(id);
+      var index = timerIdCache.indexOf(id);
       if (index !== -1) {
-        setTimeoutCache.splice(index, 1);
+        timerIdCache.splice(index, 1);
       }
     };
   };
-  
-  var reset = function() {
-    setIntervalCache.splice(0).forEach(function(id) {
-      clearInterval(id);
-    });
-    setTimeoutCache.splice(0).forEach(function(id) {
-      clearTimeout(id);
+  var restoreNativeTimerFunctions = function() {
+    global.setInterval   = _setInterval;
+    global.clearInterval = _clearInterval;
+    global.setTimeout    = _setTimeout;
+    global.clearTimeout  = _clearTimeout;
+    console.log(!!global.setInterval);
+    console.log(!!global.clearInterval);
+    console.log(!!global.setTimeout);
+    console.log(!!global.clearTimeout);
+  };
+  var resetNativeTimers = function() {
+    timerIdCache.splice(0).forEach(function(timerId) {
+      _clearInterval(timerId);
+      _clearTimeout(timerId);
     });
   };
   
   module.exports = {
     Timer: WorkerTimer || NativeTimer,
-    init : init,
-    reset: reset
+    replaceNativeTimerFunctions: replaceNativeTimerFunctions,
+    restoreNativeTimerFunctions: restoreNativeTimerFunctions,
+    resetNativeTimers: resetNativeTimers
   };
 
 });

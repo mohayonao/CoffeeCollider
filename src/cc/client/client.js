@@ -64,7 +64,7 @@ define(function(require, exports, module) {
     SynthClient.prototype.reset = function(msg) {
       buffer.reset();
       node.reset();
-      timer.reset();
+      timer.resetNativeTimers();
       this.timeline.reset();
       this.sendToServer(msg);
     };
@@ -342,7 +342,7 @@ define(function(require, exports, module) {
       client = new WorkerSynthClient();
       global.onmessage = listener;
     }
-    timer.init();
+    timer.replaceNativeTimerFunctions();
     cc.client = client;
   };
   

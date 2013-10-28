@@ -61,7 +61,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
       this.instanceManager.play(userId);
-      if (!this.timer.isRunning) {
+      if (!this.timer.isRunning()) {
         this.processStart = Date.now();
         this.processDone  = 0;
         this.processInterval = (this.strmLength / this.sampleRate) * 1000;
@@ -71,7 +71,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
       this.instanceManager.pause(userId);
-      if (this.timer.isRunning) {
+      if (this.timer.isRunning()) {
         if (!this.instanceManager.isRunning()) {
           this.timer.stop();
         }
@@ -292,7 +292,7 @@ define(function(require, exports, module) {
           this.api.play();
         }
       }
-      if (!this.timer.isRunning) {
+      if (!this.timer.isRunning()) {
         this.processStart = Date.now();
         this.processDone  = 0;
         this.processInterval = (this.strmLength / this.sampleRate) * 1000;
@@ -309,7 +309,7 @@ define(function(require, exports, module) {
           }
         }
       }
-      if (this.timer.isRunning) {
+      if (this.timer.isRunning()) {
         if (!this.instanceManager.isRunning()) {
           this.timer.stop();
         }
