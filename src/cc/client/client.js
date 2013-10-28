@@ -273,6 +273,21 @@ define(function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
+  commands["/console/log"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/debug"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/info"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/warn"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/error"] = function(msg) {
+    this.sendToIF(msg);
+  };
   commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = node.get(nodeId);
