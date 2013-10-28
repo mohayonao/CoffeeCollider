@@ -36,38 +36,16 @@ $(function() {
       return;
     }
     
-    switch (status) {
-    case "pause":
-      execute();
+    execute();
+    if (status === "pause") {
       cc.play();
       viewer.start();
-      $play.addClass("btn-danger").text("Pause");
+      $play.addClass("btn-danger").text("Run");
       status = "play";
       isPlaying = true;
-      break;
-    case "play":
-      $("#reset").click();
-      break;
-    case "changed":
-      execute();
-      $play.text("Pause");
-      status = "play";
-      break;
     }
   });
-
-  $code.on("keyup", function() {
-    if (isPlaying) {
-      if (prevCode !== $code.val().trim()) {
-        status = "changed";
-        $play.text("Run");
-      } else {
-        status = "play";
-        $play.text("Pause");
-      }
-    }
-  });
-
+  
   var execute = function() {
     var code = $code.val().trim();
     cc.execute(code, function(res) {
@@ -78,7 +56,7 @@ $(function() {
     prevCode = code;
   };
 
-  $("#reset").on("click", function() {
+  $("#pause").on("click", function() {
     if (status === "play") {
       cc.pause();
       viewer.stop();
@@ -87,7 +65,7 @@ $(function() {
       isPlaying = false;
     }
   });
-
+  
   $("#link").on("click", function() {
     var code = $code.val().trim();
     window.location = "#" + srcFragment + encodeURIComponent(code);
