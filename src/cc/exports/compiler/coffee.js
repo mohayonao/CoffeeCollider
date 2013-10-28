@@ -55,15 +55,27 @@ define(function(require, exports, module) {
   var _     = {}; // empty location
   
   var dumpTokens = function(tokens) {
+    var indent = 0;
     console.log(tokens.map(function(t) {
-      return t[0] + "\t" + t[1];
+      switch (t[0]) {
+      case "OUTDENT": case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
+        indent -= 1;
+        break;
+      }
+      var x = tab(indent) + t[0] + "\t" + t[1];
+      switch (t[0]) {
+      case "(": case "[": case "{": case "PARAM_START": case "CALL_START": case "INDENT":
+        indent += 1;
+        break;
+      }
+      return x;
     }).join("\n"));
   };
   
   var tab = function(n) {
     var t = "";
     while (n--) {
-      t += " ";
+      t += "  ";
     }
     return t;
   };
@@ -344,18 +356,19 @@ define(function(require, exports, module) {
     return tokens;
   };
 
-  var replaceAndOrOpTable = {
+  var replaceLogicOpTable = {
     "&&": "__and__", "||": "__or__"
   };
   
-  var replaceAndOrOp = function(tokens) {
+  var replaceLogicOp = function(tokens) {
     var i = 1;
     var replaceable = false;
+    var bracket = 0;
     while (i < tokens.length) {
       var token = tokens[i];
-      if (replaceable) {
-        if (replaceAndOrOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceAndOrOpTable[token[VALUE]];
+      if (replaceable && bracket === 1) {
+        if (replaceLogicOpTable.hasOwnProperty(token[VALUE])) {
+          var selector = replaceLogicOpTable[token[VALUE]];
           var b = findOperandTail(tokens, i) + 1;
           tokens.splice(i++, 1, ["."         , "."     , _]);
           tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
@@ -370,8 +383,20 @@ define(function(require, exports, module) {
           replaceable = true;
         }
         break;
-      case "INDENT": case "TERMINATOR": case "PARAM_START":
-        replaceable = false;
+      case "INDENT": case "TERMINATOR":
+        if (replaceable && bracket === 0) {
+          replaceable = false;
+        }
+        break;
+      case "(": case "[": case "{": case "PARAM_START": case "CALL_START":
+        if (replaceable) {
+          bracket += 1;
+        }
+        break;
+      case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
+        if (replaceable) {
+          bracket -= 1;
+        }
         break;
       }
       i += 1;
@@ -551,11 +576,11 @@ define(function(require, exports, module) {
         tokens = replaceUnaryOp(tokens);
         tokens = replacePrecedence(tokens);
         tokens = replaceBinaryOp(tokens);
-        tokens = replaceAndOrOp(tokens);
+        tokens = replaceLogicOp(tokens);
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceSynthDef(tokens);
-        tokens = cleanupParenthesis(tokens);
         tokens = replaceGlobal(tokens);
+        tokens = cleanupParenthesis(tokens);
         tokens = insertReturn(tokens);
       }
       this.code = code;
@@ -615,6 +640,7 @@ define(function(require, exports, module) {
     replacePrecedence    : replacePrecedence,
     replaceUnaryOp       : replaceUnaryOp,
     replaceBinaryOp      : replaceBinaryOp,
+    replaceLogicOp       : replaceLogicOp,
     replaceCompoundAssign: replaceCompoundAssign,
     replaceSynthDef      : replaceSynthDef,
     replaceGlobal        : replaceGlobal,
