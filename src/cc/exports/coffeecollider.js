@@ -26,7 +26,7 @@ define(function(require, exports, module) {
             impl.sendToClient([ "/socket/close" ]);
           },
           send: function(msg) {
-            impl.sendToClient([ "/message", msg ]);
+            impl.sendToClient([ "/socket/sendToServer", msg ]);
           }
         };
         cc.opmode = "socket";
@@ -345,7 +345,7 @@ define(function(require, exports, module) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
   };
-  commands["/messaged"] = function(msg) {
+  commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);

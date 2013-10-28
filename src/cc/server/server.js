@@ -257,7 +257,7 @@ define(function(require, exports, module) {
     };
     SocketSynthServer.prototype.connect = function() {
     };
-    SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
+    SocketSynthServer.prototype.sendToClient = function(msg, userId) {
       if (msg instanceof Int16Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
@@ -265,9 +265,6 @@ define(function(require, exports, module) {
           }
         });
       } else {
-        if (!without_cc && !msg.cc) {
-          msg = {cc:msg};
-        }
         msg = JSON.stringify(msg);
         if (userId === undefined) {
           this.list.forEach(function(ws) {
@@ -359,16 +356,22 @@ define(function(require, exports, module) {
   })();
 
   var SocketSynthServerExports = (function() {
-    function SocketSynthServerExports(server) {
+    var instance = null;
+    function SocketSynthServerExports(server, opts) {
+      if (instance) {
+        console.warn("CoffeeColliderSocketServer has been created already.");
+        return instance;
+      }
       Emitter.bind(this);
       this.server = server;
+      this.server.exports = this;
+      this.server._init(opts||{});
+      instance = this;
     }
-    SocketSynthServerExports.prototype.init = function(opts) {
-      this.server._init(opts);
-      return this;
-    };
     SocketSynthServerExports.prototype.send = function(msg, userId) {
-      this.server.sendToClient(msg, userId, true);
+      this.server.sendToClient([
+        "/socket/sendToIF", msg
+      ], userId);
       return this;
     };
     return SocketSynthServerExports;
@@ -389,7 +392,7 @@ define(function(require, exports, module) {
   commands["/processed"] = function(msg, userId) {
     this.pushToTimeline(msg, userId);
   };
-  commands["/message"] = function(msg, userId) {
+  commands["/socket/sendToServer"] = function(msg, userId) {
     // receive a message from the client-interface via the client
     if (this.exports) {
       msg = msg[1];
@@ -425,7 +428,11 @@ define(function(require, exports, module) {
     switch (cc.opmode) {
     case "socket":
       server = new SocketSynthServer();
-      server.exports = new SocketSynthServerExports(server);
+      server.exports = {
+        createServer: function(opts) {
+          return new SocketSynthServerExports(server, opts);
+        }
+      };
       break;
     case "iframe":
       server = new IFrameSynthServer();

@@ -172,12 +172,7 @@ define(function(require, exports, module) {
           that.sendToIF(new Int16Array(msg));
           return;
         }
-        msg = JSON.parse(msg);
-        if (msg.cc) {
-          that.recvFromServer(msg.cc);
-        } else {
-          that.sendToIF(["/messaged", msg]);
-        }
+        that.recvFromServer(JSON.parse(msg));
       };
       socket.onclose = function() {
       };
@@ -237,15 +232,19 @@ define(function(require, exports, module) {
   commands["/process"] = function() {
     this.process();
   };
-  commands["/message"] = function(msg) {
-    // receive a message from the client-interface
-    this.sendToServer(msg);
-  };
   commands["/socket/open"] = function() {
     this.openSocket();
   };
   commands["/socket/close"] = function() {
     this.closeSocket();
+  };
+  commands["/socket/sendToServer"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToServer(msg);
+  };
+  commands["/socket/sendToIF"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToIF(msg);
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];

@@ -10,17 +10,43 @@
        -ms-box-sizing    : border-box;
         box-sizing        : border-box;
       }
-      #code {
-        width:100%; height:120px;
-        font-family: Monaco,Consolas,'Lucida Console',monospace;
-        font-size: 16px;
-      }
       button {
         width: 80px;
       }
+      #container {
+        width : 100%;
+        height: 600px;
+      }
+      #left {
+        width: 480px;
+        float: left;
+      }
+      #right {
+        width: 480px;
+        height: 600px;
+        padding: 20px;
+        float: left;
+      }
+
+      #canvas {
+        display: block;
+        width: 480px;
+        height: 100px;
+        background: #2c3e50;
+      }
+      #code {
+        width:480px;
+        height:400px;
+        font-family: Monaco,Consolas,'Lucida Console',monospace;
+        font-size: 16px;
+      }
+      
       ul {
         list-style: none;
-        margin:0; padding:0;
+        width: 100%;
+        margin: 0;
+        padding:0;
+        overflow-y: auto;
       }
       li {
         margin: 5px;
@@ -40,26 +66,26 @@
         font-size: 12px;
         color: #1e50a2;
       }
-      #canvas {
-        position: absolute;
-        bottom : 0;
-        left: 0;
-        width: 100%;
-        height: 120px;
-        background: white;
-        opacity: 0.5;
-      }
     </style>
   </head>
   <body>
     <h1>CoffeeCollider Streamer</h1>
-    <textarea id="code"></textarea>
-    <div>
-      <button id="conn">Connect</button>
-      <button id="submit" disabled>Submit</button>
+    <div id="container">
+      <div id="left">
+        <div>
+          <button id="conn">Connect</button>
+          <canvas id="canvas"></canvas>
+        </div>
+        <textarea id="code"></textarea>
+        <div>
+          <button id="submit">Submit</button>
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+      <div id="right">
+        <ul id="list"></ul>
+      </div>
     </div>
-    <ul id="list"></ul>
-    <canvas id="canvas"></canvas>
     <script src="coffee-script.js"></script>
     <script src="coffee-collider.js"></script>
     <script src="waveviewer.js"></script>
@@ -71,6 +97,7 @@
         var $code   = document.getElementById("code");
         var $conn   = document.getElementById("conn");
         var $submit = document.getElementById("submit");
+        var $reset  = document.getElementById("reset");
         var $list   = document.getElementById("list");
 
         var ws_host = location.href.replace(/^https?/, "ws");
@@ -96,7 +123,9 @@
             break;
           }
         });
-        var viewer = new WaveViewer(cc, document.getElementById("canvas"));
+        var viewer = new WaveViewer(cc, document.getElementById("canvas"), {
+          width:480, height:100, fillStyle:"#2c3e50", strokeStyle:"#f1c40f", lineWidth:2
+        });
         
         var isPlaying = false;
         $conn.addEventListener("click", function() {
@@ -104,14 +133,12 @@
           if (isPlaying) {
             cc.socket.open();
             cc.play();
-            $submit.removeAttribute("disabled");
             $conn.innerText = "Disconnect";
             viewer.start();
           } else {
             cc.socket.close();
             cc.pause();
             removeCode(myUserId);
-            $submit.setAttribute("disabled");
             $conn.innerText = "Connect";
             $list.innerHTML = "";
             viewer.stop();
@@ -120,11 +147,19 @@
 
         $submit.addEventListener("click", function() {
           var code = $code.value.trim();
-          if (code === "") {
+          if (!isPlaying || code === "") {
             return;
           }
           cc.execute(code, function() {
             cc.socket.send({type:"code",payload:code});
+          });
+        });
+        $reset.addEventListener("click", function() {
+          if (!isPlaying) {
+            return;
+          }
+          cc.execute("", function() {
+            cc.socket.send({type:"code",payload:""});
           });
         });
         

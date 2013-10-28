@@ -91,7 +91,7 @@ define('cc/loader', function(require, exports, module) {
     cc.opmode  = "socket";
     cc.context = "server";
     require("./server/installer").install();
-    module.exports = cc.server.exports;
+    module.exports.createServer = cc.server.exports.createServer;
   }
 
 });
@@ -717,12 +717,7 @@ define('cc/client/client', function(require, exports, module) {
           that.sendToIF(new Int16Array(msg));
           return;
         }
-        msg = JSON.parse(msg);
-        if (msg.cc) {
-          that.recvFromServer(msg.cc);
-        } else {
-          that.sendToIF(["/messaged", msg]);
-        }
+        that.recvFromServer(JSON.parse(msg));
       };
       socket.onclose = function() {
       };
@@ -782,15 +777,19 @@ define('cc/client/client', function(require, exports, module) {
   commands["/process"] = function() {
     this.process();
   };
-  commands["/message"] = function(msg) {
-    // receive a message from the client-interface
-    this.sendToServer(msg);
-  };
   commands["/socket/open"] = function() {
     this.openSocket();
   };
   commands["/socket/close"] = function() {
     this.closeSocket();
+  };
+  commands["/socket/sendToServer"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToServer(msg);
+  };
+  commands["/socket/sendToIF"] = function(msg) {
+    // receive a message from the client-interface
+    this.sendToIF(msg);
   };
   commands["/execute"] = function(msg) {
     var execId   = msg[1];
@@ -4055,7 +4054,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
             impl.sendToClient([ "/socket/close" ]);
           },
           send: function(msg) {
-            impl.sendToClient([ "/message", msg ]);
+            impl.sendToClient([ "/socket/sendToServer", msg ]);
           }
         };
         cc.opmode = "socket";
@@ -4374,7 +4373,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       that.sendToClient(["/buffer/response", buffer, requestId]);
     });
   };
-  commands["/messaged"] = function(msg) {
+  commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
   require("../common/console").receive(commands);
@@ -5678,7 +5677,7 @@ define('cc/server/server', function(require, exports, module) {
     };
     SocketSynthServer.prototype.connect = function() {
     };
-    SocketSynthServer.prototype.sendToClient = function(msg, userId, without_cc) {
+    SocketSynthServer.prototype.sendToClient = function(msg, userId) {
       if (msg instanceof Int16Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
@@ -5686,9 +5685,6 @@ define('cc/server/server', function(require, exports, module) {
           }
         });
       } else {
-        if (!without_cc && !msg.cc) {
-          msg = {cc:msg};
-        }
         msg = JSON.stringify(msg);
         if (userId === undefined) {
           this.list.forEach(function(ws) {
@@ -5780,16 +5776,22 @@ define('cc/server/server', function(require, exports, module) {
   })();
 
   var SocketSynthServerExports = (function() {
-    function SocketSynthServerExports(server) {
+    var instance = null;
+    function SocketSynthServerExports(server, opts) {
+      if (instance) {
+        console.warn("CoffeeColliderSocketServer has been created already.");
+        return instance;
+      }
       Emitter.bind(this);
       this.server = server;
+      this.server.exports = this;
+      this.server._init(opts||{});
+      instance = this;
     }
-    SocketSynthServerExports.prototype.init = function(opts) {
-      this.server._init(opts);
-      return this;
-    };
     SocketSynthServerExports.prototype.send = function(msg, userId) {
-      this.server.sendToClient(msg, userId, true);
+      this.server.sendToClient([
+        "/socket/sendToIF", msg
+      ], userId);
       return this;
     };
     return SocketSynthServerExports;
@@ -5810,7 +5812,7 @@ define('cc/server/server', function(require, exports, module) {
   commands["/processed"] = function(msg, userId) {
     this.pushToTimeline(msg, userId);
   };
-  commands["/message"] = function(msg, userId) {
+  commands["/socket/sendToServer"] = function(msg, userId) {
     // receive a message from the client-interface via the client
     if (this.exports) {
       msg = msg[1];
@@ -5846,7 +5848,11 @@ define('cc/server/server', function(require, exports, module) {
     switch (cc.opmode) {
     case "socket":
       server = new SocketSynthServer();
-      server.exports = new SocketSynthServerExports(server);
+      server.exports = {
+        createServer: function(opts) {
+          return new SocketSynthServerExports(server, opts);
+        }
+      };
       break;
     case "iframe":
       server = new IFrameSynthServer();

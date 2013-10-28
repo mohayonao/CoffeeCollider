@@ -1,6 +1,6 @@
 var fs = require("fs");
 var http = require("http");
-var ccserver = require("../../coffee-collider");
+var cc = require("../../coffee-collider");
 
 var app = http.createServer();
 var speaker = true;
@@ -41,26 +41,30 @@ app.on("request", function(req, res) {
   }
 }).listen(process.env.PORT||8888, function() {
   var sessions = {};
-  ccserver.init({server:app, path:"/socket", speaker:speaker});
-  ccserver.on("open", function(userId) {
+  
+  var synthServer = cc.createServer({
+    server:app, path:"/socket", speaker:speaker
+  });
+  synthServer.on("open", function(userId) {
     sessions[userId] = "";
-    ccserver.send({
+    synthServer.send({
       type  : "init",
       userId: userId,
       list  : Object.keys(sessions).map(function(userId) {
         return [ userId, sessions[userId] ];
       })
     }, userId);
-    ccserver.send({type:"open", userId:userId});
+    synthServer.send({type:"open", userId:userId});
   }).on("close", function(userId) {
-    ccserver.send({type:"close", userId:userId});
+    synthServer.send({type:"close", userId:userId});
     delete sessions[userId];
   }).on("message", function(msg) {
     if (msg.type === "code") {
       sessions[msg.userId] = msg.payload;
     }
-    ccserver.send(msg);
+    synthServer.send(msg);
   }).on("error", function(items) {
     console.log("demo-server: onerror", items);
   });
+
 });

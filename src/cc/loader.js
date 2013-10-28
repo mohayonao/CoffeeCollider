@@ -48,7 +48,7 @@ define(function(require, exports, module) {
     cc.opmode  = "socket";
     cc.context = "server";
     require("./server/installer").install();
-    module.exports = cc.server.exports;
+    module.exports.createServer = cc.server.exports.createServer;
   }
 
 });
