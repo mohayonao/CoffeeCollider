@@ -196,12 +196,12 @@ define(function(require, exports, module) {
       if (msg instanceof Int16Array) {
         this.strmList[this.strmListWriteIndex] = msg;
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
-        return;
-      }
-      if (msg) {
+      } else {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
         }
       }
     };

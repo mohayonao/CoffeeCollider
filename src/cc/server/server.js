@@ -31,12 +31,12 @@ define(function(require, exports, module) {
       userId = userId|0;
       if (msg instanceof Uint8Array) {
         this.instanceManager.doBinayCommand(userId, msg);
-        return;
-      }
-      if (msg) {
+      } else {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg, userId);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
         }
       }
     };

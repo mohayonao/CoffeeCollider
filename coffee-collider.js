@@ -587,12 +587,12 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.recvFromServer = function(msg) {
       if (msg instanceof Int16Array) {
         this.sendToIF(msg);
-        return;
-      }
-      if (msg) {
+      } else {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
         }
       }
     };
@@ -4316,12 +4316,12 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       if (msg instanceof Int16Array) {
         this.strmList[this.strmListWriteIndex] = msg;
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
-        return;
-      }
-      if (msg) {
+      } else {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
         }
       }
     };
@@ -5576,12 +5576,12 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       if (msg instanceof Uint8Array) {
         this.instanceManager.doBinayCommand(userId, msg);
-        return;
-      }
-      if (msg) {
+      } else {
         var func = commands[msg[0]];
         if (func) {
           func.call(this, msg, userId);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
         }
       }
     };
