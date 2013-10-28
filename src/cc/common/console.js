@@ -3,7 +3,7 @@ define(function(require, exports, module) {
   
   var unpack = require("./pack").unpack;
   
-  var receive = function(commands) {
+  var bindConsoleApply = function(commands) {
     commands["/console/log"] = function(msg) {
       console.log.apply(console, unpack(msg[1]));
     };
@@ -22,7 +22,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    receive: receive
+    bindConsoleApply: bindConsoleApply
   };
 
 });

@@ -348,7 +348,7 @@ define(function(require, exports, module) {
   commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
-  require("../common/console").receive(commands);
+  require("../common/console").bindConsoleApply(commands);
   
   module.exports = {
     CoffeeCollider: CoffeeCollider
