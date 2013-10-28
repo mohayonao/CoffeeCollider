@@ -1,6 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
   
+  var _setInterval = setInterval;
+  var _setTimeout  = setTimeout;
+  var _clearInterval = clearInterval;
+  var _clearTimeout  = clearTimeout;
+  
   var NativeTimer = (function() {
     function NativeTimer() {
       this.timerId = 0;
@@ -8,14 +13,14 @@ define(function(require, exports, module) {
     }
     NativeTimer.prototype.start = function(callback, interval) {
       if (this.timerId) {
-        clearInterval(this.timerId);
+        _clearInterval(this.timerId);
       }
-      this.timerId = setInterval(callback, interval);
+      this.timerId = _setInterval(callback, interval);
       this.isRunning = true;
     };
     NativeTimer.prototype.stop = function() {
       if (this.timerId) {
-        clearInterval(this.timerId);
+        _clearInterval(this.timerId);
       }
       this.isRunning = false;
     };
@@ -60,10 +65,6 @@ define(function(require, exports, module) {
 
   var setIntervalCache = [];
   var setTimeoutCache  = [];
-  var _setInterval = setInterval;
-  var _setTimeout  = setTimeout;
-  var _clearInterval = clearInterval;
-  var _clearTimeout  = clearTimeout;
   
   var init = function() {
     global.setInterval = function(func, delay) {

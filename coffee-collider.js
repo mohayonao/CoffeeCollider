@@ -818,6 +818,21 @@ define('cc/client/client', function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
+  commands["/console/log"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/debug"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/info"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/warn"] = function(msg) {
+    this.sendToIF(msg);
+  };
+  commands["/console/error"] = function(msg) {
+    this.sendToIF(msg);
+  };
   commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = node.get(nodeId);
@@ -996,6 +1011,11 @@ define('cc/common/pack', function(require, exports, module) {
 });
 define('cc/common/timer', function(require, exports, module) {
   
+  var _setInterval = setInterval;
+  var _setTimeout  = setTimeout;
+  var _clearInterval = clearInterval;
+  var _clearTimeout  = clearTimeout;
+  
   var NativeTimer = (function() {
     function NativeTimer() {
       this.timerId = 0;
@@ -1003,14 +1023,14 @@ define('cc/common/timer', function(require, exports, module) {
     }
     NativeTimer.prototype.start = function(callback, interval) {
       if (this.timerId) {
-        clearInterval(this.timerId);
+        _clearInterval(this.timerId);
       }
-      this.timerId = setInterval(callback, interval);
+      this.timerId = _setInterval(callback, interval);
       this.isRunning = true;
     };
     NativeTimer.prototype.stop = function() {
       if (this.timerId) {
-        clearInterval(this.timerId);
+        _clearInterval(this.timerId);
       }
       this.isRunning = false;
     };
@@ -1055,10 +1075,6 @@ define('cc/common/timer', function(require, exports, module) {
 
   var setIntervalCache = [];
   var setTimeoutCache  = [];
-  var _setInterval = setInterval;
-  var _setTimeout  = setTimeout;
-  var _clearInterval = clearInterval;
-  var _clearTimeout  = clearTimeout;
   
   var init = function() {
     global.setInterval = function(func, delay) {
