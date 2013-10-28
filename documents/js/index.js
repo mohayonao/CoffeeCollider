@@ -3,8 +3,6 @@ $(function() {
   
   var srcFragment = "try:";
   var $code = $("#code");
-  var $exec = $("#exec");
-  var $link = $("#link");
   var $play = $("#play");
   
   var config = {};
@@ -30,22 +28,67 @@ $(function() {
   });
   var isPlaying = false;
   var prevCode  = null;
+  var status = "pause";
   
-  $exec.on("click", function(e) {
-    var code = $code.val().trim();
+  $play.on("click", function(e) {
     if (e.shiftKey) {
-      console.log(cc.compiler.toString(code));
-    } else {
-      cc.execute(code, function(res) {
-        if (res !== undefined) {
-          console.log(res);
-        }
-      });
-      prevCode = code;
+      console.log(cc.compiler.toString($code.val().trim()));
+      return;
+    }
+    
+    switch (status) {
+    case "pause":
+      execute();
+      cc.play();
+      viewer.start();
+      $play.addClass("btn-danger").text("Pause");
+      status = "play";
+      isPlaying = true;
+      break;
+    case "play":
+      $("#reset").click();
+      break;
+    case "changed":
+      execute();
+      $play.text("Pause");
+      status = "play";
+      break;
     }
   });
 
-  $link.on("click", function() {
+  $code.on("keyup", function() {
+    if (isPlaying) {
+      if (prevCode !== $code.val().trim()) {
+        status = "changed";
+        $play.text("Run");
+      } else {
+        status = "play";
+        $play.text("Pause");
+      }
+    }
+  });
+
+  var execute = function() {
+    var code = $code.val().trim();
+    cc.execute(code, function(res) {
+      if (res !== undefined) {
+        console.log(res);
+      }
+    });
+    prevCode = code;
+  };
+
+  $("#reset").on("click", function() {
+    if (status === "play") {
+      cc.pause();
+      viewer.stop();
+      $play.removeClass("btn-danger").text("Play");
+      status = "pause";
+      isPlaying = false;
+    }
+  });
+
+  $("#link").on("click", function() {
     var code = $code.val().trim();
     window.location = "#" + srcFragment + encodeURIComponent(code);
   });
@@ -58,22 +101,6 @@ $(function() {
       });
       return false;
     });
-  });
-  
-  $play.on("click", function() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      if (prevCode !== $code.val().trim()) {
-        $exec.click();
-      }
-      cc.play();
-      viewer.start();
-      $play.addClass("btn-danger");
-    } else {
-      cc.pause();
-      viewer.stop();
-      $play.removeClass("btn-danger");
-    }
   });
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
