@@ -18,6 +18,7 @@ define(function(require, exports, module) {
     var calc;
     before(function() {
       var compiler = new Compiler();
+      global._gltc_ = null;
       object.install();
       uop.install();
       bop.install();

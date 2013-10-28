@@ -36,6 +36,7 @@ define(function(require, exports, module) {
       cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
+      this.blocking = false;
       return this;
     });
     return Node;

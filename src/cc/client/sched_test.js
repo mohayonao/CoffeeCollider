@@ -297,6 +297,142 @@ define(function(require, exports, module) {
       procT(100);
       assert.equal(actual, 3);
     });
+    describe("__and__", function() {
+      it("__and__", function() {
+        var actual = [0];
+        Task.do(function() {
+          actual.push(1);
+          var t1 = Task.do(function() {
+            actual.push(2);
+            this.wait(200);
+          }).on("end", function() {
+            actual.push(3);
+          }).play();
+          var t2 = Task.do(function() {
+            actual.push(4);
+            this.wait(300);
+          }).on("end", function() {
+            actual.push(5);
+          }).play();
+          this.wait(t1.__and__(t2).__and__(100));
+        }).on("end", function() {
+          actual.push(6);
+        }).play();
+        
+        assert.deepEqual(actual, [0]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5, 6]);
+      });
+      it("__and__ with array", function() {
+        var actual = [0];
+        Task.do(function() {
+          actual.push(1);
+          var t1 = Task.do(function() {
+            actual.push(2);
+            this.wait(200);
+          }).on("end", function() {
+            actual.push(3);
+          }).play();
+          var t2 = Task.do(function() {
+            actual.push(4);
+            this.wait(300);
+          }).on("end", function() {
+            actual.push(5);
+          }).play();
+          this.wait(1..__and__([t1, t2]));
+        }).on("end", function() {
+          actual.push(6);
+        }).play();
+        
+        assert.deepEqual(actual, [0]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5, 6]);
+      });
+    });
+    describe("__or__", function() {
+      it("__or__", function() {
+        var actual = [0];
+        Task.do(function() {
+          actual.push(1);
+          var t1 = Task.do(function() {
+            actual.push(2);
+            this.wait(200);
+          }).on("end", function() {
+            actual.push(3);
+          }).play();
+          var t2 = Task.do(function() {
+            actual.push(4);
+            this.wait(300);
+          }).on("end", function() {
+            actual.push(5);
+          }).play();
+          this.wait(t1.__or__(t2).__or__(100));
+        }).on("end", function() {
+          actual.push(6);
+        }).play();
+        
+        assert.deepEqual(actual, [0]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+      });
+      it("__or__ with array", function() {
+        var actual = [0];
+        Task.do(function() {
+          actual.push(1);
+          var t1 = Task.do(function() {
+            actual.push(2);
+            this.wait(200);
+          }).on("end", function() {
+            actual.push(3);
+          }).play();
+          var t2 = Task.do(function() {
+            actual.push(4);
+            this.wait(300);
+          }).on("end", function() {
+            actual.push(5);
+          }).play();
+          this.wait(t1.__or__([t2, 100]));
+        }).on("end", function() {
+          actual.push(6);
+        }).play();
+        
+        assert.deepEqual(actual, [0]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3]);
+        procT(100);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+        procN(1);
+        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+      });
+    });
   });
 
 });

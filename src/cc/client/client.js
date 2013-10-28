@@ -255,7 +255,8 @@ define(function(require, exports, module) {
     if (!append) {
       this.reset(["/reset"]);
     }
-    global.DATA = data;
+    global.DATA   = data;
+    global._gltc_ = this.timeline.context;
     var result = eval.call(global, code);
     if (callback) {
       this.sendToIF(["/executed", execId, pack(result)]);

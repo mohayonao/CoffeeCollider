@@ -344,6 +344,42 @@ define(function(require, exports, module) {
     return tokens;
   };
 
+  var replaceAndOrOpTable = {
+    "&&": "__and__", "||": "__or__"
+  };
+  
+  var replaceAndOrOp = function(tokens) {
+    var i = 1;
+    var replaceable = false;
+    while (i < tokens.length) {
+      var token = tokens[i];
+      if (replaceable) {
+        if (replaceAndOrOpTable.hasOwnProperty(token[VALUE])) {
+          var selector = replaceAndOrOpTable[token[VALUE]];
+          var b = findOperandTail(tokens, i) + 1;
+          tokens.splice(i++, 1, ["."         , "."     , _]);
+          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
+          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
+          continue;
+        }
+      }
+      switch (token[TAG]) {
+      case "IDENTIFIER":
+        if (tokens[i-1][TAG] === "@" && token[VALUE] === "wait") {
+          replaceable = true;
+        }
+        break;
+      case "INDENT": case "TERMINATOR": case "PARAM_START":
+        replaceable = false;
+        break;
+      }
+      i += 1;
+    }
+    // dumpTokens(tokens);
+    return tokens;
+  };
+  
   var replaceCompoundAssignTable = {
     "+=": "__add__",
     "-=": "__sub__",
@@ -489,11 +525,7 @@ define(function(require, exports, module) {
     tokens.splice(i++, 0, ["."         , "."     , _]);
     tokens.splice(i++, 0, ["IDENTIFIER", "call"  , _]);
     tokens.splice(i++, 0, ["CALL_START", "("     , _]);
-    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
-    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "_gltc_", _]);
     tokens.splice(i++, 0, [","         , ","     , _]);
     tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
     tokens.splice(i++, 0, ["."         , "."     , _]);
@@ -519,6 +551,7 @@ define(function(require, exports, module) {
         tokens = replaceUnaryOp(tokens);
         tokens = replacePrecedence(tokens);
         tokens = replaceBinaryOp(tokens);
+        tokens = replaceAndOrOp(tokens);
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceSynthDef(tokens);
         tokens = cleanupParenthesis(tokens);
