@@ -27,16 +27,18 @@
     if (this.isPlaying) {
       if (t - this.t > 60) {
         var strm = this.cc.getStream();
+        var strmL = strm.getChannelData(0);
+        var strmR = strm.getChannelData(1);
         var len  = strm.length * 0.5;
         var imax = 256;
         var dx   = this.canvas.width / imax;
         context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         context.beginPath();
-        context.moveTo(0, this._calcY((strm[0]+strm[len])*0.5));
+        context.moveTo(0, this._calcY((strmL[0]+strmR[0])*0.5));
         for (var i = 0; i < imax; i++) {
-          context.lineTo(i * dx, this._calcY((strm[i]+strm[i+len])*0.5));
+          context.lineTo(i * dx, this._calcY((strmL[i]+strmR[i])*0.5));
         }
-        context.lineTo(this.canvas.width, this._calcY((strm[imax-1]+strm[len+imax-1])*0.5));
+        context.lineTo(this.canvas.width, this._calcY((strmL[imax-1]+strmR[imax-1])*0.5));
         context.stroke();
         this.t = t;
       }
@@ -46,7 +48,7 @@
     }
   };
   WaveViewer.prototype._calcY = function(val) {
-    return val * 0.00002 * this.canvas.height + (this.canvas.height * 0.5);
+    return val * 0.95 * this.canvas.height + (this.canvas.height * 0.5);
   };
   
   window.WaveViewer = WaveViewer;

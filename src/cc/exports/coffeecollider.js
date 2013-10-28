@@ -59,7 +59,7 @@ define(function(require, exports, module) {
       return this;
     };
     CoffeeCollider.prototype.getStream = function() {
-      return this.impl.strm;
+      return this.impl.getStream();
     };
     CoffeeCollider.prototype.importScripts = function() {
       this.impl.importScripts(slice.call(arguments));
@@ -183,6 +183,22 @@ define(function(require, exports, module) {
         }
         this.execId += 1;
       }
+    };
+    CoffeeColliderImpl.prototype.getStream = function() {
+      var f32 = new Float32Array(this.strm);
+      for (var i = f32.length; i--; ) {
+        f32[i] *= 0.000030517578125;
+      }
+      var strmLength = this.strmLength;
+      return {
+        getChannelData: function(channel) {
+          if (channel === 0) {
+            return new Float32Array(f32.buffer, 0, strmLength);
+          } else if (channel === 1) {
+            return new Float32Array(f32.buffer, strmLength * 4);
+          }
+        }
+      };
     };
     CoffeeColliderImpl.prototype.importScripts = function(list) {
       this.sendToClient(["/importScripts", list]);
