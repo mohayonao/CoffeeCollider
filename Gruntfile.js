@@ -294,7 +294,17 @@ module.exports = function(grunt) {
       done();
     });
   });
-
+  
+  grunt.registerTask("coverage", function() {
+    var child = grunt.util.spawn({
+      cmd:"istanbul", args:["cover", "src/cc/test/run.js"]
+    }, function(err, result) {
+      console.log(result);
+    });
+    child.stdout.pipe(process.stdout);
+    child.stderr.pipe(process.stderr);
+  });
+  
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
