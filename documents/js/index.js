@@ -32,7 +32,7 @@ $(function() {
   
   $play.on("click", function(e) {
     if (e.shiftKey) {
-      console.log(cc.compiler.toString($code.val().trim()));
+      console.log(cc.impl.compiler.toString($code.val().trim()));
       return;
     }
     
