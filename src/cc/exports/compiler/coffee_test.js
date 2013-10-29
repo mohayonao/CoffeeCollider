@@ -12,18 +12,19 @@ define(function(require, exports, module) {
   
   describe("compiler.js", function() {
     describe("splitCodeAndData", function() {
-      it("Without __END__", function() {
+      it("__END__ does not exist", function() {
         var code = [
-          "this is code"
+          "this is code",
+          "this is too",
         ].join("\n");
         var expected = [
-          "this is code",
+          "this is code\nthis is too",
           ""
         ];
         var actual = compiler.splitCodeAndData(code);
         assert.deepEqual(actual, expected);
       });
-      it("With __END__", function() {
+      it("__END__ exists", function() {
         var code = [
           "this is code",
           "this is too",
@@ -43,6 +44,7 @@ define(function(require, exports, module) {
       it("Unary operator", function() {
         /*
           ( +Math.PI * 2 )
+            ^------^
          */
         var tokens = [
           ["("           , "("     ],
@@ -62,6 +64,7 @@ define(function(require, exports, module) {
       it("Assign", function() {
         /*
           ( a = Math.sin(10) * 10 )
+                ^----------^
          */
         var tokens = [
           ["IDENTIFIER"  , "a"   ],
@@ -83,6 +86,7 @@ define(function(require, exports, module) {
       it("Begin of parenthesis", function() {
         /*
           [ (Math.PI + 10) * 10 ]
+            ^------------^
          */
         var tokens = [
           ["["             , "["       ],
@@ -103,6 +107,11 @@ define(function(require, exports, module) {
         assert.equal(actual, expected);
       });
       it("Begin of a function", function() {
+        /*
+          def (x=100)->
+            x
+          , 300
+         */
         var tokens = [
           ["IDENTIFIER"    , "def"    ],
           ["CALL_START"    , "("      ],
@@ -130,6 +139,7 @@ define(function(require, exports, module) {
     describe("findOperandTail", function() {
       /*
         10 * Math.PI
+             ^-----^
        */
       it("", function() {
         var tokens = [
@@ -147,6 +157,7 @@ define(function(require, exports, module) {
       it("End of parenthesis", function() {
         /*
           10 * (Math.PI * 10)
+               ^------------^
          */
         var tokens = [
           ["NUMBER"      , "10"    ],
@@ -167,6 +178,7 @@ define(function(require, exports, module) {
       it("End of a function calling", function() {
         /*
           ( ~[].func() )
+             ^-------^
          */
         var tokens = [
           ["("           , "("     ],
@@ -202,7 +214,7 @@ define(function(require, exports, module) {
           ["INDENT"      , 2      ],
           [  "IDENTIFIER",   "x"  ],
           ["OUTDENT"     , 2      ],
-          ["TERMINATOR"  , "\n"   ], // <-- here
+          ["TERMINATOR"  , "\n"   ], // <-- tail
           ["IDENTIFIER"  , "x"    ],
           ["CALL_START"  , ")"    ],
           ["CALL_END"    , ")"    ],
@@ -214,7 +226,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replacePi", function() {
-      it("pi => Math.PI", function() {
+      it("case 1", function() {
+        /*
+          source:
+          pi
+
+          replaced:
+          Math.PI
+        */
         var tokens = [
           ["IDENTIFIER", "pi"],
           ["TERMINATOR", "\n"],
@@ -228,7 +247,14 @@ define(function(require, exports, module) {
         var actual = compiler.replacePi(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("[10pi] => [(10 * Math.PI)]", function() {
+      it("case 2", function() {
+        /*
+          source:
+          [ 10pi ]
+
+          replaced:
+          [ (10 * Math.PI) ]
+         */
         var tokens = [
           ["["           , "["   ],
           [  "NUMBER"    ,   "10"],
@@ -251,7 +277,14 @@ define(function(require, exports, module) {
         var actual = compiler.replacePi(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("-10pi => (-10 * Math.PI)", function() {
+      it("case 3", function() {
+        /*
+          source:
+          -10pi
+
+          replaced:
+          (-10 * Math.PI)
+         */
         var tokens = [
           ["-"         , "-" ],
           ["NUMBER"    , "10"],
@@ -274,7 +307,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replacePrecedence", function() {
-      it("a * b + c => (a * b) + c", function() {
+      it("case 1", function() {
+        /*
+          source:
+          a * b + c
+
+          replaced:
+          (a * b) + c
+         */
         var tokens = [
           ["IDENTIFIER", "a" ],
           ["MATH"      , "*" ],
@@ -298,7 +338,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceBinaryOp", function() {
-      it("a + b => a.__add__(b)", function() {
+      it("case 1", function() {
+        /*
+          source:
+          a + b
+
+          replaced:
+          a.__add__(b)
+        */
         var tokens = [
           ["IDENTIFIER", "a" ],
           ["+"         , "+" ],
@@ -319,7 +366,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceLogicOp", function() {
-      it("a || b => a || b", function() {
+      it("case 1", function() {
+        /*
+          source:
+          a || b
+
+          replaced:
+          a || b    (do nothing)
+        */
         var tokens = [
           ["IDENTIFIER", "a" ],
           ["LOGIC"     , "||"],
@@ -330,7 +384,14 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("@wait a && b => @wait a.__and__(b)", function() {
+      it("case 2", function() {
+        /*
+          source:
+          @wait a && b
+
+          replaced:
+          @wait a.__and__(b)
+        */
         var tokens = [
           ["@"           , "@"   ],
           ["IDENTIFIER"  , "wait"],
@@ -357,7 +418,16 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("@wait a && b, (x=a&&b)->x => @wait a.__and__(b), (x=a&&b)->x", function() {
+      it("case 3", function() {
+        /*
+          source:
+          @wait a && b, (x = a && b)->
+            x
+
+          replaced:
+          @wait a.__and__(b), (x = a && b)->
+            x
+        */
         var tokens = [
           ["@"             , "@"     ],
           ["IDENTIFIER"    , "wait"  ],
@@ -408,7 +478,16 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("@wait a && ((x=a&&b)->x) && b, (x=a&&b)->x => @wait a.__and__((x=a&&b)->x).__and__(b), (x=a&&b)->x", function() {
+      it("case 4", function() {
+        /*
+          source:
+          @wait a && ((x=a&&b)->x) && b, (x = a && b)->
+            x
+
+          replaced:
+          @wait a.__and__(((x=a&&b)->x)).__and__(b), (x = a && b)->
+            x
+        */
         var tokens = [
           ["@"               , "@"     ],
           ["IDENTIFIER"      , "wait"  ],
@@ -492,7 +571,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceUnaryOp", function() {
-      it("+a + a => a.__plus__() + a", function() {
+      it("case 1", function() {
+        /*
+          source:
+          +a + a
+
+          replaced:
+          a.__plus__() + a
+         */
         var tokens = [
           ["+"         , "+" ],
           ["IDENTIFIER", "a" ],
@@ -513,7 +599,14 @@ define(function(require, exports, module) {
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("-a + a => a._minus__() + a", function() {
+      it("case 2", function() {
+        /*
+          source:
+          -a + a
+
+          replaced:
+          a.__minus__() + a
+         */
         var tokens = [
           ["-"         , "-" ],
           ["IDENTIFIER", "a" ],
@@ -534,28 +627,14 @@ define(function(require, exports, module) {
         var actual = compiler.replaceUnaryOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("-a + a => a.__minus__() + a", function() {
-        var tokens = [
-          ["-"         , "-" ],
-          ["IDENTIFIER", "a" ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "a" ],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["IDENTIFIER", "a"        ],
-          ["."         , "."        ],
-          ["IDENTIFIER", "__minus__"],
-          ["CALL_START", "("        ],
-          ["CALL_END"  , ")"        ],
-          ["+"         , "+"        ],
-          ["IDENTIFIER", "a"        ],
-          ["TERMINATOR", "\n"       ],
-        ];
-        var actual = compiler.replaceUnaryOp(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("{a:+100}", function() {
+      it("case 3", function() {
+        /*
+          source:
+          { a: +100 }
+
+          replaced:
+          { a: 100.__plus__() }
+         */
         var tokens = [
           ["{"           , "{"    ],
           [  "IDENTIFIER",   "a"  ],
@@ -582,7 +661,14 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceCompoundAssign", function() {
-      it("a.a += b.b => a.a = a.a.__add__(b.b)", function() {
+      it("case 1", function() {
+        /*
+          source:
+          a.a += b.b => a.a
+
+          replaced:
+          a.a = a.a.__add__(b.b)
+         */
         var tokens = [
           ["IDENTIFIER"     , "a" ],
           ["."              , "." ],
@@ -615,7 +701,17 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceSynthDef", function() {
-      it("None args", function() {
+      it("case 1", function() {
+        /*
+          source:
+          Synth.def ->
+            x
+          
+          replaced:
+          Synth.def ->
+            x
+          , ""
+         */
         var tokens = [
           ["IDENTIFIER"    , "Synth"],
           ["."             , "."    ],
@@ -645,113 +741,141 @@ define(function(require, exports, module) {
         var actual = compiler.replaceSynthDef(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("x=100, y=200", function() {
+      it("case 2", function() {
+        /*
+          source:
+          Synth.def (x=100, y=200)->
+            x
+
+          replaced:
+          Synth.def (x=100, y=200)->
+            x
+          , "x=100,y=200"
+         */
         var tokens = [
-          ["IDENTIFIER" , "Synth"],
-          ["."          , "."    ],
-          ["IDENTIFIER" , "def"  ],
-          ["CALL_START" , "("    ],
-          ["PARAM_START", "("    ],
-          ["IDENTIFIER" , "x"    ],
-          ["="          , "="    ],
-          ["NUMBER"     , "100"  ],
-          [","          , ","    ],
-          ["IDENTIFIER" , "y"    ],
-          ["="          , "="    ],
-          ["NUMBER"     , "200"  ],
-          ["PARAM_END"  , ")"    ],
-          ["->"         , "->"   ],
-          ["INDENT"     , 2      ],
-          ["IDENTIFIER" , "x"    ],
-          ["OUTDENT"    , 2      ],
-          ["CALL_END"   , ")"    ],
-          ["TERMINATOR" , "\n"   ],      
+          ["IDENTIFIER"    , "Synth"  ],
+          ["."             , "."      ],
+          ["IDENTIFIER"    , "def"    ],
+          ["CALL_START"    , "("      ],
+          [  "PARAM_START" ,   "("    ],
+          [    "IDENTIFIER",     "x"  ],
+          [    "="         ,     "="  ],
+          [    "NUMBER"    ,     "100"],
+          [    ","         ,     ","  ],
+          [    "IDENTIFIER",     "y"  ],
+          [    "="         ,     "="  ],
+          [    "NUMBER"    ,     "200"],
+          [  "PARAM_END"   ,   ")"    ],
+          [  "->"          ,   "->"   ],
+          [  "INDENT"      ,   2      ],
+          [    "IDENTIFIER",     "x"  ],
+          [  "OUTDENT"     ,   2      ],
+          ["CALL_END"      , ")"      ],
+          ["TERMINATOR"    , "\n"     ],      
         ];
         var expected = [
-          ["IDENTIFIER" , "Synth"        ],
-          ["."          , "."            ],
-          ["IDENTIFIER" , "def"          ],
-          ["CALL_START" , "("            ],
-          ["PARAM_START", "("            ],
-          ["IDENTIFIER" , "x"            ],
-          ["="          , "="            ],
-          ["NUMBER"     , "100"          ],
-          [","          , ","            ],
-          ["IDENTIFIER" , "y"            ],
-          ["="          , "="            ],
-          ["NUMBER"     , "200"          ],
-          ["PARAM_END"  , ")"            ],
-          ["->"         , "->"           ],
-          ["INDENT"     , 2              ],
-          ["IDENTIFIER" , "x"            ],
-          ["OUTDENT"    , 2              ],
-          [","          , ","            ],
-          ["STRING"     , '"x=100,y=200"'],
-          ["CALL_END"   , ")"            ],
-          ["TERMINATOR" , "\n"           ],      
+          ["IDENTIFIER"    , "Synth"          ],
+          ["."             , "."              ],
+          ["IDENTIFIER"    , "def"            ],
+          ["CALL_START"    , "("              ],
+          [  "PARAM_START" ,   "("            ],
+          [    "IDENTIFIER",     "x"          ],
+          [    "="         ,     "="          ],
+          [    "NUMBER"    ,     "100"        ],
+          [    ","         ,     ","          ],
+          [    "IDENTIFIER",     "y"          ],
+          [    "="         ,     "="          ],
+          [    "NUMBER"    ,     "200"        ],
+          [  "PARAM_END"   ,   ")"            ],
+          [  "->"          ,   "->"           ],
+          [  "INDENT"      ,   2              ],
+          [    "IDENTIFIER",     "x"          ],
+          [  "OUTDENT"     ,   2              ],
+          [  ","           ,   ","            ],
+          [  "STRING"      ,   '"x=100,y=200"'],
+          ["CALL_END"      , ")"              ],
+          ["TERMINATOR"    , "\n"             ],      
         ];
         var actual = compiler.replaceSynthDef(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("With other args", function() {
+      it("case 3", function() {
+        /*
+          source:
+          Synth.def (x=100,y=200)->
+            x
+          , 300
+
+          replaced:
+          Synth.def (x=100,y=200)->
+            x
+          , "x=100,y=200", 300
+         */
         var tokens = [
-          ["IDENTIFIER" , "Synth"],
-          ["."          , "."    ],
-          ["IDENTIFIER" , "def"  ],
-          ["CALL_START" , "("    ],
-          ["("          , "("    ],
-          ["PARAM_START", "("    ],
-          ["IDENTIFIER" , "x"    ],
-          ["="          , "="    ],
-          ["NUMBER"     , "100"  ],
-          [","          , ","    ],
-          ["IDENTIFIER" , "y"    ],
-          ["="          , "="    ],
-          ["NUMBER"     , "200"  ],
-          ["PARAM_END"  , ")"    ],
-          ["->"         , "->"   ],
-          ["INDENT"     , 2      ],
-          ["IDENTIFIER" , "x"    ],
-          ["OUTDENT"    , 2      ],
-          [")"          , ")"    ],
-          [","          , ","    ],
-          ["NUMBER"     , "300"  ],
-          ["CALL_END"   , ")"    ],
-          ["TERMINATOR" , "\n"   ],      
+          ["IDENTIFIER"      , "Synth"    ],
+          ["."               , "."        ],
+          ["IDENTIFIER"      , "def"      ],
+          ["CALL_START"      , "("        ],
+          [  "("             ,   "("      ],
+          [    "PARAM_START" ,     "("    ],
+          [      "IDENTIFIER",       "x"  ],
+          [      "="         ,       "="  ],
+          [      "NUMBER"    ,       "100"],
+          [      ","         ,       ","  ],
+          [      "IDENTIFIER",       "y"  ],
+          [      "="         ,       "="  ],
+          [      "NUMBER"    ,       "200"],
+          [    "PARAM_END"   ,     ")"    ],
+          [    "->"          ,     "->"   ],
+          [    "INDENT"      ,     2      ],
+          [      "IDENTIFIER",       "x"  ],
+          [    "OUTDENT"     ,     2      ],
+          [  ")"             ,   ")"      ],
+          [  ","             ,   ","      ],
+          [  "NUMBER"        ,   "300"    ],
+          ["CALL_END"        , ")"        ],
+          ["TERMINATOR"      , "\n"       ],
         ];
         var expected = [
-          ["IDENTIFIER" , "Synth"        ],
-          ["."          , "."            ],
-          ["IDENTIFIER" , "def"          ],
-          ["CALL_START" , "("            ],
-          ["("          , "("            ],
-          ["PARAM_START", "("            ],
-          ["IDENTIFIER" , "x"            ],
-          ["="          , "="            ],
-          ["NUMBER"     , "100"          ],
-          [","          , ","            ],
-          ["IDENTIFIER" , "y"            ],
-          ["="          , "="            ],
-          ["NUMBER"     , "200"          ],
-          ["PARAM_END"  , ")"            ],
-          ["->"         , "->"           ],
-          ["INDENT"     , 2              ],
-          ["IDENTIFIER" , "x"            ],
-          ["OUTDENT"    , 2              ],
-          [")"          , ")"            ],
-          [","          , ","            ],
-          ["STRING"     , '"x=100,y=200"'],
-          [","          , ","            ],
-          ["NUMBER"     , "300"          ],
-          ["CALL_END"   , ")"            ],
-          ["TERMINATOR" , "\n"           ],      
+          ["IDENTIFIER"      , "Synth"          ],
+          ["."               , "."              ],
+          ["IDENTIFIER"      , "def"            ],
+          ["CALL_START"      , "("              ],
+          [  "("             ,   "("            ],
+          [    "PARAM_START" ,     "("          ],
+          [      "IDENTIFIER",     "x"          ],
+          [      "="         ,     "="          ],
+          [      "NUMBER"    ,     "100"        ],
+          [      ","         ,     ","          ],
+          [      "IDENTIFIER",     "y"          ],
+          [      "="         ,     "="          ],
+          [      "NUMBER"    ,     "200"        ],
+          [    "PARAM_END"   ,   ")"            ],
+          [    "->"          ,   "->"           ],
+          [    "INDENT"      ,   2              ],
+          [      "IDENTIFIER",     "x"          ],
+          [    "OUTDENT"     ,   2              ],
+          [  ")"             ,   ")"            ],
+          [  ","             ,   ","            ],
+          [  "STRING"        ,   '"x=100,y=200"'],
+          [  ","             ,   ","            ],
+          [  "NUMBER"        ,   "300"          ],
+          ["CALL_END"        , ")"              ],
+          ["TERMINATOR"      , "\n"             ],      
         ];
         var actual = compiler.replaceSynthDef(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
     describe("replaceGlobal", function() {
-      it("$a => global.a", function() {
+      it("case 1", function() {
+        /*
+          source:
+          $a = 10
+
+          replaced:
+          global.a = 10
+         */
         var tokens = [
           ["IDENTIFIER", "$a"],
           ["="         , "=" ],
@@ -769,7 +893,14 @@ define(function(require, exports, module) {
         var actual = compiler.replaceGlobal(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("$ => $", function() {
+      it("case 2", function() {
+        /*
+          source:
+          $ = 10
+
+          replaced
+          $ = 10    (do nothing)
+         */
         var tokens = [
           ["IDENTIFIER", "$" ],
           ["="         , "=" ],
@@ -780,7 +911,14 @@ define(function(require, exports, module) {
         var actual = compiler.replaceGlobal(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("a.$b => a.$b", function() {
+      it("case 3", function() {
+        /*
+          source:
+          a.$b = 10
+
+          replaced:
+          a.$b = 10    (do nothing)
+         */
         var tokens = [
           ["IDENTIFIER", "a" ],
           ["."         , "." ],
@@ -795,82 +933,105 @@ define(function(require, exports, module) {
       });
     });
     describe("cleanupParenthesis", function() {
-      it("((a + b)) => (a + b)", function() {
+      /*
+        source:
+        ((a + b)) => (a + b)
+
+        replaced:
+        ( a + b ) => (a + b)
+       */
+      it("case 1", function() {
         var tokens = [
-          ["("         , "(" ],
-          ["("         , "(" ],
-          ["IDENTIFIER", "a" ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "b" ],
-          [")"         , ")" ],
-          [")"         , ")" ],
-          ["TERMINATOR", "\n"],
+          ["("             , "("    ],
+          [  "("           ,   "("  ],
+          [    "IDENTIFIER",     "a"],
+          [    "+"         ,     "+"],
+          [    "IDENTIFIER",     "b"],
+          [  ")"           ,   ")"  ],
+          [")"             , ")"    ],
+          ["TERMINATOR"    , "\n"   ],
         ];
         var expected = [
-          ["("         , "(" ],
-          ["IDENTIFIER", "a" ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "b" ],
-          [")"         , ")" ],
-          ["TERMINATOR", "\n"],
+          ["("           , "("  ],
+          [  "IDENTIFIER",   "a"],
+          [  "+"         ,   "+"],
+          [  "IDENTIFIER",   "b"],
+          [")"           , ")"  ],
+          ["TERMINATOR"  , "\n" ],
         ];
         var actual = compiler.cleanupParenthesis(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("((a + b) + c) => ((a + b) + c)", function() {
+      it("case 2", function() {
+        /*
+          source:
+          ((a + b) + c)
+
+          replaced:
+          ((a + b) + c)    (do nothing)
+         */
         var tokens = [
-          ["("         , "(" ],
-          ["("         , "(" ],
-          ["IDENTIFIER", "a" ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "b" ],
-          [")"         , ")" ],
-          ["+"         , "+" ],
-          ["IDENTIFIER", "c" ],
-          [")"         , ")" ],
-          ["TERMINATOR", "\n"],
+          ["("             , "("    ],
+          [  "("           ,   "("  ],
+          [    "IDENTIFIER",     "a"],
+          [    "+"         ,     "+"],
+          [    "IDENTIFIER",     "b"],
+          [  ")"           ,   ")"  ],
+          [  "+"           ,   "+"  ],
+          [  "IDENTIFIER"  ,   "c"  ],
+          [")"             , ")"    ],
+          ["TERMINATOR"    , "\n"   ],
         ];
         var expected = tokens;
         var actual = compiler.cleanupParenthesis(tokens).erode();
         assert.deepEqual(actual, expected);
       });
     });
-    it("insertReturn", function() {
-      var tokens = [
-        ["IDENTIFIER", "a" ],
-        ["="         , "=" ],
-        ["NUMBER"    , "0" ],
-        ["TERMINATOR", "\n"],
-      ];
-      var expected = [
-        ["("          , "("     ],
-        ["PARAM_START", "("     ],
-        ["IDENTIFIER" , "global"],
-        ["PARAM_END"  , ")"     ],
-        ["->"         , "->"    ],
-        ["INDENT"     , 2       ],
-        
-        ["IDENTIFIER" , "a"     ],
-        ["="          , "="     ],
-        ["NUMBER"     , "0"     ],
-        
-        ["OUTDENT"    , 2       ],
-        [")"          , ")"     ],
-        ["."          , "."     ],
-        ["IDENTIFIER" , "call"  ],
-        ["CALL_START" , "("     ],
-        ["IDENTIFIER" , "_gltc_"],
-        [","          , ","     ],
-        ["THIS"       , "this"  ],
-        ["."          , "."     ],
-        ["IDENTIFIER" , "self"  ],
-        ["LOGIC"      , "||"    ],
-        ["IDENTIFIER" , "global"],
-        ["CALL_END"   , ")"     ],
-        ["TERMINATOR" , "\n"    ],
-      ];
-      var actual = compiler.insertReturn(tokens).erode();
-      assert.deepEqual(actual, expected);
+    describe("insertReturn", function() {
+      it("case 1", function() {
+        /*
+          source:
+          a = 0
+
+          replaced:
+          ((global)->
+          a = 0
+          ).call(_gltc_, this.self||global)
+        */
+        var tokens = [
+          ["IDENTIFIER", "a" ],
+          ["="         , "=" ],
+          ["NUMBER"    , "0" ],
+          ["TERMINATOR", "\n"],
+        ];
+        var expected = [
+          ["("             , "("         ],
+          [  "PARAM_START" ,   "("       ],
+          [    "IDENTIFIER",     "global"],
+          [  "PARAM_END"   ,   ")"       ],
+          [  "->"          ,   "->"      ],
+          [  "INDENT"      ,   2         ],
+          [    "IDENTIFIER",     "a"     ],
+          [    "="         ,     "="     ],
+          [    "NUMBER"    ,     "0"     ],
+          [  "OUTDENT"     ,   2         ],
+          [")"             , ")"         ],
+          ["."             , "."         ],
+          ["IDENTIFIER"    , "call"      ],
+          ["CALL_START"    , "("         ],
+          [  "IDENTIFIER"  ,   "_gltc_"  ],
+          [  ","           ,   ","       ],
+          [  "THIS"        ,   "this"    ],
+          [  "."           ,   "."       ],
+          [  "IDENTIFIER"  ,   "self"    ],
+          [  "LOGIC"       ,   "||"      ],
+          [  "IDENTIFIER"  ,   "global"  ],
+          ["CALL_END"      , ")"         ],
+          ["TERMINATOR"    , "\n"        ],
+        ];
+        var actual = compiler.insertReturn(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
     });
   });
 
