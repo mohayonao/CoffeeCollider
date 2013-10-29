@@ -421,6 +421,48 @@ define(function(require, exports, module) {
       it("case 3", function() {
         /*
           source:
+          ->
+            @wait a && b
+
+          replaced:
+          ->
+            @wait a.__and__(b)
+        */
+        var tokens = [
+          ["->"            , "->"    ],
+          ["INDENT"        , 2       ],
+          [  "@"           ,   "@"   ],
+          [  "IDENTIFIER"  ,   "wait"],
+          [  "CALL_START"  ,   "("   ],
+          [    "IDENTIFIER",     "a" ],
+          [    "LOGIC"     ,     "&&"],
+          [    "IDENTIFIER",     "b" ],
+          [  "CALL_END"    ,   ")"   ],
+          ["OUTDENT"       , 2       ],
+          ["TERMINATOR"    , "\n"    ],
+        ];
+        var expected = [
+          ["->"              , "->"         ],
+          ["INDENT"          , 2            ],
+          [  "@"             ,   "@"        ],
+          [  "IDENTIFIER"    ,   "wait"     ],
+          [  "CALL_START"    ,   "("        ],
+          [    "IDENTIFIER"  ,     "a"      ],
+          [    "."           ,     "."      ],
+          [    "IDENTIFIER"  ,     "__and__"],
+          [    "CALL_START"  ,     "("      ],
+          [      "IDENTIFIER",       "b"    ],
+          [    "CALL_END"    ,     ")"      ],
+          [  "CALL_END"      ,   ")"        ],
+          ["OUTDENT"         , 2            ],
+          ["TERMINATOR"      , "\n"         ],
+        ];
+        var actual = compiler.replaceLogicOp(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("case 4", function() {
+        /*
+          source:
           @wait (a && b) || c
 
           replaced:
@@ -463,7 +505,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("case 4", function() {
+      it("case 5", function() {
         /*
           source:
           @wait a && b, (x = a && b)->
@@ -523,7 +565,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("case 5", function() {
+      it("case 6", function() {
         /*
           source:
           @wait a && ((x=a&&b)->x) && b, (x = a && b)->
@@ -614,7 +656,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("case 6", function() {
+      it("case 7", function() {
         /*
           source:
           @wait a && [ b || c ]

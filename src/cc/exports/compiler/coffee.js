@@ -381,6 +381,7 @@ define(function(require, exports, module) {
       case "IDENTIFIER":
         if (tokens[i-1][TAG] === "@" && token[VALUE] === "wait") {
           replaceable = true;
+          bracket = 0;
         }
         break;
       case "INDENT": case "TERMINATOR":
