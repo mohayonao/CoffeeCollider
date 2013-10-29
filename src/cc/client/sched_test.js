@@ -290,9 +290,9 @@ define(function(require, exports, module) {
         });
         assert.equal(t.klassName, "TaskWaitTokenNumber");
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, true);
       });
       it("function", function() {
@@ -305,55 +305,61 @@ define(function(require, exports, module) {
         });
         assert.equal(t.klassName, "TaskWaitTokenFunction");
         assert.equal(emitted, false);
-        t.process(1);
+        t.performWait(1);
         assert.equal(emitted, false);
-        t.process(1);
+        t.performWait(1);
         assert.equal(emitted, true);
       });
       it("array", function() {
-        var list = [ 1, 2, 3 ];
+        var list = [ 5, 15, 10 ];
         var t = cc.createTaskWaitToken(list).on("end", function() {
           emitted = true;
         });
-        assert.equal(t.klassName, "TaskWaitTokenArray");
+        assert.equal(t.klassName, "TaskWaitAND");
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, false);
-        list.splice(0);
-        t.process(5);
+        t.performWait(5);
+        assert.equal(emitted, false);
+        t.performWait(5);
         assert.equal(emitted, true);
       });
       it("block", function() {
-        var obj = { blocking:true };
+        var obj = {
+          blocking   : true,
+          performWait: function() {
+            return this.blocking;
+          }
+        };
         var t = cc.createTaskWaitToken(obj).on("end", function() {
           emitted = true;
         });
         assert.equal(t.klassName, "TaskWaitTokenBlock");
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, false);
         obj.blocking = false;
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, true);
       });
       it("true (infinity block)", function() {
         var t = cc.createTaskWaitToken(true).on("end", function() {
           emitted = true;
         });
-        assert.equal(t.klassName, "TaskWaitToken");
+        assert.equal(t.klassName, "TaskWaitTokenBoolean");
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, false);
       });
       it("false (not block)", function() {
         var t = cc.createTaskWaitToken(false).on("end", function() {
           emitted = true;
         });
-        assert.equal(t.klassName, "TaskWaitToken");
+        assert.equal(t.klassName, "TaskWaitTokenBoolean");
         assert.equal(emitted, false);
-        t.process(5);
+        t.performWait(5);
         assert.equal(emitted, true);
       });
       it("pass", function() {
@@ -382,13 +388,13 @@ define(function(require, exports, module) {
         });
         assert.equal(t.klassName, "TaskWaitAND");
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 3]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 3, 2, 4]);
       });
       it("or", function() {
@@ -406,13 +412,13 @@ define(function(require, exports, module) {
         });
         assert.equal(t.klassName, "TaskWaitOR");
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 4]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 4]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 4]);
       });
       it("and/or", function() {
@@ -433,13 +439,13 @@ define(function(require, exports, module) {
         });
         assert.equal(t.klassName, "TaskWaitOR");
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, []);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 3, 5]);
-        t.process(5);
+        t.performWait(5);
         assert.deepEqual(emitted, [1, 3, 5]);
       });
     });

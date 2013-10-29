@@ -140,7 +140,7 @@ define('cc/client/client', function(require, exports, module) {
       this.strmLength = 0;
       this.bufLength  = 0;
       this.rootNode   = cc.createGroup();
-      this.timeline   = cc.createTimeline(this);
+      this.timeline   = cc.createTimeline();
       this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
@@ -177,7 +177,7 @@ define('cc/client/client', function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthClient.prototype.play = function(msg) {
-      this.timeline.play();
+      this.timeline.play((this.bufLength / this.sampleRate) * 1000);
       this.sendToServer(msg);
     };
     SynthClient.prototype.pause = function(msg) {
@@ -502,10 +502,10 @@ define('cc/client/client', function(require, exports, module) {
 define('cc/client/cc', function(require, exports, module) {
 
   var _cc = require("../cc");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
   
   if (!_cc.emit) {
-    Emitter.bind(_cc);
+    emitter.mixin(_cc);
   }
   
   module.exports = _cc;
@@ -573,20 +573,22 @@ define('cc/common/emitter', function(require, exports, module) {
       }
       return this;
     };
-    Emitter.bind = function(obj) {
-      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
-        if (!obj[method]) {
-          obj[method] = Emitter.prototype[method];
-        }
-      });
-      Emitter.call(obj);
-      return obj;
-    };
     return Emitter;
   })();
-
+  
+  var mixin = function(obj) {
+    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+      if (!obj[method]) {
+        obj[method] = Emitter.prototype[method];
+      }
+    });
+    Emitter.call(obj);
+    return obj;
+  };
+  
   module.exports = {
-    Emitter: Emitter
+    Emitter: Emitter,
+    mixin: mixin
   };
 
 });
@@ -908,7 +910,7 @@ define('cc/client/buffer', function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend = require("../common/extend");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
 
   var bufSrcId = 0;
   var bufferSrcCache = {};
@@ -916,20 +918,25 @@ define('cc/client/buffer', function(require, exports, module) {
   var AudioBuffer = (function() {
     var bufId = 0;
     function AudioBuffer() {
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.klassName = "Buffer";
       // TODO: set below parameters
       this.frames     = 0;
       this.channels   = 0;
       this.sampleRate = 0;
       
-      this.blocking   = true;
+      this._blocking = true;
       this._bufId = bufId++;
       cc.client.pushToTimeline([
         "/b_new", this._bufId
       ]);
     }
     extend(AudioBuffer, cc.Object);
+    
+    AudioBuffer.prototype.performWait = function() {
+      return this._blocking;
+    };
+    
     return AudioBuffer;
   })();
   
@@ -1202,17 +1209,17 @@ define('cc/client/node', function(require, exports, module) {
   var extend = require("../common/extend");
   var utils = require("./utils");
   var ugen  = require("./ugen/ugen");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
 
   var nodes = {};
   
   var Node = (function() {
     var nodeId = 0;
     function Node() {
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.klassName = "Node";
-      this.blocking  = true;
       this.nodeId    = nodeId++;
+      this._blocking  = true;
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
@@ -1232,9 +1239,12 @@ define('cc/client/node', function(require, exports, module) {
       cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
-      this.blocking = false;
+      this._blocking = false;
       return this;
     });
+    Node.prototype.performWait = function() {
+      return this._blocking;
+    };
     return Node;
   })();
 
@@ -1998,24 +2008,26 @@ define('cc/client/sched', function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend = require("../common/extend");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
   
   var Timeline = (function() {
-    function Timeline(client) {
+    function Timeline() {
       this.klassName = "Timeline";
-      this._client  = client;
       this.reset();
     }
-    Timeline.prototype.play = function() {
-      this.counterIncr = (this._client.bufLength / this._client.sampleRate) * 1000;
+    extend(Timeline, cc.Object);
+    
+    Timeline.prototype.play = function(counterIncr) {
+      this.counterIncr = counterIncr;
     };
     Timeline.prototype.pause = function() {
+      this.counterIncr = 0;
     };
     Timeline.prototype.reset = function() {
-      var globalTask = new GlobalTask(this);
-      this._list   = [ globalTask ];
-      this._stack  = [ globalTask ];
-      this.context = globalTask.context;
+      var taskGlobal = cc.createTaskGlobal(this);
+      this._list   = [ taskGlobal ];
+      this._stack  = [ taskGlobal ];
+      this.context = taskGlobal.context;
     };
     Timeline.prototype.append = function(sched) {
       var index = this._list.indexOf(sched);
@@ -2030,26 +2042,213 @@ define('cc/client/sched', function(require, exports, module) {
       }
     };
     Timeline.prototype.push = function(that, func, args) {
-      var sched = this._stack[this._stack.length - 1];
-      sched._push(that, func, args);
+      this._stack[this._stack.length - 1].push(that, func, args);
     };
     Timeline.prototype.process = function() {
-      var _list = this._list;
       var counterIncr = this.counterIncr;
-      for (var i = 0; i < _list.length; ++i) {
-        _list[i]._process(counterIncr);
+      if (counterIncr) {
+        var _list = this._list;
+        for (var i = 0; i < _list.length; ++i) {
+          _list[i].process(counterIncr);
+        }
       }
     };
+    
     return Timeline;
   })();
+  
+  var TaskWaitToken = (function() {
+    function TaskWaitToken(item) {
+      emitter.mixin(this);
+      this.klassName = "TaskWaitToken";
+      this.item = item;
+      this._blocking = true;
+    }
+    extend(TaskWaitToken, cc.Object);
+    
+    TaskWaitToken.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = !!this.item;
+        if (!this._blocking) {
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitToken;
+  })();
 
+  var TaskWaitTokenNumber = (function() {
+    function TaskWaitTokenNumber(item) {
+      TaskWaitToken.call(this, item);
+      this.klassName = "TaskWaitTokenNumber";
+    }
+    extend(TaskWaitTokenNumber, TaskWaitToken);
+    
+    TaskWaitTokenNumber.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this.item -= counterIncr;
+        if (this.item <= 0) {
+          this._blocking = false;
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitTokenNumber;
+  })();
+
+  var TaskWaitTokenFunction = (function() {
+    function TaskWaitTokenFunction(item) {
+      TaskWaitToken.call(this, item);
+      this.klassName = "TaskWaitTokenFunction";
+    }
+    extend(TaskWaitTokenFunction, TaskWaitToken);
+    
+    TaskWaitTokenFunction.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = !!this.item();
+        if (!this._blocking) {
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitTokenFunction;
+  })();
+
+  var TaskWaitTokenBoolean = (function() {
+    function TaskWaitTokenBoolean(item) {
+      TaskWaitToken.call(this, item);
+      this.klassName = "TaskWaitTokenBoolean";
+    }
+    extend(TaskWaitTokenBoolean, TaskWaitToken);
+    
+    TaskWaitTokenBoolean.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = this.item;
+        if (!this._blocking) {
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitTokenBoolean;
+  })();
+  
+  var TaskWaitTokenBlock = (function() {
+    function TaskWaitTokenBlock(item) {
+      TaskWaitToken.call(this, item);
+      this.klassName = "TaskWaitTokenBlock";
+    }
+    extend(TaskWaitTokenBlock, TaskWaitToken);
+    
+    TaskWaitTokenBlock.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.item.performWait(counterIncr);
+        if (!this._blocking) {
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitTokenBlock;
+  })();
+
+  var TaskWaitAND = (function() {
+    function TaskWaitAND(list) {
+      emitter.mixin(this);
+      this.klassName = "TaskWaitAND";
+      var items = [];
+      list.forEach(function(x) {
+        if (x instanceof TaskWaitAND) {
+          items = items.concat(x.list);
+        } else {
+          items.push(x);
+        }
+      });
+      this.items = items;
+      this._blocking = true;
+    }
+    extend(TaskWaitAND, TaskWaitToken);
+    
+    TaskWaitAND.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.items.reduce(function(_blocking, item) {
+          return item.performWait(counterIncr) || _blocking;
+        }, false);
+      }
+      if (!this._blocking) {
+        this.emit("end");
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitAND;
+  })();
+
+  var TaskWaitOR = (function() {
+    function TaskWaitOR(list) {
+      emitter.mixin(this);
+      this.klassName = "TaskWaitOR";
+      var items = [];
+      list.forEach(function(x) {
+        if (x instanceof TaskWaitOR) {
+          items = items.concat(x.list);
+        } else {
+          items.push(x);
+        }
+      });
+      this.items = items;
+      this._blocking = true;
+    }
+    extend(TaskWaitOR, TaskWaitToken);
+    
+    TaskWaitOR.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.items.reduce(function(_blocking, item) {
+          return item.performWait(counterIncr) && _blocking;
+        }, true);
+        if (!this._blocking) {
+          this.emit("end");
+        }
+      }
+      return this._blocking;
+    };
+    
+    return TaskWaitOR;
+  })();
+  
+  var TaskContext = (function() {
+    function TaskContext(task) {
+      this.klassName = "TaskContext";
+      this.wait = function(item) {
+        var token = cc.createTaskWaitToken(item);
+        task._queue.push(token);
+        return token;
+      };
+      this.pause = function() {
+        task.pause();
+      };
+      this.stop = function() {
+        task.stop();
+      };
+    }
+    return TaskContext;
+  })();
+  
   var Task = (function() {
     function Task() {
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.klassName = "Task";
-      this.blocking  = true;
+      this._blocking  = true;
       this.timeline  = cc.timeline;
-      this.context = new TaskContext(this);
+      this.context   = cc.createTaskContext(this);
       this._queue = [];
       this._bang  = false;
       this._index = 0;
@@ -2060,6 +2259,7 @@ define('cc/client/sched', function(require, exports, module) {
     
     Task.prototype.play = fn.sync(function() {
       var that = this;
+      // rewind to the head task of a chain
       while (that._prev !== null) {
         that = that._prev;
       }
@@ -2082,7 +2282,7 @@ define('cc/client/sched', function(require, exports, module) {
       }
       this._bang = false;
       this.timeline = null;
-      this.blocking = false;
+      this._blocking = false;
       this.emit("end");
       if (this._next) {
         this._next._prev = null;
@@ -2090,47 +2290,54 @@ define('cc/client/sched', function(require, exports, module) {
         this._next = null;
       }
     });
+    Task.prototype.performWait = function() {
+      return this._blocking;
+    };
+
+    // task chain methods
     Task.prototype["do"] = function(func) {
-      var next = TaskInterface["do"](func);
+      var next = cc.createTaskDo(func);
       next._prev = this;
       this._next = next;
       return next;
     };
     Task.prototype.loop = function(func) {
-      var next = TaskInterface.loop(func);
+      var next = cc.createTasLoop(func);
       next._prev = this;
       this._next = next;
       return next;
     };
     Task.prototype.each = function(list, func) {
-      var next = TaskInterface.each(list, func);
+      var next = cc.createTaskEach(list, func);
       next._prev = this;
       this._next = next;
       return next;
     };
     Task.prototype.timeout = function(delay, func) {
-      var next = TaskInterface.timeout(delay, func);
+      var next = cc.createTaskTimeout(delay, func);
       next._prev = this;
       this._next = next;
       return next;
     };
     Task.prototype.interval = function(delay, func) {
-      var next = TaskInterface.interval(delay, func);
+      var next = cc.createTaskInterval(delay, func);
       next._prev = this;
       this._next = next;
       return next;
     };
+
     
-    Task.prototype._push = function(that, func, args) {
+    Task.prototype.push = function(that, func, args) {
       if (typeof that === "function") {
         this._queue.push([that, null, args]);
       } else {
         this._queue.push([func, that, args]);
       }
     };
-    Task.prototype._done = function() {
+    Task.prototype.done = function() {
+      // should be overridden
     };
-    Task.prototype._process = function(counterIncr) {
+    Task.prototype.process = function(counterIncr) {
       var timeline = this.timeline;
       var _queue   = this._queue;
       var continuance = false;
@@ -2149,11 +2356,10 @@ define('cc/client/sched', function(require, exports, module) {
           if (Array.isArray(e)) {
             e[0].apply(e[1], e[2]);
           } else {
-            if (e instanceof TaskWaitToken) {
-              e.process(counterIncr);
-            }
-            if (e.blocking) {
-              break LOOP;
+            if (e.performWait) {
+              if (e.performWait(counterIncr)) {
+                break LOOP;
+              }
             }
           }
           i += 1;
@@ -2162,179 +2368,60 @@ define('cc/client/sched', function(require, exports, module) {
         if (i) {
           _queue.splice(0, i);
           if (_queue.length === 0) {
-            continuance = this._done();
+            continuance = this.done();
           }
         }
       } while (continuance);
     };
     return Task;
   })();
-
-  var TaskWaitToken = (function() {
-    function TaskWaitToken(item, callback) {
-      if (item instanceof TaskWaitToken) {
-        if (typeof callback === "function") {
-          item.callback = callback;
-        }
-        return item;
-      }
-      this.klassName = "TaskWaitToken";
-      if (callback === undefined) {
-        if (typeof item === "function") {
-          callback = item;
-          item = 0;
-        }
-      }
-      this.item = item;
-      this.callback = callback;
-      this.blocking = true;
-    }
-    extend(TaskWaitToken, cc.Object);
-    
-    TaskWaitToken.prototype.process = function(counterIncr) {
-      if (this.blocking) {
-        var blocking = true;
-        if (typeof this.item === "number") {
-          this.item -= counterIncr;
-          if (this.item <= 0) {
-            blocking = false;
-          }
-        } else if (this.item instanceof TaskWaitToken) {
-          blocking = this.item.process();
-        } else if (!this.item.blocking) {
-          blocking = false;
-        }
-        if (!blocking) {
-          this.blocking = false;
-          if (this.callback) {
-            this.callback();
-            delete this.callback;
-          }
-        }
-      }
-      return this.blocking;
-    };
-    return TaskWaitToken;
-  })();
-
-  var TaskWaitTokenAND = (function() {
-    function TaskWaitTokenAND(list) {
-      this.klassName = "TaskWaitTokenAND";
-      this.list = list.map(function(x) {
-        return new TaskWaitToken(x);
-      });
-    }
-    extend(TaskWaitTokenAND, TaskWaitToken);
-    TaskWaitTokenAND.prototype.process = function(counterIncr) {
-      this.blocking = this.list.reduce(function(blocking, x) {
-        return x.process(counterIncr) || blocking;
-      }, false);
-      if (!this.blocking) {
-        if (this.callback) {
-          this.callback();
-          delete this.callback;
-        }
-      }
-      return this.blocking;
-    };
-    TaskWaitTokenAND.prototype.__and__ = function(x) {
-      if (Array.isArray(x)) {
-        this.list = this.list.concat(x.map(function(x) {
-          return new TaskWaitToken(x);
-        }));
-      } else {
-        this.list.push(new TaskWaitToken(x));
-      }
-      return this;
-    };
-    return TaskWaitTokenAND;
-  })();
   
-  var TaskWaitTokenOR = (function() {
-    function TaskWaitTokenOR(list) {
-      this.klassName = "TaskWaitTokenOR";
-      this.list = list.map(function(x) {
-        return new TaskWaitToken(x);
-      });
-    }
-    extend(TaskWaitTokenOR, TaskWaitToken);
-    TaskWaitTokenOR.prototype.process = function(counterIncr) {
-      this.blocking = this.list.reduce(function(blocking, x) {
-        return x.process(counterIncr) && blocking;
-      }, true);
-      if (!this.blocking) {
-        if (this.callback) {
-          this.callback();
-          delete this.callback;
-        }
-      }
-      return this.blocking;
-    };
-    TaskWaitTokenOR.prototype.__or__ = function(x) {
-      if (Array.isArray(x)) {
-        this.list = this.list.concat(x.map(function(x) {
-          return new TaskWaitToken(x);
-        }));
-      } else {
-        this.list.push(new TaskWaitToken(x));
-      }
-      return this;
-    };
-    return TaskWaitTokenOR;
-  })();
-  
-  var TaskContext = (function() {
-    function TaskContext(task) {
-      this.klassName = "TaskContext";
-      this.wait = function(item, callback) {
-        task._queue.push(new TaskWaitToken(item, callback));
-      };
-      this.pause = function() {
-        task.pause();
-      };
-      this.stop = function() {
-        task.stop();
-      };
-    }
-    return TaskContext;
-  })();
-
-  var GlobalTask = (function() {
-    function GlobalTask(timeline) {
+  var TaskGlobal = (function() {
+    function TaskGlobal(timeline) {
       Task.call(this, timeline);
-      this.klassName = "GlobalTask";
+      this.klassName = "TaskGlobal";
     }
-    extend(GlobalTask, Task);
-    GlobalTask.prototype.play  = function() {};
-    GlobalTask.prototype.pause = function() {};
-    GlobalTask.prototype.stop  = function() {};
-    return GlobalTask;
+    extend(TaskGlobal, Task);
+    
+    TaskGlobal.prototype.play  = function() {};
+    TaskGlobal.prototype.pause = function() {};
+    TaskGlobal.prototype.stop  = function() {};
+    
+    return TaskGlobal;
   })();
-
+  
   var TaskDo = (function() {
-    function TaskLoop(func) {
+    function TaskDo(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.do: First argument must be a Function.");
+      }
       Task.call(this);
+      this.klassName = "TaskDo";
       this.func = func;
     }
-    extend(TaskLoop, Task);
+    extend(TaskDo, Task);
 
-    TaskLoop.prototype._execute = function() {
+    TaskDo.prototype._execute = function() {
       this.func.call(this.context, this._index);
     };
-    TaskLoop.prototype._done = function() {
+    TaskDo.prototype.done = function() {
       this.stop();
     };
     
-    return TaskLoop;
+    return TaskDo;
   })();
   
   var TaskLoop = (function() {
     function TaskLoop(func) {
+      if (typeof func !== "function") {
+        throw new TypeError("Task.loop: First argument must be a Function.");
+      }
       TaskDo.call(this, func);
+      this.klassName = "TaskLoop";
     }
     extend(TaskLoop, TaskDo);
 
-    TaskLoop.prototype._done = function() {
+    TaskLoop.prototype.done = function() {
       this._bang = true;
     };
     
@@ -2343,7 +2430,14 @@ define('cc/client/sched', function(require, exports, module) {
 
   var TaskEach = (function() {
     function TaskEach(list, func) {
+      if (!(Array.isArray(list))) {
+        throw new TypeError("Task.each: First argument must be an Array.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.each: Second argument must be a Function.");
+      }
       Task.call(this);
+      this.klassName = "TaskEach";
       this.list = list;
       this.func = func;
     }
@@ -2354,7 +2448,7 @@ define('cc/client/sched', function(require, exports, module) {
         this.func.call(this.context, this.list[this._index], this._index);
       }
     };
-    TaskEach.prototype._done = function() {
+    TaskEach.prototype.done = function() {
       if (this._index < this.list.length) {
         this._bang = true;
       } else {
@@ -2367,20 +2461,27 @@ define('cc/client/sched', function(require, exports, module) {
 
   var TaskTimeout = (function() {
     function TaskTimeout(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.timeout: First argument must be a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.timeout: Second argument must be a Function.");
+      }
       Task.call(this);
+      this.klassName = "TaskTimeout";
       delay = Math.max(0, delay);
       if (isNaN(delay)) {
         delay = 0;
       }
       this.func = func;
-      this._queue.push(new TaskWaitToken(delay));
+      this._queue.push(cc.createTaskWaitToken(delay));
     }
     extend(TaskTimeout, Task);
     
     TaskTimeout.prototype._execute = function() {
       this.func.call(this.context, this._index);
     };
-    TaskTimeout.prototype._done = function() {
+    TaskTimeout.prototype.done = function() {
       if (this._index === 0) {
         this._bang = true;
         return true;
@@ -2393,11 +2494,18 @@ define('cc/client/sched', function(require, exports, module) {
   
   var TaskInterval = (function() {
     function TaskInterval(delay, func) {
+      if (typeof delay !== "number") {
+        throw new TypeError("Task.interval: First argument must be a Number.");
+      }
+      if (typeof func !== "function") {
+        throw new TypeError("Task.interval: Second argument must be a Function.");
+      }
       TaskTimeout.call(this, delay, func);
+      this.klassName = "TaskInterval";
     }
     extend(TaskInterval, TaskTimeout);
 
-    TaskInterval.prototype._done = function() {
+    TaskInterval.prototype.done = function() {
       this._bang = true;
       return true;
     };
@@ -2412,7 +2520,7 @@ define('cc/client/sched', function(require, exports, module) {
         count = 1;
       }
       this._count = count;
-      this.blocking = true;
+      this._blocking = true;
     }
     TaskBlock.prototype.lock = fn.sync(function(count) {
       if (typeof count !== "number") {
@@ -2426,107 +2534,98 @@ define('cc/client/sched', function(require, exports, module) {
       }
       this._count -= count;
       if (this._count <= 0) {
-        this.blocking = false;
+        this._blocking = false;
       }
     });
+    TaskBlock.prototype.performWait = function() {
+      return this._blocking;
+    };
     return TaskBlock;
   })();
   
-  var TaskInterface = function() {
-  };
-  TaskInterface["do"] = function(func) {
-    if (typeof func !== "function") {
-      throw new TypeError("Task.do: arguments[0] is not a Function.");
-    }
-    return new TaskDo(func);
-  };
-  TaskInterface.loop = function(func) {
-    if (typeof func !== "function") {
-      throw new TypeError("Task.loop: arguments[0] is not a Function.");
-    }
-    return new TaskLoop(func);
-  };
-  TaskInterface.each = function(list, func) {
-    if (!(Array.isArray(list))) {
-      throw new TypeError("Task.each: arguments[0] is not an Array.");
-    }
-    if (typeof func !== "function") {
-      throw new TypeError("Task.each: arguments[1] is not a Function.");
-    }
-    return new TaskEach(list, func);
-  };
-  TaskInterface.timeout = function(delay, func) {
-    if (typeof delay !== "number") {
-      throw new TypeError("Task.timeout: arguments[0] is not a Number.");
-    }
-    if (typeof func !== "function") {
-      throw new TypeError("Task.timeout: arguments[1] is not a Function.");
-    }
-    return new TaskTimeout(delay, func);
-  };
-  TaskInterface.interval = function(delay, func) {
-    if (typeof delay !== "number") {
-      throw new TypeError("Task.interval: arguments[0] is not a Number.");
-    }
-    if (typeof func !== "function") {
-      throw new TypeError("Task.interval: arguments[1] is not a Function.");
-    }
-    return new TaskInterval(delay, func);
-  };
-  TaskInterface.block = function() {
-    return new TaskBlock();
-  };
-  
   var install = function() {
-    cc.createTimeline = function(client) {
-      cc.timeline = new Timeline(client);
+    cc.createTimeline = function() {
+      cc.timeline = new Timeline();
       return cc.timeline;
+    };
+    cc.createTaskGlobal = function(timeline) {
+      return new TaskGlobal(timeline);
+    };
+    cc.createTaskDo = function(func) {
+      return new TaskDo(func);
+    };
+    cc.createTaskLoop = function(func) {
+      return new TaskLoop(func);
+    };
+    cc.createTaskEach = function(list, func) {
+      return new TaskEach(list, func);
+    };
+    cc.createTaskTimeout = function(delay, func) {
+      return new TaskTimeout(delay, func);
+    };
+    cc.createTaskInterval = function(delay, func) {
+      return new TaskInterval(delay, func);
+    };
+    cc.createTaskBlock = function() {
+      return new TaskBlock();
+    };
+    cc.createTaskContext = function(task) {
+      return new TaskContext(task);
+    };
+    cc.createTaskWaitToken = function(item) {
+      if (item instanceof TaskWaitToken) {
+        return item;
+      }
+      switch (typeof item) {
+      case "number":
+        return new TaskWaitTokenNumber(item);
+      case "function":
+        return new TaskWaitTokenFunction(item);
+      case "boolean":
+        return new TaskWaitTokenBoolean(item);
+      default:
+        if (item) {
+          if (Array.isArray(item)) {
+            return cc.createTaskWaitLogic("and", item);
+          } else if (typeof item.performWait === "function") {
+            return new TaskWaitTokenBlock(item);
+          }
+        }
+      }
+      throw new TypeError("TaskWaitToken: Invalid type");
+    };
+    cc.createTaskWaitLogic = function(logic, list) {
+      list = list.map(function(x) {
+        return cc.createTaskWaitToken(x);
+      });
+      return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
     };
   };
   
   exports = function() {
-    global.Task = TaskInterface;
-
-    fn.definePrototypeProperty(cc.Object, "__and__", function(b) {
-      return new TaskWaitTokenAND([this].concat(b));
-    });
-    fn.definePrototypeProperty(Number, "__and__", function(b) {
-      var a = this;
-      if (typeof b === "number") {
-        return new TaskWaitToken(Math.max(a, b));
+    global.Task = {
+      "do": function(func) {
+        return cc.createTaskDo(func);
+      },
+      loop: function(func) {
+        return cc.createTaskLoop(func);
+      },
+      each: function(list, func) {
+        return cc.createTaskEach(list, func);
+      },
+      timeout: function(delay, func) {
+        return cc.createTaskTimeout(delay, func);
+      },
+      interval: function(delay, func) {
+        return cc.createTaskInterval(delay, func);
+      },
+      block: function() {
+        return cc.createTaskBlock();
       }
-      return new TaskWaitTokenAND([a].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__and__", function(b) {
-      return new TaskWaitTokenAND(this.concat(b));
-    });
-    fn.definePrototypeProperty(cc.Object, "__or__", function(b) {
-      return new TaskWaitTokenOR([this].concat(b));
-    });
-    fn.definePrototypeProperty(Number, "__or__", function(b) {
-      var a = this;
-      if (typeof b === "number") {
-        return new TaskWaitToken(Math.minx(a, b));
-      }
-      return new TaskWaitTokenOR([a].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__or__", function(b) {
-      return new TaskWaitTokenOR(this.concat(b));
-    });
+    };
   };
   
   module.exports = {
-    Timeline: Timeline,
-    GlobalTask: GlobalTask,
-    Task      : Task,
-    TaskDo    : TaskDo,
-    TaskLoop  : TaskLoop,
-    TaskEach  : TaskEach,
-    TaskTimeout : TaskTimeout,
-    TaskInterval: TaskInterval,
-    TaskBlock: TaskBlock,
-    TaskInterface: TaskInterface,
-    
     install: install,
     exports: exports,
   };
@@ -2693,12 +2792,25 @@ define('cc/client/object', function(require, exports, module) {
       return this;
     });
 
+    setup("__and__",function(b) {
+      return cc.createTaskWaitLogic("and", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__and__", function(b) {
+      return cc.createTaskWaitLogic("and", this.concat(b));
+    });
+    
+    setup("__or__", function(b) {
+      return cc.createTaskWaitLogic("or", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__or__", function(b) {
+      return cc.createTaskWaitLogic("or", this.concat(b));
+    });
   };
   
   cc.once("basic_ops.js", function(payload) {
     MulAdd = payload.MulAdd;
   });
-
+  
   module.exports = {
     exports: exports
   };
@@ -4243,14 +4355,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
 
   var cc = require("../cc");
   var extend = require("../common/extend");
-  var Emitter  = require("../common/emitter").Emitter;
+  var emitter  = require("../common/emitter");
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;
   
   var CoffeeCollider = (function() {
     function CoffeeCollider(opts) {
-      Emitter.bind(this);
+      emitter.mixin(this);
       opts = opts || {};
       this.version = cc.version;
       if (opts.socket) {
@@ -5303,10 +5415,10 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         if (replaceLogicOpTable.hasOwnProperty(token[VALUE])) {
           var selector = replaceLogicOpTable[token[VALUE]];
           var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
+          tokens.splice(i++, 1, ["."          , "."     , _]);
+          tokens.splice(i++, 0, ["IDENTIFIER" , selector, _]);
+          tokens.splice(i++, 0, ["!CALL_START", "("     , _]);
+          tokens.splice(b+2, 0, ["!CALL_END"  , ")"     , _]);
           continue;
         }
       }
@@ -5314,6 +5426,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       case "IDENTIFIER":
         if (tokens[i-1][TAG] === "@" && token[VALUE] === "wait") {
           replaceable = true;
+          bracket = 0;
         }
         break;
       case "INDENT": case "TERMINATOR":
@@ -5334,6 +5447,11 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       }
       i += 1;
     }
+    tokens.forEach(function(items) {
+      if (items[TAG].charAt(0) === "!") {
+        items[TAG] = items[TAG].substr(1);
+      }
+    });
     // dumpTokens(tokens);
     return tokens;
   };
@@ -5747,7 +5865,7 @@ define('cc/server/server', function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack  = require("../common/pack").pack;
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
   var commands = {};
   
   var SynthServer = (function() {
@@ -6106,7 +6224,7 @@ define('cc/server/server', function(require, exports, module) {
         console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.server = server;
       this.server.exports = this;
       this.server._init(opts||{});
@@ -6232,10 +6350,10 @@ define('cc/server/server', function(require, exports, module) {
 define('cc/server/cc', function(require, exports, module) {
 
   var _cc = require("../cc");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
 
   if (!_cc.emit) {
-    Emitter.bind(_cc);
+    emitter.mixin(_cc);
   }
   
   module.exports = _cc;

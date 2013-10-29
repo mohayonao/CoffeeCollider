@@ -19,13 +19,18 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.sampleRate = 0;
       
-      this.blocking   = true;
+      this._blocking = true;
       this._bufId = bufId++;
       cc.client.pushToTimeline([
         "/b_new", this._bufId
       ]);
     }
     extend(AudioBuffer, cc.Object);
+    
+    AudioBuffer.prototype.performWait = function() {
+      return this._blocking;
+    };
+    
     return AudioBuffer;
   })();
   

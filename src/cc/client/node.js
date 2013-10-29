@@ -15,8 +15,8 @@ define(function(require, exports, module) {
     function Node() {
       emitter.mixin(this);
       this.klassName = "Node";
-      this.blocking  = true;
       this.nodeId    = nodeId++;
+      this._blocking  = true;
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
@@ -36,9 +36,12 @@ define(function(require, exports, module) {
       cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
-      this.blocking = false;
+      this._blocking = false;
       return this;
     });
+    Node.prototype.performWait = function() {
+      return this._blocking;
+    };
     return Node;
   })();
 

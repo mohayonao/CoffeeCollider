@@ -38,14 +38,14 @@ define(function(require, exports, module) {
       }
     };
     Timeline.prototype.push = function(that, func, args) {
-      this._stack[this._stack.length - 1]._push(that, func, args);
+      this._stack[this._stack.length - 1].push(that, func, args);
     };
     Timeline.prototype.process = function() {
       var counterIncr = this.counterIncr;
       if (counterIncr) {
         var _list = this._list;
         for (var i = 0; i < _list.length; ++i) {
-          _list[i]._process(counterIncr);
+          _list[i].process(counterIncr);
         }
       }
     };
@@ -58,18 +58,18 @@ define(function(require, exports, module) {
       emitter.mixin(this);
       this.klassName = "TaskWaitToken";
       this.item = item;
-      this.blocking = true;
+      this._blocking = true;
     }
     extend(TaskWaitToken, cc.Object);
     
-    TaskWaitToken.prototype.process = function() {
-      if (this.blocking) {
-        this.blocking = !!this.item;
-        if (!this.blocking) {
+    TaskWaitToken.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = !!this.item;
+        if (!this._blocking) {
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitToken;
@@ -82,15 +82,15 @@ define(function(require, exports, module) {
     }
     extend(TaskWaitTokenNumber, TaskWaitToken);
     
-    TaskWaitTokenNumber.prototype.process = function(counterIncr) {
-      if (this.blocking) {
+    TaskWaitTokenNumber.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
         this.item -= counterIncr;
         if (this.item <= 0) {
-          this.blocking = false;
+          this._blocking = false;
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitTokenNumber;
@@ -103,39 +103,39 @@ define(function(require, exports, module) {
     }
     extend(TaskWaitTokenFunction, TaskWaitToken);
     
-    TaskWaitTokenFunction.prototype.process = function() {
-      if (this.blocking) {
-        this.blocking = !!this.item();
-        if (!this.blocking) {
+    TaskWaitTokenFunction.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = !!this.item();
+        if (!this._blocking) {
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitTokenFunction;
   })();
 
-  var TaskWaitTokenArray = (function() {
-    function TaskWaitTokenArray(item) {
+  var TaskWaitTokenBoolean = (function() {
+    function TaskWaitTokenBoolean(item) {
       TaskWaitToken.call(this, item);
-      this.klassName = "TaskWaitTokenArray";
+      this.klassName = "TaskWaitTokenBoolean";
     }
-    extend(TaskWaitTokenArray, TaskWaitToken);
+    extend(TaskWaitTokenBoolean, TaskWaitToken);
     
-    TaskWaitTokenArray.prototype.process = function() {
-      if (this.blocking) {
-        this.blocking = !!this.item.length;
-        if (!this.blocking) {
+    TaskWaitTokenBoolean.prototype.performWait = function() {
+      if (this._blocking) {
+        this._blocking = this.item;
+        if (!this._blocking) {
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
-    return TaskWaitTokenArray;
+    return TaskWaitTokenBoolean;
   })();
-
+  
   var TaskWaitTokenBlock = (function() {
     function TaskWaitTokenBlock(item) {
       TaskWaitToken.call(this, item);
@@ -143,14 +143,14 @@ define(function(require, exports, module) {
     }
     extend(TaskWaitTokenBlock, TaskWaitToken);
     
-    TaskWaitTokenBlock.prototype.process = function() {
-      if (this.blocking) {
-        this.blocking = this.item.blocking;
-        if (!this.blocking) {
+    TaskWaitTokenBlock.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.item.performWait(counterIncr);
+        if (!this._blocking) {
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitTokenBlock;
@@ -169,20 +169,20 @@ define(function(require, exports, module) {
         }
       });
       this.items = items;
-      this.blocking = true;
+      this._blocking = true;
     }
     extend(TaskWaitAND, TaskWaitToken);
     
-    TaskWaitAND.prototype.process = function(counterIncr) {
-      if (this.blocking) {
-        this.blocking = this.items.reduce(function(blocking, item) {
-          return item.process(counterIncr) || blocking;
+    TaskWaitAND.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.items.reduce(function(_blocking, item) {
+          return item.performWait(counterIncr) || _blocking;
         }, false);
       }
-      if (!this.blocking) {
+      if (!this._blocking) {
         this.emit("end");
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitAND;
@@ -201,20 +201,20 @@ define(function(require, exports, module) {
         }
       });
       this.items = items;
-      this.blocking = true;
+      this._blocking = true;
     }
     extend(TaskWaitOR, TaskWaitToken);
     
-    TaskWaitOR.prototype.process = function(counterIncr) {
-      if (this.blocking) {
-        this.blocking = this.items.reduce(function(blocking, item) {
-          return item.process(counterIncr) && blocking;
+    TaskWaitOR.prototype.performWait = function(counterIncr) {
+      if (this._blocking) {
+        this._blocking = this.items.reduce(function(_blocking, item) {
+          return item.performWait(counterIncr) && _blocking;
         }, true);
-        if (!this.blocking) {
+        if (!this._blocking) {
           this.emit("end");
         }
       }
-      return this.blocking;
+      return this._blocking;
     };
     
     return TaskWaitOR;
@@ -242,7 +242,7 @@ define(function(require, exports, module) {
     function Task() {
       emitter.mixin(this);
       this.klassName = "Task";
-      this.blocking  = true;
+      this._blocking  = true;
       this.timeline  = cc.timeline;
       this.context   = cc.createTaskContext(this);
       this._queue = [];
@@ -278,7 +278,7 @@ define(function(require, exports, module) {
       }
       this._bang = false;
       this.timeline = null;
-      this.blocking = false;
+      this._blocking = false;
       this.emit("end");
       if (this._next) {
         this._next._prev = null;
@@ -286,6 +286,9 @@ define(function(require, exports, module) {
         this._next = null;
       }
     });
+    Task.prototype.performWait = function() {
+      return this._blocking;
+    };
 
     // task chain methods
     Task.prototype["do"] = function(func) {
@@ -320,17 +323,17 @@ define(function(require, exports, module) {
     };
 
     
-    Task.prototype._push = function(that, func, args) {
+    Task.prototype.push = function(that, func, args) {
       if (typeof that === "function") {
         this._queue.push([that, null, args]);
       } else {
         this._queue.push([func, that, args]);
       }
     };
-    Task.prototype._done = function() {
+    Task.prototype.done = function() {
       // should be overridden
     };
-    Task.prototype._process = function(counterIncr) {
+    Task.prototype.process = function(counterIncr) {
       var timeline = this.timeline;
       var _queue   = this._queue;
       var continuance = false;
@@ -349,11 +352,10 @@ define(function(require, exports, module) {
           if (Array.isArray(e)) {
             e[0].apply(e[1], e[2]);
           } else {
-            if (e instanceof TaskWaitToken) {
-              e.process(counterIncr);
-            }
-            if (e.blocking) {
-              break LOOP;
+            if (e.performWait) {
+              if (e.performWait(counterIncr)) {
+                break LOOP;
+              }
             }
           }
           i += 1;
@@ -362,7 +364,7 @@ define(function(require, exports, module) {
         if (i) {
           _queue.splice(0, i);
           if (_queue.length === 0) {
-            continuance = this._done();
+            continuance = this.done();
           }
         }
       } while (continuance);
@@ -398,7 +400,7 @@ define(function(require, exports, module) {
     TaskDo.prototype._execute = function() {
       this.func.call(this.context, this._index);
     };
-    TaskDo.prototype._done = function() {
+    TaskDo.prototype.done = function() {
       this.stop();
     };
     
@@ -415,7 +417,7 @@ define(function(require, exports, module) {
     }
     extend(TaskLoop, TaskDo);
 
-    TaskLoop.prototype._done = function() {
+    TaskLoop.prototype.done = function() {
       this._bang = true;
     };
     
@@ -442,7 +444,7 @@ define(function(require, exports, module) {
         this.func.call(this.context, this.list[this._index], this._index);
       }
     };
-    TaskEach.prototype._done = function() {
+    TaskEach.prototype.done = function() {
       if (this._index < this.list.length) {
         this._bang = true;
       } else {
@@ -475,7 +477,7 @@ define(function(require, exports, module) {
     TaskTimeout.prototype._execute = function() {
       this.func.call(this.context, this._index);
     };
-    TaskTimeout.prototype._done = function() {
+    TaskTimeout.prototype.done = function() {
       if (this._index === 0) {
         this._bang = true;
         return true;
@@ -499,7 +501,7 @@ define(function(require, exports, module) {
     }
     extend(TaskInterval, TaskTimeout);
 
-    TaskInterval.prototype._done = function() {
+    TaskInterval.prototype.done = function() {
       this._bang = true;
       return true;
     };
@@ -514,7 +516,7 @@ define(function(require, exports, module) {
         count = 1;
       }
       this._count = count;
-      this.blocking = true;
+      this._blocking = true;
     }
     TaskBlock.prototype.lock = fn.sync(function(count) {
       if (typeof count !== "number") {
@@ -528,9 +530,12 @@ define(function(require, exports, module) {
       }
       this._count -= count;
       if (this._count <= 0) {
-        this.blocking = false;
+        this._blocking = false;
       }
     });
+    TaskBlock.prototype.performWait = function() {
+      return this._blocking;
+    };
     return TaskBlock;
   })();
   
@@ -572,16 +577,18 @@ define(function(require, exports, module) {
         return new TaskWaitTokenNumber(item);
       case "function":
         return new TaskWaitTokenFunction(item);
-      }
-      if (item) {
-        if (Array.isArray(item)) {
-          return new TaskWaitTokenArray(item);
+      case "boolean":
+        return new TaskWaitTokenBoolean(item);
+      default:
+        if (item) {
+          if (Array.isArray(item)) {
+            return cc.createTaskWaitLogic("and", item);
+          } else if (typeof item.performWait === "function") {
+            return new TaskWaitTokenBlock(item);
+          }
         }
-        if (typeof item.blocking === "boolean") {
-          return new TaskWaitTokenBlock(item);
-        }
       }
-      return new TaskWaitToken(!!item);
+      throw new TypeError("TaskWaitToken: Invalid type");
     };
     cc.createTaskWaitLogic = function(logic, list) {
       list = list.map(function(x) {
