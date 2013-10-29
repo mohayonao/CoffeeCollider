@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack  = require("../common/pack").pack;
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
   var commands = {};
   
   var SynthServer = (function() {
@@ -363,7 +363,7 @@ define(function(require, exports, module) {
         console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.server = server;
       this.server.exports = this;
       this.server._init(opts||{});

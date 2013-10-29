@@ -2,12 +2,12 @@ define(function(require, exports, module) {
   "use strict";
   
   var assert = require("chai").assert;
-  var Emitter = require("./emitter").Emitter;
+  var emitter = require("./emitter");
 
   describe("emitter.js", function() {
     var e;
     beforeEach(function() {
-      e = Emitter.bind({});
+      e = emitter.mixin({});
     });
     it("on", function() {
       var actual = 0;

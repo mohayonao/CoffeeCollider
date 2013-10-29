@@ -6,14 +6,14 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   var utils = require("./utils");
   var ugen  = require("./ugen/ugen");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
 
   var nodes = {};
   
   var Node = (function() {
     var nodeId = 0;
     function Node() {
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.klassName = "Node";
       this.blocking  = true;
       this.nodeId    = nodeId++;

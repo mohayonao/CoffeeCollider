@@ -5,21 +5,14 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var register  = require("./installer").register;
+  var object    = require("./object");
   var sched     = require("./sched");
-  var Timeline  = sched.Timeline;
-  var Task      = sched.TaskInterface;
-  var TaskDo    = sched.TaskDo;
-  var TaskLoop  = sched.TaskLoop;
-  var TaskEach  = sched.TaskEach;
-  var TaskTimeout  = sched.TaskTimeout;
-  var TaskInterval = sched.TaskInterval;
-  var TaskBlock = sched.TaskBlock;
   
   describe("sched.js", function() {
     var timeline, procN, procT;
     before(function() {
+      object.exports();
       sched.install();
-      sched.exports();
     });
     beforeEach(function() {
       timeline = cc.createTimeline({
@@ -36,19 +29,18 @@ define(function(require, exports, module) {
           timeline.process();
         }
       };
-      timeline.play();
+      timeline.play( (64 / 44100) * 1000 );
     });
     describe("TaskDo", function() {
       it("create", function() {
-        var t = Task.do(function() {});
-        assert.instanceOf(t, TaskDo);
+        var t = cc.createTaskDo(function() {});
+        assert.equal(t.klassName, "TaskDo");
       });
       it("sync", function() {
         var actual = 0;
-        var t = Task.do(function() {
+        var t = cc.createTaskDo(function() {
           actual = 1;
-          this.wait(100);
-          this.wait(function() {
+          this.wait(100).on("end", function() {
             actual = 2;
           });
           this.wait(100);
@@ -66,10 +58,9 @@ define(function(require, exports, module) {
       });
       it("pause", function() {
         var actual = 0;
-        var t = Task.do(function() {
+        var t = cc.createTaskDo(function() {
           actual = 1;
-          this.wait(100);
-          this.wait(function() {
+          this.wait(100).on("end", function() {
             actual = 2;
           });
           this.wait(100);
@@ -91,10 +82,9 @@ define(function(require, exports, module) {
       });
       it("stop", function() {
         var actual = 0;
-        var t = Task.do(function() {
+        var t = cc.createTaskDo(function() {
           actual = 1;
-          this.wait(100);
-          this.wait(function() {
+          this.wait(100).on("end", function() {
             throw "should not pass through";
           });
         }).on("end", function() {
@@ -112,12 +102,12 @@ define(function(require, exports, module) {
     });
     describe("TaskLoop", function() {
       it("create", function() {
-        var t = Task.loop(function() {})
-        assert.instanceOf(t, TaskLoop);
+        var t = cc.createTaskLoop(function() {})
+        assert.equal(t.klassName, "TaskLoop");
       });
       it("sync", function() {
         var actual = 0;
-        var t = Task.loop(function() {
+        var t = cc.createTaskLoop(function() {
           actual += 1;
           this.wait(100);
         }).on("end", function() {
@@ -135,12 +125,12 @@ define(function(require, exports, module) {
     });
     describe("TaskEach", function() {
       it("create", function() {
-        var t = Task.each([], function() {});
-        assert.instanceOf(t, TaskEach);
+        var t = cc.createTaskEach([], function() {});
+        assert.equal(t.klassName, "TaskEach");
       });
       it("sync", function() {
         var actual = 0;
-        var t = Task.each([1,2,3], function(i) {
+        var t = cc.createTaskEach([1,2,3], function(i) {
           actual = i;
           this.wait(100);
         }).on("end", function() {
@@ -160,12 +150,12 @@ define(function(require, exports, module) {
     });
     describe("TaskTimeout", function() {
       it("create", function() {
-        var t = Task.timeout(0, function() {});
-        assert.instanceOf(t, TaskTimeout);
+        var t = cc.createTaskTimeout(0, function() {});
+        assert.equal(t.klassName, "TaskTimeout");
       });
       it("sync", function() {
         var actual = 0;
-        var t = Task.timeout(10, function(i) {
+        var t = cc.createTaskTimeout(10, function(i) {
           actual = 1;
           this.wait(100);
         }).on("end", function() {
@@ -183,12 +173,12 @@ define(function(require, exports, module) {
     });
     describe("TaskInterval", function() {
       it("create", function() {
-        var t = Task.interval(0, function() {});
-        assert.instanceOf(t, TaskInterval);
+        var t = cc.createTaskInterval(0, function() {});
+        assert.equal(t.klassName, "TaskInterval");
       });
       it("sync", function() {
         var actual = 0;
-        var t = Task.interval(10, function(i) {
+        var t = cc.createTaskInterval(10, function(i) {
           actual += 1;
           this.wait(100);
         }).on("end", function() {
@@ -207,21 +197,19 @@ define(function(require, exports, module) {
     });
     describe("TaskBlock", function() {
       it("create", function() {
-        var t = Task.block();
-        assert.instanceOf(t, TaskBlock);
+        var t = cc.createTaskBlock();
+        assert.equal(t.klassName, "TaskBlock");
       });
       it("sync", function() {
         var actual = 0;
-        var block1 = Task.block();
-        var block2 = Task.block();
-        var t = Task.do(function() {
+        var block1 = cc.createTaskBlock();
+        var block2 = cc.createTaskBlock();
+        var t = cc.createTaskDo(function() {
           actual = 1;
-          this.wait(block1);
-          this.wait(function() {
+          this.wait(block1).on("end", function() {
             actual = 2;
           });
-          this.wait(block2);
-          this.wait(function() {
+          this.wait(block2).on("end", function() {
             actual = 3;
           });
         }).on("end", function() {
@@ -248,10 +236,10 @@ define(function(require, exports, module) {
     });
     it("nesting", function() {
       var actual = 0;
-      var t = Task.do(function() {
+      var t = cc.createTaskDo(function() {
         actual = 1;
         this.wait(100);
-        var tt = Task.each([2,3], function(i) {
+        var tt = cc.createTaskEach([2,3], function(i) {
           actual = i;
           this.wait(100);
         }).play();
@@ -272,7 +260,7 @@ define(function(require, exports, module) {
     });
     it("chain", function() {
       var actual = 0;
-      var t = Task.do(function() {
+      var t = cc.createTaskDo(function() {
         actual = 1;
         this.wait(100);
       }).do(function() {
@@ -290,142 +278,170 @@ define(function(require, exports, module) {
       procT(100);
       assert.equal(actual, 3);
     });
-    describe("__and__", function() {
-      it("__and__", function() {
-        var actual = [0];
-        Task.do(function() {
-          actual.push(1);
-          var t1 = Task.do(function() {
-            actual.push(2);
-            this.wait(200);
-          }).on("end", function() {
-            actual.push(3);
-          }).play();
-          var t2 = Task.do(function() {
-            actual.push(4);
-            this.wait(300);
-          }).on("end", function() {
-            actual.push(5);
-          }).play();
-          this.wait(t1.__and__(t2).__and__(100));
-        }).on("end", function() {
-          actual.push(6);
-        }).play();
-        
-        assert.deepEqual(actual, [0]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5, 6]);
+
+    describe("TaskWaitToken", function() {
+      var emitted;
+      beforeEach(function() {
+        emitted = false;
       });
-      it("__and__ with array", function() {
-        var actual = [0];
-        Task.do(function() {
-          actual.push(1);
-          var t1 = Task.do(function() {
-            actual.push(2);
-            this.wait(200);
-          }).on("end", function() {
-            actual.push(3);
-          }).play();
-          var t2 = Task.do(function() {
-            actual.push(4);
-            this.wait(300);
-          }).on("end", function() {
-            actual.push(5);
-          }).play();
-          this.wait(1..__and__([t1, t2]));
+      it("number", function() {
+        var t = cc.createTaskWaitToken(10).on("end", function() {
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitTokenNumber");
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, true);
+      });
+      it("function", function() {
+        var cnt = 2;
+        var t = cc.createTaskWaitToken(function() {
+          cnt -= 1;
+          return cnt > 0;
         }).on("end", function() {
-          actual.push(6);
-        }).play();
-        
-        assert.deepEqual(actual, [0]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4, 3, 5, 6]);
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitTokenFunction");
+        assert.equal(emitted, false);
+        t.process(1);
+        assert.equal(emitted, false);
+        t.process(1);
+        assert.equal(emitted, true);
+      });
+      it("array", function() {
+        var list = [ 1, 2, 3 ];
+        var t = cc.createTaskWaitToken(list).on("end", function() {
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitTokenArray");
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, false);
+        list.splice(0);
+        t.process(5);
+        assert.equal(emitted, true);
+      });
+      it("block", function() {
+        var obj = { blocking:true };
+        var t = cc.createTaskWaitToken(obj).on("end", function() {
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitTokenBlock");
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, false);
+        obj.blocking = false;
+        t.process(5);
+        assert.equal(emitted, true);
+      });
+      it("true (infinity block)", function() {
+        var t = cc.createTaskWaitToken(true).on("end", function() {
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitToken");
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, false);
+      });
+      it("false (not block)", function() {
+        var t = cc.createTaskWaitToken(false).on("end", function() {
+          emitted = true;
+        });
+        assert.equal(t.klassName, "TaskWaitToken");
+        assert.equal(emitted, false);
+        t.process(5);
+        assert.equal(emitted, true);
+      });
+      it("pass", function() {
+        var t1 = cc.createTaskWaitToken(10);
+        var t2 = cc.createTaskWaitToken(t1);
+        assert.equal(t1, t2);
       });
     });
-    describe("__or__", function() {
-      it("__or__", function() {
-        var actual = [0];
-        Task.do(function() {
-          actual.push(1);
-          var t1 = Task.do(function() {
-            actual.push(2);
-            this.wait(200);
-          }).on("end", function() {
-            actual.push(3);
-          }).play();
-          var t2 = Task.do(function() {
-            actual.push(4);
-            this.wait(300);
-          }).on("end", function() {
-            actual.push(5);
-          }).play();
-          this.wait(t1.__or__(t2).__or__(100));
-        }).on("end", function() {
-          actual.push(6);
-        }).play();
-        
-        assert.deepEqual(actual, [0]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+    describe("TaskWaitLogic", function() {
+      var emitted;
+      beforeEach(function() {
+        emitted = [];
       });
-      it("__or__ with array", function() {
-        var actual = [0];
-        Task.do(function() {
-          actual.push(1);
-          var t1 = Task.do(function() {
-            actual.push(2);
-            this.wait(200);
-          }).on("end", function() {
-            actual.push(3);
-          }).play();
-          var t2 = Task.do(function() {
-            actual.push(4);
-            this.wait(300);
-          }).on("end", function() {
-            actual.push(5);
-          }).play();
-          this.wait(t1.__or__([t2, 100]));
-        }).on("end", function() {
-          actual.push(6);
-        }).play();
-        
-        assert.deepEqual(actual, [0]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3]);
-        procT(100);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
-        procN(1);
-        assert.deepEqual(actual, [0, 1, 2, 4, 6, 3, 5]);
+      it("and", function() {
+        var t1 = cc.createTaskWaitToken(10).on("end", function() {
+          emitted.push(1);
+        });
+        var t2 = cc.createTaskWaitToken(20).on("end", function() {
+          emitted.push(2);
+        });
+        var t3 = cc.createTaskWaitToken(15).on("end", function() {
+          emitted.push(3);
+        });
+        var t = cc.createTaskWaitLogic("and", [t1,t2,t3]).on("end", function() {
+          emitted.push(4);
+        });
+        assert.equal(t.klassName, "TaskWaitAND");
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, [1]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 3]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 3, 2, 4]);
+      });
+      it("or", function() {
+        var t1 = cc.createTaskWaitToken(10).on("end", function() {
+          emitted.push(1);
+        });
+        var t2 = cc.createTaskWaitToken(20).on("end", function() {
+          emitted.push(2);
+        });
+        var t3 = cc.createTaskWaitToken(15).on("end", function() {
+          emitted.push(3);
+        });
+        var t = cc.createTaskWaitLogic("or", [t1,t2,t3]).on("end", function() {
+          emitted.push(4);
+        });
+        assert.equal(t.klassName, "TaskWaitOR");
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 4]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 4]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 4]);
+      });
+      it("and/or", function() {
+        var t1 = cc.createTaskWaitToken(10).on("end", function() {
+          emitted.push(1);
+        });
+        var t2 = cc.createTaskWaitToken(20).on("end", function() {
+          emitted.push(2);
+        });
+        var t3 = cc.createTaskWaitToken(15).on("end", function() {
+          emitted.push(3);
+        });
+        var t4 = cc.createTaskWaitLogic("and", [t1,t2]).on("end", function() {
+          emitted.push(4);
+        });
+        var t = cc.createTaskWaitLogic("or", [t3, t4]).on("end", function() {
+          emitted.push(5);
+        });
+        assert.equal(t.klassName, "TaskWaitOR");
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, []);
+        t.process(5);
+        assert.deepEqual(emitted, [1]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 3, 5]);
+        t.process(5);
+        assert.deepEqual(emitted, [1, 3, 5]);
       });
     });
   });
-
 });

@@ -14,7 +14,7 @@ define(function(require, exports, module) {
       this.strmLength = 0;
       this.bufLength  = 0;
       this.rootNode   = cc.createGroup();
-      this.timeline   = cc.createTimeline(this);
+      this.timeline   = cc.createTimeline();
       this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
@@ -51,7 +51,7 @@ define(function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthClient.prototype.play = function(msg) {
-      this.timeline.play();
+      this.timeline.play((this.bufLength / this.sampleRate) * 1000);
       this.sendToServer(msg);
     };
     SynthClient.prototype.pause = function(msg) {

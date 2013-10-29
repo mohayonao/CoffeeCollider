@@ -3,14 +3,14 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var extend = require("../common/extend");
-  var Emitter  = require("../common/emitter").Emitter;
+  var emitter  = require("../common/emitter");
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;
   
   var CoffeeCollider = (function() {
     function CoffeeCollider(opts) {
-      Emitter.bind(this);
+      emitter.mixin(this);
       opts = opts || {};
       this.version = cc.version;
       if (opts.socket) {

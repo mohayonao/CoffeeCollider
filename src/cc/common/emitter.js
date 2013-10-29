@@ -61,20 +61,22 @@ define(function(require, exports, module) {
       }
       return this;
     };
-    Emitter.bind = function(obj) {
-      ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
-        if (!obj[method]) {
-          obj[method] = Emitter.prototype[method];
-        }
-      });
-      Emitter.call(obj);
-      return obj;
-    };
     return Emitter;
   })();
-
+  
+  var mixin = function(obj) {
+    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+      if (!obj[method]) {
+        obj[method] = Emitter.prototype[method];
+      }
+    });
+    Emitter.call(obj);
+    return obj;
+  };
+  
   module.exports = {
-    Emitter: Emitter
+    Emitter: Emitter,
+    mixin: mixin
   };
 
 });

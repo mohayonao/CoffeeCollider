@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend = require("../common/extend");
-  var Emitter = require("../common/emitter").Emitter;
+  var emitter = require("../common/emitter");
 
   var bufSrcId = 0;
   var bufferSrcCache = {};
@@ -12,7 +12,7 @@ define(function(require, exports, module) {
   var AudioBuffer = (function() {
     var bufId = 0;
     function AudioBuffer() {
-      Emitter.bind(this);
+      emitter.mixin(this);
       this.klassName = "Buffer";
       // TODO: set below parameters
       this.frames     = 0;

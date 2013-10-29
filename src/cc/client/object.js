@@ -138,12 +138,25 @@ define(function(require, exports, module) {
       return this;
     });
 
+    setup("__and__",function(b) {
+      return cc.createTaskWaitLogic("and", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__and__", function(b) {
+      return cc.createTaskWaitLogic("and", this.concat(b));
+    });
+    
+    setup("__or__", function(b) {
+      return cc.createTaskWaitLogic("or", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__or__", function(b) {
+      return cc.createTaskWaitLogic("or", this.concat(b));
+    });
   };
   
   cc.once("basic_ops.js", function(payload) {
     MulAdd = payload.MulAdd;
   });
-
+  
   module.exports = {
     exports: exports
   };
