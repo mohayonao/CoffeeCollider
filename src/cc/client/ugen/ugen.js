@@ -245,7 +245,7 @@ define(function(require, exports, module) {
     Out         : Out,
     setSynthDef : setSynthDef,
     register: register,
-    install: function() {
+    exports: function() {
       register("Out", iOut);
       register("In" , iIn );
     }

@@ -1986,7 +1986,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     Out         : Out,
     setSynthDef : setSynthDef,
     register: register,
-    install: function() {
+    exports: function() {
       register("Out", iOut);
       register("In" , iIn );
     }
@@ -5321,12 +5321,12 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           replaceable = false;
         }
         break;
-      case "(": case "[": case "{": case "PARAM_START": case "CALL_START":
+      case "{": case "PARAM_START": case "CALL_START":
         if (replaceable) {
           bracket += 1;
         }
         break;
-      case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
+      case "CALL_END": case "PARAM_END": case "}":
         if (replaceable) {
           bracket -= 1;
         }
