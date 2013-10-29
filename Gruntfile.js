@@ -233,7 +233,8 @@ module.exports = function(grunt) {
     var Mocha = require("mocha");
     var mocha = new Mocha();
     var exclusive = hasExclusiveTest();
-    
+
+    global.require = require;
     global.C = grunt.file.readJSON("src/const.json");
 
     var reporter = "dot";

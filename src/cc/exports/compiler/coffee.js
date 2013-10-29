@@ -5,9 +5,7 @@ define(function(require, exports, module) {
     if (global.CoffeeScript) {
       return global.CoffeeScript;
     }
-    try {
-      return require(["coffee-script"][0]);
-    } catch(e) {}
+    return global.require("coffee-script");
   })();
 
   var timevalue = require("../../common/timevalue").calc;
