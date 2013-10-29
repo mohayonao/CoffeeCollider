@@ -9,8 +9,8 @@ define(function(require, exports, module) {
 
   describe("bop.js", function() {
     before(function() {
-      object.install();
-      bop.install();
+      object.exports();
+      bop.exports();
     });
     describe("__add__", function() {
       it("num + ary", function() {

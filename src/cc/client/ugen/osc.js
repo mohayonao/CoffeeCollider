@@ -18,12 +18,10 @@ define(function(require, exports, module) {
     }
   };
   
-  var install = function() {
-    ugen.register("SinOsc", iSinOsc);
-  };
-  
   module.exports = {
-    install: install
+    exports: function() {
+      ugen.register("SinOsc", iSinOsc);
+    }
   };
 
 });

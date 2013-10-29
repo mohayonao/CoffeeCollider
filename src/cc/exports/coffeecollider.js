@@ -3,9 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var extend = require("../common/extend");
-  var Compiler = require("./compiler/coffee").Compiler;
   var Emitter  = require("../common/emitter").Emitter;
-  var AudioAPI = require("../common/audioapi").AudioAPI;
   var unpack   = require("../common/pack").unpack;
   var commands = {};
   var slice    = [].slice;
@@ -16,7 +14,7 @@ define(function(require, exports, module) {
       opts = opts || {};
       this.version = cc.version;
       if (opts.socket) {
-        var impl  = new CoffeeColliderSocketImpl(this, opts);
+        var impl  = cc.createCoffeeColliderSocketImpl(this, opts);
         this.impl = impl;
         this.socket = {
           open: function() {
@@ -31,15 +29,14 @@ define(function(require, exports, module) {
         };
         cc.opmode = "socket";
       } else if (opts.iframe) {
-        this.impl = new CoffeeColliderIFrameImpl(this, opts);
+        this.impl = cc.createCoffeeColliderIFrameImpl(this, opts);
         cc.opmode = "iframe";
       } else {
-        this.impl = new CoffeeColliderWorkerImpl(this, opts);
+        this.impl = cc.createCoffeeColliderWorkerImpl(this, opts);
         cc.opmode = "worker";
       }
       this.sampleRate = this.impl.sampleRate;
       this.channels   = this.impl.channels;
-      this.compiler   = this.impl.compiler;
     }
     
     CoffeeCollider.prototype.play = function() {
@@ -76,7 +73,7 @@ define(function(require, exports, module) {
     function CoffeeColliderImpl(exports, opts) {
       var that = this;
       this.exports  = exports;
-      this.compiler = new Compiler();
+      this.compiler = cc.createCompiler("coffee");
       
       this.isPlaying = false;
       this.execId = 0;
@@ -84,7 +81,7 @@ define(function(require, exports, module) {
 
       this.sampleRate = 44100;
       this.channels   = 2;
-      this.api = new AudioAPI(this, opts);
+      this.api = cc.createAudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
       this.strm  = new Int16Array(this.strmLength * this.channels);
@@ -96,7 +93,7 @@ define(function(require, exports, module) {
       this.api.init();
 
       var syncItems = new Uint8Array(C.SYNC_ITEM_LEN);
-      if (opts.mouse !== false) {
+      if (typeof window !== "undefined" && opts.mouse !== false) {
         var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
           f32_syncItems[C.POS_X] = e.pageX / window.innerWidth;
@@ -227,19 +224,16 @@ define(function(require, exports, module) {
         callback(null);
         return;
       }
-      var decode = function(buffer) {
-        api.decodeAudioFile(buffer, function(buffer) {
-          callback(buffer);
-        });
-      };
-      var xhr = new XMLHttpRequest();
+      var xhr = cc.createXMLHttpRequest();
       xhr.open("GET", path);
       xhr.responseType = "arraybuffer";
       xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
           if (xhr.status === 200 && xhr.response) {
             if (callback) {
-              decode(xhr.response);
+              api.decodeAudioFile(xhr.response, function(buffer) {
+                callback(buffer);
+              });
             }
           } else {
             callback(null);
@@ -265,7 +259,7 @@ define(function(require, exports, module) {
       this.bufLength  = C.WORKER_BUF_LENGTH;
       CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
-      this.client = new Worker(cc.coffeeColliderPath);
+      this.client = cc.createWebWorker(cc.coffeeColliderPath);
       this.client.onmessage = function(e) {
         that.recvFromClient(e.data);
       };
@@ -282,17 +276,11 @@ define(function(require, exports, module) {
       this.bufLength  = C.IFRAME_BUF_LENGTH;
       CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
-      var iframe = document.createElement("iframe");
-      iframe.style.width  = 0;
-      iframe.style.height = 0;
-      iframe.style.border = 0;
-      document.body.appendChild(iframe);
-
-      this.iframe = iframe;
+      var iframe = this.iframe = cc.createHTMLIFrameElement();
       // TODO: want to remove 'allow-same-origin'
       iframe.sandbox = "allow-scripts allow-same-origin";
       iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#iframe'></script>";
-      var channel = new MessageChannel();
+      var channel = cc.createMessageChannel();
       iframe.onload = function() {
         iframe.contentWindow.postMessage(null, [channel.port2], "*");
       };
@@ -313,16 +301,10 @@ define(function(require, exports, module) {
       this.bufLength  = C.SOCKET_BUF_LENGTH;
       CoffeeColliderImpl.call(this, exports, opts);
       var that = this;
-      var iframe = document.createElement("iframe");
-      iframe.style.width  = 0;
-      iframe.style.height = 0;
-      iframe.style.border = 0;
-      document.body.appendChild(iframe);
-
-      this.iframe = iframe;
+      var iframe = this.iframe = cc.createHTMLIFrameElement();
       iframe.sandbox = "allow-scripts";
       iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
-      var channel = new MessageChannel();
+      var channel = cc.createMessageChannel();
       iframe.onload = function() {
         iframe.contentWindow.postMessage(opts.socket, [channel.port2], "*");
       };
@@ -366,8 +348,30 @@ define(function(require, exports, module) {
   };
   require("../common/console").bindConsoleApply(commands);
   
+  var install = function() {
+    require("../common/browser").install();
+    require("../common/audioapi").install();
+    require("./compiler/installer").install();
+    cc.createCoffeeCollider = function(opts) {
+      return new CoffeeCollider(opts);
+    };
+    cc.createCoffeeColliderImpl = function(exports, opts) {
+      return new CoffeeColliderImpl(exports, opts);
+    };
+    cc.createCoffeeColliderWorkerImpl = function(exports, opts) {
+      return new CoffeeColliderWorkerImpl(exports, opts);
+    };
+    cc.createCoffeeColliderIFrameImpl = function(exports, opts) {
+      return new CoffeeColliderIFrameImpl(exports, opts);
+    };
+    cc.createCoffeeColliderSocketImpl = function(exports, opts) {
+      return new CoffeeColliderSocketImpl(exports, opts);
+    };
+  };
+  
   module.exports = {
-    CoffeeCollider: CoffeeCollider
+    CoffeeCollider: CoffeeCollider,
+    install: install
   };
 
 });

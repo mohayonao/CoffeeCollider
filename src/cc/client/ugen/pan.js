@@ -29,12 +29,10 @@ define(function(require, exports, module) {
     },
   };
   
-  var install = function() {
-    ugen.register("Pan2", iPan2);
-  };
-  
   module.exports = {
-    install: install
+    exports: function() {
+      ugen.register("Pan2", iPan2);
+    }
   };
 
 });

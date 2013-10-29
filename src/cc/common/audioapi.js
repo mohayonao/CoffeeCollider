@@ -285,9 +285,15 @@ define(function(require, exports, module) {
       return NodeAudioAPI;
     })();
   }
+
+  var install = function() {
+    cc.createAudioAPI = function(sys, opts) {
+      return new AudioAPI(sys, opts);
+    };
+  };
   
   module.exports = {
-    AudioAPI: AudioAPI
+    install: install
   };
 
 });

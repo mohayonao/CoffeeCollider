@@ -4,10 +4,6 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack   = require("../common/pack").pack;
-  var timer  = require("../common/timer");
-  var Timeline = require("./sched").Timeline;
-  var node     = require("./node");
-  var buffer   = require("./buffer");
   var commands = {};
   
   var SynthClient = (function() {
@@ -17,8 +13,8 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.rootNode   = new node.Group();
-      this.timeline   = new Timeline(this);
+      this.rootNode   = cc.createGroup();
+      this.timeline   = cc.createTimeline(this);
       this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
@@ -62,9 +58,9 @@ define(function(require, exports, module) {
       this.sendToServer(msg);
     };
     SynthClient.prototype.reset = function(msg) {
-      buffer.reset();
-      node.reset();
-      timer.resetNativeTimers();
+      cc.resetBuffer();
+      cc.resetNode();
+      cc.resetNativeTimers();
       this.timeline.reset();
       this.sendToServer(msg);
     };
@@ -108,6 +104,7 @@ define(function(require, exports, module) {
   
   
   var IFrameSynthClient = (function() {
+    require("../common/browser").install();
     function IFrameSynthClient() {
       SynthClient.call(this);
       var that = this;
@@ -115,7 +112,7 @@ define(function(require, exports, module) {
       this.channels   = C.IFRAME_CHANNELS;
       this.strmLength = C.IFRAME_STRM_LENGTH;
       this.bufLength  = C.IFRAME_BUF_LENGTH;
-      this.server = new Worker(cc.coffeeColliderPath);
+      this.server = cc.createWebWorker(cc.coffeeColliderPath);
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
       };
@@ -144,6 +141,7 @@ define(function(require, exports, module) {
 
 
   var SocketSynthClient = (function() {
+    require("../common/browser").install();
     function SocketSynthClient() {
       SynthClient.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
@@ -156,7 +154,7 @@ define(function(require, exports, module) {
 
     SocketSynthClient.prototype.openSocket = function() {
       var that = this;
-      var socket   = this.socket = new WebSocket(this.socketPath);
+      var socket   = this.socket = cc.createWebSocket(this.socketPath);
       var pendings = [];
       socket.binaryType = "arraybuffer";
       socket.onopen = function() {
@@ -291,7 +289,7 @@ define(function(require, exports, module) {
   };
   commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
-    var n = node.get(nodeId);
+    var n = cc.getNode(nodeId);
     if (n) {
       n.emit("end");
     }
@@ -299,51 +297,75 @@ define(function(require, exports, module) {
   commands["/emit/n_done"] = function(msg) {
     var nodeId = msg[1]|0;
     var tag    = msg[2];
-    var n = node.get(nodeId);
+    var n = cc.getNode(nodeId);
     if (n) {
       n.emit("done", tag);
     }
   };
   
-  var listener = function(e) {
-    var msg = e.data;
-    if (msg instanceof Uint8Array) {
-      cc.client.sendToServer(msg);
-    } else {
-      cc.client.recvFromIF(msg);
-    }
-  };
-  
   var install = function() {
-    var client;
-    switch (cc.opmode) {
-    case "socket":
-      client = new SocketSynthClient();
-      window.onmessage = function(e) {
-        e.ports[0].onmessage = listener;
-        client.sendToIF = function(msg) {
-          e.ports[0].postMessage(msg);
+    require("../common/timer").install();
+    require("./buffer").install();
+    require("./node").install();
+    require("./sched").install();
+    require("./exports").install();
+    
+    cc.createSynthClient = function() {
+      cc.exports();
+      switch (cc.opmode) {
+      case "worker":
+        return cc.createWorkerSynthClient();
+      case "iframe":
+        return cc.createIFrameSynthClient();
+      case "socket":
+        return cc.createSocketSynthClient();
+      }
+      throw new Error("A SynthClient is not defined for: " + cc.opmode);
+    };
+    var onmessage = function(e) {
+      var msg = e.data;
+      if (msg instanceof Uint8Array) {
+        cc.client.sendToServer(msg);
+      } else {
+        cc.client.recvFromIF(msg);
+      }
+    };
+    cc.createWorkerSynthClient = function() {
+      var client = new WorkerSynthClient();
+      global.onmessage = onmessage;
+      cc.opmode = "worker";
+      return client;
+    };
+    cc.createIFrameSynthClient = function() {
+      var client = new IFrameSynthClient();
+      if (typeof window !== "undefined") {
+        window.onmessage = function(e) {
+          e.ports[0].onmessage = onmessage;
+          client.sendToIF = function(msg) {
+            e.ports[0].postMessage(msg);
+          };
+          window.onmessage = null;
         };
-        client.socketPath = e.data;
-        window.onmessage = null;
-      };
-      break;
-    case "iframe":
-      client = new IFrameSynthClient();
-      window.onmessage = function(e) {
-        e.ports[0].onmessage = listener;
-        client.sendToIF = function(msg) {
-          e.ports[0].postMessage(msg);
+      }
+      cc.opmode = "iframe";
+      return client;
+    };
+    cc.createSocketSynthClient = function() {
+      var client = new SocketSynthClient();
+      if (typeof window !== "undefined") {
+        window.onmessage = function(e) {
+          e.ports[0].onmessage = onmessage;
+          client.sendToIF = function(msg) {
+            e.ports[0].postMessage(msg);
+          };
+          client.socketPath = e.data;
+          window.onmessage = null;
         };
-        window.onmessage = null;
-      };
-      break;
-    default: // "worker"
-      client = new WorkerSynthClient();
-      global.onmessage = listener;
-    }
-    timer.replaceNativeTimerFunctions();
-    cc.client = client;
+      }
+      cc.opmode = "socket";
+      return client;
+    };
+    cc.replaceNativeTimerFunctions();
   };
   
   module.exports = {

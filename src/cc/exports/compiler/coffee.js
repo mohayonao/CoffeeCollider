@@ -1,6 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
-
+  
+  var cc = require("../../cc");
+  
   var CoffeeScript = (function() {
     if (global.CoffeeScript) {
       return global.CoffeeScript;
@@ -627,6 +629,12 @@ define(function(require, exports, module) {
     return Compiler;
   })();
 
+  var install = function() {
+    cc.createCoffeeCompiler = function() {
+      return new Compiler();
+    };
+  };
+  
   module.exports = {
     Compiler  : Compiler,
     dumpTokens: dumpTokens,
@@ -644,6 +652,7 @@ define(function(require, exports, module) {
     replaceGlobal        : replaceGlobal,
     cleanupParenthesis   : cleanupParenthesis,
     insertReturn         : insertReturn,
+    install: install,
   };
 
 });

@@ -19,7 +19,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: function() {
+    exports: function() {
       ugen.register("CombN", iComb);
       ugen.register("CombL", iComb);
       ugen.register("CombC", iComb);

@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("./cc");
   var node = require("./node");
   var commands = require("./commands");
   
@@ -190,9 +191,16 @@ define(function(require, exports, module) {
     
     return Instance;
   })();
+
+  var install = function() {
+    cc.createInstanceManager = function() {
+      return new InstanceManager();
+    };
+  };
   
   module.exports = {
-    InstanceManager: InstanceManager
+    InstanceManager: InstanceManager,
+    install: install
   };
 
 });

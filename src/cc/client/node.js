@@ -523,6 +523,14 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
+    cc.createGroup = function(target, addAction) {
+      return new Group(target, addAction);
+    };
+    cc.getNode   = get;
+    cc.resetNode = reset;
+  };
+
+  exports = function() {
     global.Group = GroupInterface;
     global.Synth = SynthInterface;
   };
@@ -531,9 +539,8 @@ define(function(require, exports, module) {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    get    : get,
-    reset  : reset,
     install: install,
+    exports: exports,
   };
 
 });

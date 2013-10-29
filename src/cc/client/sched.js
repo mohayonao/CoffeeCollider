@@ -7,12 +7,13 @@ define(function(require, exports, module) {
   var Emitter = require("../common/emitter").Emitter;
   
   var Timeline = (function() {
-    function Timeline() {
+    function Timeline(client) {
       this.klassName = "Timeline";
+      this._client  = client;
       this.reset();
     }
     Timeline.prototype.play = function() {
-      this.counterIncr = (cc.client.bufLength / cc.client.sampleRate) * 1000;
+      this.counterIncr = (this._client.bufLength / this._client.sampleRate) * 1000;
     };
     Timeline.prototype.pause = function() {
     };
@@ -49,11 +50,11 @@ define(function(require, exports, module) {
   })();
 
   var Task = (function() {
-    function Task(timeline) {
+    function Task() {
       Emitter.bind(this);
       this.klassName = "Task";
       this.blocking  = true;
-      this.timeline = timeline || cc.client.timeline;
+      this.timeline  = cc.timeline;
       this.context = new TaskContext(this);
       this._queue = [];
       this._bang  = false;
@@ -483,35 +484,41 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
-    global.Task = TaskInterface;
-    
-    // TODO: should be moved
-    cc.Object.prototype.__and__ = function(b) {
-      return new TaskWaitTokenAND([this].concat(b));
+    cc.createTimeline = function(client) {
+      cc.timeline = new Timeline(client);
+      return cc.timeline;
     };
-    Number.prototype.__and__ = function(b) {
+  };
+  
+  exports = function() {
+    global.Task = TaskInterface;
+
+    fn.definePrototypeProperty(cc.Object, "__and__", function(b) {
+      return new TaskWaitTokenAND([this].concat(b));
+    });
+    fn.definePrototypeProperty(Number, "__and__", function(b) {
       var a = this;
       if (typeof b === "number") {
         return new TaskWaitToken(Math.max(a, b));
       }
       return new TaskWaitTokenAND([a].concat(b));
-    };
-    Array.prototype.__and__ = function(b) {
+    });
+    fn.definePrototypeProperty(Array, "__and__", function(b) {
       return new TaskWaitTokenAND(this.concat(b));
-    };
-    cc.Object.prototype.__or__ = function(b) {
+    });
+    fn.definePrototypeProperty(cc.Object, "__or__", function(b) {
       return new TaskWaitTokenOR([this].concat(b));
-    };
-    Number.prototype.__or__ = function(b) {
+    });
+    fn.definePrototypeProperty(Number, "__or__", function(b) {
       var a = this;
       if (typeof b === "number") {
-        return new TaskWaitToken(Math.max(a, b));
+        return new TaskWaitToken(Math.minx(a, b));
       }
       return new TaskWaitTokenOR([a].concat(b));
-    };
-    Array.prototype.__or__ = function(b) {
+    });
+    fn.definePrototypeProperty(Array, "__or__", function(b) {
       return new TaskWaitTokenOR(this.concat(b));
-    };
+    });
   };
   
   module.exports = {
@@ -525,7 +532,9 @@ define(function(require, exports, module) {
     TaskInterval: TaskInterval,
     TaskBlock: TaskBlock,
     TaskInterface: TaskInterface,
-    install: install
+    
+    install: install,
+    exports: exports,
   };
 
 });

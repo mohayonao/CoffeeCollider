@@ -193,11 +193,6 @@ define(function(require, exports, module) {
     addToSynthDef = func;
   };
   
-  var install = function() {
-    register("Out", iOut);
-    register("In" , iIn );
-  };
-  
   var register = function(name, payload) {
     var klass = global[name] = function() {
       return new UGen(name);
@@ -250,7 +245,10 @@ define(function(require, exports, module) {
     Out         : Out,
     setSynthDef : setSynthDef,
     register: register,
-    install: install,
+    install: function() {
+      register("Out", iOut);
+      register("In" , iIn );
+    }
   };
 
 });

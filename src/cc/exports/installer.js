@@ -1,10 +1,13 @@
 define(function(require, exports, module) {
   "use strict";
-  
-  var CoffeeCollider = require("./coffeecollider").CoffeeCollider;
+
+  var cc = require("../cc");
   
   var install = function() {
-    global.CoffeeCollider = CoffeeCollider;
+    require("./coffeecollider").install();
+    global.CoffeeCollider = function(opts) {
+      return cc.createCoffeeCollider(opts);
+    };
   };
   
   module.exports = {

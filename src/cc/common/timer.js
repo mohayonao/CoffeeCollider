@@ -1,6 +1,8 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("../cc");
+  
   // save native timer functions
   var _setInterval   = setInterval;
   var _clearInterval = clearInterval;
@@ -108,10 +110,6 @@ define(function(require, exports, module) {
     global.clearInterval = _clearInterval;
     global.setTimeout    = _setTimeout;
     global.clearTimeout  = _clearTimeout;
-    console.log(!!global.setInterval);
-    console.log(!!global.clearInterval);
-    console.log(!!global.setTimeout);
-    console.log(!!global.clearTimeout);
   };
   var resetNativeTimers = function() {
     timerIdCache.splice(0).forEach(function(timerId) {
@@ -119,12 +117,25 @@ define(function(require, exports, module) {
       _clearTimeout(timerId);
     });
   };
+
+  var install = function() {
+    cc.createTimer = function() {
+      if (WorkerTimer) {
+        return new WorkerTimer();
+      }
+      return new NativeTimer();
+    };
+    cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
+    cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
+    cc.resetNativeTimers = resetNativeTimers;
+  };
   
   module.exports = {
     Timer: WorkerTimer || NativeTimer,
     replaceNativeTimerFunctions: replaceNativeTimerFunctions,
     restoreNativeTimerFunctions: restoreNativeTimerFunctions,
-    resetNativeTimers: resetNativeTimers
+    resetNativeTimers: resetNativeTimers,
+    install: install,
   };
 
 });

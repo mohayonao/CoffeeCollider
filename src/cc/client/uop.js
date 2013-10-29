@@ -5,7 +5,7 @@ define(function(require, exports, module) {
   var UGen = require("./ugen/ugen").UGen;
   var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
   
-  var install = function() {
+  exports = function() {
     fn.definePrototypeProperty(Array, "__plus__", function() {
       return this.map(function(x) {
         return x.__plus__();
@@ -25,7 +25,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    exports: exports
   };
 
 });

@@ -1,19 +1,19 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var install = function() {
-    require("./ugen").install();
-    require("./basic_ops").install();
-    require("./bufio").install();
-    require("./delay").install();
-    require("./line").install();
-    require("./osc").install();
-    require("./pan").install();
-    require("./ui").install();
+  exports = function() {
+    require("./ugen").exports();
+    require("./basic_ops").exports();
+    require("./bufio").exports();
+    require("./delay").exports();
+    require("./line").exports();
+    require("./osc").exports();
+    require("./pan").exports();
+    require("./ui").exports();
   };
   
   module.exports = {
-    install: install
+    exports: exports
   };
  
 });

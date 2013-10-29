@@ -333,7 +333,7 @@ define(function(require, exports, module) {
     };
   })();
   
-  var install = function() {
+  exports = function() {
   };
 
   cc.emit("basic_ops.js", {
@@ -350,7 +350,7 @@ define(function(require, exports, module) {
     Sum4: Sum4,
     UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
     BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
-    install: install,
+    exports: exports,
   };
 
 });

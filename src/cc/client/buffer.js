@@ -98,13 +98,17 @@ define(function(require, exports, module) {
   };
   
   var install = function() {
+    cc.resetBuffer = reset;
+  };
+
+  exports = function() {
     global.Buffer = BufferInterface;
   };
   
   module.exports = {
     AudioBuffer : AudioBuffer,
-    reset : reset,
-    install: install
+    install: install,
+    exports: exports,
   };
 
 });

@@ -19,9 +19,9 @@ define(function(require, exports, module) {
     before(function() {
       var compiler = new Compiler();
       global._gltc_ = null;
-      object.install();
-      uop.install();
-      bop.install();
+      object.exports();
+      uop.exports();
+      bop.exports();
       calc = function(code) {
         code = compiler.compile(code);
         return eval.call(null, code);

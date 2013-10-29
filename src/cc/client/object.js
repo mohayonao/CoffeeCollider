@@ -12,8 +12,8 @@ define(function(require, exports, module) {
       fn.definePrototypeProperty(Klass, key, func);
     });
   };
-
-  var install = function() {
+  
+  exports = function() {
     setup("__plus__", function() {
       return +this;
     });
@@ -137,14 +137,15 @@ define(function(require, exports, module) {
     fn.definePrototypeProperty(Array, "to_a", function() {
       return this;
     });
+
   };
   
   cc.once("basic_ops.js", function(payload) {
     MulAdd = payload.MulAdd;
   });
-  
+
   module.exports = {
-    install: install
+    exports: exports
   };
 
 });

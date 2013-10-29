@@ -9,7 +9,7 @@ define(function(require, exports, module) {
       return x + 1;
     };
     before(function() {
-      object.install();
+      object.exports();
     });
     it("__plus__", function() {
       var actual   = [-1, 0, 1,true ,false,"str","2","", d, f];

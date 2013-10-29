@@ -14,24 +14,17 @@ define(function(require, exports, module) {
   var TaskTimeout  = sched.TaskTimeout;
   var TaskInterval = sched.TaskInterval;
   var TaskBlock = sched.TaskBlock;
-
-  var MockClient = (function() {
-    function MockClient() {
-      this.sampleRate = 44100;
-      this.bufLength  = 64;
-      this.timeline   = new Timeline(this);
-    }
-    return MockClient;
-  })();
-
+  
   describe("sched.js", function() {
-    var timeline, sync, procN, procT;
+    var timeline, procN, procT;
     before(function() {
-      sched.install(register);
+      sched.install();
+      sched.exports();
     });
     beforeEach(function() {
-      cc.client = new MockClient();
-      timeline  = cc.client.timeline;
+      timeline = cc.createTimeline({
+        bufLength:64, sampleRate:44100
+      });
       procN = function(n) {
         for (var i = 0; i < n; i++) {
           timeline.process();

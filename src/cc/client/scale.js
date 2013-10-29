@@ -817,7 +817,7 @@ define(function(require, exports, module) {
     return Object.keys(scales).sort();
   };
   
-  var install = function() {
+  exports = function() {
     global.Scale  = ScaleInterface;
     global.Tuning = TuningInterface;
   };
@@ -825,7 +825,7 @@ define(function(require, exports, module) {
   module.exports = {
     Scale  : Scale,
     Tuning : Tuning,
-    install: install
+    exports: exports,
   };
 
 });

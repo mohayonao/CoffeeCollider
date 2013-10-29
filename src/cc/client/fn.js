@@ -98,7 +98,7 @@ define(function(require, exports, module) {
   
   fn.sync = function(func) {
     return function() {
-      cc.client.timeline.push(this, func, slice.call(arguments));
+      cc.timeline.push(this, func, slice.call(arguments));
       return this;
     };
   };

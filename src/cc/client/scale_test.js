@@ -14,7 +14,7 @@ define(function(require, exports, module) {
   
   describe("scale.js", function() {
     before(function() {
-      scale.install();
+      scale.exports();
     });
     describe("Tuning", function() {
       var et12, just, expected, actual;

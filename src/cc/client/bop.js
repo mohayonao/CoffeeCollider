@@ -69,7 +69,7 @@ define(function(require, exports, module) {
     );
   };
   
-  var install = function() {
+  exports = function() {
     setup("__add__", function(a, b) {
       return a + b;
     }, "+");
@@ -88,7 +88,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install,
+    exports: exports
   };
 
 });

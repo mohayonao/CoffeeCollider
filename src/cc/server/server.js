@@ -4,9 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   var pack  = require("../common/pack").pack;
-  var Timer = require("../common/timer").Timer;
   var Emitter = require("../common/emitter").Emitter;
-  var InstanceManager = require("./instance").InstanceManager;
   var commands = {};
   
   var SynthServer = (function() {
@@ -15,9 +13,9 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.instanceManager = new InstanceManager();
+      this.instanceManager = cc.createInstanceManager();
       this.strm = null;
-      this.timer = new Timer();
+      this.timer = cc.createTimer();
       this.processed = 0;
       this.processStart    = 0;
       this.processInterval = 0;
@@ -91,6 +89,9 @@ define(function(require, exports, module) {
       userId = userId|0;
       var timeline = msg[1];
       this.instanceManager.pushToTimeline(userId, timeline);
+    };
+    SynthServer.prototype.process = function() {
+      throw "should be overridden";
     };
     
     return SynthServer;
@@ -198,7 +199,7 @@ define(function(require, exports, module) {
     if (global.require) {
       WebSocketServer = global.require("ws").Server;
     }
-    var AudioAPI = require("../common/audioapi").AudioAPI;
+    require("../common/audioapi").install();
     function SocketSynthServer() {
       SynthServer.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
@@ -217,7 +218,7 @@ define(function(require, exports, module) {
       var exports = this.exports;
       if (typeof opts.speaker !== "undefined") {
         if (opts.speaker) {
-          this.api = new AudioAPI(this);
+          this.api = cc.createAudioAPI(this);
         }
         delete opts.speaker;
       }
@@ -424,36 +425,55 @@ define(function(require, exports, module) {
   })();
   
   var install = function() {
-    var server;
-    switch (cc.opmode) {
-    case "socket":
-      server = new SocketSynthServer();
+    require("../common/timer").install();
+    require("./instance").install();
+    
+    cc.createSynthServer = function() {
+      switch (cc.opmode) {
+      case "worker":
+        return cc.createWorkerSynthServer();
+      case "iframe":
+        return cc.createIFrameSynthServer();
+      case "socket":
+        return cc.createSocketSynthServer();
+      }
+      throw new Error("A SynthServer is not defined for: " + cc.opmode);
+    };
+    cc.createWorkerSynthServer = function() {
+      var server = new WorkerSynthServer();
+      cc.opmode = "worker";
+      return server;
+    };
+    cc.createIFrameSynthServer = function() {
+      var server = new IFrameSynthServer();
+      global.onmessage = function(e) {
+        server.recvFromClient(e.data, 0);
+      };
+      cc.opmode = "iframe";
+      return server;
+    };
+    cc.createSocketSynthServer = function() {
+      var server = new SocketSynthServer();
       server.exports = {
         createServer: function(opts) {
           return new SocketSynthServerExports(server, opts);
         }
       };
-      break;
-    case "iframe":
-      server = new IFrameSynthServer();
-      global.onmessage = function(e) {
-        server.recvFromClient(e.data, 0);
-      };
-      break;
-    default: // "worker"
-      server = new WorkerSynthServer();
-    }
-    cc.server = server;
+      cc.opmode = "socket";
+      return server;
+    };
     
     if (typeof global.console === "undefined") {
       global.console = (function() {
         var console = {};
         ["log", "debug", "info", "warn", "error"].forEach(function(method) {
           console[method] = function() {
-            var args = Array.prototype.slice.call(arguments).map(function(x) {
-              return pack(x);
-            });
-            server.sendToClient(["/console/" + method, args]);
+            if (cc.server) {
+              var args = Array.prototype.slice.call(arguments).map(function(x) {
+                return pack(x);
+              });
+              cc.server.sendToClient(["/console/" + method, args]);
+            }
           };
         });
         return console;

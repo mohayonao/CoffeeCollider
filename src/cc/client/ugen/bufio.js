@@ -34,7 +34,7 @@ define(function(require, exports, module) {
   };
 
   module.exports = {
-    install: function() {
+    exports: function() {
       ugen.register("PlayBuf", iPlayBuf);
     }
   };

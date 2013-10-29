@@ -25,14 +25,12 @@ define(function(require, exports, module) {
     }
   };
   
-  var install = function() {
-    ugen.register("MouseX", iMouseXY);
-    ugen.register("MouseY", iMouseXY);
-    ugen.register("MouseButton", iMouseButton);
-  };
-  
   module.exports = {
-    install: install
+    exports: function() {
+      ugen.register("MouseX", iMouseXY);
+      ugen.register("MouseY", iMouseXY);
+      ugen.register("MouseButton", iMouseButton);
+    }
   };
 
 });

@@ -8,8 +8,8 @@ define(function(require, exports, module) {
 
   describe("uop.js", function() {
     before(function() {
-      object.install();
-      uop.install();
+      object.exports();
+      uop.exports();
     });
     it("__plus__", function() {
       var tokens = [-1, 0, 1, [-1, -0, 1], "10"];
