@@ -388,12 +388,12 @@ define(function(require, exports, module) {
           replaceable = false;
         }
         break;
-      case "(": case "[": case "{": case "PARAM_START": case "CALL_START":
+      case "{": case "PARAM_START": case "CALL_START":
         if (replaceable) {
           bracket += 1;
         }
         break;
-      case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
+      case "CALL_END": case "PARAM_END": case "}":
         if (replaceable) {
           bracket -= 1;
         }

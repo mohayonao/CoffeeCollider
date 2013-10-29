@@ -10,7 +10,7 @@ define(function(require, exports, module) {
     });
   };
   
-  describe("compiler.js", function() {
+  describe("coffee.js", function() {
     describe("splitCodeAndData", function() {
       it("__END__ does not exist", function() {
         var code = [
@@ -421,6 +421,51 @@ define(function(require, exports, module) {
       it("case 3", function() {
         /*
           source:
+          @wait (a && b) || c
+
+          replaced:
+          @wait (a.__and__(b)).__or__(c)
+        */
+        var tokens = [
+          ["@"             , "@"     ],
+          ["IDENTIFIER"    , "wait"  ],
+          ["CALL_START"    , "("     ],
+          [  "("           ,   "("   ],
+          [    "IDENTIFIER",     "a" ],
+          [    "LOGIC"     ,     "&&"],
+          [    "IDENTIFIER",     "b" ],
+          [  ")"           ,   ")"   ],
+          [  "LOGIC"       ,   "||"  ],
+          [  "IDENTIFIER"  ,   "c"   ],
+          ["CALL_END"      , ")"     ],
+          ["TERMINATOR"    , "\n"    ],
+        ];
+        var expected = [
+          ["@"               , "@"          ],
+          ["IDENTIFIER"      , "wait"       ],
+          ["CALL_START"      , "("          ],
+          [  "("             ,   "("        ],
+          [    "IDENTIFIER"  ,     "a"      ],
+          [    "."           ,     "."      ],
+          [    "IDENTIFIER"  ,     "__and__"],
+          [    "CALL_START"  ,     "("      ],
+          [      "IDENTIFIER",       "b"    ],
+          [    "CALL_END"    ,     ")"      ],
+          [  ")"             ,   ")"        ],
+          [  "."             ,   "."        ],
+          [  "IDENTIFIER"    ,   "__or__"   ],
+          [  "CALL_START"    ,   "("        ],
+          [    "IDENTIFIER"  ,     "c"      ],
+          [  "CALL_END"      ,   ")"        ],
+          ["CALL_END"        , ")"          ],
+          ["TERMINATOR"      , "\n"         ],
+        ];
+        var actual = compiler.replaceLogicOp(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
+      it("case 4", function() {
+        /*
+          source:
           @wait a && b, (x = a && b)->
             x
 
@@ -478,7 +523,7 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
-      it("case 4", function() {
+      it("case 5", function() {
         /*
           source:
           @wait a && ((x=a&&b)->x) && b, (x = a && b)->
