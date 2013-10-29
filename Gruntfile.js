@@ -232,7 +232,8 @@ module.exports = function(grunt) {
 
     var Mocha = require("mocha");
     var mocha = new Mocha();
-
+    var exclusive = hasExclusiveTest();
+    
     global.C = grunt.file.readJSON("src/const.json");
 
     var reporter = "dot";
@@ -252,6 +253,9 @@ module.exports = function(grunt) {
           files.push(related);
         }
       }
+    }
+    if (reporter === "dot" && exclusive) {
+      reporter = "nyan";
     }
 
     if (!files.length) {
@@ -282,7 +286,7 @@ module.exports = function(grunt) {
         testFailed = [];
       }
       if (args === "travis") {
-        if (hasExclusiveTest()) {
+        if (exclusive) {
           grunt.fail.warn("test succeeded, but not completely.");
         }
       }
