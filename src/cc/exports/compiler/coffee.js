@@ -370,10 +370,10 @@ define(function(require, exports, module) {
         if (replaceLogicOpTable.hasOwnProperty(token[VALUE])) {
           var selector = replaceLogicOpTable[token[VALUE]];
           var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
+          tokens.splice(i++, 1, ["."          , "."     , _]);
+          tokens.splice(i++, 0, ["IDENTIFIER" , selector, _]);
+          tokens.splice(i++, 0, ["!CALL_START", "("     , _]);
+          tokens.splice(b+2, 0, ["!CALL_END"  , ")"     , _]);
           continue;
         }
       }
@@ -401,6 +401,11 @@ define(function(require, exports, module) {
       }
       i += 1;
     }
+    tokens.forEach(function(items) {
+      if (items[TAG].charAt(0) === "!") {
+        items[TAG] = items[TAG].substr(1);
+      }
+    });
     // dumpTokens(tokens);
     return tokens;
   };

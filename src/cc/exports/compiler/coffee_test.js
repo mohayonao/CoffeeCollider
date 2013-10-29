@@ -614,6 +614,52 @@ define(function(require, exports, module) {
         var actual = compiler.replaceLogicOp(tokens).erode();
         assert.deepEqual(actual, expected);
       });
+      it("case 6", function() {
+        /*
+          source:
+          @wait a && [ b || c ]
+
+          replaced:
+          @wait a.__and__([b.__or__(c)])
+
+        */
+        var tokens = [
+          ["@"               , "@"     ],
+          ["IDENTIFIER"      , "wait"  ],
+          ["CALL_START"      , "("     ],
+          [  "IDENTIFIER"    ,   "a"   ], 
+          [  "LOGIC"         ,   "&&"  ],
+          [  "["             ,   "["   ],
+          [    "IDENTIFIER"  ,     "b" ], 
+          [    "LOGIC"       ,     "||"],
+          [    "IDENTIFIER"  ,     "c" ], 
+          [  "]"             ,   "]"   ],
+          ["CALL_END"          , ")"   ],
+          ["TERMINATOR"        , "\n"  ],
+        ];
+        var expected = [
+          ["@"                 , "@"           ],
+          ["IDENTIFIER"        , "wait"        ],
+          ["CALL_START"        , "("           ],
+          [  "IDENTIFIER"      ,   "a"         ], 
+          [  "."               ,   "."         ],
+          [  "IDENTIFIER"      ,   "__and__"   ],
+          [  "CALL_START"      ,   "("         ],
+          [    "["             ,     "["       ],
+          [      "IDENTIFIER"  ,       "b"     ],
+          [      "."           ,       "."     ],
+          [      "IDENTIFIER"  ,       "__or__"],
+          [      "CALL_START"  ,       "("     ],
+          [        "IDENTIFIER",         "c"   ],
+          [      "CALL_END"    ,       ")"     ],
+          [    "]"             ,     "]"       ],
+          [  "CALL_END"        ,   ")"         ],
+          ["CALL_END"          , ")"           ],
+          ["TERMINATOR"        , "\n"          ],
+        ];
+        var actual = compiler.replaceLogicOp(tokens).erode();
+        assert.deepEqual(actual, expected);
+      });
     });
     describe("replaceUnaryOp", function() {
       it("case 1", function() {
