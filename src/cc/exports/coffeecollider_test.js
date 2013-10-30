@@ -200,9 +200,9 @@ define(function(require, exports, module) {
         });
         it("#readAudioFile", function(done) {
           instance.api.decodeAudioFile = function(_, callback) {
-            callback("decodeAudioFile");
+            callback(null, "decodeAudioFile");
           };
-          instance.readAudioFile("path/to/audio", function(result) {
+          instance.readAudioFile("path/to/audio", function(err, result) {
             assert.equal(result, "decodeAudioFile");
             done();
           });
@@ -225,7 +225,7 @@ define(function(require, exports, module) {
           });
           it("/buffer/request", function() {
             instance.recvFromClient(["/buffer/request", "/path/to/audio", 1]);
-            assert.deepEqual(posted, ["/buffer/response", null, 1]);
+            assert.deepEqual(posted, "");
           });
           it("/socket/sendToIF", function() {
             instance.recvFromClient(["/socket/sendToIF", "hello"]);

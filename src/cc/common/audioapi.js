@@ -86,7 +86,7 @@ define(function(require, exports, module) {
               samples[k++] = channelData[j][i];
             }
           }
-          callback({
+          callback(null, {
             sampleRate : buffer.sampleRate,
             numChannels: buffer.numberOfChannels,
             numFrames  : buffer.length,

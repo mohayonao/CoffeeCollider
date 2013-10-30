@@ -220,8 +220,14 @@ define(function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
       var api = this.api;
+      if (typeof path !== "string") {
+        throw new TypeError("readAudioFile: first argument must be a String.");
+      }
+      if (typeof callback !== "function") {
+        throw new TypeError("readAudioFile: second argument must be a Function.");
+      }
       if (!api.decodeAudioFile) {
-        callback(null);
+        callback("Audio decoding not supported", null);
         return;
       }
       var xhr = cc.createXMLHttpRequest();
@@ -230,13 +236,11 @@ define(function(require, exports, module) {
       xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
           if (xhr.status === 200 && xhr.response) {
-            if (callback) {
-              api.decodeAudioFile(xhr.response, function(buffer) {
-                callback(buffer);
-              });
-            }
+            api.decodeAudioFile(xhr.response, function(err, buffer) {
+              callback(err, buffer);
+            });
           } else {
-            callback(null);
+            callback("error", null);
           }
         }
       };
@@ -339,8 +343,10 @@ define(function(require, exports, module) {
   commands["/buffer/request"] = function(msg) {
     var that = this;
     var requestId = msg[2];
-    this.readAudioFile(msg[1], function(buffer) {
-      that.sendToClient(["/buffer/response", buffer, requestId]);
+    this.readAudioFile(msg[1], function(err, buffer) {
+      if (!err) {
+        that.sendToClient(["/buffer/response", buffer, requestId]);
+      }
     });
   };
   commands["/socket/sendToIF"] = function(msg) {
