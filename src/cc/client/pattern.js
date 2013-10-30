@@ -80,7 +80,7 @@ define(function(require, exports, module) {
     };
     PSequence.prototype.reset = function() {
       this._pos = 0;
-      this._blocking = false;
+      this._blocking = true;
       var list = this.list;
       for (var i = 0, imax = list.length; i < imax; ++i) {
         if (list[i] instanceof Pattern) {

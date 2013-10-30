@@ -5,31 +5,31 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var pattern = require("./pattern");
   
-  describe.only("pattern.js", function() {
+  describe("pattern.js", function() {
     var emitted;
     beforeEach(function() {
       pattern.use();
       emitted = false;
     });
     describe("PSequence", function() {
-      // it("without offset", function() {
-      //   var pseq = cc.createPSequence([1, 2, 3], 3, 0).on("end", function() {
-      //     emitted = true;
-      //   });
-      //   var actual   = pseq.nextN(11);
-      //   var expected = [ 1, 2, 3, 1, 2, 3, 1, 2, 3, null, null ];
-      //   assert.deepEqual(actual, expected);
-      //   assert.isTrue(emitted);
-      // });
-      // it("with offset", function() {
-      //   var pseq = cc.createPSequence([1, 2, 3], 3, 1).on("end", function() {
-      //     emitted = true;
-      //   });
-      //   var actual   = pseq.nextN(11);
-      //   var expected = [ 2, 3, 1, 2, 3, 1, 2, 3, 1, null, null ];
-      //   assert.deepEqual(actual, expected);
-      //   assert.isTrue(emitted);
-      // });
+      it("without offset", function() {
+        var pseq = cc.createPSequence([1, 2, 3], 3, 0).on("end", function() {
+          emitted = true;
+        });
+        var actual   = pseq.nextN(11);
+        var expected = [ 1, 2, 3, 1, 2, 3, 1, 2, 3, null, null ];
+        assert.deepEqual(actual, expected);
+        assert.isTrue(emitted);
+      });
+      it("with offset", function() {
+        var pseq = cc.createPSequence([1, 2, 3], 3, 1).on("end", function() {
+          emitted = true;
+        });
+        var actual   = pseq.nextN(11);
+        var expected = [ 2, 3, 1, 2, 3, 1, 2, 3, 1, null, null ];
+        assert.deepEqual(actual, expected);
+        assert.isTrue(emitted);
+      });
       it("nesting", function() {
         var pseq1 = cc.createPSequence([1, 2, 3], 3, 0);
         var pseq2 = cc.createPSequence([pseq1, 4], 2, 0).on("end", function() {
