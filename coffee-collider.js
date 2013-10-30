@@ -62,31 +62,33 @@ define('cc/loader', function(require, exports, module) {
     if (cc.coffeeColliderHash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "client";
-      require("./client/installer").install();
+      require("./client/client").use();
       cc.client = cc.createSynthClient();
     } else if (cc.coffeeColliderHash === "#socket") {
       cc.opmode  = "socket";
       cc.context = "client";
-      require("./client/installer").install();
+      require("./client/client").use();
       cc.client = cc.createSynthClient();
     } else {
       cc.opmode  = "exports";
       cc.context = "exports";
-      require("./exports/installer").install();
-      
+      require("./exports/coffeecollider").use();
+      global.CoffeeCollider = function(opts) {
+        return cc.createCoffeeCollider(opts);
+      };
     }
   } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "server";
-      require("./server/installer").install();
+      require("./server/server").use();
       cc.server = cc.createSynthServer();
       cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "client/server";
-      require("./client/installer").install();
-      require("./server/installer").install();
+      require("./client/client").use();
+      require("./server/server").use();
       cc.client = cc.createSynthClient();
       cc.server = cc.createSynthServer();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
@@ -96,7 +98,7 @@ define('cc/loader', function(require, exports, module) {
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";
-    require("./server/installer").install();
+    require("./server/server").use();
     cc.server = cc.createSynthServer();
     module.exports.createServer = cc.server.exports.createServer;
   }
@@ -110,18 +112,6 @@ define('cc/cc', function(require, exports, module) {
   module.exports = {
     version: "0",
     Object: CCObject
-  };
-
-});
-define('cc/client/installer', function(require, exports, module) {
-  
-  var install = function() {
-    require("./client").install();
-  };
-  
-  module.exports = {
-    install: install,
-    exports: exports
   };
 
 });
@@ -230,7 +220,7 @@ define('cc/client/client', function(require, exports, module) {
   
   
   var IFrameSynthClient = (function() {
-    require("../common/browser").install();
+    require("../common/browser").use();
     function IFrameSynthClient() {
       SynthClient.call(this);
       var that = this;
@@ -267,7 +257,7 @@ define('cc/client/client', function(require, exports, module) {
 
 
   var SocketSynthClient = (function() {
-    require("../common/browser").install();
+    require("../common/browser").use();
     function SocketSynthClient() {
       SynthClient.call(this);
       this.sampleRate = 44100;
@@ -429,15 +419,15 @@ define('cc/client/client', function(require, exports, module) {
     }
   };
   
-  var install = function() {
-    require("../common/timer").install();
-    require("./buffer").install();
-    require("./node").install();
-    require("./sched").install();
-    require("./exports").install();
+  var use = function() {
+    require("../common/timer").use();
+    require("./buffer").use();
+    require("./node").use();
+    require("./sched").use();
+    require("./exports").use();
     
     cc.createSynthClient = function() {
-      cc.exports();
+      cc.client_exports();
       switch (cc.opmode) {
       case "worker":
         return cc.createWorkerSynthClient();
@@ -495,7 +485,7 @@ define('cc/client/client', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });
@@ -710,7 +700,7 @@ define('cc/common/browser', function(require, exports, module) {
 
   var cc = require("../cc");
   
-  var install = function() {
+  var use = function() {
     cc.createWebWorker = function(path) {
       return new Worker(path);
     };
@@ -734,7 +724,7 @@ define('cc/common/browser', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });
@@ -884,7 +874,7 @@ define('cc/common/timer', function(require, exports, module) {
     });
   };
 
-  var install = function() {
+  var use = function() {
     cc.createTimer = function() {
       if (WorkerTimer) {
         return new WorkerTimer();
@@ -901,7 +891,7 @@ define('cc/common/timer', function(require, exports, module) {
     replaceNativeTimerFunctions: replaceNativeTimerFunctions,
     restoreNativeTimerFunctions: restoreNativeTimerFunctions,
     resetNativeTimers: resetNativeTimers,
-    install: install,
+    use:use,
   };
 
 });
@@ -1008,18 +998,20 @@ define('cc/client/buffer', function(require, exports, module) {
     bufSrcId = 0;
   };
   
-  var install = function() {
+  var use = function() {
     cc.resetBuffer = reset;
   };
 
   exports = function() {
-    global.Buffer = BufferInterface;
+    if (typeof Buffer === "undefined") {
+      // TODO: rename????
+      global.Buffer = BufferInterface;
+    }
   };
   
   module.exports = {
     AudioBuffer : AudioBuffer,
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });
@@ -1728,7 +1720,7 @@ define('cc/client/node', function(require, exports, module) {
     return nodes[nodeId];
   };
   
-  var install = function() {
+  var use = function() {
     cc.createGroup = function(target, addAction) {
       return new Group(target, addAction);
     };
@@ -1745,8 +1737,7 @@ define('cc/client/node', function(require, exports, module) {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });
@@ -2543,7 +2534,7 @@ define('cc/client/sched', function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var install = function() {
+  var use = function() {
     cc.createTimeline = function() {
       cc.timeline = new Timeline();
       return cc.timeline;
@@ -2626,30 +2617,32 @@ define('cc/client/sched', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });
 define('cc/client/exports', function(require, exports, module) {
 
   var cc = require("./cc");
-  
-  var install = function() {
-    cc.exports = function() {
-      require("./object").exports();
-      require("./bop").exports();
-      require("./uop").exports();
-      require("./buffer").exports();
-      require("./node").exports();
-      require("./sched").exports();
-      require("./scale").exports();
-      require("./ugen/installer").exports();
+
+  var use = function() {
+    cc.client_exports = function() {
+      exports();
     };
+  };
+  exports = function() {
+    require("./object").exports();
+    require("./bop").exports();
+    require("./uop").exports();
+    require("./buffer").exports();
+    require("./node").exports();
+    require("./sched").exports();
+    require("./scale").exports();
+    require("./ugen/exports").exports();
   };
   
   module.exports = {
-    install: install
+    use:use, exports:exports
   };
 
 });
@@ -4124,7 +4117,7 @@ define('cc/client/scale', function(require, exports, module) {
   };
 
 });
-define('cc/client/ugen/installer', function(require, exports, module) {
+define('cc/client/ugen/exports', function(require, exports, module) {
 
   exports = function() {
     require("./ugen").exports();
@@ -4332,22 +4325,6 @@ define('cc/client/ugen/ui', function(require, exports, module) {
       ugen.register("MouseY", iMouseXY);
       ugen.register("MouseButton", iMouseButton);
     }
-  };
-
-});
-define('cc/exports/installer', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var install = function() {
-    require("./coffeecollider").install();
-    global.CoffeeCollider = function(opts) {
-      return cc.createCoffeeCollider(opts);
-    };
-  };
-  
-  module.exports = {
-    install: install
   };
 
 });
@@ -4700,10 +4677,11 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   };
   require("../common/console").bindConsoleApply(commands);
   
-  var install = function() {
-    require("../common/browser").install();
-    require("../common/audioapi").install();
-    require("./compiler/installer").install();
+  var use = function() {
+    require("../common/browser").use();
+    require("../common/audioapi").use();
+    require("./compiler/compiler").use();
+    
     cc.createCoffeeCollider = function(opts) {
       return new CoffeeCollider(opts);
     };
@@ -4723,7 +4701,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   
   module.exports = {
     CoffeeCollider: CoffeeCollider,
-    install: install
+    use:use
   };
 
 });
@@ -5014,24 +4992,24 @@ define('cc/common/audioapi', function(require, exports, module) {
     })();
   }
 
-  var install = function() {
+  var use = function() {
     cc.createAudioAPI = function(sys, opts) {
       return new AudioAPI(sys, opts);
     };
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });
-define('cc/exports/compiler/installer', function(require, exports, module) {
+define('cc/exports/compiler/compiler', function(require, exports, module) {
 
   var cc = require("../../cc");
-  var coffee = require("./coffee");
-
-  var install = function() {
-    coffee.install();
+  
+  var use = function() {
+    require("./coffee").use();
+    
     cc.createCompiler = function(lang) {
       if (lang === "coffee") {
         return cc.createCoffeeCompiler();
@@ -5040,7 +5018,7 @@ define('cc/exports/compiler/installer', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });
@@ -5680,7 +5658,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     return Compiler;
   })();
 
-  var install = function() {
+  var use = function() {
     cc.createCoffeeCompiler = function() {
       return new Compiler();
     };
@@ -5703,7 +5681,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     replaceGlobal        : replaceGlobal,
     cleanupParenthesis   : cleanupParenthesis,
     insertReturn         : insertReturn,
-    install: install,
+    use:use,
   };
 
 });
@@ -5845,18 +5823,6 @@ define('cc/common/timevalue', function(require, exports, module) {
     calcBeat : calcBeat,
     calcTicks: calcTicks,
     calc: calc,
-  };
-
-});
-define('cc/server/installer', function(require, exports, module) {
-  
-  var install = function() {
-    require("./server").install();
-    require("./unit/installer").install();
-  };
-  
-  module.exports = {
-    install : install
   };
 
 });
@@ -6060,7 +6026,7 @@ define('cc/server/server', function(require, exports, module) {
     if (global.require) {
       WebSocketServer = global.require("ws").Server;
     }
-    require("../common/audioapi").install();
+    require("../common/audioapi").use();
     function SocketSynthServer() {
       SynthServer.call(this);
       this.sampleRate = 44100;
@@ -6285,11 +6251,13 @@ define('cc/server/server', function(require, exports, module) {
     return Rate;
   })();
   
-  var install = function() {
-    require("../common/timer").install();
-    require("./instance").install();
+  var use = function() {
+    require("../common/timer").use();
+    require("./instance").use();
+    require("./exports").use();
     
     cc.createSynthServer = function() {
+      cc.unit_install();
       switch (cc.opmode) {
       case "worker":
         return cc.createWorkerSynthServer();
@@ -6343,7 +6311,7 @@ define('cc/server/server', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });
@@ -6552,7 +6520,7 @@ define('cc/server/instance', function(require, exports, module) {
     return Instance;
   })();
 
-  var install = function() {
+  var use = function() {
     cc.createInstanceManager = function() {
       return new InstanceManager();
     };
@@ -6560,7 +6528,7 @@ define('cc/server/instance', function(require, exports, module) {
   
   module.exports = {
     InstanceManager: InstanceManager,
-    install: install
+    use:use
   };
 
 });
@@ -7292,6 +7260,25 @@ define('cc/server/buffer', function(require, exports, module) {
   };
 
 });
+define('cc/server/exports', function(require, exports, module) {
+  
+  var cc = require("./cc");
+  
+  var use = function() {
+    cc.unit_install = function() {
+      exports();
+    };
+    
+  };
+  exports = function() {
+    require("./unit/installer").install();
+  };
+  
+  module.exports = {
+    use:use
+  };
+
+});
 define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
@@ -7306,7 +7293,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    install:install
   };
 
 });

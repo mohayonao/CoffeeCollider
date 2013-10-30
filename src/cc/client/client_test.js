@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   describe("client.js", function() {
     var called;
     beforeEach(function() {
-      require("./client").install();
+      require("./client").use();
       called = [];
       cc.exports = nop;
       cc.createTimeline = function() {

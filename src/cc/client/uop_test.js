@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var register = require("./installer").register;
   var object = require("./object");
   var uop = require("./uop");
 

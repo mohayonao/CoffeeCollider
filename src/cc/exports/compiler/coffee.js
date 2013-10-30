@@ -635,7 +635,7 @@ define(function(require, exports, module) {
     return Compiler;
   })();
 
-  var install = function() {
+  var use = function() {
     cc.createCoffeeCompiler = function() {
       return new Compiler();
     };
@@ -658,7 +658,7 @@ define(function(require, exports, module) {
     replaceGlobal        : replaceGlobal,
     cleanupParenthesis   : cleanupParenthesis,
     insertReturn         : insertReturn,
-    install: install,
+    use:use,
   };
 
 });

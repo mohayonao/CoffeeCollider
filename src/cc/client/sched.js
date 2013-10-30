@@ -539,7 +539,7 @@ define(function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var install = function() {
+  var use = function() {
     cc.createTimeline = function() {
       cc.timeline = new Timeline();
       return cc.timeline;
@@ -622,8 +622,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });

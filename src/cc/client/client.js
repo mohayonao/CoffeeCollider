@@ -104,7 +104,7 @@ define(function(require, exports, module) {
   
   
   var IFrameSynthClient = (function() {
-    require("../common/browser").install();
+    require("../common/browser").use();
     function IFrameSynthClient() {
       SynthClient.call(this);
       var that = this;
@@ -141,7 +141,7 @@ define(function(require, exports, module) {
 
 
   var SocketSynthClient = (function() {
-    require("../common/browser").install();
+    require("../common/browser").use();
     function SocketSynthClient() {
       SynthClient.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
@@ -303,15 +303,15 @@ define(function(require, exports, module) {
     }
   };
   
-  var install = function() {
-    require("../common/timer").install();
-    require("./buffer").install();
-    require("./node").install();
-    require("./sched").install();
-    require("./exports").install();
+  var use = function() {
+    require("../common/timer").use();
+    require("./buffer").use();
+    require("./node").use();
+    require("./sched").use();
+    require("./exports").use();
     
     cc.createSynthClient = function() {
-      cc.exports();
+      cc.client_exports();
       switch (cc.opmode) {
       case "worker":
         return cc.createWorkerSynthClient();
@@ -369,7 +369,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });

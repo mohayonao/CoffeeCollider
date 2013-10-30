@@ -199,7 +199,7 @@ define(function(require, exports, module) {
     if (global.require) {
       WebSocketServer = global.require("ws").Server;
     }
-    require("../common/audioapi").install();
+    require("../common/audioapi").use();
     function SocketSynthServer() {
       SynthServer.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
@@ -424,11 +424,13 @@ define(function(require, exports, module) {
     return Rate;
   })();
   
-  var install = function() {
-    require("../common/timer").install();
-    require("./instance").install();
+  var use = function() {
+    require("../common/timer").use();
+    require("./instance").use();
+    require("./exports").use();
     
     cc.createSynthServer = function() {
+      cc.unit_install();
       switch (cc.opmode) {
       case "worker":
         return cc.createWorkerSynthServer();
@@ -482,7 +484,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });

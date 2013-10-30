@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   describe("server.js", function() {
     var called;
     beforeEach(function() {
-      require("./server").install();
+      require("./server").use();
       called = [];
       cc.client = { process: nop };
       cc.createTimer = function() {

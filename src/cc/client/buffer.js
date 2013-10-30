@@ -102,18 +102,20 @@ define(function(require, exports, module) {
     bufSrcId = 0;
   };
   
-  var install = function() {
+  var use = function() {
     cc.resetBuffer = reset;
   };
 
   exports = function() {
-    global.Buffer = BufferInterface;
+    if (typeof Buffer === "undefined") {
+      // TODO: rename????
+      global.Buffer = BufferInterface;
+    }
   };
   
   module.exports = {
     AudioBuffer : AudioBuffer,
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });

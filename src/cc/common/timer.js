@@ -118,7 +118,7 @@ define(function(require, exports, module) {
     });
   };
 
-  var install = function() {
+  var use = function() {
     cc.createTimer = function() {
       if (WorkerTimer) {
         return new WorkerTimer();
@@ -135,7 +135,7 @@ define(function(require, exports, module) {
     replaceNativeTimerFunctions: replaceNativeTimerFunctions,
     restoreNativeTimerFunctions: restoreNativeTimerFunctions,
     resetNativeTimers: resetNativeTimers,
-    install: install,
+    use:use,
   };
 
 });

@@ -4,7 +4,6 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var cc = require("./cc");
   var fn = require("./fn");
-  var register  = require("./installer").register;
   var object    = require("./object");
   var sched     = require("./sched");
   
@@ -12,7 +11,7 @@ define(function(require, exports, module) {
     var timeline, procN, procT;
     before(function() {
       object.exports();
-      sched.install();
+      sched.use();
     });
     beforeEach(function() {
       timeline = cc.createTimeline({

@@ -286,14 +286,14 @@ define(function(require, exports, module) {
     })();
   }
 
-  var install = function() {
+  var use = function() {
     cc.createAudioAPI = function(sys, opts) {
       return new AudioAPI(sys, opts);
     };
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });

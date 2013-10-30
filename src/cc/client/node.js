@@ -525,7 +525,7 @@ define(function(require, exports, module) {
     return nodes[nodeId];
   };
   
-  var install = function() {
+  var use = function() {
     cc.createGroup = function(target, addAction) {
       return new Group(target, addAction);
     };
@@ -542,8 +542,7 @@ define(function(require, exports, module) {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    install: install,
-    exports: exports,
+    use:use, exports:exports,
   };
 
 });

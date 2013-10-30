@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   
-  var install = function() {
+  var use = function() {
     cc.createWebWorker = function(path) {
       return new Worker(path);
     };
@@ -27,7 +27,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    use:use
   };
 
 });

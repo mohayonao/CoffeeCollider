@@ -13,7 +13,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    install: install
+    install:install
   };
 
 });

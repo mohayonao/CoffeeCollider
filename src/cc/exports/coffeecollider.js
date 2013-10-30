@@ -348,10 +348,11 @@ define(function(require, exports, module) {
   };
   require("../common/console").bindConsoleApply(commands);
   
-  var install = function() {
-    require("../common/browser").install();
-    require("../common/audioapi").install();
-    require("./compiler/installer").install();
+  var use = function() {
+    require("../common/browser").use();
+    require("../common/audioapi").use();
+    require("./compiler/compiler").use();
+    
     cc.createCoffeeCollider = function(opts) {
       return new CoffeeCollider(opts);
     };
@@ -371,7 +372,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     CoffeeCollider: CoffeeCollider,
-    install: install
+    use:use
   };
 
 });

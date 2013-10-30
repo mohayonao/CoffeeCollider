@@ -192,7 +192,7 @@ define(function(require, exports, module) {
     return Instance;
   })();
 
-  var install = function() {
+  var use = function() {
     cc.createInstanceManager = function() {
       return new InstanceManager();
     };
@@ -200,7 +200,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     InstanceManager: InstanceManager,
-    install: install
+    use:use
   };
 
 });

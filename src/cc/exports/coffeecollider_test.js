@@ -8,7 +8,7 @@ define(function(require, exports, module) {
   
   describe("coffeecollider.js", function() {
     beforeEach(function() {
-      require("./coffeecollider").install();
+      require("./coffeecollider").use();
     });
     describe("CoffeeCollider", function() {
       describe("createCoffeeCollider", function() {

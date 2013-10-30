@@ -19,31 +19,33 @@ define(function(require, exports, module) {
     if (cc.coffeeColliderHash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "client";
-      require("./client/installer").install();
+      require("./client/client").use();
       cc.client = cc.createSynthClient();
     } else if (cc.coffeeColliderHash === "#socket") {
       cc.opmode  = "socket";
       cc.context = "client";
-      require("./client/installer").install();
+      require("./client/client").use();
       cc.client = cc.createSynthClient();
     } else {
       cc.opmode  = "exports";
       cc.context = "exports";
-      require("./exports/installer").install();
-      
+      require("./exports/coffeecollider").use();
+      global.CoffeeCollider = function(opts) {
+        return cc.createCoffeeCollider(opts);
+      };
     }
   } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "server";
-      require("./server/installer").install();
+      require("./server/server").use();
       cc.server = cc.createSynthServer();
       cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "client/server";
-      require("./client/installer").install();
-      require("./server/installer").install();
+      require("./client/client").use();
+      require("./server/server").use();
       cc.client = cc.createSynthClient();
       cc.server = cc.createSynthServer();
       cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
@@ -53,7 +55,7 @@ define(function(require, exports, module) {
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.opmode  = "socket";
     cc.context = "server";
-    require("./server/installer").install();
+    require("./server/server").use();
     cc.server = cc.createSynthServer();
     module.exports.createServer = cc.server.exports.createServer;
   }
