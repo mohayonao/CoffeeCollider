@@ -56,7 +56,7 @@ define(function(require, exports, module) {
     
     PSequence.prototype.next = function() {
       if (this._blocking) {
-        if (this._pos < this.repeats) {
+        if (this._pos < this.repeats * this.list.length) {
           var index = (this._pos + this.offset) % this.list.length;
           var item  = this.list[index];
           var value = this.valueOf(item);
@@ -92,16 +92,6 @@ define(function(require, exports, module) {
     return PSequence;
   })();
   
-  var PList = (function() {
-    function PList(list, repeats, offset) {
-      PSequence.call(this, list, repeats, offset);
-      this.klassName = "PList";
-      this.repeats = repeats * this.list.length;
-    }
-    extend(PList, PSequence);
-    return PList;
-  })();
-  
   var use = function() {
     cc.createPSequence = function(list, repeats, offset) {
       if (!(Array.isArray(list) || list instanceof Pattern)) {
@@ -115,25 +105,10 @@ define(function(require, exports, module) {
       }
       return new PSequence(list, repeats, offset);
     };
-    cc.createPList = function(list, repeats, offset) {
-      if (!(Array.isArray(list) || list instanceof Pattern)) {
-        throw new TypeError("PList: the first argument is invalid");
-      }
-      if (typeof repeats !== "number") {
-        throw new TypeError("PList: the second argument must be a Number");
-      }
-      if (typeof offset !== "number") {
-        throw new TypeError("PList: the third argument must be a Number");
-      }
-      return new PList(list, repeats, offset);
-    };
   };
   exports = function() {
     global.PSequence = fn(function(list, repeats, offset) {
       return cc.createPSequence(list, repeats, offset);
-    }).defaults("list,repeats=1,offset=0").build();
-    global.PList = fn(function(list, repeats, offset) {
-      return cc.createPList(list, repeats, offset);
     }).defaults("list,repeats=1,offset=0").build();
   };
   

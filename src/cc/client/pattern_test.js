@@ -12,41 +12,32 @@ define(function(require, exports, module) {
       emitted = false;
     });
     describe("PSequence", function() {
-      it("without offset", function() {
-        var pseq = cc.createPSequence([1, 2], 5, 0).on("end", function() {
+      // it("without offset", function() {
+      //   var pseq = cc.createPSequence([1, 2, 3], 3, 0).on("end", function() {
+      //     emitted = true;
+      //   });
+      //   var actual   = pseq.nextN(11);
+      //   var expected = [ 1, 2, 3, 1, 2, 3, 1, 2, 3, null, null ];
+      //   assert.deepEqual(actual, expected);
+      //   assert.isTrue(emitted);
+      // });
+      // it("with offset", function() {
+      //   var pseq = cc.createPSequence([1, 2, 3], 3, 1).on("end", function() {
+      //     emitted = true;
+      //   });
+      //   var actual   = pseq.nextN(11);
+      //   var expected = [ 2, 3, 1, 2, 3, 1, 2, 3, 1, null, null ];
+      //   assert.deepEqual(actual, expected);
+      //   assert.isTrue(emitted);
+      // });
+      it("nesting", function() {
+        var pseq1 = cc.createPSequence([1, 2, 3], 3, 0);
+        var pseq2 = cc.createPSequence([pseq1, 4], 2, 0).on("end", function() {
           emitted = true;
         });
-        var actual   = pseq.nextN(10);
-        var expected = [ 1, 2, 1, 2, 1, null, null, null, null, null ];
-        assert.deepEqual(actual, expected);
-        assert.isTrue(emitted);
-      });
-      it("with offset", function() {
-        var pseq = cc.createPSequence([1, 2], 5, 1).on("end", function() {
-          emitted = true;
-        });
-        var actual   = pseq.nextN(10);
-        var expected = [ 2, 1, 2, 1, 2, null, null, null, null, null ];
-        assert.deepEqual(actual, expected);
-        assert.isTrue(emitted);
-      });
-    });
-    describe("PList", function() {
-      it("without offset", function() {
-        var pseq = cc.createPList([1, 2], 3, 0).on("end", function() {
-          emitted = true;
-        });
-        var actual   = pseq.nextN(7);
-        var expected = [ 1, 2, 1, 2, 1, 2, null ];
-        assert.deepEqual(actual, expected);
-        assert.isTrue(emitted);
-      });
-      it("with offset", function() {
-        var pseq = cc.createPList([1, 2], 3, 1).on("end", function() {
-          emitted = true;
-        });
-        var actual   = pseq.nextN(7);
-        var expected = [ 2, 1, 2, 1, 2, 1, null ];
+        var actual   = pseq2.nextN(22);
+        var expected = [ 1, 2, 3, 1, 2, 3, 1, 2, 3, 4,
+                         1, 2, 3, 1, 2, 3, 1, 2, 3, 4, null, null ];
         assert.deepEqual(actual, expected);
         assert.isTrue(emitted);
       });
