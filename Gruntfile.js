@@ -227,12 +227,27 @@ module.exports = function(grunt) {
       }
     });
     resetPrototype();
+
+    var path     = require("path");
+    var istanbul = require("istanbul");
+    var Instrumenter = istanbul.Instrumenter;
+    var Collector    = istanbul.Collector;
+    var Report       = istanbul.Report;
+    var hook         = istanbul.hook;
+
+    var coverageVar = "$$cov_" + Date.now() + "$$";
+    var instrumenter = new Instrumenter({
+      coverageVariable:coverageVar
+    });
+    var transformer = instrumenter.instrumentSync.bind(instrumenter);
+    var matchFn;
     
     var hasExclusive = checkExclusiveTest();
     
     var reporter = "dot";
     var args  = arguments[0];
     var files = [];
+    var covFile = null;
     if (args) {
       if (args === "travis") {
         reporter = "list";
@@ -241,6 +256,10 @@ module.exports = function(grunt) {
       } else {
         if (grunt.file.exists(args)) {
           files.push(args);
+          covFile = path.resolve(args.replace(/_test\.js$/, ".js"));
+          matchFn = function(file) {
+            return covFile === file;
+          };
         }
         var related = args.replace(/\.js$/, "_test.js");
         if (grunt.file.exists(related)) {
@@ -251,7 +270,7 @@ module.exports = function(grunt) {
     if (reporter === "dot" && hasExclusive) {
       reporter = "nyan";
     }
-
+    
     if (!files.length) {
       files = grunt.file.expand("src/cc/**/*_test.js");
     } else {
@@ -269,6 +288,12 @@ module.exports = function(grunt) {
       }
       return false;
     });
+
+    if (covFile) {
+      reporter = "nyan";
+      hook.hookRequire(matchFn, transformer);
+      global[coverageVar] = {};
+    }
     
     var done = this.async();
     doMochaTest(reporter, files, function(failures) {
@@ -282,6 +307,11 @@ module.exports = function(grunt) {
         if (hasExclusive) {
           grunt.fail.warn("test succeeded, but not completely.");
         }
+      }
+      if (covFile.length) {
+        var collector = new Collector();
+        collector.add(global[coverageVar]);
+        Report.create("text").writeReport(collector, true);
       }
       done();
     });
