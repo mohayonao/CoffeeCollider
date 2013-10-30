@@ -2,14 +2,14 @@ define(function(require, exports, module) {
   "use strict";
 
   var install = function() {
-    require("./unit").install();
-    require("./basic_ops").install();
-    require("./bufio").install();
-    require("./delay").install();
-    require("./line").install();
-    require("./osc").install();
-    require("./pan").install();
-    require("./ui").install();
+    require("./unit");
+    require("./basic_ops");
+    require("./bufio");
+    require("./delay");
+    require("./line");
+    require("./osc");
+    require("./pan");
+    require("./ui");
   };
   
   module.exports = {

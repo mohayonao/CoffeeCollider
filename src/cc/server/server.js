@@ -49,9 +49,6 @@ define(function(require, exports, module) {
           this.channels   = msg[2]|0;
         }
         this.strm  = new Int16Array(this.strmLength * this.channels);
-        this.rates = {};
-        this.rates[C.AUDIO  ] = new Rate(this.sampleRate, this.bufLength);
-        this.rates[C.CONTROL] = new Rate(this.sampleRate / this.bufLength, 1);
         this.instanceManager.init(this);
         this.instanceManager.append(0);
       }
@@ -78,9 +75,6 @@ define(function(require, exports, module) {
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
       this.instanceManager.reset(userId);
-    };
-    SynthServer.prototype.getRate = function(rate) {
-      return this.rates[rate] || this.rates[C.CONTROL];
     };
     SynthServer.prototype.process = function() {
       throw "should be overridden";
@@ -420,7 +414,6 @@ define(function(require, exports, module) {
         this.filterSlope = 1 / this.filterLoops;
       }
     }
-    
     return Rate;
   })();
   
@@ -464,6 +457,25 @@ define(function(require, exports, module) {
       cc.opmode = "socket";
       return server;
     };
+    cc.createRate = function(sampleRate, bufLength) {
+      return new Rate(sampleRate, bufLength);
+    };
+    cc.getRateInstance = (function() {
+      var rates = {};
+      return function(rate) {
+        if (!rates[rate]) {
+          switch (rate) {
+          case C.AUDIO:
+            rates[C.AUDIO] = new Rate(cc.server.sampleRate, cc.server.bufLength);
+            break;
+          case C.CONTROL:
+            rates[C.CONTROL] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
+            break;
+          }
+        }
+        return rates[rate];
+      };
+    })();
     
     if (typeof global.console === "undefined") {
       global.console = (function() {
@@ -484,7 +496,8 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    use:use
+    Rate: Rate,
+    use : use
   };
 
 });

@@ -41,12 +41,12 @@ define(function(require, exports, module) {
     this._feedbk    = calcFeedback(this._delaytime, this._decaytime);
   };
 
-  var CombN = function() {
+  unit.specs.CombN = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -106,15 +106,16 @@ define(function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
-    return ctor;
-  };
 
-  var CombL = function() {
+    return ctor;
+  })();
+
+  unit.specs.CombL = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -181,15 +182,16 @@ define(function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
-    return ctor;
-  };
 
-  var CombC = function() {
+    return ctor;
+  })();
+  
+  unit.specs.CombC = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -262,15 +264,10 @@ define(function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("CombN", CombN);
-      unit.register("CombL", CombL);
-      unit.register("CombC", CombC);
-    }
-  };
+  module.exports = {};
 
 });

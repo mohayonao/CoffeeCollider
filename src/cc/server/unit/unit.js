@@ -2,8 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-    
-  var units = {};
+
+  var specs = {};
   
   var Unit = (function() {
     function Unit(parent, specs) {
@@ -17,7 +17,7 @@ define(function(require, exports, module) {
       this.inputs   = new Array(this.numOfInputs);
       this.inRates  = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate = cc.server.getRate(this.calcRate);
+      this.rate = cc.getRateInstance(this.calcRate);
       var bufLength = this.rate.bufLength;
       var outs = new Array(this.numOfOutputs);
       for (var i = 0, imax = outs.length; i < imax; ++i) {
@@ -28,8 +28,8 @@ define(function(require, exports, module) {
       this.done      = false;
     }
     Unit.prototype.init = function(tag) {
-      var ctor = units[this.name];
-      if (ctor) {
+      var ctor = specs[this.name];
+      if (typeof ctor === "function") {
         ctor.call(this);
       } else {
         console.warn(this.name + "'s ctor is not found.");
@@ -46,7 +46,7 @@ define(function(require, exports, module) {
     return Unit;
   })();
   
-  var Control = function() {
+  specs.Control = (function() {
     var ctor = function() {
       if (this.numOfOutputs === 1) {
         this.process = next_1;
@@ -67,9 +67,9 @@ define(function(require, exports, module) {
       }
     };
     return ctor;
-  };
+  })();
   
-  var Out = function() {
+  specs.Out = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
@@ -104,9 +104,9 @@ define(function(require, exports, module) {
       }
     };
     return ctor;
-  };
-
-  var In = function() {
+  })();
+  
+  specs.In = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
@@ -136,23 +136,11 @@ define(function(require, exports, module) {
       }
     };
     return ctor;
-  };
-  
-  var register = function(name, payload) {
-    units[name] = payload();
-  };
-  
-  var install = function() {
-    register("Control", Control);
-    register("Out"    , Out    );
-    register("In"     , In     );
-  };
+  })();
   
   module.exports = {
-    Unit    : Unit,
-    Control : Control,
-    register: register,
-    install : install
+    Unit : Unit,
+    specs: specs,
   };
 
 });

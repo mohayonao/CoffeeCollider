@@ -4,13 +4,13 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   var table = require("./table");
   var gSine = table.gSine;
-  
-  var Pan2 = function() {
+
+  unit.specs.Pan2 = (function() {
     var ctor = function() {
       if (this.inRates[1] === C.AUDIO) {
-        this.process = aa;
+        this.process = next_aa;
       } else {
-        this.process = ak;
+        this.process = next_ak;
       }
       this._pos   = this.inputs[1][0];
       this._level = this.inputs[2][0];
@@ -18,9 +18,9 @@ define(function(require, exports, module) {
       ipos = Math.max(0, Math.min(ipos, 2048));
       this._leftAmp  = this._level * gSine[2048 - ipos];
       this._rightAmp = this._level * gSine[ipos];
-      aa.call(this, 1);
+      next_aa.call(this, 1);
     };
-    var ak = function(inNumSamples) {
+    var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var leftOut  = this.outs[0];
       var rightOut = this.outs[1];
@@ -57,7 +57,7 @@ define(function(require, exports, module) {
         }
       }
     };
-    var aa = function(inNumSamples) {
+    var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var leftOut  = this.outs[0];
       var rightOut = this.outs[1];
@@ -91,13 +91,10 @@ define(function(require, exports, module) {
         }
       }
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("Pan2", Pan2);
-    }
-  };
+  module.exports = {};
 
 });

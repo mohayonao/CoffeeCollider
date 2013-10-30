@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var kSineMask = table.kSineMask;
   var gSineWavetable = table.gSineWavetable;
   
-  var SinOsc = function() {
+  unit.specs.SinOsc = (function() {
     var ctor = function() {
       this._freq  = this.inputs[0][0];
       this._phase = this.inputs[1][0];
@@ -19,25 +19,25 @@ define(function(require, exports, module) {
       this._table = gSineWavetable;
       if (this.inRates[0] === C.AUDIO) {
         if (this.inRates[1] === C.AUDIO) {
-          this.process = aa;
+          this.process = next_aa;
         } else if (this.inRates[1] === C.CONTROL) {
-          this.process = ak;
+          this.process = next_ak;
         } else {
-          this.process = ai;
+          this.process = next_ai;
         }
         this._x = 0;
       } else {
         if (this.inRates[1] === C.AUDIO) {
-          this.process = ka;
+          this.process = next_ka;
           this._x = 0;
         } else {
-          this.process = kk;
+          this.process = next_kk;
           this._x = this._phase * this._radtoinc;
         }
       }
-      kk.call(this, 1);
+      next_kk.call(this, 1);
     };
-    var aa = function(inNumSamples) {
+    var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn  = this.inputs[0];
@@ -55,7 +55,7 @@ define(function(require, exports, module) {
       }
       this._x = x;
     };
-    var ak = function(inNumSamples) {
+    var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn    = this.inputs[0];
@@ -87,7 +87,7 @@ define(function(require, exports, module) {
       }
       this._x = x;
     };
-    var ai = function(inNumSamples) {
+    var next_ai = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn = this.inputs[0];
@@ -104,7 +104,7 @@ define(function(require, exports, module) {
       }
       this._x = x;
     };
-    var ka = function(inNumSamples) {
+    var next_ka = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var nextFreq = this.inputs[0][0];
@@ -136,7 +136,7 @@ define(function(require, exports, module) {
       }
       this._x = x;
     };
-    var kk = function(inNumSamples) {
+    var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var nextFreq  = this.inputs[0][0];
@@ -173,13 +173,10 @@ define(function(require, exports, module) {
       }
       this._x = x;
     };
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("SinOsc", SinOsc);
-    }
-  };
+  module.exports = {};
 
 });

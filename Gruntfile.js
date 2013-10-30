@@ -308,7 +308,7 @@ module.exports = function(grunt) {
           grunt.fail.warn("test succeeded, but not completely.");
         }
       }
-      if (covFile.length) {
+      if (covFile) {
         var collector = new Collector();
         collector.add(global[coverageVar]);
         Report.create("text").writeReport(collector, true);

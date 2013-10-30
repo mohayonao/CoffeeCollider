@@ -3,9 +3,9 @@ define(function(require, exports, module) {
 
   var unit = require("./unit");
   
-  var Line = function() {
+  unit.specs.Line = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_kkk;
       var start = this.inputs[0][0];
       var end = this.inputs[1][0];
       var dur = this.inputs[2][0];
@@ -22,7 +22,7 @@ define(function(require, exports, module) {
       this._doneAction = this.inputs[3][0];
       this.outs[0][0] = this._level;
     };
-    var next = function(inNumSamples) {
+    var next_kkk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var level   = this._level;
@@ -54,13 +54,10 @@ define(function(require, exports, module) {
       this._counter = counter;
       this._level   = level;
     };
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("Line", Line);
-    }
-  };
+  module.exports = {};
 
 });

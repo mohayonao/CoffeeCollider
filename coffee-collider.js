@@ -4549,8 +4549,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
       var api = this.api;
+      if (typeof path !== "string") {
+        throw new TypeError("readAudioFile: first argument must be a String.");
+      }
+      if (typeof callback !== "function") {
+        throw new TypeError("readAudioFile: second argument must be a Function.");
+      }
       if (!api.decodeAudioFile) {
-        callback(null);
+        callback("Audio decoding not supported", null);
         return;
       }
       var xhr = cc.createXMLHttpRequest();
@@ -4559,13 +4565,11 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
           if (xhr.status === 200 && xhr.response) {
-            if (callback) {
-              api.decodeAudioFile(xhr.response, function(buffer) {
-                callback(buffer);
-              });
-            }
+            api.decodeAudioFile(xhr.response, function(err, buffer) {
+              callback(err, buffer);
+            });
           } else {
-            callback(null);
+            callback("error", null);
           }
         }
       };
@@ -4668,8 +4672,10 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   commands["/buffer/request"] = function(msg) {
     var that = this;
     var requestId = msg[2];
-    this.readAudioFile(msg[1], function(buffer) {
-      that.sendToClient(["/buffer/response", buffer, requestId]);
+    this.readAudioFile(msg[1], function(err, buffer) {
+      if (!err) {
+        that.sendToClient(["/buffer/response", buffer, requestId]);
+      }
     });
   };
   commands["/socket/sendToIF"] = function(msg) {
@@ -4792,7 +4798,7 @@ define('cc/common/audioapi', function(require, exports, module) {
               samples[k++] = channelData[j][i];
             }
           }
-          callback({
+          callback(null, {
             sampleRate : buffer.sampleRate,
             numChannels: buffer.numberOfChannels,
             numFrames  : buffer.length,
@@ -5876,9 +5882,6 @@ define('cc/server/server', function(require, exports, module) {
           this.channels   = msg[2]|0;
         }
         this.strm  = new Int16Array(this.strmLength * this.channels);
-        this.rates = {};
-        this.rates[2  ] = new Rate(this.sampleRate, this.bufLength);
-        this.rates[1] = new Rate(this.sampleRate / this.bufLength, 1);
         this.instanceManager.init(this);
         this.instanceManager.append(0);
       }
@@ -5905,9 +5908,6 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
       this.instanceManager.reset(userId);
-    };
-    SynthServer.prototype.getRate = function(rate) {
-      return this.rates[rate] || this.rates[1];
     };
     SynthServer.prototype.process = function() {
       throw "should be overridden";
@@ -6247,7 +6247,6 @@ define('cc/server/server', function(require, exports, module) {
         this.filterSlope = 1 / this.filterLoops;
       }
     }
-    
     return Rate;
   })();
   
@@ -6291,6 +6290,25 @@ define('cc/server/server', function(require, exports, module) {
       cc.opmode = "socket";
       return server;
     };
+    cc.createRate = function(sampleRate, bufLength) {
+      return new Rate(sampleRate, bufLength);
+    };
+    cc.getRateInstance = (function() {
+      var rates = {};
+      return function(rate) {
+        if (!rates[rate]) {
+          switch (rate) {
+          case 2:
+            rates[2] = new Rate(cc.server.sampleRate, cc.server.bufLength);
+            break;
+          case 1:
+            rates[1] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
+            break;
+          }
+        }
+        return rates[rate];
+      };
+    })();
     
     if (typeof global.console === "undefined") {
       global.console = (function() {
@@ -6311,7 +6329,8 @@ define('cc/server/server', function(require, exports, module) {
   };
   
   module.exports = {
-    use:use
+    Rate: Rate,
+    use : use
   };
 
 });
@@ -6940,8 +6959,8 @@ define('cc/server/node', function(require, exports, module) {
 define('cc/server/unit/unit', function(require, exports, module) {
 
   var cc = require("../cc");
-    
-  var units = {};
+
+  var specs = {};
   
   var Unit = (function() {
     function Unit(parent, specs) {
@@ -6955,7 +6974,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.inputs   = new Array(this.numOfInputs);
       this.inRates  = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate = cc.server.getRate(this.calcRate);
+      this.rate = cc.getRateInstance(this.calcRate);
       var bufLength = this.rate.bufLength;
       var outs = new Array(this.numOfOutputs);
       for (var i = 0, imax = outs.length; i < imax; ++i) {
@@ -6966,8 +6985,8 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.done      = false;
     }
     Unit.prototype.init = function(tag) {
-      var ctor = units[this.name];
-      if (ctor) {
+      var ctor = specs[this.name];
+      if (typeof ctor === "function") {
         ctor.call(this);
       } else {
         console.warn(this.name + "'s ctor is not found.");
@@ -6984,7 +7003,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
     return Unit;
   })();
   
-  var Control = function() {
+  specs.Control = (function() {
     var ctor = function() {
       if (this.numOfOutputs === 1) {
         this.process = next_1;
@@ -7005,9 +7024,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
       }
     };
     return ctor;
-  };
+  })();
   
-  var Out = function() {
+  specs.Out = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === 2) {
@@ -7042,9 +7061,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
       }
     };
     return ctor;
-  };
-
-  var In = function() {
+  })();
+  
+  specs.In = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === 2) {
@@ -7074,23 +7093,11 @@ define('cc/server/unit/unit', function(require, exports, module) {
       }
     };
     return ctor;
-  };
-  
-  var register = function(name, payload) {
-    units[name] = payload();
-  };
-  
-  var install = function() {
-    register("Control", Control);
-    register("Out"    , Out    );
-    register("In"     , In     );
-  };
+  })();
   
   module.exports = {
-    Unit    : Unit,
-    Control : Control,
-    register: register,
-    install : install
+    Unit : Unit,
+    specs: specs,
   };
 
 });
@@ -7282,14 +7289,14 @@ define('cc/server/exports', function(require, exports, module) {
 define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
-    require("./unit").install();
-    require("./basic_ops").install();
-    require("./bufio").install();
-    require("./delay").install();
-    require("./line").install();
-    require("./osc").install();
-    require("./pan").install();
-    require("./ui").install();
+    require("./unit");
+    require("./basic_ops");
+    require("./bufio");
+    require("./delay");
+    require("./line");
+    require("./osc");
+    require("./pan");
+    require("./ui");
   };
   
   module.exports = {
@@ -7302,39 +7309,35 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
   var unit = require("./unit");
   var ops  = require("../../client/ugen/basic_ops");
 
-  var UnaryOpUGen = (function() {
+  unit.specs.UnaryOpUGen = (function() {
     var UNARY_OP_UGEN_MAP = ops.UNARY_OP_UGEN_MAP;
-    
     var calcFunc = {};
     
-    var UnaryOpUGen = function() {
-      var ctor = function() {
-        var func = calcFunc[UNARY_OP_UGEN_MAP[this.specialIndex]];
-        var process;
-        if (func) {
-          switch (this.inRates[0]) {
-          case 2  : process = func.a; break;
-          case 1: process = func.k; break;
-          }
-          this.process = process;
-          if (this.process) {
-            this.process(1);
-          } else {
-            this.outs[0][0] = func(this.inputs[0][0]);
-          }
-        } else {
-          console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+    var ctor = function() {
+      var func = calcFunc[UNARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0]) {
+        case 2  : process = func.a; break;
+        case 1: process = func.k; break;
         }
-      };
-      return ctor;
+        this.process = process;
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0]);
+        }
+      } else {
+        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
     };
     
-    var k = function(func) {
+    var unary_k = function(func) {
       return function() {
         this.outs[0][0] = func(this.inputs[0][0]);
       };
     };
-    var a = function(func) {
+    var unary_a = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var out = this.outs[0];
@@ -7363,16 +7366,16 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
-      if (!func.a) { func.a = a(func); }
-      if (!func.k) { func.k = k(func); }
+      if (!func.a) { func.a = unary_a(func); }
+      if (!func.k) { func.k = unary_k(func); }
     });
     
-    return UnaryOpUGen;
+    return ctor;
   })();
 
-  var BinaryOpUGen = (function() {
+  unit.specs.BinaryOpUGen = (function() {
     var BINARY_OP_UGEN_MAP = ops.BINARY_OP_UGEN_MAP;
-
+    
     var AA = 2   * 10 + 2;
     var AK = 2   * 10 + 1;
     var AI = 2   * 10 + 0;
@@ -7385,38 +7388,35 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
 
     var calcFunc = {};
     
-    var BinaryOpUGen = function() {
-      var ctor = function() {
-        var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
-        var process;
-        if (func) {
-          switch (this.inRates[0] * 10 + this.inRates[1]) {
-          case AA: process = func.aa; break;
-          case AK: process = func.ak; break;
-          case AI: process = func.ai; break;
-          case KA: process = func.ka; break;
-          case KK: process = func.kk; break;
-          case KI: process = func.ki; break;
-          case IA: process = func.ia; break;
-          case IK: process = func.ik; break;
-          case II: process = func.ii; break;
-          }
-          this.process = process;
-          this._a = this.inputs[0][0];
-          this._b = this.inputs[1][0];
-          if (this.process) {
-            this.process(1);
-          } else {
-            this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
-          }
-        } else {
-          console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+    var ctor = function() {
+      var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0] * 10 + this.inRates[1]) {
+        case AA: process = func.aa; break;
+        case AK: process = func.ak; break;
+        case AI: process = func.ai; break;
+        case KA: process = func.ka; break;
+        case KK: process = func.kk; break;
+        case KI: process = func.ki; break;
+        case IA: process = func.ia; break;
+        case IK: process = func.ik; break;
+        case II: process = func.ii; break;
         }
-      };
-      return ctor;
+        this.process = process;
+        this._a = this.inputs[0][0];
+        this._b = this.inputs[1][0];
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+        }
+      } else {
+        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
     };
-
-    var aa = function(func) {
+    
+    var binary_aa = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var out = this.outs[0];
@@ -7429,7 +7429,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         }
       };
     };
-    var ak = function(func) {
+    var binary_ak = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -7449,7 +7449,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         this._b = nextB;
       };
     };
-    var ai = function(func) {
+    var binary_ai = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -7466,7 +7466,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         }
       };
     };
-    var ka = function(func) {
+    var binary_ka = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -7486,12 +7486,12 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         this._a = nextA;
       };
     };
-    var kk = function(func) {
+    var binary_kk = function(func) {
       return function() {
         this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
       };
     };
-    var ia = function(func) {
+    var binary_ia = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -7508,7 +7508,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         }
       };
     };
-
+    
     calcFunc["+"] = function(a, b) {
       return a + b;
     };
@@ -7782,20 +7782,20 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
-      if (!func.aa) { func.aa = aa(func); }
-      if (!func.ak) { func.ak = ak(func); }
-      if (!func.ai) { func.ai = ai(func); }
-      if (!func.ka) { func.ka = ka(func); }
-      if (!func.kk) { func.kk = kk(func); }
-      if (!func.ki) { func.ki = func.kk;  }
-      if (!func.ia) { func.ia = ia(func); }
-      if (!func.ik) { func.ik = func.kk;  }
+      if (!func.aa) { func.aa = binary_aa(func); }
+      if (!func.ak) { func.ak = binary_ak(func); }
+      if (!func.ai) { func.ai = binary_ai(func); }
+      if (!func.ka) { func.ka = binary_ka(func); }
+      if (!func.kk) { func.kk = binary_kk(func); }
+      if (!func.ki) { func.ki = func.kk; }
+      if (!func.ia) { func.ia = binary_ia(func); }
+      if (!func.ik) { func.ik = func.kk; }
     });
     
-    return BinaryOpUGen;
+    return ctor;
   })();
   
-  var MulAdd = function() {
+  unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -7809,6 +7809,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         this.outs[0][0] = this._in * this._mul + this._add;
       }
     };
+
     var next = {};
     next[2] = {};
     next[2][2] = {};
@@ -8152,10 +8153,11 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     next[0][0][1] = function() {
       this.outs[0][0] = this._in * this._mul + this.inputs[2][0];
     };
+    
     return ctor;
-  };
-
-  var Sum3 = function() {
+  })();
+  
+  unit.specs.Sum3 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -8169,6 +8171,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         this.outs[0][0] = this._in0 * this._in1 + this._in2;
       }
     };
+    
     var next = {};
     next[2] = {};
     next[2][2] = {};
@@ -8274,10 +8277,11 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     };
     next[1][1][0] = next[1][1][1];
     next[1][0][0] = next[1][1][1];
-    return ctor;
-  };
 
-  var Sum4 = function() {
+    return ctor;
+  })();
+  
+  unit.specs.Sum4 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]][rates[3]];
@@ -8292,6 +8296,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
         this.outs[0][0] = this._in0 * this._in1 + this._in2 + this._in3;
       }
     };
+
     var next = {};
     next[2] = {};
     next[2][2] = {};
@@ -8454,19 +8459,11 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     next[1][1][1][0] = next[1][1][1][1];
     next[1][1][0][0] = next[1][1][1][1];
     next[1][0][0][0] = next[1][1][1][1];
-
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("UnaryOpUGen" , UnaryOpUGen );
-      unit.register("BinaryOpUGen", BinaryOpUGen);
-      unit.register("MulAdd", MulAdd);
-      unit.register("Sum3"  , Sum3  );
-      unit.register("Sum4"  , Sum4  );
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/bufio', function(require, exports, module) {
@@ -8506,31 +8503,33 @@ define('cc/server/unit/bufio', function(require, exports, module) {
     return ((c3 * x + c2) * x + c1) * x + c0;
   };
   
-  var PlayBuf = function() {
+  unit.specs.PlayBuf = (function() {
     var ctor = function() {
       this._buffer = null;
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
       this.process = next_choose;
     };
-    var next_choose  = function(inNumSamples, instance) {
+    
+    var next_choose = function(inNumSamples, instance) {
       this._buffer = instance.buffers[this.specialIndex];
       if (this._buffer) {
         if (this._buffer.samples !== null) {
           if (this.inRates[1] === 2) {
             if (this.inRates[2] === 2) {
-              this.process = next_kk; // aa
+              this.process = next_kk; // TODO: implements aa
             } else {
-              this.process = next_kk; // ak
+              this.process = next_kk; // TODO: implements ak
             }
           } else {
             if (this.inRates[2] === 2) {
-              this.process = next_kk; // ka
+              this.process = next_kk; // TODO: implements ka
             } else {
-              this.process = next_kk; // kk
+              this.process = next_kk;
             }
           }
           this.process.call(this, inNumSamples);
+          delete this.spec;
         }
       }
     };
@@ -8596,14 +8595,11 @@ define('cc/server/unit/bufio', function(require, exports, module) {
       }
       this._phase = phase;
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("PlayBuf", PlayBuf);
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/delay', function(require, exports, module) {
@@ -8648,12 +8644,12 @@ define('cc/server/unit/delay', function(require, exports, module) {
     this._feedbk    = calcFeedback(this._delaytime, this._decaytime);
   };
 
-  var CombN = function() {
+  unit.specs.CombN = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -8713,15 +8709,16 @@ define('cc/server/unit/delay', function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
-    return ctor;
-  };
 
-  var CombL = function() {
+    return ctor;
+  })();
+
+  unit.specs.CombL = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -8788,15 +8785,16 @@ define('cc/server/unit/delay', function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
-    return ctor;
-  };
 
-  var CombC = function() {
+    return ctor;
+  })();
+  
+  unit.specs.CombC = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_akk;
       feedbackdelay_ctor.call(this);
     };
-    var next = function(inNumSamples) {
+    var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var inIn = this.inputs[0];
@@ -8869,25 +8867,20 @@ define('cc/server/unit/delay', function(require, exports, module) {
       }
       this._iwrphase = iwrphase;
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("CombN", CombN);
-      unit.register("CombL", CombL);
-      unit.register("CombC", CombC);
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/line', function(require, exports, module) {
 
   var unit = require("./unit");
   
-  var Line = function() {
+  unit.specs.Line = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_kkk;
       var start = this.inputs[0][0];
       var end = this.inputs[1][0];
       var dur = this.inputs[2][0];
@@ -8904,7 +8897,7 @@ define('cc/server/unit/line', function(require, exports, module) {
       this._doneAction = this.inputs[3][0];
       this.outs[0][0] = this._level;
     };
-    var next = function(inNumSamples) {
+    var next_kkk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var level   = this._level;
@@ -8936,14 +8929,11 @@ define('cc/server/unit/line', function(require, exports, module) {
       this._counter = counter;
       this._level   = level;
     };
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("Line", Line);
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/osc', function(require, exports, module) {
@@ -8956,7 +8946,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
   var kSineMask = table.kSineMask;
   var gSineWavetable = table.gSineWavetable;
   
-  var SinOsc = function() {
+  unit.specs.SinOsc = (function() {
     var ctor = function() {
       this._freq  = this.inputs[0][0];
       this._phase = this.inputs[1][0];
@@ -8966,25 +8956,25 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._table = gSineWavetable;
       if (this.inRates[0] === 2) {
         if (this.inRates[1] === 2) {
-          this.process = aa;
+          this.process = next_aa;
         } else if (this.inRates[1] === 1) {
-          this.process = ak;
+          this.process = next_ak;
         } else {
-          this.process = ai;
+          this.process = next_ai;
         }
         this._x = 0;
       } else {
         if (this.inRates[1] === 2) {
-          this.process = ka;
+          this.process = next_ka;
           this._x = 0;
         } else {
-          this.process = kk;
+          this.process = next_kk;
           this._x = this._phase * this._radtoinc;
         }
       }
-      kk.call(this, 1);
+      next_kk.call(this, 1);
     };
-    var aa = function(inNumSamples) {
+    var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn  = this.inputs[0];
@@ -9002,7 +8992,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
       }
       this._x = x;
     };
-    var ak = function(inNumSamples) {
+    var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn    = this.inputs[0];
@@ -9034,7 +9024,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
       }
       this._x = x;
     };
-    var ai = function(inNumSamples) {
+    var next_ai = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var freqIn = this.inputs[0];
@@ -9051,7 +9041,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
       }
       this._x = x;
     };
-    var ka = function(inNumSamples) {
+    var next_ka = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var nextFreq = this.inputs[0][0];
@@ -9083,7 +9073,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
       }
       this._x = x;
     };
-    var kk = function(inNumSamples) {
+    var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var outs = this.outs[0];
       var nextFreq  = this.inputs[0][0];
@@ -9120,14 +9110,11 @@ define('cc/server/unit/osc', function(require, exports, module) {
       }
       this._x = x;
     };
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("SinOsc", SinOsc);
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/table', function(require, exports, module) {
@@ -9186,13 +9173,13 @@ define('cc/server/unit/pan', function(require, exports, module) {
   var unit = require("./unit");
   var table = require("./table");
   var gSine = table.gSine;
-  
-  var Pan2 = function() {
+
+  unit.specs.Pan2 = (function() {
     var ctor = function() {
       if (this.inRates[1] === 2) {
-        this.process = aa;
+        this.process = next_aa;
       } else {
-        this.process = ak;
+        this.process = next_ak;
       }
       this._pos   = this.inputs[1][0];
       this._level = this.inputs[2][0];
@@ -9200,9 +9187,9 @@ define('cc/server/unit/pan', function(require, exports, module) {
       ipos = Math.max(0, Math.min(ipos, 2048));
       this._leftAmp  = this._level * gSine[2048 - ipos];
       this._rightAmp = this._level * gSine[ipos];
-      aa.call(this, 1);
+      next_aa.call(this, 1);
     };
-    var ak = function(inNumSamples) {
+    var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var leftOut  = this.outs[0];
       var rightOut = this.outs[1];
@@ -9239,7 +9226,7 @@ define('cc/server/unit/pan', function(require, exports, module) {
         }
       }
     };
-    var aa = function(inNumSamples) {
+    var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var leftOut  = this.outs[0];
       var rightOut = this.outs[1];
@@ -9273,32 +9260,28 @@ define('cc/server/unit/pan', function(require, exports, module) {
         }
       }
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("Pan2", Pan2);
-    }
-  };
+  module.exports = {};
 
 });
 define('cc/server/unit/ui', function(require, exports, module) {
 
-  var cc = require("../cc");
   var unit = require("./unit");
   
   var log001 = Math.log(0.001);
-  
-  var MouseX = function() {
+
+  unit.specs.MouseX = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_kkkk;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, instance) {
+    var next_kkkk = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -9314,22 +9297,23 @@ define('cc/server/unit/ui', function(require, exports, module) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
         y0 = Math.pow(maxval / minval, y0) * minval;
+        if (isNaN(y0)) { y0 = 0; }
       }
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
-  };
+  })();
 
-  var MouseY = function() {
+  unit.specs.MouseY = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_kkkk;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, instance) {
+    var next_kkkk = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -9345,23 +9329,23 @@ define('cc/server/unit/ui', function(require, exports, module) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
         y0 = Math.pow(maxval / minval, y0) * minval;
+        if (isNaN(y0)) { y0 = 0; }
       }
       this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
-  };
+  })();
 
-  var MouseButton = function() {
+  unit.specs.MouseButton = (function() {
     var ctor = function() {
-      this.process = next;
+      this.process = next_kkk;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
-      this._mouse = cc.server.syncItems;
       this.process(1);
     };
-    var next = function(inNumSamples, instance) {
+    var next_kkk = function(inNumSamples, instance) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];
@@ -9376,15 +9360,9 @@ define('cc/server/unit/ui', function(require, exports, module) {
       this._y1 = y1;
     };
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("MouseX", MouseX);
-      unit.register("MouseY", MouseY);
-      unit.register("MouseButton", MouseButton);
-    }
-  };
+  module.exports = {};
 
 });
 var exports = _require("cc/cc", "cc/loader");

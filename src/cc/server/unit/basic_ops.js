@@ -4,39 +4,35 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   var ops  = require("../../client/ugen/basic_ops");
 
-  var UnaryOpUGen = (function() {
+  unit.specs.UnaryOpUGen = (function() {
     var UNARY_OP_UGEN_MAP = ops.UNARY_OP_UGEN_MAP;
-    
     var calcFunc = {};
     
-    var UnaryOpUGen = function() {
-      var ctor = function() {
-        var func = calcFunc[UNARY_OP_UGEN_MAP[this.specialIndex]];
-        var process;
-        if (func) {
-          switch (this.inRates[0]) {
-          case C.AUDIO  : process = func.a; break;
-          case C.CONTROL: process = func.k; break;
-          }
-          this.process = process;
-          if (this.process) {
-            this.process(1);
-          } else {
-            this.outs[0][0] = func(this.inputs[0][0]);
-          }
-        } else {
-          console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+    var ctor = function() {
+      var func = calcFunc[UNARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0]) {
+        case C.AUDIO  : process = func.a; break;
+        case C.CONTROL: process = func.k; break;
         }
-      };
-      return ctor;
+        this.process = process;
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0]);
+        }
+      } else {
+        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
     };
     
-    var k = function(func) {
+    var unary_k = function(func) {
       return function() {
         this.outs[0][0] = func(this.inputs[0][0]);
       };
     };
-    var a = function(func) {
+    var unary_a = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var out = this.outs[0];
@@ -65,16 +61,16 @@ define(function(require, exports, module) {
     
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
-      if (!func.a) { func.a = a(func); }
-      if (!func.k) { func.k = k(func); }
+      if (!func.a) { func.a = unary_a(func); }
+      if (!func.k) { func.k = unary_k(func); }
     });
     
-    return UnaryOpUGen;
+    return ctor;
   })();
 
-  var BinaryOpUGen = (function() {
+  unit.specs.BinaryOpUGen = (function() {
     var BINARY_OP_UGEN_MAP = ops.BINARY_OP_UGEN_MAP;
-
+    
     var AA = C.AUDIO   * 10 + C.AUDIO;
     var AK = C.AUDIO   * 10 + C.CONTROL;
     var AI = C.AUDIO   * 10 + C.SCALAR;
@@ -87,38 +83,35 @@ define(function(require, exports, module) {
 
     var calcFunc = {};
     
-    var BinaryOpUGen = function() {
-      var ctor = function() {
-        var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
-        var process;
-        if (func) {
-          switch (this.inRates[0] * 10 + this.inRates[1]) {
-          case AA: process = func.aa; break;
-          case AK: process = func.ak; break;
-          case AI: process = func.ai; break;
-          case KA: process = func.ka; break;
-          case KK: process = func.kk; break;
-          case KI: process = func.ki; break;
-          case IA: process = func.ia; break;
-          case IK: process = func.ik; break;
-          case II: process = func.ii; break;
-          }
-          this.process = process;
-          this._a = this.inputs[0][0];
-          this._b = this.inputs[1][0];
-          if (this.process) {
-            this.process(1);
-          } else {
-            this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
-          }
-        } else {
-          console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+    var ctor = function() {
+      var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0] * 10 + this.inRates[1]) {
+        case AA: process = func.aa; break;
+        case AK: process = func.ak; break;
+        case AI: process = func.ai; break;
+        case KA: process = func.ka; break;
+        case KK: process = func.kk; break;
+        case KI: process = func.ki; break;
+        case IA: process = func.ia; break;
+        case IK: process = func.ik; break;
+        case II: process = func.ii; break;
         }
-      };
-      return ctor;
+        this.process = process;
+        this._a = this.inputs[0][0];
+        this._b = this.inputs[1][0];
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+        }
+      } else {
+        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
     };
-
-    var aa = function(func) {
+    
+    var binary_aa = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var out = this.outs[0];
@@ -131,7 +124,7 @@ define(function(require, exports, module) {
         }
       };
     };
-    var ak = function(func) {
+    var binary_ak = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -151,7 +144,7 @@ define(function(require, exports, module) {
         this._b = nextB;
       };
     };
-    var ai = function(func) {
+    var binary_ai = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -168,7 +161,7 @@ define(function(require, exports, module) {
         }
       };
     };
-    var ka = function(func) {
+    var binary_ka = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -188,12 +181,12 @@ define(function(require, exports, module) {
         this._a = nextA;
       };
     };
-    var kk = function(func) {
+    var binary_kk = function(func) {
       return function() {
         this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
       };
     };
-    var ia = function(func) {
+    var binary_ia = function(func) {
       return function(inNumSamples) {
         inNumSamples = inNumSamples|0;
         var outs = this.outs[0];
@@ -210,7 +203,7 @@ define(function(require, exports, module) {
         }
       };
     };
-
+    
     calcFunc["+"] = function(a, b) {
       return a + b;
     };
@@ -484,20 +477,20 @@ define(function(require, exports, module) {
     
     Object.keys(calcFunc).forEach(function(key) {
       var func = calcFunc[key];
-      if (!func.aa) { func.aa = aa(func); }
-      if (!func.ak) { func.ak = ak(func); }
-      if (!func.ai) { func.ai = ai(func); }
-      if (!func.ka) { func.ka = ka(func); }
-      if (!func.kk) { func.kk = kk(func); }
-      if (!func.ki) { func.ki = func.kk;  }
-      if (!func.ia) { func.ia = ia(func); }
-      if (!func.ik) { func.ik = func.kk;  }
+      if (!func.aa) { func.aa = binary_aa(func); }
+      if (!func.ak) { func.ak = binary_ak(func); }
+      if (!func.ai) { func.ai = binary_ai(func); }
+      if (!func.ka) { func.ka = binary_ka(func); }
+      if (!func.kk) { func.kk = binary_kk(func); }
+      if (!func.ki) { func.ki = func.kk; }
+      if (!func.ia) { func.ia = binary_ia(func); }
+      if (!func.ik) { func.ik = func.kk; }
     });
     
-    return BinaryOpUGen;
+    return ctor;
   })();
   
-  var MulAdd = function() {
+  unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -511,6 +504,7 @@ define(function(require, exports, module) {
         this.outs[0][0] = this._in * this._mul + this._add;
       }
     };
+
     var next = {};
     next[C.AUDIO] = {};
     next[C.AUDIO][C.AUDIO] = {};
@@ -854,10 +848,11 @@ define(function(require, exports, module) {
     next[C.SCALAR][C.SCALAR][C.CONTROL] = function() {
       this.outs[0][0] = this._in * this._mul + this.inputs[2][0];
     };
+    
     return ctor;
-  };
-
-  var Sum3 = function() {
+  })();
+  
+  unit.specs.Sum3 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -871,6 +866,7 @@ define(function(require, exports, module) {
         this.outs[0][0] = this._in0 * this._in1 + this._in2;
       }
     };
+    
     var next = {};
     next[C.AUDIO] = {};
     next[C.AUDIO][C.AUDIO] = {};
@@ -976,10 +972,11 @@ define(function(require, exports, module) {
     };
     next[C.CONTROL][C.CONTROL][C.SCALAR] = next[C.CONTROL][C.CONTROL][C.CONTROL];
     next[C.CONTROL][C.SCALAR][C.SCALAR] = next[C.CONTROL][C.CONTROL][C.CONTROL];
-    return ctor;
-  };
 
-  var Sum4 = function() {
+    return ctor;
+  })();
+  
+  unit.specs.Sum4 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]][rates[3]];
@@ -994,6 +991,7 @@ define(function(require, exports, module) {
         this.outs[0][0] = this._in0 * this._in1 + this._in2 + this._in3;
       }
     };
+
     var next = {};
     next[C.AUDIO] = {};
     next[C.AUDIO][C.AUDIO] = {};
@@ -1156,18 +1154,10 @@ define(function(require, exports, module) {
     next[C.CONTROL][C.CONTROL][C.CONTROL][C.SCALAR] = next[C.CONTROL][C.CONTROL][C.CONTROL][C.CONTROL];
     next[C.CONTROL][C.CONTROL][C.SCALAR][C.SCALAR] = next[C.CONTROL][C.CONTROL][C.CONTROL][C.CONTROL];
     next[C.CONTROL][C.SCALAR][C.SCALAR][C.SCALAR] = next[C.CONTROL][C.CONTROL][C.CONTROL][C.CONTROL];
-
+    
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("UnaryOpUGen" , UnaryOpUGen );
-      unit.register("BinaryOpUGen", BinaryOpUGen);
-      unit.register("MulAdd", MulAdd);
-      unit.register("Sum3"  , Sum3  );
-      unit.register("Sum4"  , Sum4  );
-    }
-  };
+  module.exports = {};
 
 });

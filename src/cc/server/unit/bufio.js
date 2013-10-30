@@ -36,31 +36,33 @@ define(function(require, exports, module) {
     return ((c3 * x + c2) * x + c1) * x + c0;
   };
   
-  var PlayBuf = function() {
+  unit.specs.PlayBuf = (function() {
     var ctor = function() {
       this._buffer = null;
       this._phase  = this.inputs[3][0];
       this._trig   = 0;
       this.process = next_choose;
     };
-    var next_choose  = function(inNumSamples, instance) {
+    
+    var next_choose = function(inNumSamples, instance) {
       this._buffer = instance.buffers[this.specialIndex];
       if (this._buffer) {
         if (this._buffer.samples !== null) {
           if (this.inRates[1] === C.AUDIO) {
             if (this.inRates[2] === C.AUDIO) {
-              this.process = next_kk; // aa
+              this.process = next_kk; // TODO: implements aa
             } else {
-              this.process = next_kk; // ak
+              this.process = next_kk; // TODO: implements ak
             }
           } else {
             if (this.inRates[2] === C.AUDIO) {
-              this.process = next_kk; // ka
+              this.process = next_kk; // TODO: implements ka
             } else {
-              this.process = next_kk; // kk
+              this.process = next_kk;
             }
           }
           this.process.call(this, inNumSamples);
+          delete this.spec;
         }
       }
     };
@@ -126,13 +128,10 @@ define(function(require, exports, module) {
       }
       this._phase = phase;
     };
+
     return ctor;
-  };
+  })();
   
-  module.exports = {
-    install: function() {
-      unit.register("PlayBuf", PlayBuf);
-    }
-  };
+  module.exports = {};
 
 });
