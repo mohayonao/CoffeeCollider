@@ -7,7 +7,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-este-watch");
 
   var testFailed = [];
-  var hasExclusiveTest = function() {
+  var checkExclusiveTest = function() {
     var files = grunt.file.expand("src/cc/**/*_test.js");
     return files.some(function(file) {
       var code = grunt.file.read(file);
@@ -131,7 +131,7 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("dryice", function() {
-    if (hasExclusiveTest()) {
+    if (checkExclusiveTest()) {
       grunt.fail.warn("NOT builded, '.only' attribute is detected in any tests.");
       return;
     }
@@ -226,17 +226,10 @@ module.exports = function(grunt) {
         delete require.cache[filepath];
       }
     });
-    require("amd-loader");
-
     resetPrototype();
-
-    var Mocha = require("mocha");
-    var mocha = new Mocha();
-    var exclusive = hasExclusiveTest();
-
-    global.require = require;
-    global.C = grunt.file.readJSON("src/const.json");
-
+    
+    var hasExclusive = checkExclusiveTest();
+    
     var reporter = "dot";
     var args  = arguments[0];
     var files = [];
@@ -255,7 +248,7 @@ module.exports = function(grunt) {
         }
       }
     }
-    if (reporter === "dot" && exclusive) {
+    if (reporter === "dot" && hasExclusive) {
       reporter = "nyan";
     }
 
@@ -267,6 +260,7 @@ module.exports = function(grunt) {
       );
     }
     files = files.concat(testFailed);
+    
     var set = {};
     files = files.filter(function(file) {
       if (!set[file] && /_test\.js$/.test(file)) {
@@ -275,11 +269,9 @@ module.exports = function(grunt) {
       }
       return false;
     });
-    files.forEach(function(file) {
-      mocha.addFile(file);
-    });
+    
     var done = this.async();
-    mocha.reporter(reporter).run(function(failures) {
+    doMochaTest(reporter, files, function(failures) {
       if (failures) {
         grunt.fail.fatal("test failed.");
         testFailed = files;
@@ -287,7 +279,7 @@ module.exports = function(grunt) {
         testFailed = [];
       }
       if (args === "travis") {
-        if (exclusive) {
+        if (hasExclusive) {
           grunt.fail.warn("test succeeded, but not completely.");
         }
       }
@@ -296,14 +288,73 @@ module.exports = function(grunt) {
   });
   
   grunt.registerTask("coverage", function() {
-    var child = grunt.util.spawn({
-      cmd:"istanbul", args:["cover", "src/cc/test/run.js"]
-    }, function(err, result) {
-      console.log(result);
+    var path     = require("path");
+    var istanbul = require("istanbul");
+    var Instrumenter = istanbul.Instrumenter;
+    var Collector    = istanbul.Collector;
+    var Report       = istanbul.Report;
+    var hook         = istanbul.hook;
+    
+    var coverageVar = "$$cov_" + Date.now() + "$$";
+    var instrumenter = new Instrumenter({
+      coverageVariable:coverageVar
     });
-    child.stdout.pipe(process.stdout);
-    child.stderr.pipe(process.stderr);
+    var transformer = instrumenter.instrumentSync.bind(instrumenter);
+    
+    var testFiles = [];
+    var srcFiles  = [];
+    grunt.file.expand("src/cc/**/*.*").forEach(function(file) {
+      var filepath = path.resolve(file);
+      if (/_test\.js$/.test(filepath)) {
+        testFiles.push(filepath);
+      } else {
+        srcFiles[filepath] = true;
+      }
+    });
+    var matchFn = function(filepath) {
+      return srcFiles[filepath];
+    };
+    hook.hookRequire(matchFn, transformer);
+    
+    global[coverageVar] = {};
+    
+    var done = this.async();
+    doMochaTest("nyan", testFiles, function() {
+      var reports = [];
+      reports.push(Report.create("text-summary"));
+      reports.push(Report.create("lcov", { dir:"coverage" }));
+      
+      var cov = global[coverageVar];
+      grunt.file.write("coverage/coverage.json", JSON.stringify(cov));
+      
+      var collector = new Collector();
+      collector.add(cov);
+      
+      reports.forEach(function(report) {
+        report.writeReport(collector, true);
+      });
+      
+      done();
+    });
   });
+
+  var doMochaTest = function(reporter, files, callback) {
+    require("amd-loader");
+    
+    var Mocha = require("mocha");
+    var mocha = new Mocha();
+    
+    global.require = require;
+    global.C = grunt.file.readJSON("src/const.json");
+
+    files.forEach(function(file) {
+      mocha.addFile(file);
+    });
+    
+    mocha.reporter(reporter).run(function(failures) {
+      callback(failures);
+    });
+  };
   
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
