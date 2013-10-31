@@ -419,83 +419,82 @@ define('cc/client/client', function(require, exports, module) {
     }
   };
   
-  var use = function() {
-    require("../common/timer").use();
-    require("./buffer").use();
-    require("./node").use();
-    require("./sched").use();
-    require("./ugen/exports").use();
-    
-    cc.client_exports = function() {
-      require("./object").exports();
-      require("./number").exports();
-      require("./data").exports();
-      require("./buffer").exports();
-      require("./node").exports();
-      require("./sched").exports();
-      require("./scale").exports();
-      require("./ugen/exports").exports();
-    };
-    cc.createSynthClient = function() {
-      cc.client_exports();
-      switch (cc.opmode) {
-      case "worker":
-        return cc.createWorkerSynthClient();
-      case "iframe":
-        return cc.createIFrameSynthClient();
-      case "socket":
-        return cc.createSocketSynthClient();
-      }
-      throw new Error("A SynthClient is not defined for: " + cc.opmode);
-    };
-    var onmessage = function(e) {
-      var msg = e.data;
-      if (msg instanceof Uint8Array) {
-        cc.client.sendToServer(msg);
-      } else {
-        cc.client.recvFromIF(msg);
-      }
-    };
-    cc.createWorkerSynthClient = function() {
-      var client = new WorkerSynthClient();
-      global.onmessage = onmessage;
-      cc.opmode = "worker";
-      return client;
-    };
-    cc.createIFrameSynthClient = function() {
-      var client = new IFrameSynthClient();
-      if (typeof window !== "undefined") {
-        window.onmessage = function(e) {
-          e.ports[0].onmessage = onmessage;
-          client.sendToIF = function(msg) {
-            e.ports[0].postMessage(msg);
-          };
-          window.onmessage = null;
-        };
-      }
-      cc.opmode = "iframe";
-      return client;
-    };
-    cc.createSocketSynthClient = function() {
-      var client = new SocketSynthClient();
-      if (typeof window !== "undefined") {
-        window.onmessage = function(e) {
-          e.ports[0].onmessage = onmessage;
-          client.sendToIF = function(msg) {
-            e.ports[0].postMessage(msg);
-          };
-          client.socketPath = e.data;
-          window.onmessage = null;
-        };
-      }
-      cc.opmode = "socket";
-      return client;
-    };
-    cc.replaceNativeTimerFunctions();
-  };
   
   module.exports = {
-    use:use
+    use: function() {
+      require("../common/timer").use();
+      require("./buffer").use();
+      require("./node").use();
+      require("./sched").use();
+      require("./ugen/exports").use();
+      
+      cc.client_exports = function() {
+        require("./object").exports();
+        require("./number").exports();
+        require("./data").exports();
+        require("./buffer").exports();
+        require("./node").exports();
+        require("./sched").exports();
+        require("./scale").exports();
+        require("./ugen/exports").exports();
+      };
+      cc.createSynthClient = function() {
+        cc.client_exports();
+        switch (cc.opmode) {
+        case "worker":
+          return cc.createWorkerSynthClient();
+        case "iframe":
+          return cc.createIFrameSynthClient();
+        case "socket":
+          return cc.createSocketSynthClient();
+        }
+        throw new Error("A SynthClient is not defined for: " + cc.opmode);
+      };
+      var onmessage = function(e) {
+        var msg = e.data;
+        if (msg instanceof Uint8Array) {
+          cc.client.sendToServer(msg);
+        } else {
+          cc.client.recvFromIF(msg);
+        }
+      };
+      cc.createWorkerSynthClient = function() {
+        var client = new WorkerSynthClient();
+        global.onmessage = onmessage;
+        cc.opmode = "worker";
+        return client;
+      };
+      cc.createIFrameSynthClient = function() {
+        var client = new IFrameSynthClient();
+        if (typeof window !== "undefined") {
+          window.onmessage = function(e) {
+            e.ports[0].onmessage = onmessage;
+            client.sendToIF = function(msg) {
+              e.ports[0].postMessage(msg);
+            };
+            window.onmessage = null;
+          };
+        }
+        cc.opmode = "iframe";
+        return client;
+      };
+      cc.createSocketSynthClient = function() {
+        var client = new SocketSynthClient();
+        if (typeof window !== "undefined") {
+          window.onmessage = function(e) {
+            e.ports[0].onmessage = onmessage;
+            client.sendToIF = function(msg) {
+              e.ports[0].postMessage(msg);
+            };
+            client.socketPath = e.data;
+            window.onmessage = null;
+          };
+        }
+        cc.opmode = "socket";
+        return client;
+      };
+      cc.replaceNativeTimerFunctions();
+    }
   };
 
 });
@@ -622,31 +621,29 @@ define('cc/common/browser', function(require, exports, module) {
 
   var cc = require("../cc");
   
-  var use = function() {
-    cc.createWebWorker = function(path) {
-      return new Worker(path);
-    };
-    cc.createWebSocket = function(path) {
-      return new WebSocket(path);
-    };
-    cc.createXMLHttpRequest = function() {
-      return new XMLHttpRequest();
-    };
-    cc.createMessageChannel = function() {
-      return new MessageChannel();
-    };
-    cc.createHTMLIFrameElement = function() {
-      var iframe = document.createElement("iframe");
-      iframe.style.width  = 0;
-      iframe.style.height = 0;
-      iframe.style.border = 0;
-      document.body.appendChild(iframe);
-      return iframe;
-    };
-  };
-  
   module.exports = {
-    use:use
+    use: function() {
+      cc.createWebWorker = function(path) {
+        return new Worker(path);
+      };
+      cc.createWebSocket = function(path) {
+        return new WebSocket(path);
+      };
+      cc.createXMLHttpRequest = function() {
+        return new XMLHttpRequest();
+      };
+      cc.createMessageChannel = function() {
+        return new MessageChannel();
+      };
+      cc.createHTMLIFrameElement = function() {
+        var iframe = document.createElement("iframe");
+        iframe.style.width  = 0;
+        iframe.style.height = 0;
+        iframe.style.border = 0;
+        document.body.appendChild(iframe);
+        return iframe;
+      };
+    }
   };
 
 });
@@ -795,25 +792,22 @@ define('cc/common/timer', function(require, exports, module) {
       _clearTimeout(timerId);
     });
   };
-
-  var use = function() {
-    cc.createTimer = function() {
-      if (WorkerTimer) {
-        return new WorkerTimer();
-      }
-      return new NativeTimer();
-    };
-    cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
-    cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
-    cc.resetNativeTimers = resetNativeTimers;
-  };
   
   module.exports = {
-    Timer: WorkerTimer || NativeTimer,
-    replaceNativeTimerFunctions: replaceNativeTimerFunctions,
-    restoreNativeTimerFunctions: restoreNativeTimerFunctions,
-    resetNativeTimers: resetNativeTimers,
-    use:use,
+    WorkerTimer: WorkerTimer,
+    NativeTimer: NativeTimer,
+    
+    use: function() {
+      cc.createTimer = function() {
+        if (WorkerTimer) {
+          return new WorkerTimer();
+        }
+        return new NativeTimer();
+      };
+      cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
+      cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
+      cc.resetNativeTimers = resetNativeTimers;
+    }
   };
 
 });
@@ -920,26 +914,25 @@ define('cc/client/buffer', function(require, exports, module) {
     bufSrcId = 0;
   };
   
-  var use = function() {
-    cc.createAudioBuffer = function() {
-      return new AudioBuffer();
-    };
-    cc.instanceOfAudioBuffer = function(obj) {
-      return obj instanceof AudioBuffer;
-    };
-    cc.resetBuffer = resetBuffer;
-  };
-
-  exports = function() {
-    if (typeof Buffer === "undefined") {
-      // TODO: rename????
-      global.Buffer = BufferInterface;
-    }
-  };
   
   module.exports = {
     AudioBuffer: AudioBuffer,
-    use:use, exports:exports,
+    
+    use: function() {
+      cc.createAudioBuffer = function() {
+        return new AudioBuffer();
+      };
+      cc.instanceOfAudioBuffer = function(obj) {
+        return obj instanceof AudioBuffer;
+      };
+      cc.resetBuffer = resetBuffer;
+    },
+    exports: function() {
+      if (typeof Buffer === "undefined") {
+        // TODO: rename????
+        global.Buffer = BufferInterface;
+      }
+    }
   };
 
 });
@@ -1728,26 +1721,25 @@ define('cc/client/node', function(require, exports, module) {
     return nodes[nodeId];
   };
   
-  var use = function() {
-    require("./ugen/ugen").use();
-    
-    cc.createGroup = function(target, addAction) {
-      return new Group(target, addAction);
-    };
-    cc.getNode   = get;
-    cc.resetNode = reset;
-  };
-
-  exports = function() {
-    global.Group = GroupInterface;
-    global.Synth = SynthInterface;
-  };
   
   module.exports = {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    use:use, exports:exports,
+    
+    use: function() {
+      require("./ugen/ugen").use();
+      
+      cc.createGroup = function(target, addAction) {
+        return new Group(target, addAction);
+      };
+      cc.getNode   = get;
+      cc.resetNode = reset;
+    },
+    exports: function() {
+      global.Group = GroupInterface;
+      global.Synth = SynthInterface;
+    }
   };
 
 });
@@ -1975,40 +1967,6 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     });
   };
   
-  var use = function() {
-    cc.createUGen = function() {
-      return new UGen();
-    };
-    cc.createOutputProxy = function(rate, source, index) {
-      return new OutputProxy(rate, source, index);
-    };
-    cc.createControl = function(rate) {
-      return new Control(rate);
-    };
-    cc.instanceOfUGen = function(obj) {
-      return obj instanceof UGen;
-    };
-    cc.instanceOfMultiOutUGen = function(obj) {
-      return obj instanceof MultiOutUGen;
-    };
-    cc.instanceOfOutputProxy = function(obj) {
-      return obj instanceof OutputProxy;
-    };
-    cc.instanceOfOut = function(obj) {
-      return obj instanceof Out;
-    };
-    cc.setSynthDef = function(func) {
-      if (func && addToSynthDef !== null) {
-        throw new Error("nested Synth.def");
-      }
-      addToSynthDef = func;
-    };
-
-    // redefinition for tests
-    cc.UGen = UGen;
-    cc.MultiOutUGen = MultiOutUGen;
-    cc.registerUGen = registerUGen;
-  };
   
   // exports for prototype extending
   cc.UGen = UGen;
@@ -2016,12 +1974,46 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   cc.registerUGen = registerUGen;
   
   module.exports = {
-    UGen: UGen,
+    UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
     OutputProxy : OutputProxy,
     Control     : Control,
     Out         : Out,
-    use:use,
+    
+    use: function() {
+      cc.createUGen = function() {
+        return new UGen();
+      };
+      cc.createOutputProxy = function(rate, source, index) {
+        return new OutputProxy(rate, source, index);
+      };
+      cc.createControl = function(rate) {
+        return new Control(rate);
+      };
+      cc.instanceOfUGen = function(obj) {
+        return obj instanceof UGen;
+      };
+      cc.instanceOfMultiOutUGen = function(obj) {
+        return obj instanceof MultiOutUGen;
+      };
+      cc.instanceOfOutputProxy = function(obj) {
+        return obj instanceof OutputProxy;
+      };
+      cc.instanceOfOut = function(obj) {
+        return obj instanceof Out;
+      };
+      cc.setSynthDef = function(func) {
+        if (func && addToSynthDef !== null) {
+          throw new Error("nested Synth.def");
+        }
+        addToSynthDef = func;
+      };
+      
+      // redefinition for tests
+      cc.UGen = UGen;
+      cc.MultiOutUGen = MultiOutUGen;
+      cc.registerUGen = registerUGen;
+    },
     exports: function() {
       registerUGen("Out", iOut);
       registerUGen("In" , iIn );
@@ -2569,90 +2561,6 @@ define('cc/client/sched', function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var use = function() {
-    cc.createTimeline = function() {
-      cc.timeline = new Timeline();
-      return cc.timeline;
-    };
-    cc.createTaskGlobal = function(timeline) {
-      return new TaskGlobal(timeline);
-    };
-    cc.createTaskDo = function(func) {
-      return new TaskDo(func);
-    };
-    cc.createTaskLoop = function(func) {
-      return new TaskLoop(func);
-    };
-    cc.createTaskEach = function(list, func) {
-      return new TaskEach(list, func);
-    };
-    cc.createTaskTimeout = function(delay, func) {
-      return new TaskTimeout(delay, func);
-    };
-    cc.createTaskInterval = function(delay, func) {
-      return new TaskInterval(delay, func);
-    };
-    cc.createTaskBlock = function() {
-      return new TaskBlock();
-    };
-    cc.createTaskContext = function(task) {
-      return new TaskContext(task);
-    };
-    cc.createTaskWaitToken = function(item) {
-      if (item instanceof TaskWaitToken) {
-        return item;
-      }
-      switch (typeof item) {
-      case "number":
-        return new TaskWaitTokenNumber(item);
-      case "function":
-        return new TaskWaitTokenFunction(item);
-      case "boolean":
-        return new TaskWaitTokenBoolean(item);
-      default:
-        if (item) {
-          if (Array.isArray(item)) {
-            return cc.createTaskWaitLogic("and", item);
-          } else if (typeof item.performWait === "function") {
-            return new TaskWaitTokenBlock(item);
-          }
-        }
-      }
-      throw new TypeError("TaskWaitToken: Invalid type");
-    };
-    cc.createTaskWaitLogic = function(logic, list) {
-      list = list.map(function(x) {
-        return cc.createTaskWaitToken(x);
-      });
-      return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
-    };
-    cc.instanceOfWaitToken = function(obj) {
-      return obj instanceof TaskWaitToken;
-    };
-  };
-  
-  exports = function() {
-    global.Task = {
-      "do": function(func) {
-        return cc.createTaskDo(func);
-      },
-      loop: function(func) {
-        return cc.createTaskLoop(func);
-      },
-      each: function(list, func) {
-        return cc.createTaskEach(list, func);
-      },
-      timeout: function(delay, func) {
-        return cc.createTaskTimeout(delay, func);
-      },
-      interval: function(delay, func) {
-        return cc.createTaskInterval(delay, func);
-      },
-      block: function() {
-        return cc.createTaskBlock();
-      }
-    };
-  };
   
   module.exports = {
     Timeline: Timeline,
@@ -2672,7 +2580,90 @@ define('cc/client/sched', function(require, exports, module) {
     TaskTimeout : TaskTimeout,
     TaskInterval: TaskInterval,
     TaskBlock   : TaskBlock,
-    use:use, exports:exports,
+    
+    use: function() {
+      cc.createTimeline = function() {
+        cc.timeline = new Timeline();
+        return cc.timeline;
+      };
+      cc.createTaskGlobal = function(timeline) {
+        return new TaskGlobal(timeline);
+      };
+      cc.createTaskDo = function(func) {
+        return new TaskDo(func);
+      };
+      cc.createTaskLoop = function(func) {
+        return new TaskLoop(func);
+      };
+      cc.createTaskEach = function(list, func) {
+        return new TaskEach(list, func);
+      };
+      cc.createTaskTimeout = function(delay, func) {
+        return new TaskTimeout(delay, func);
+      };
+      cc.createTaskInterval = function(delay, func) {
+        return new TaskInterval(delay, func);
+      };
+      cc.createTaskBlock = function() {
+        return new TaskBlock();
+      };
+      cc.createTaskContext = function(task) {
+        return new TaskContext(task);
+      };
+      cc.createTaskWaitToken = function(item) {
+        if (item instanceof TaskWaitToken) {
+          return item;
+        }
+        switch (typeof item) {
+        case "number":
+          return new TaskWaitTokenNumber(item);
+        case "function":
+          return new TaskWaitTokenFunction(item);
+        case "boolean":
+          return new TaskWaitTokenBoolean(item);
+        default:
+          if (item) {
+            if (Array.isArray(item)) {
+              return cc.createTaskWaitLogic("and", item);
+            } else if (typeof item.performWait === "function") {
+              return new TaskWaitTokenBlock(item);
+            }
+          }
+        }
+        throw new TypeError("TaskWaitToken: Invalid type");
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        list = list.map(function(x) {
+          return cc.createTaskWaitToken(x);
+        });
+        return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
+      };
+      cc.instanceOfWaitToken = function(obj) {
+        return obj instanceof TaskWaitToken;
+      };
+    },
+    exports: function() {
+      global.Task = {
+        "do": function(func) {
+          return cc.createTaskDo(func);
+        },
+        loop: function(func) {
+          return cc.createTaskLoop(func);
+        },
+        each: function(list, func) {
+          return cc.createTaskEach(list, func);
+        },
+        timeout: function(delay, func) {
+          return cc.createTaskTimeout(delay, func);
+        },
+        interval: function(delay, func) {
+          return cc.createTaskInterval(delay, func);
+        },
+        block: function() {
+          return cc.createTaskBlock();
+        }
+      };
+    }
   };
 
 });
@@ -2680,28 +2671,19 @@ define('cc/client/ugen/exports', function(require, exports, module) {
 
   exports = function() {
     require("./ugen").exports();
-    require("./madd").exports();
-    require("./uop").exports();
-    require("./bop").exports();
     require("./bufio").exports();
-    require("./delay").exports();
     require("./line").exports();
     require("./osc").exports();
     require("./pan").exports();
+    require("./delay").exports();
     require("./ui").exports();
   };
 
   var use = function() {
     require("./ugen").use();
-    require("./madd").use();
     require("./uop").use();
     require("./bop").use();
-    require("./bufio").use();
-    require("./delay").use();
-    require("./line").use();
-    require("./osc").use();
-    require("./pan").use();
-    require("./ui").use();
+    require("./madd").use();
   };
   
   module.exports = {
@@ -2709,163 +2691,200 @@ define('cc/client/ugen/exports', function(require, exports, module) {
   };
 
 });
-define('cc/client/ugen/madd', function(require, exports, module) {
-  
+define('cc/client/ugen/bufio', function(require, exports, module) {
+
   var cc = require("../cc");
-  var extend = require("../../common/extend");
+  var slice = [].slice;
   
-  var asRate = function(obj) {
-    if (Array.isArray(obj)) {
-      return obj.reduce(function(rate, obj) {
-        return Math.max(rate, asRate(obj));
-      }, 0);
-    }
-    return (obj && obj.rate) || 0;
+  var playBuf_ctor = function(rate) {
+    return function(numChannels, buffer) {
+      if (typeof numChannels !== "number") {
+        throw new TypeError("Buffer: arguments[0] should be an integer.");
+      }
+      if (!cc.instanceOfAudioBuffer(buffer)) {
+        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      }
+      numChannels = Math.max(0, numChannels|0);
+      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
+      this.specialIndex = buffer._bufId;
+      return this.initOutputs(numChannels, this.rate);
+    };
   };
   
-  var MulAdd = (function() {
-    function MulAdd() {
-      cc.UGen.call(this, "MulAdd");
-    }
-    extend(MulAdd, cc.UGen);
-
-    MulAdd.prototype.init = function(_in, mul, add) {
-      var t, minus, nomul, noadd, rate;
-      if (_in.rate - mul.rate < 0) {
-        t = _in; _in = mul; mul = t;
-      }
-      if (mul === 0) {
-        return add;
-      }
-      minus = mul === -1;
-      nomul = mul ===  1;
-      noadd = add ===  0;
-      
-      if (nomul && noadd) {
-        return _in;
-      }
-      if (minus && noadd) {
-        return cc.createBinaryOpUGen("*", _in, -1);
-      }
-      if (noadd) {
-        return cc.createBinaryOpUGen("*", _in, mul);
-      }
-      if (minus) {
-        return cc.createBinaryOpUGen("-", add, _in);
-      }
-      if (nomul) {
-        return cc.createBinaryOpUGen("+", _in, add);
-      }
-      if (validate(_in, mul, add)) {
-        rate = asRate([_in, mul, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
-      }
-      if (validate(mul, _in, add)) {
-        rate = asRate([mul, _in, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
-      }
-      return _in * mul + add;
-    };
-    
-    var validate = function(_in, mul, add) {
-      _in = asRate(_in);
-      mul = asRate(mul);
-      add = asRate(add);
-      if (_in === 2) {
-        return true;
-      }
-      if (_in === 1 &&
-          (mul === 1 || mul === 0) &&
-          (add === 1 || add === 0)) {
-        return true;
-      }
-      return false;
-    };
-    
-    return MulAdd;
-  })();
-  
-  var Sum3 = (function() {
-    function Sum3() {
-      cc.UGen.call(this, "Sum3");
-       }
-    extend(Sum3, cc.UGen);
-    
-    Sum3.prototype.init = function(in0, in1, in2) {
-      if (in0 === 0) {
-        return cc.createBinaryOpUGen("+", in1, in2);
-      }
-      if (in1 === 0) {
-        return cc.createBinaryOpUGen("+", in0, in2);
-      }
-      if (in2 === 0) {
-        return cc.createBinaryOpUGen("+", in0, in1);
-      }
-      var rate = asRate([in0, in1, in2]);
-      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum3;
-  })();
-
-  var Sum4 = (function() {
-    function Sum4() {
-      cc.UGen.call(this, "Sum4");
-    }
-    extend(Sum4, cc.UGen);
-    
-    Sum4.prototype.init = function(in0, in1, in2, in3) {
-      if (in0 === 0) {
-        return cc.createSum3(in1, in2, in3);
-      }
-      if (in1 === 0) {
-        return cc.createSum3(in0, in2, in3);
-      }
-      if (in2 === 0) {
-        return cc.createSum3(in0, in1, in3);
-      }
-      if (in3 === 0) {
-        return cc.createSum3(in0, in1, in2);
-      }
-      var rate = asRate([in0, in1, in2, in3]);
-      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum4;
-  })();
-  
-  var use = function() {
-    cc.createMulAdd = function(_in, mul, add) {
-      return new MulAdd().init(_in, mul, add);
-    };
-    cc.createSum3 = function(in0, in1, in2) {
-      return new Sum3().init(in0, in1, in2);
-    };
-    cc.createSum4 = function(in0, in1, in2, in3) {
-      return new Sum4().init(in0, in1, in2, in3);
-    };
-    cc.instanceOfMulAdd = function(obj) {
-      return obj instanceof MulAdd;
-    };
-    cc.instanceOfSum3 = function(obj) {
-      return obj instanceof Sum3;
-    };
-    cc.instanceOfSum4 = function(obj) {
-      return obj instanceof Sum4;
-    };
+  var iPlayBuf = {
+    ar: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
   };
-
-  exports = function() {
-  };
+  
   
   module.exports = {
-    use:use, exports:exports
+    exports: function() {
+      cc.registerUGen("PlayBuf", iPlayBuf);
+    }
+  };
+
+});
+define('cc/client/ugen/line', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iLine = {
+    ar: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+  
+  
+  module.exports = {
+    exports: function() {
+      cc.registerUGen("Line", iLine);
+    }
+  };
+
+});
+define('cc/client/ugen/osc', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iSinOsc = {
+    ar: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
+    }
+  };
+  
+  
+  module.exports = {
+    exports: function() {
+      cc.registerUGen("SinOsc", iSinOsc);
+    }
+  };
+
+});
+define('cc/client/ugen/pan', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var pan2_ctor = function(rate) {
+    return function(_in, pos, level) {
+      this.init.call(this, rate, _in, pos, level);
+      this.channels = [
+        cc.createOutputProxy(this.rate, this, 0),
+        cc.createOutputProxy(this.rate, this, 1),
+      ];
+      this.numOfOutputs = 2;
+      return this.channels;
+    };
+  };
+  
+  var iPan2 = {
+    ar: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
+  };
+  
+  
+  module.exports = {
+    exports: function() {
+      cc.registerUGen("Pan2", iPan2);
+    }
+  };
+
+});
+define('cc/client/ugen/delay', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  var iComb = {
+    ar: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+  };
+  
+  
+  module.exports = {
+    exports: function() {
+      cc.registerUGen("CombN", iComb);
+      cc.registerUGen("CombL", iComb);
+      cc.registerUGen("CombC", iComb);
+    }
+  };
+
+});
+define('cc/client/ugen/ui', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iMouseXY = {
+    kr: {
+      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
+      ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential") {
+          warp = 1;
+        } else if (typeof warp !== "number") {
+          warp = 0;
+        }
+        return this.init(1, minval, maxval, warp, lag);
+      }
+    }
+  };
+  var iMouseButton = {
+    kr: {
+      defaults: "minval=0,maxval=1,lag=0.2",
+      ctor: function(minval, maxval, lag) {
+        return this.init(1, minval, maxval, lag);
+      }
+    }
+  };
+  
+  
+  module.exports = {
+    exports: function() {
+      cc.registerUGen("MouseX", iMouseXY);
+      cc.registerUGen("MouseY", iMouseXY);
+      cc.registerUGen("MouseButton", iMouseButton);
+    }
   };
 
 });
@@ -2898,20 +2917,16 @@ define('cc/client/ugen/uop', function(require, exports, module) {
     return UnaryOpUGen;
   })();
   
-  var use = function() {
-    cc.createUnaryOpUGen = function(selector, a) {
-      return new UnaryOpUGen().init(selector, a);
-    };
-    cc.instanceOfUnaryOpUGen = function(obj) {
-      return obj instanceof UnaryOpUGen;
-    };
-  };
   
-  exports = function() {
-  };
-
   module.exports = {
-    use:use, exports:exports
+    use: function() {
+      cc.createUnaryOpUGen = function(selector, a) {
+        return new UnaryOpUGen().init(selector, a);
+      };
+      cc.instanceOfUnaryOpUGen = function(obj) {
+        return obj instanceof UnaryOpUGen;
+      };
+    }
   };
 
 });
@@ -3104,234 +3119,171 @@ define('cc/client/ugen/bop', function(require, exports, module) {
     };
   })();
   
-  var use = function() {
-    cc.createBinaryOpUGen = function(selector, a, b) {
-      return new BinaryOpUGen().init(selector, a, b);
+  
+  module.exports = {
+    use: function() {
+      cc.createBinaryOpUGen = function(selector, a, b) {
+        return new BinaryOpUGen().init(selector, a, b);
+      };
+      cc.instanceOfBinaryOpUGen = function(obj) {
+        return obj instanceof BinaryOpUGen;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/madd', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  
+  var asRate = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj.reduce(function(rate, obj) {
+        return Math.max(rate, asRate(obj));
+      }, 0);
+    }
+    return (obj && obj.rate) || 0;
+  };
+  
+  var MulAdd = (function() {
+    function MulAdd() {
+      cc.UGen.call(this, "MulAdd");
+    }
+    extend(MulAdd, cc.UGen);
+
+    MulAdd.prototype.init = function(_in, mul, add) {
+      var t, minus, nomul, noadd, rate;
+      if (_in.rate - mul.rate < 0) {
+        t = _in; _in = mul; mul = t;
+      }
+      if (mul === 0) {
+        return add;
+      }
+      minus = mul === -1;
+      nomul = mul ===  1;
+      noadd = add ===  0;
+      
+      if (nomul && noadd) {
+        return _in;
+      }
+      if (minus && noadd) {
+        return cc.createBinaryOpUGen("*", _in, -1);
+      }
+      if (noadd) {
+        return cc.createBinaryOpUGen("*", _in, mul);
+      }
+      if (minus) {
+        return cc.createBinaryOpUGen("-", add, _in);
+      }
+      if (nomul) {
+        return cc.createBinaryOpUGen("+", _in, add);
+      }
+      if (validate(_in, mul, add)) {
+        rate = asRate([_in, mul, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
+      }
+      if (validate(mul, _in, add)) {
+        rate = asRate([mul, _in, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
+      }
+      return _in * mul + add;
     };
-    cc.instanceOfBinaryOpUGen = function(obj) {
-      return obj instanceof BinaryOpUGen;
+    
+    var validate = function(_in, mul, add) {
+      _in = asRate(_in);
+      mul = asRate(mul);
+      add = asRate(add);
+      if (_in === 2) {
+        return true;
+      }
+      if (_in === 1 &&
+          (mul === 1 || mul === 0) &&
+          (add === 1 || add === 0)) {
+        return true;
+      }
+      return false;
     };
-  };
+    
+    return MulAdd;
+  })();
   
-  exports = function() {
-  };
-  
-  module.exports = {
-    use:use, exports:exports
-  };
-
-});
-define('cc/client/ugen/bufio', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var slice = [].slice;
-  
-  var playBuf_ctor = function(rate) {
-    return function(numChannels, buffer) {
-      if (typeof numChannels !== "number") {
-        throw new TypeError("Buffer: arguments[0] should be an integer.");
+  var Sum3 = (function() {
+    function Sum3() {
+      cc.UGen.call(this, "Sum3");
+       }
+    extend(Sum3, cc.UGen);
+    
+    Sum3.prototype.init = function(in0, in1, in2) {
+      if (in0 === 0) {
+        return cc.createBinaryOpUGen("+", in1, in2);
       }
-      if (!cc.instanceOfAudioBuffer(buffer)) {
-        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      if (in1 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in2);
       }
-      numChannels = Math.max(0, numChannels|0);
-      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
-      this.specialIndex = buffer._bufId;
-      return this.initOutputs(numChannels, this.rate);
+      if (in2 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in1);
+      }
+      var rate = asRate([in0, in1, in2]);
+      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-  };
-  
-  var iPlayBuf = {
-    ar: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(2),
-      Klass: cc.MultiOutUGen
-    },
-    kr: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(1),
-      Klass: cc.MultiOutUGen
-    },
-  };
+    
+    return Sum3;
+  })();
 
-  var use = function() {
-  };
-  
-  module.exports = {
-    use: use,
-    exports: function() {
-      cc.registerUGen("PlayBuf", iPlayBuf);
+  var Sum4 = (function() {
+    function Sum4() {
+      cc.UGen.call(this, "Sum4");
     }
-  };
-
-});
-define('cc/client/ugen/delay', function(require, exports, module) {
-
-  var cc = require("../cc");
-
-  var iComb = {
-    ar: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+    extend(Sum4, cc.UGen);
+    
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
+      if (in0 === 0) {
+        return cc.createSum3(in1, in2, in3);
       }
-    },
-    kr: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      if (in1 === 0) {
+        return cc.createSum3(in0, in2, in3);
       }
-    },
-  };
-
-  var use = function() {
-  };
-  
-  module.exports = {
-    use: use,
-    exports: function() {
-      cc.registerUGen("CombN", iComb);
-      cc.registerUGen("CombL", iComb);
-      cc.registerUGen("CombC", iComb);
-    }
-  };
-
-});
-define('cc/client/ugen/line', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  
-  var iLine = {
-    ar: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      if (in2 === 0) {
+        return cc.createSum3(in0, in1, in3);
       }
-    },
-    kr: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      if (in3 === 0) {
+        return cc.createSum3(in0, in1, in2);
       }
-    }
-  };
-
-  var use = function() {
-  };
-  
-  module.exports = {
-    use:use,
-    exports: function() {
-      cc.registerUGen("Line", iLine);
-    }
-  };
-
-});
-define('cc/client/ugen/osc', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  
-  var iSinOsc = {
-    ar: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(2, freq, phase).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(1, freq, phase).madd(mul, add);
-      }
-    }
-  };
-
-  var use = function() {
-  };
-  
-  module.exports = {
-    use:use,
-    exports: function() {
-      cc.registerUGen("SinOsc", iSinOsc);
-    }
-  };
-
-});
-define('cc/client/ugen/pan', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var pan2_ctor = function(rate) {
-    return function(_in, pos, level) {
-      this.init.call(this, rate, _in, pos, level);
-      this.channels = [
-        cc.createOutputProxy(this.rate, this, 0),
-        cc.createOutputProxy(this.rate, this, 1),
-      ];
-      this.numOfOutputs = 2;
-      return this.channels;
+      var rate = asRate([in0, in1, in2, in3]);
+      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
-  };
+    
+    return Sum4;
+  })();
   
-  var iPan2 = {
-    ar: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(2),
-      Klass: cc.MultiOutUGen
-    },
-    kr: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(1),
-      Klass: cc.MultiOutUGen
-    },
-  };
-
-  var use = function() {
-  };
   
   module.exports = {
-    use:use,
-    exports: function() {
-      cc.registerUGen("Pan2", iPan2);
-    }
-  };
-
-});
-define('cc/client/ugen/ui', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  
-  var iMouseXY = {
-    kr: {
-      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
-      ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
-        return this.init(1, minval, maxval, warp, lag);
-      }
-    }
-  };
-  var iMouseButton = {
-    kr: {
-      defaults: "minval=0,maxval=1,lag=0.2",
-      ctor: function(minval, maxval, lag) {
-        return this.init(1, minval, maxval, lag);
-      }
-    }
-  };
-
-  var use = function() {
-  };
-  
-  module.exports = {
-    use:use,
-    exports: function() {
-      cc.registerUGen("MouseX", iMouseXY);
-      cc.registerUGen("MouseY", iMouseXY);
-      cc.registerUGen("MouseButton", iMouseButton);
+    use: function() {
+      cc.createMulAdd = function(_in, mul, add) {
+        return new MulAdd().init(_in, mul, add);
+      };
+      cc.createSum3 = function(in0, in1, in2) {
+        return new Sum3().init(in0, in1, in2);
+      };
+      cc.createSum4 = function(in0, in1, in2, in3) {
+        return new Sum4().init(in0, in1, in2, in3);
+      };
+      cc.instanceOfMulAdd = function(obj) {
+        return obj instanceof MulAdd;
+      };
+      cc.instanceOfSum3 = function(obj) {
+        return obj instanceof Sum3;
+      };
+      cc.instanceOfSum4 = function(obj) {
+        return obj instanceof Sum4;
+      };
     }
   };
 
@@ -3443,152 +3395,151 @@ define('cc/client/object', function(require, exports, module) {
     );
   };
   
-  exports = function() {
-    setupUnaryOperator("__plus__", function() {
-      return +this;
-    }, "+");
-    setupUnaryOperator("__minus__", function() {
-      return -this;
-    }, "-");
-    
-    setupBinaryOperator("__add__", function(a, b) {
-      return a + b;
-    }, "+");
-    
-    setupBinaryOperator("__sub__", function(a, b) {
-      return a - b;
-    }, "-");
-    
-    setupBinaryOperator("__mul__", function(a, b) {
-      return a * b;
-    }, "*");
-    fn.definePrototypeProperty(String, "__mul__", function(b) {
-      if (typeof b === "number") {
-        var result = new Array(Math.max(0, b));
-        for (var i = 0; i < b; i++) {
-          result[i] = this;
-        }
-        return result.join("");
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mul__(b);
-        }, this);
-      }
-      return this * b;
-    });
-    fn.definePrototypeProperty(Function, "__mul__", function(b) {
-      if (typeof b === "function") {
-        var f = this, g = b;
-        return function() {
-          return f.call(null, g.apply(null, arguments));
-        };
-      }
-      if (Array.isArray(b)) {
-        return b.map(function() {
-          return NaN;
-        });
-      }
-      return this * b;
-    });
-
-    
-    setupBinaryOperator("__div__", function(a, b) {
-      return a / b;
-    }, "/");
-    fn.definePrototypeProperty(String, "__div__", function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__div__(b);
-        }, this);
-      }
-      return this / b;
-    });
-    
-    setupBinaryOperator("__mod__", function(a, b) {
-      return a % b;
-    }, "%");
-    fn.definePrototypeProperty(String, "__mod__", function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), b|0).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mod__(b);
-        }, this);
-      }
-      return this % b;
-    });
-    
-    
-    setup("__and__",function(b) {
-      return cc.createTaskWaitLogic("and", [this].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__and__", function(b) {
-      return cc.createTaskWaitLogic("and", this.concat(b));
-    });
-    
-    setup("__or__", function(b) {
-      return cc.createTaskWaitLogic("or", [this].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__or__", function(b) {
-      return cc.createTaskWaitLogic("or", this.concat(b));
-    });
-    
-    
-    setup("to_i", function() {
-      return this|0;
-    });
-    fn.definePrototypeProperty(Array, "to_i", function() {
-      return this.map(function(x) {
-        return x.to_i();
-      });
-    });
-    
-    setup("to_f", function() {
-      return +this;
-    });
-    fn.definePrototypeProperty(Array, "to_f", function() {
-      return this.map(function(x) {
-        return x.to_f();
-      });
-    });
-    
-    setup("to_s", function() {
-      return this.toString();
-    });
-    fn.definePrototypeProperty(Array, "to_s", function() {
-      return this.map(function(x) {
-        return x.to_s();
-      });
-    });
-    
-    setup("to_a", function() {
-      return [this];
-    });
-    fn.definePrototypeProperty(Array, "to_a", function() {
-      return this;
-    });
-    
-    
-    fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
-      return cc.createMulAdd(this, mul, add);
-    }).defaults("mul=1,add=0").multiCall().build());
-    
-    fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-      return utils.flop([this, mul, add]).map(function(items) {
-        var _in = items[0], mul = items[1], add = items[2];
-        return cc.createMulAdd(_in, mul, add);
-      });
-    }).defaults("mul=1,add=0").multiCall().build());
-  };
   
   module.exports = {
-    exports: exports
+    exports: function() {
+      setupUnaryOperator("__plus__", function() {
+        return +this;
+      }, "+");
+      setupUnaryOperator("__minus__", function() {
+        return -this;
+      }, "-");
+      
+      setupBinaryOperator("__add__", function(a, b) {
+        return a + b;
+      }, "+");
+      
+      setupBinaryOperator("__sub__", function(a, b) {
+        return a - b;
+      }, "-");
+      
+      setupBinaryOperator("__mul__", function(a, b) {
+        return a * b;
+      }, "*");
+      fn.definePrototypeProperty(String, "__mul__", function(b) {
+        if (typeof b === "number") {
+          var result = new Array(Math.max(0, b));
+          for (var i = 0; i < b; i++) {
+            result[i] = this;
+          }
+          return result.join("");
+        } else if (Array.isArray(b)) {
+          return b.map(function(b) {
+            return this.__mul__(b);
+          }, this);
+        }
+        return this * b;
+      });
+      fn.definePrototypeProperty(Function, "__mul__", function(b) {
+        if (typeof b === "function") {
+          var f = this, g = b;
+          return function() {
+            return f.call(null, g.apply(null, arguments));
+          };
+        }
+        if (Array.isArray(b)) {
+          return b.map(function() {
+            return NaN;
+          });
+        }
+        return this * b;
+      });
+
+      
+      setupBinaryOperator("__div__", function(a, b) {
+        return a / b;
+      }, "/");
+      fn.definePrototypeProperty(String, "__div__", function(b) {
+        if (typeof b === "number") {
+          return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+            return items.join("");
+          });
+        } else if (Array.isArray(b)) {
+          return b.map(function(b) {
+            return this.__div__(b);
+          }, this);
+        }
+        return this / b;
+      });
+      
+      setupBinaryOperator("__mod__", function(a, b) {
+        return a % b;
+      }, "%");
+      fn.definePrototypeProperty(String, "__mod__", function(b) {
+        if (typeof b === "number") {
+          return utils.clump(this.split(""), b|0).map(function(items) {
+            return items.join("");
+          });
+        } else if (Array.isArray(b)) {
+          return b.map(function(b) {
+            return this.__mod__(b);
+          }, this);
+        }
+        return this % b;
+      });
+      
+      
+      setup("__and__",function(b) {
+        return cc.createTaskWaitLogic("and", [this].concat(b));
+      });
+      fn.definePrototypeProperty(Array, "__and__", function(b) {
+        return cc.createTaskWaitLogic("and", this.concat(b));
+      });
+      
+      setup("__or__", function(b) {
+        return cc.createTaskWaitLogic("or", [this].concat(b));
+      });
+      fn.definePrototypeProperty(Array, "__or__", function(b) {
+        return cc.createTaskWaitLogic("or", this.concat(b));
+      });
+      
+      
+      setup("to_i", function() {
+        return this|0;
+      });
+      fn.definePrototypeProperty(Array, "to_i", function() {
+        return this.map(function(x) {
+          return x.to_i();
+        });
+      });
+      
+      setup("to_f", function() {
+        return +this;
+      });
+      fn.definePrototypeProperty(Array, "to_f", function() {
+        return this.map(function(x) {
+          return x.to_f();
+        });
+      });
+      
+      setup("to_s", function() {
+        return this.toString();
+      });
+      fn.definePrototypeProperty(Array, "to_s", function() {
+        return this.map(function(x) {
+          return x.to_s();
+        });
+      });
+      
+      setup("to_a", function() {
+        return [this];
+      });
+      fn.definePrototypeProperty(Array, "to_a", function() {
+        return this;
+      });
+      
+      
+      fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+        return cc.createMulAdd(this, mul, add);
+      }).defaults("mul=1,add=0").multiCall().build());
+      
+      fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+        return utils.flop([this, mul, add]).map(function(items) {
+          var _in = items[0], mul = items[1], add = items[2];
+          return cc.createMulAdd(_in, mul, add);
+        });
+      }).defaults("mul=1,add=0").multiCall().build());
+    }
   };
 
 });
@@ -3607,32 +3558,31 @@ define('cc/client/number', function(require, exports, module) {
     });
   };
   
-  exports = function() {
-    setup("pi", function() {
-      return this * Math.PI;
-    });
-    setup("abs", function() {
-      return Math.abs(this);
-    });
-    setup("midicps", function() {
-      return 440 * Math.pow(2, (this - 69) * 1/12);
-    });
-    setup("cpsmidi", function() {
-      return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
-    });
-    setup("ampdb", function() {
-      return Math.log(this) * Math.LOG10E * 20;
-    });
-    setup("dbamp", function() {
-      return Math.pow(10, this * 0.05);
-    });
-    setup("coin", function() {
-      return Math.random() < this;
-    });
-  };
   
   module.exports = {
-    exports: exports
+    exports: function() {
+      setup("pi", function() {
+        return this * Math.PI;
+      });
+      setup("abs", function() {
+        return Math.abs(this);
+      });
+      setup("midicps", function() {
+        return 440 * Math.pow(2, (this - 69) * 1/12);
+      });
+      setup("cpsmidi", function() {
+        return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
+      });
+      setup("ampdb", function() {
+        return Math.log(this) * Math.LOG10E * 20;
+      });
+      setup("dbamp", function() {
+        return Math.pow(10, this * 0.05);
+      });
+      setup("coin", function() {
+        return Math.random() < this;
+      });
+    }
   };
 
 });
@@ -3640,16 +3590,15 @@ define('cc/client/data', function(require, exports, module) {
 
   var cc = require("./cc");
   
-  exports = function() {
-    global.DATA = {
-      get: function(n) {
-        return cc.DATA[n] || "";
-      }
-    };
-  };
   
   module.exports = {
-    exports:exports
+    exports: function() {
+      global.DATA = {
+        get: function(n) {
+          return cc.DATA[n] || "";
+        }
+      };
+    }
   };
 
 });
@@ -4471,15 +4420,14 @@ define('cc/client/scale', function(require, exports, module) {
     return Object.keys(scales).sort();
   };
   
-  exports = function() {
-    global.Scale  = ScaleInterface;
-    global.Tuning = TuningInterface;
-  };
   
   module.exports = {
     Scale  : Scale,
     Tuning : Tuning,
-    exports: exports,
+    exports: function() {
+      global.Scale  = ScaleInterface;
+      global.Tuning = TuningInterface;
+    }
   };
 
 });
@@ -5152,15 +5100,14 @@ define('cc/common/audioapi', function(require, exports, module) {
       return NodeAudioAPI;
     })();
   }
-
-  var use = function() {
-    cc.createAudioAPI = function(sys, opts) {
-      return new AudioAPI(sys, opts);
-    };
-  };
+  
   
   module.exports = {
-    use:use
+    use: function() {
+      cc.createAudioAPI = function(sys, opts) {
+        return new AudioAPI(sys, opts);
+      };
+    }
   };
 
 });
@@ -6339,71 +6286,69 @@ define('cc/server/server', function(require, exports, module) {
   };
   
   
-  var use = function() {
-    require("../common/timer").use();
-    require("./instance").use();
-    require("./rate").use();
-    require("./unit/unit").use();
-    
-    cc.unit_install = function() {
-      require("./unit/installer").install();
-    };
-    cc.createSynthServer = function() {
-      cc.unit_install();
-      switch (cc.opmode) {
-      case "worker":
-        return cc.createWorkerSynthServer();
-      case "iframe":
-        return cc.createIFrameSynthServer();
-      case "socket":
-        return cc.createSocketSynthServer();
-      }
-      throw new Error("A SynthServer is not defined for: " + cc.opmode);
-    };
-    cc.createWorkerSynthServer = function() {
-      var server = new WorkerSynthServer();
-      cc.opmode = "worker";
-      return server;
-    };
-    cc.createIFrameSynthServer = function() {
-      var server = new IFrameSynthServer();
-      global.onmessage = function(e) {
-        server.recvFromClient(e.data, 0);
-      };
-      cc.opmode = "iframe";
-      return server;
-    };
-    cc.createSocketSynthServer = function() {
-      var server = new SocketSynthServer();
-      server.exports = {
-        createServer: function(opts) {
-          return new SocketSynthServerExports(server, opts);
-        }
-      };
-      cc.opmode = "socket";
-      return server;
-    };
-    
-    if (typeof global.console === "undefined") {
-      global.console = (function() {
-        var console = {};
-        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-          console[method] = function() {
-            if (cc.server) {
-              var args = Array.prototype.slice.call(arguments).map(function(x) {
-                return pack(x);
-              });
-              cc.server.sendToClient(["/console/" + method, args]);
-            }
-          };
-        });
-        return console;
-      })();
-    }
-  };
-  
   module.exports = {
-    use:use
+    use: function() {
+      require("../common/timer").use();
+      require("./instance").use();
+      require("./rate").use();
+      require("./unit/unit").use();
+      
+      cc.unit_install = function() {
+        require("./unit/installer").install();
+      };
+      cc.createSynthServer = function() {
+        cc.unit_install();
+        switch (cc.opmode) {
+        case "worker":
+          return cc.createWorkerSynthServer();
+        case "iframe":
+          return cc.createIFrameSynthServer();
+        case "socket":
+          return cc.createSocketSynthServer();
+        }
+        throw new Error("A SynthServer is not defined for: " + cc.opmode);
+      };
+      cc.createWorkerSynthServer = function() {
+        var server = new WorkerSynthServer();
+        cc.opmode = "worker";
+        return server;
+      };
+      cc.createIFrameSynthServer = function() {
+        var server = new IFrameSynthServer();
+        global.onmessage = function(e) {
+          server.recvFromClient(e.data, 0);
+        };
+        cc.opmode = "iframe";
+        return server;
+      };
+      cc.createSocketSynthServer = function() {
+        var server = new SocketSynthServer();
+        server.exports = {
+          createServer: function(opts) {
+            return new SocketSynthServerExports(server, opts);
+          }
+        };
+        cc.opmode = "socket";
+        return server;
+      };
+      
+      if (typeof global.console === "undefined") {
+        global.console = (function() {
+          var console = {};
+          ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+            console[method] = function() {
+              if (cc.server) {
+                var args = Array.prototype.slice.call(arguments).map(function(x) {
+                  return pack(x);
+                });
+                cc.server.sendToClient(["/console/" + method, args]);
+              }
+            };
+          });
+          return console;
+        })();
+      }
+    }
   };
 
 });
@@ -6610,16 +6555,16 @@ define('cc/server/instance', function(require, exports, module) {
     
     return Instance;
   })();
-
-  var use = function() {
-    cc.createInstanceManager = function() {
-      return new InstanceManager();
-    };
-  };
+  
   
   module.exports = {
     InstanceManager: InstanceManager,
-    use:use
+    
+    use: function() {
+      cc.createInstanceManager = function() {
+        return new InstanceManager();
+      };
+    }
   };
 
 });
@@ -7046,13 +6991,19 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.inputs   = new Array(this.numOfInputs);
       this.inRates  = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate = cc.getRateInstance(this.calcRate);
+      this.rate     = cc.getRateInstance(this.calcRate || 1);
       var bufLength = this.rate.bufLength;
-      var outs = new Array(this.numOfOutputs);
+      var allOuts  = new Float32Array(bufLength * this.numOfOutputs);
+      var outs     = new Array(this.numOfOutputs);
       for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i] = new Float32Array(bufLength);
+        outs[i] = new Float32Array(
+          allOuts.buffer,
+          bufLength * i * allOuts.BYTES_PER_ELEMENT,
+          bufLength
+        );
       }
       this.outs      = outs;
+      this.allOuts   = allOuts;
       this.bufLength = bufLength;
       this.done      = false;
     }
@@ -7166,17 +7117,17 @@ define('cc/server/unit/unit', function(require, exports, module) {
     };
     return ctor;
   })();
-
-  var use = function() {
-    cc.createUnit = function(parent, specs) {
-      return new Unit(parent, specs);
-    };
-  };
+  
   
   module.exports = {
     Unit : Unit,
     specs: specs,
-    use  : use,
+    
+    use  : function() {
+      cc.createUnit = function(parent, specs) {
+        return new Unit(parent, specs);
+      };
+    }
   };
 
 });
@@ -7371,50 +7322,47 @@ define('cc/server/rate', function(require, exports, module) {
     return Rate;
   })();
   
-  var use = function() {
-    cc.createRate = function(sampleRate, bufLength) {
-      return new Rate(sampleRate, bufLength);
-    };
-    cc.getRateInstance = (function() {
-      var rates = {};
-      return function(rate) {
-        if (!rates[rate]) {
-          switch (rate) {
-          case 2:
-            rates[2] = new Rate(cc.server.sampleRate, cc.server.bufLength);
-            break;
-          case 1:
-            rates[1] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
-            break;
-          }
-        }
-        return rates[rate];
-      };
-    })();
-  };
   
   module.exports = {
-    use:use
+    use: function() {
+      cc.createRate = function(sampleRate, bufLength) {
+        return new Rate(sampleRate, bufLength);
+      };
+      cc.getRateInstance = (function() {
+        var rates = {};
+        return function(rate) {
+          if (!rates[rate]) {
+            switch (rate) {
+            case 2:
+              rates[2] = new Rate(cc.server.sampleRate, cc.server.bufLength);
+              break;
+            case 1:
+              rates[1] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
+              break;
+            }
+          }
+          return rates[rate];
+        };
+      })();
+    }
   };
 
 });
 define('cc/server/unit/installer', function(require, exports, module) {
-
-  var install = function() {
-    require("./unit");
-    require("./madd");
-    require("./uop");
-    require("./bop");
-    require("./bufio");
-    require("./delay");
-    require("./line");
-    require("./osc");
-    require("./pan");
-    require("./ui");
-  };
   
   module.exports = {
-    install:install
+    install: function() {
+      require("./unit");
+      require("./madd");
+      require("./uop");
+      require("./bop");
+      require("./bufio");
+      require("./delay");
+      require("./line");
+      require("./osc");
+      require("./pan");
+      require("./ui");
+    }
   };
 
 });
@@ -9294,8 +9242,6 @@ define('cc/server/unit/table', function(require, exports, module) {
   };
 
 });
-
-       
 define('cc/server/unit/pan', function(require, exports, module) {
 
   var unit = require("./unit");

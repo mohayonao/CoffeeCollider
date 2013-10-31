@@ -91,13 +91,16 @@ define(function(require, exports, module) {
   
   var unitTestSuite = function(spec, inputSpecs, opts) {
     opts = opts || {};
+    
+    unit.use();
     cc.getRateInstance = function(rate) {
       return (rate === C.AUDIO) ? a_rate : k_rate;
     };
+    
     var min = typeof opts.min === "undefined" ? -1.05 : opts.min;
     var max = typeof opts.max === "undefined" ? +1.05 : opts.max;
     var i, j, k;
-    var u = new unit.Unit(parent, spec);
+    var u = cc.createUnit(parent, spec);
     for (i = 0; i < u.numOfInputs; ++i) {
       u.inRates[i] = inputSpecs[i].rate;
       switch (u.inRates[i]) {
@@ -117,7 +120,7 @@ define(function(require, exports, module) {
     }
     u.init();
     
-    var n = 2048;
+    var n = ((u.rate.sampleRate * (opts.dur || 1)) / u.rate.bufLength)|0;
     for (i = 0; i < n; ++i) {
       for (j = 0; j < u.numOfInputs; ++j) {
         if (inputSpecs[j].rate !== C.SCALAR) {
@@ -131,16 +134,17 @@ define(function(require, exports, module) {
       }
       if (u.process) {
         u.process(u.rate.bufLength, opts.instance);
-        for (j = 0; j < u.numOfOutputs; ++j) {
-          for (k = 0; k < u.rate.bufLength; ++k) {
-            var x = u.outs[j][k];
-            if (isNaN(x)) {
-              throw new Error("NaN");
-            }
-            if (x < min || max < x) {
-              throw new Error("Out of range: " + x);
-            }
+        for (j = u.allOuts.length; j--; ) {
+          var x = u.allOuts[j];
+          if (isNaN(x)) {
+            throw new Error("NaN");
           }
+          if (x < min || max < x) {
+            throw new Error("Out of range: " + x);
+          }
+        }
+        if (opts.validator) {
+          opts.validator.call(u, u.inputs, u.outs);
         }
       }
       if (opts.postProcess) {
