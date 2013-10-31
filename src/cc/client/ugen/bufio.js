@@ -31,12 +31,9 @@ define(function(require, exports, module) {
       Klass: cc.MultiOutUGen
     },
   };
-
-  var use = function() {
-  };
+  
   
   module.exports = {
-    use: use,
     exports: function() {
       cc.registerUGen("PlayBuf", iPlayBuf);
     }

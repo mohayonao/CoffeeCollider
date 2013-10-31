@@ -177,20 +177,16 @@ define(function(require, exports, module) {
     };
   })();
   
-  var use = function() {
-    cc.createBinaryOpUGen = function(selector, a, b) {
-      return new BinaryOpUGen().init(selector, a, b);
-    };
-    cc.instanceOfBinaryOpUGen = function(obj) {
-      return obj instanceof BinaryOpUGen;
-    };
-  };
-  
-  exports = function() {
-  };
   
   module.exports = {
-    use:use, exports:exports
+    use: function() {
+      cc.createBinaryOpUGen = function(selector, a, b) {
+        return new BinaryOpUGen().init(selector, a, b);
+      };
+      cc.instanceOfBinaryOpUGen = function(obj) {
+        return obj instanceof BinaryOpUGen;
+      };
+    }
   };
 
 });

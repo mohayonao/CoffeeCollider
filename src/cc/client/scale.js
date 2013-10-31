@@ -817,15 +817,14 @@ define(function(require, exports, module) {
     return Object.keys(scales).sort();
   };
   
-  exports = function() {
-    global.Scale  = ScaleInterface;
-    global.Tuning = TuningInterface;
-  };
   
   module.exports = {
     Scale  : Scale,
     Tuning : Tuning,
-    exports: exports,
+    exports: function() {
+      global.Scale  = ScaleInterface;
+      global.Tuning = TuningInterface;
+    }
   };
 
 });

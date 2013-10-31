@@ -137,17 +137,17 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
-
-  var use = function() {
-    cc.createUnit = function(parent, specs) {
-      return new Unit(parent, specs);
-    };
-  };
+  
   
   module.exports = {
     Unit : Unit,
     specs: specs,
-    use  : use,
+    
+    use  : function() {
+      cc.createUnit = function(parent, specs) {
+        return new Unit(parent, specs);
+      };
+    }
   };
 
 });

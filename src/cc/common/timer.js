@@ -117,25 +117,22 @@ define(function(require, exports, module) {
       _clearTimeout(timerId);
     });
   };
-
-  var use = function() {
-    cc.createTimer = function() {
-      if (WorkerTimer) {
-        return new WorkerTimer();
-      }
-      return new NativeTimer();
-    };
-    cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
-    cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
-    cc.resetNativeTimers = resetNativeTimers;
-  };
   
   module.exports = {
-    Timer: WorkerTimer || NativeTimer,
-    replaceNativeTimerFunctions: replaceNativeTimerFunctions,
-    restoreNativeTimerFunctions: restoreNativeTimerFunctions,
-    resetNativeTimers: resetNativeTimers,
-    use:use,
+    WorkerTimer: WorkerTimer,
+    NativeTimer: NativeTimer,
+    
+    use: function() {
+      cc.createTimer = function() {
+        if (WorkerTimer) {
+          return new WorkerTimer();
+        }
+        return new NativeTimer();
+      };
+      cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
+      cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
+      cc.resetNativeTimers = resetNativeTimers;
+    }
   };
 
 });

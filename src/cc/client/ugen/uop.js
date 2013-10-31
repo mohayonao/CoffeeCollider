@@ -28,20 +28,16 @@ define(function(require, exports, module) {
     return UnaryOpUGen;
   })();
   
-  var use = function() {
-    cc.createUnaryOpUGen = function(selector, a) {
-      return new UnaryOpUGen().init(selector, a);
-    };
-    cc.instanceOfUnaryOpUGen = function(obj) {
-      return obj instanceof UnaryOpUGen;
-    };
-  };
   
-  exports = function() {
-  };
-
   module.exports = {
-    use:use, exports:exports
+    use: function() {
+      cc.createUnaryOpUGen = function(selector, a) {
+        return new UnaryOpUGen().init(selector, a);
+      };
+      cc.instanceOfUnaryOpUGen = function(obj) {
+        return obj instanceof UnaryOpUGen;
+      };
+    }
   };
 
 });

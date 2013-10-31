@@ -45,6 +45,15 @@ define(function(require, exports, module) {
   
   var PSequence = (function() {
     function PSequence(list, repeats, offset) {
+      if (!(Array.isArray(list) || list instanceof Pattern)) {
+        throw new TypeError("PSequence: the first argument is invalid");
+      }
+      if (typeof repeats !== "number") {
+        throw new TypeError("PSequence: the second argument must be a Number");
+      }
+      if (typeof offset !== "number") {
+        throw new TypeError("PSequence: the third argument must be a Number");
+      }
       Pattern.call(this);
       this.klassName = "PSequence";
       this.list    = list;
@@ -92,30 +101,21 @@ define(function(require, exports, module) {
     return PSequence;
   })();
   
-  var use = function() {
-    cc.createPSequence = function(list, repeats, offset) {
-      if (!(Array.isArray(list) || list instanceof Pattern)) {
-        throw new TypeError("PSequence: the first argument is invalid");
-      }
-      if (typeof repeats !== "number") {
-        throw new TypeError("PSequence: the second argument must be a Number");
-      }
-      if (typeof offset !== "number") {
-        throw new TypeError("PSequence: the third argument must be a Number");
-      }
-      return new PSequence(list, repeats, offset);
-    };
-  };
-  exports = function() {
-    global.PSequence = fn(function(list, repeats, offset) {
-      return cc.createPSequence(list, repeats, offset);
-    }).defaults("list,repeats=1,offset=0").build();
-  };
   
   module.exports = {
     Pattern  : Pattern,
     PSequence: PSequence,
-    use:use, exports:exports
+    
+    use: function() {
+      cc.createPSequence = function(list, repeats, offset) {
+        return new PSequence(list, repeats, offset);
+      };
+    },
+    exports: function() {
+      global.PSequence = fn(function(list, repeats, offset) {
+        return cc.createPSequence(list, repeats, offset);
+      }).defaults("list,repeats=1,offset=0").build();
+    }
   };
 
 });

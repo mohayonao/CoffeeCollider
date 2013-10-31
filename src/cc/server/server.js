@@ -398,71 +398,69 @@ define(function(require, exports, module) {
   };
   
   
-  var use = function() {
-    require("../common/timer").use();
-    require("./instance").use();
-    require("./rate").use();
-    require("./unit/unit").use();
-    
-    cc.unit_install = function() {
-      require("./unit/installer").install();
-    };
-    cc.createSynthServer = function() {
-      cc.unit_install();
-      switch (cc.opmode) {
-      case "worker":
-        return cc.createWorkerSynthServer();
-      case "iframe":
-        return cc.createIFrameSynthServer();
-      case "socket":
-        return cc.createSocketSynthServer();
-      }
-      throw new Error("A SynthServer is not defined for: " + cc.opmode);
-    };
-    cc.createWorkerSynthServer = function() {
-      var server = new WorkerSynthServer();
-      cc.opmode = "worker";
-      return server;
-    };
-    cc.createIFrameSynthServer = function() {
-      var server = new IFrameSynthServer();
-      global.onmessage = function(e) {
-        server.recvFromClient(e.data, 0);
-      };
-      cc.opmode = "iframe";
-      return server;
-    };
-    cc.createSocketSynthServer = function() {
-      var server = new SocketSynthServer();
-      server.exports = {
-        createServer: function(opts) {
-          return new SocketSynthServerExports(server, opts);
-        }
-      };
-      cc.opmode = "socket";
-      return server;
-    };
-    
-    if (typeof global.console === "undefined") {
-      global.console = (function() {
-        var console = {};
-        ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-          console[method] = function() {
-            if (cc.server) {
-              var args = Array.prototype.slice.call(arguments).map(function(x) {
-                return pack(x);
-              });
-              cc.server.sendToClient(["/console/" + method, args]);
-            }
-          };
-        });
-        return console;
-      })();
-    }
-  };
-  
   module.exports = {
-    use:use
+    use: function() {
+      require("../common/timer").use();
+      require("./instance").use();
+      require("./rate").use();
+      require("./unit/unit").use();
+      
+      cc.unit_install = function() {
+        require("./unit/installer").install();
+      };
+      cc.createSynthServer = function() {
+        cc.unit_install();
+        switch (cc.opmode) {
+        case "worker":
+          return cc.createWorkerSynthServer();
+        case "iframe":
+          return cc.createIFrameSynthServer();
+        case "socket":
+          return cc.createSocketSynthServer();
+        }
+        throw new Error("A SynthServer is not defined for: " + cc.opmode);
+      };
+      cc.createWorkerSynthServer = function() {
+        var server = new WorkerSynthServer();
+        cc.opmode = "worker";
+        return server;
+      };
+      cc.createIFrameSynthServer = function() {
+        var server = new IFrameSynthServer();
+        global.onmessage = function(e) {
+          server.recvFromClient(e.data, 0);
+        };
+        cc.opmode = "iframe";
+        return server;
+      };
+      cc.createSocketSynthServer = function() {
+        var server = new SocketSynthServer();
+        server.exports = {
+          createServer: function(opts) {
+            return new SocketSynthServerExports(server, opts);
+          }
+        };
+        cc.opmode = "socket";
+        return server;
+      };
+      
+      if (typeof global.console === "undefined") {
+        global.console = (function() {
+          var console = {};
+          ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+            console[method] = function() {
+              if (cc.server) {
+                var args = Array.prototype.slice.call(arguments).map(function(x) {
+                  return pack(x);
+                });
+                cc.server.sendToClient(["/console/" + method, args]);
+              }
+            };
+          });
+          return console;
+        })();
+      }
+    }
   };
 
 });

@@ -191,16 +191,16 @@ define(function(require, exports, module) {
     
     return Instance;
   })();
-
-  var use = function() {
-    cc.createInstanceManager = function() {
-      return new InstanceManager();
-    };
-  };
+  
   
   module.exports = {
     InstanceManager: InstanceManager,
-    use:use
+    
+    use: function() {
+      cc.createInstanceManager = function() {
+        return new InstanceManager();
+      };
+    }
   };
 
 });

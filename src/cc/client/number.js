@@ -14,32 +14,31 @@ define(function(require, exports, module) {
     });
   };
   
-  exports = function() {
-    setup("pi", function() {
-      return this * Math.PI;
-    });
-    setup("abs", function() {
-      return Math.abs(this);
-    });
-    setup("midicps", function() {
-      return 440 * Math.pow(2, (this - 69) * 1/12);
-    });
-    setup("cpsmidi", function() {
-      return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
-    });
-    setup("ampdb", function() {
-      return Math.log(this) * Math.LOG10E * 20;
-    });
-    setup("dbamp", function() {
-      return Math.pow(10, this * 0.05);
-    });
-    setup("coin", function() {
-      return Math.random() < this;
-    });
-  };
   
   module.exports = {
-    exports: exports
+    exports: function() {
+      setup("pi", function() {
+        return this * Math.PI;
+      });
+      setup("abs", function() {
+        return Math.abs(this);
+      });
+      setup("midicps", function() {
+        return 440 * Math.pow(2, (this - 69) * 1/12);
+      });
+      setup("cpsmidi", function() {
+        return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
+      });
+      setup("ampdb", function() {
+        return Math.log(this) * Math.LOG10E * 20;
+      });
+      setup("dbamp", function() {
+        return Math.pow(10, this * 0.05);
+      });
+      setup("coin", function() {
+        return Math.random() < this;
+      });
+    }
   };
 
 });

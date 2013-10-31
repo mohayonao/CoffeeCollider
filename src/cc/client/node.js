@@ -524,26 +524,25 @@ define(function(require, exports, module) {
     return nodes[nodeId];
   };
   
-  var use = function() {
-    require("./ugen/ugen").use();
-    
-    cc.createGroup = function(target, addAction) {
-      return new Group(target, addAction);
-    };
-    cc.getNode   = get;
-    cc.resetNode = reset;
-  };
-
-  exports = function() {
-    global.Group = GroupInterface;
-    global.Synth = SynthInterface;
-  };
   
   module.exports = {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    use:use, exports:exports,
+    
+    use: function() {
+      require("./ugen/ugen").use();
+      
+      cc.createGroup = function(target, addAction) {
+        return new Group(target, addAction);
+      };
+      cc.getNode   = get;
+      cc.resetNode = reset;
+    },
+    exports: function() {
+      global.Group = GroupInterface;
+      global.Synth = SynthInterface;
+    }
   };
 
 });

@@ -539,90 +539,6 @@ define(function(require, exports, module) {
     return TaskBlock;
   })();
   
-  var use = function() {
-    cc.createTimeline = function() {
-      cc.timeline = new Timeline();
-      return cc.timeline;
-    };
-    cc.createTaskGlobal = function(timeline) {
-      return new TaskGlobal(timeline);
-    };
-    cc.createTaskDo = function(func) {
-      return new TaskDo(func);
-    };
-    cc.createTaskLoop = function(func) {
-      return new TaskLoop(func);
-    };
-    cc.createTaskEach = function(list, func) {
-      return new TaskEach(list, func);
-    };
-    cc.createTaskTimeout = function(delay, func) {
-      return new TaskTimeout(delay, func);
-    };
-    cc.createTaskInterval = function(delay, func) {
-      return new TaskInterval(delay, func);
-    };
-    cc.createTaskBlock = function() {
-      return new TaskBlock();
-    };
-    cc.createTaskContext = function(task) {
-      return new TaskContext(task);
-    };
-    cc.createTaskWaitToken = function(item) {
-      if (item instanceof TaskWaitToken) {
-        return item;
-      }
-      switch (typeof item) {
-      case "number":
-        return new TaskWaitTokenNumber(item);
-      case "function":
-        return new TaskWaitTokenFunction(item);
-      case "boolean":
-        return new TaskWaitTokenBoolean(item);
-      default:
-        if (item) {
-          if (Array.isArray(item)) {
-            return cc.createTaskWaitLogic("and", item);
-          } else if (typeof item.performWait === "function") {
-            return new TaskWaitTokenBlock(item);
-          }
-        }
-      }
-      throw new TypeError("TaskWaitToken: Invalid type");
-    };
-    cc.createTaskWaitLogic = function(logic, list) {
-      list = list.map(function(x) {
-        return cc.createTaskWaitToken(x);
-      });
-      return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
-    };
-    cc.instanceOfWaitToken = function(obj) {
-      return obj instanceof TaskWaitToken;
-    };
-  };
-  
-  exports = function() {
-    global.Task = {
-      "do": function(func) {
-        return cc.createTaskDo(func);
-      },
-      loop: function(func) {
-        return cc.createTaskLoop(func);
-      },
-      each: function(list, func) {
-        return cc.createTaskEach(list, func);
-      },
-      timeout: function(delay, func) {
-        return cc.createTaskTimeout(delay, func);
-      },
-      interval: function(delay, func) {
-        return cc.createTaskInterval(delay, func);
-      },
-      block: function() {
-        return cc.createTaskBlock();
-      }
-    };
-  };
   
   module.exports = {
     Timeline: Timeline,
@@ -642,7 +558,90 @@ define(function(require, exports, module) {
     TaskTimeout : TaskTimeout,
     TaskInterval: TaskInterval,
     TaskBlock   : TaskBlock,
-    use:use, exports:exports,
+    
+    use: function() {
+      cc.createTimeline = function() {
+        cc.timeline = new Timeline();
+        return cc.timeline;
+      };
+      cc.createTaskGlobal = function(timeline) {
+        return new TaskGlobal(timeline);
+      };
+      cc.createTaskDo = function(func) {
+        return new TaskDo(func);
+      };
+      cc.createTaskLoop = function(func) {
+        return new TaskLoop(func);
+      };
+      cc.createTaskEach = function(list, func) {
+        return new TaskEach(list, func);
+      };
+      cc.createTaskTimeout = function(delay, func) {
+        return new TaskTimeout(delay, func);
+      };
+      cc.createTaskInterval = function(delay, func) {
+        return new TaskInterval(delay, func);
+      };
+      cc.createTaskBlock = function() {
+        return new TaskBlock();
+      };
+      cc.createTaskContext = function(task) {
+        return new TaskContext(task);
+      };
+      cc.createTaskWaitToken = function(item) {
+        if (item instanceof TaskWaitToken) {
+          return item;
+        }
+        switch (typeof item) {
+        case "number":
+          return new TaskWaitTokenNumber(item);
+        case "function":
+          return new TaskWaitTokenFunction(item);
+        case "boolean":
+          return new TaskWaitTokenBoolean(item);
+        default:
+          if (item) {
+            if (Array.isArray(item)) {
+              return cc.createTaskWaitLogic("and", item);
+            } else if (typeof item.performWait === "function") {
+              return new TaskWaitTokenBlock(item);
+            }
+          }
+        }
+        throw new TypeError("TaskWaitToken: Invalid type");
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        list = list.map(function(x) {
+          return cc.createTaskWaitToken(x);
+        });
+        return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
+      };
+      cc.instanceOfWaitToken = function(obj) {
+        return obj instanceof TaskWaitToken;
+      };
+    },
+    exports: function() {
+      global.Task = {
+        "do": function(func) {
+          return cc.createTaskDo(func);
+        },
+        loop: function(func) {
+          return cc.createTaskLoop(func);
+        },
+        each: function(list, func) {
+          return cc.createTaskEach(list, func);
+        },
+        timeout: function(delay, func) {
+          return cc.createTaskTimeout(delay, func);
+        },
+        interval: function(delay, func) {
+          return cc.createTaskInterval(delay, func);
+        },
+        block: function() {
+          return cc.createTaskBlock();
+        }
+      };
+    }
   };
 
 });

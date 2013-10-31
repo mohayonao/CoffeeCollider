@@ -24,12 +24,9 @@ define(function(require, exports, module) {
       }
     }
   };
-
-  var use = function() {
-  };
+  
   
   module.exports = {
-    use:use,
     exports: function() {
       cc.registerUGen("MouseX", iMouseXY);
       cc.registerUGen("MouseY", iMouseXY);

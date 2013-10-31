@@ -303,83 +303,82 @@ define(function(require, exports, module) {
     }
   };
   
-  var use = function() {
-    require("../common/timer").use();
-    require("./buffer").use();
-    require("./node").use();
-    require("./sched").use();
-    require("./ugen/exports").use();
-    
-    cc.client_exports = function() {
-      require("./object").exports();
-      require("./number").exports();
-      require("./data").exports();
-      require("./buffer").exports();
-      require("./node").exports();
-      require("./sched").exports();
-      require("./scale").exports();
-      require("./ugen/exports").exports();
-    };
-    cc.createSynthClient = function() {
-      cc.client_exports();
-      switch (cc.opmode) {
-      case "worker":
-        return cc.createWorkerSynthClient();
-      case "iframe":
-        return cc.createIFrameSynthClient();
-      case "socket":
-        return cc.createSocketSynthClient();
-      }
-      throw new Error("A SynthClient is not defined for: " + cc.opmode);
-    };
-    var onmessage = function(e) {
-      var msg = e.data;
-      if (msg instanceof Uint8Array) {
-        cc.client.sendToServer(msg);
-      } else {
-        cc.client.recvFromIF(msg);
-      }
-    };
-    cc.createWorkerSynthClient = function() {
-      var client = new WorkerSynthClient();
-      global.onmessage = onmessage;
-      cc.opmode = "worker";
-      return client;
-    };
-    cc.createIFrameSynthClient = function() {
-      var client = new IFrameSynthClient();
-      if (typeof window !== "undefined") {
-        window.onmessage = function(e) {
-          e.ports[0].onmessage = onmessage;
-          client.sendToIF = function(msg) {
-            e.ports[0].postMessage(msg);
-          };
-          window.onmessage = null;
-        };
-      }
-      cc.opmode = "iframe";
-      return client;
-    };
-    cc.createSocketSynthClient = function() {
-      var client = new SocketSynthClient();
-      if (typeof window !== "undefined") {
-        window.onmessage = function(e) {
-          e.ports[0].onmessage = onmessage;
-          client.sendToIF = function(msg) {
-            e.ports[0].postMessage(msg);
-          };
-          client.socketPath = e.data;
-          window.onmessage = null;
-        };
-      }
-      cc.opmode = "socket";
-      return client;
-    };
-    cc.replaceNativeTimerFunctions();
-  };
   
   module.exports = {
-    use:use
+    use: function() {
+      require("../common/timer").use();
+      require("./buffer").use();
+      require("./node").use();
+      require("./sched").use();
+      require("./ugen/exports").use();
+      
+      cc.client_exports = function() {
+        require("./object").exports();
+        require("./number").exports();
+        require("./data").exports();
+        require("./buffer").exports();
+        require("./node").exports();
+        require("./sched").exports();
+        require("./scale").exports();
+        require("./ugen/exports").exports();
+      };
+      cc.createSynthClient = function() {
+        cc.client_exports();
+        switch (cc.opmode) {
+        case "worker":
+          return cc.createWorkerSynthClient();
+        case "iframe":
+          return cc.createIFrameSynthClient();
+        case "socket":
+          return cc.createSocketSynthClient();
+        }
+        throw new Error("A SynthClient is not defined for: " + cc.opmode);
+      };
+      var onmessage = function(e) {
+        var msg = e.data;
+        if (msg instanceof Uint8Array) {
+          cc.client.sendToServer(msg);
+        } else {
+          cc.client.recvFromIF(msg);
+        }
+      };
+      cc.createWorkerSynthClient = function() {
+        var client = new WorkerSynthClient();
+        global.onmessage = onmessage;
+        cc.opmode = "worker";
+        return client;
+      };
+      cc.createIFrameSynthClient = function() {
+        var client = new IFrameSynthClient();
+        if (typeof window !== "undefined") {
+          window.onmessage = function(e) {
+            e.ports[0].onmessage = onmessage;
+            client.sendToIF = function(msg) {
+              e.ports[0].postMessage(msg);
+            };
+            window.onmessage = null;
+          };
+        }
+        cc.opmode = "iframe";
+        return client;
+      };
+      cc.createSocketSynthClient = function() {
+        var client = new SocketSynthClient();
+        if (typeof window !== "undefined") {
+          window.onmessage = function(e) {
+            e.ports[0].onmessage = onmessage;
+            client.sendToIF = function(msg) {
+              e.ports[0].postMessage(msg);
+            };
+            client.socketPath = e.data;
+            window.onmessage = null;
+          };
+        }
+        cc.opmode = "socket";
+        return client;
+      };
+      cc.replaceNativeTimerFunctions();
+    }
   };
 
 });

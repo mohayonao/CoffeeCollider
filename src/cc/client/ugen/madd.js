@@ -130,32 +130,28 @@ define(function(require, exports, module) {
     return Sum4;
   })();
   
-  var use = function() {
-    cc.createMulAdd = function(_in, mul, add) {
-      return new MulAdd().init(_in, mul, add);
-    };
-    cc.createSum3 = function(in0, in1, in2) {
-      return new Sum3().init(in0, in1, in2);
-    };
-    cc.createSum4 = function(in0, in1, in2, in3) {
-      return new Sum4().init(in0, in1, in2, in3);
-    };
-    cc.instanceOfMulAdd = function(obj) {
-      return obj instanceof MulAdd;
-    };
-    cc.instanceOfSum3 = function(obj) {
-      return obj instanceof Sum3;
-    };
-    cc.instanceOfSum4 = function(obj) {
-      return obj instanceof Sum4;
-    };
-  };
-
-  exports = function() {
-  };
   
   module.exports = {
-    use:use, exports:exports
+    use: function() {
+      cc.createMulAdd = function(_in, mul, add) {
+        return new MulAdd().init(_in, mul, add);
+      };
+      cc.createSum3 = function(in0, in1, in2) {
+        return new Sum3().init(in0, in1, in2);
+      };
+      cc.createSum4 = function(in0, in1, in2, in3) {
+        return new Sum4().init(in0, in1, in2, in3);
+      };
+      cc.instanceOfMulAdd = function(obj) {
+        return obj instanceof MulAdd;
+      };
+      cc.instanceOfSum3 = function(obj) {
+        return obj instanceof Sum3;
+      };
+      cc.instanceOfSum4 = function(obj) {
+        return obj instanceof Sum4;
+      };
+    }
   };
 
 });

@@ -102,26 +102,25 @@ define(function(require, exports, module) {
     bufSrcId = 0;
   };
   
-  var use = function() {
-    cc.createAudioBuffer = function() {
-      return new AudioBuffer();
-    };
-    cc.instanceOfAudioBuffer = function(obj) {
-      return obj instanceof AudioBuffer;
-    };
-    cc.resetBuffer = resetBuffer;
-  };
-
-  exports = function() {
-    if (typeof Buffer === "undefined") {
-      // TODO: rename????
-      global.Buffer = BufferInterface;
-    }
-  };
   
   module.exports = {
     AudioBuffer: AudioBuffer,
-    use:use, exports:exports,
+    
+    use: function() {
+      cc.createAudioBuffer = function() {
+        return new AudioBuffer();
+      };
+      cc.instanceOfAudioBuffer = function(obj) {
+        return obj instanceof AudioBuffer;
+      };
+      cc.resetBuffer = resetBuffer;
+    },
+    exports: function() {
+      if (typeof Buffer === "undefined") {
+        // TODO: rename????
+        global.Buffer = BufferInterface;
+      }
+    }
   };
 
 });

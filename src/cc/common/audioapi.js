@@ -285,15 +285,14 @@ define(function(require, exports, module) {
       return NodeAudioAPI;
     })();
   }
-
-  var use = function() {
-    cc.createAudioAPI = function(sys, opts) {
-      return new AudioAPI(sys, opts);
-    };
-  };
+  
   
   module.exports = {
-    use:use
+    use: function() {
+      cc.createAudioAPI = function(sys, opts) {
+        return new AudioAPI(sys, opts);
+      };
+    }
   };
 
 });

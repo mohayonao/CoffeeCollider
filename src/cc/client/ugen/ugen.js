@@ -223,40 +223,6 @@ define(function(require, exports, module) {
     });
   };
   
-  var use = function() {
-    cc.createUGen = function() {
-      return new UGen();
-    };
-    cc.createOutputProxy = function(rate, source, index) {
-      return new OutputProxy(rate, source, index);
-    };
-    cc.createControl = function(rate) {
-      return new Control(rate);
-    };
-    cc.instanceOfUGen = function(obj) {
-      return obj instanceof UGen;
-    };
-    cc.instanceOfMultiOutUGen = function(obj) {
-      return obj instanceof MultiOutUGen;
-    };
-    cc.instanceOfOutputProxy = function(obj) {
-      return obj instanceof OutputProxy;
-    };
-    cc.instanceOfOut = function(obj) {
-      return obj instanceof Out;
-    };
-    cc.setSynthDef = function(func) {
-      if (func && addToSynthDef !== null) {
-        throw new Error("nested Synth.def");
-      }
-      addToSynthDef = func;
-    };
-
-    // redefinition for tests
-    cc.UGen = UGen;
-    cc.MultiOutUGen = MultiOutUGen;
-    cc.registerUGen = registerUGen;
-  };
   
   // exports for prototype extending
   cc.UGen = UGen;
@@ -264,12 +230,46 @@ define(function(require, exports, module) {
   cc.registerUGen = registerUGen;
   
   module.exports = {
-    UGen: UGen,
+    UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
     OutputProxy : OutputProxy,
     Control     : Control,
     Out         : Out,
-    use:use,
+    
+    use: function() {
+      cc.createUGen = function() {
+        return new UGen();
+      };
+      cc.createOutputProxy = function(rate, source, index) {
+        return new OutputProxy(rate, source, index);
+      };
+      cc.createControl = function(rate) {
+        return new Control(rate);
+      };
+      cc.instanceOfUGen = function(obj) {
+        return obj instanceof UGen;
+      };
+      cc.instanceOfMultiOutUGen = function(obj) {
+        return obj instanceof MultiOutUGen;
+      };
+      cc.instanceOfOutputProxy = function(obj) {
+        return obj instanceof OutputProxy;
+      };
+      cc.instanceOfOut = function(obj) {
+        return obj instanceof Out;
+      };
+      cc.setSynthDef = function(func) {
+        if (func && addToSynthDef !== null) {
+          throw new Error("nested Synth.def");
+        }
+        addToSynthDef = func;
+      };
+      
+      // redefinition for tests
+      cc.UGen = UGen;
+      cc.MultiOutUGen = MultiOutUGen;
+      cc.registerUGen = registerUGen;
+    },
     exports: function() {
       registerUGen("Out", iOut);
       registerUGen("In" , iIn );
