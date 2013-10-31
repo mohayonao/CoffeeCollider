@@ -113,6 +113,8 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
+    Pattern  : Pattern,
+    PSequence: PSequence,
     use:use, exports:exports
   };
 

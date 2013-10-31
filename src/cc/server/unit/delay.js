@@ -126,12 +126,12 @@ define(function(require, exports, module) {
       var dsamp    = this._dsamp;
       var feedbk   = this._feedbk;
       var mask     = this._mask;
-      var irdphase, frac, value, d1, d2;
+      var frac     = dsamp - (dsamp|0);
+      var irdphase, value, d1, d2;
       var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
       var i;
       if (delaytime === this._delaytime) {
         irdphase = iwrphase - (dsamp|0);
-        frac     = dsamp - (dsamp|0);
         if (decaytime === this._decaytime) {
           for (i = 0; i < inNumSamples; ++i) {
             d1 = dlybuf[(irdphase  )&mask];
@@ -202,12 +202,12 @@ define(function(require, exports, module) {
       var dsamp    = this._dsamp;
       var feedbk   = this._feedbk;
       var mask     = this._mask;
-      var irdphase, frac, value, d0, d1, d2, d3;
+      var frac     = dsamp - (dsamp|0);
+      var irdphase, value, d0, d1, d2, d3;
       var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
       var i;
       if (delaytime === this._delaytime) {
         irdphase = iwrphase - (dsamp|0);
-        frac     = dsamp - (dsamp|0);
         if (decaytime === this._decaytime) {
           for (i = 0; i < inNumSamples; ++i) {
             d0 = dlybuf[(irdphase+1)&mask];

@@ -4,12 +4,8 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
-  var slice = [].slice;
-
-  var UnaryOpUGen;
-  var BinaryOpUGen;
-  var MulAdd;
-
+  var slice  = [].slice;
+  
   var addToSynthDef = null;
   
   var UGen = (function() {
@@ -37,7 +33,7 @@ define(function(require, exports, module) {
     };
     
     UGen.prototype.madd = fn(function(mul, add) {
-      return new MulAdd().init(this, mul, add);
+      return cc.createMulAdd(this, mul, add);
     }).defaults("mul=1,add=0").multiCall().build();
     
     UGen.prototype.range = fn(function(lo, hi) {
@@ -49,7 +45,7 @@ define(function(require, exports, module) {
         mul = (hi - lo);
         add = lo;
       }
-      return new MulAdd().init(this, mul, add);
+      return cc.createMulAdd(this, mul, add);
     }).defaults("lo=0,hi=1").multiCall().build();
     
     UGen.prototype.unipolar = fn(function(mul) {
@@ -189,11 +185,7 @@ define(function(require, exports, module) {
     }
   };
   
-  var setSynthDef = function(func) {
-    addToSynthDef = func;
-  };
-  
-  var register = function(name, payload) {
+  var registerUGen = function(name, payload) {
     var klass = global[name] = function() {
       return new UGen(name);
     };
@@ -231,11 +223,45 @@ define(function(require, exports, module) {
     });
   };
   
-  cc.once("basic_ops.js", function(payload) {
-    UnaryOpUGen  = payload.UnaryOpUGen;
-    BinaryOpUGen = payload.BinaryOpUGen;
-    MulAdd       = payload.MulAdd;
-  });
+  var use = function() {
+    cc.createUGen = function() {
+      return new UGen();
+    };
+    cc.createOutputProxy = function(rate, source, index) {
+      return new OutputProxy(rate, source, index);
+    };
+    cc.createControl = function(rate) {
+      return new Control(rate);
+    };
+    cc.instanceOfUGen = function(obj) {
+      return obj instanceof UGen;
+    };
+    cc.instanceOfMultiOutUGen = function(obj) {
+      return obj instanceof MultiOutUGen;
+    };
+    cc.instanceOfOutputProxy = function(obj) {
+      return obj instanceof OutputProxy;
+    };
+    cc.instanceOfOut = function(obj) {
+      return obj instanceof Out;
+    };
+    cc.setSynthDef = function(func) {
+      if (func && addToSynthDef !== null) {
+        throw new Error("nested Synth.def");
+      }
+      addToSynthDef = func;
+    };
+
+    // redefinition for tests
+    cc.UGen = UGen;
+    cc.MultiOutUGen = MultiOutUGen;
+    cc.registerUGen = registerUGen;
+  };
+  
+  // exports for prototype extending
+  cc.UGen = UGen;
+  cc.MultiOutUGen = MultiOutUGen;
+  cc.registerUGen = registerUGen;
   
   module.exports = {
     UGen: UGen,
@@ -243,11 +269,10 @@ define(function(require, exports, module) {
     OutputProxy : OutputProxy,
     Control     : Control,
     Out         : Out,
-    setSynthDef : setSynthDef,
-    register: register,
+    use:use,
     exports: function() {
-      register("Out", iOut);
-      register("In" , iIn );
+      registerUGen("Out", iOut);
+      registerUGen("In" , iIn );
     }
   };
 

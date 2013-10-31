@@ -10,6 +10,7 @@ define(function(require, exports, module) {
     var called;
     beforeEach(function() {
       require("./server").use();
+      
       called = [];
       cc.client = { process: nop };
       cc.createTimer = function() {

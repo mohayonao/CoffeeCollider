@@ -2,9 +2,11 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+
+  var cc = require("../cc");
   var ugen = require("./ugen");
   
-  ugen.register("Test", {
+  cc.registerUGen("Test", {
     ar: {
       defaults: "val1=1,val2=2",
       ctor: function(val1, val2) {
@@ -20,6 +22,9 @@ define(function(require, exports, module) {
   });
   
   describe("ugen.js", function() {
+    before(function() {
+      ugen.use();
+    });
     describe("UGen", function() {
       it("create", function() {
         var instance = Test.ar();
@@ -45,12 +50,12 @@ define(function(require, exports, module) {
     describe("MultiOutUGen", function() {
       it("case 1", function() {
         var values = [ 1 ];
-        var instance = new ugen.Control(C.CONTROL).init(values);
+        var instance = cc.createControl(C.CONTROL).init(values);
         assert.instanceOf(instance, ugen.OutputProxy);
       });
       it("case 2", function() {
         var values = [ 1, 2, 3 ];
-        var instance = new ugen.Control(C.CONTROL).init(values);
+        var instance = cc.createControl(C.CONTROL).init(values);
         assert.isArray(instance);
         assert.equal(values.length, instance.length);
       });

@@ -97,13 +97,19 @@ define(function(require, exports, module) {
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
   
-  var reset = function() {
+  var resetBuffer = function() {
     bufferSrcCache = {};
     bufSrcId = 0;
   };
   
   var use = function() {
-    cc.resetBuffer = reset;
+    cc.createAudioBuffer = function() {
+      return new AudioBuffer();
+    };
+    cc.instanceOfAudioBuffer = function(obj) {
+      return obj instanceof AudioBuffer;
+    };
+    cc.resetBuffer = resetBuffer;
   };
 
   exports = function() {
@@ -114,7 +120,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    AudioBuffer : AudioBuffer,
+    AudioBuffer: AudioBuffer,
     use:use, exports:exports,
   };
 

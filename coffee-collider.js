@@ -424,8 +424,17 @@ define('cc/client/client', function(require, exports, module) {
     require("./buffer").use();
     require("./node").use();
     require("./sched").use();
-    require("./exports").use();
+    require("./ugen/exports").use();
     
+    cc.client_exports = function() {
+      require("./object").exports();
+      require("./number").exports();
+      require("./buffer").exports();
+      require("./node").exports();
+      require("./sched").exports();
+      require("./scale").exports();
+      require("./ugen/exports").exports();
+    };
     cc.createSynthClient = function() {
       cc.client_exports();
       switch (cc.opmode) {
@@ -490,96 +499,8 @@ define('cc/client/client', function(require, exports, module) {
 
 });
 define('cc/client/cc', function(require, exports, module) {
-
-  var _cc = require("../cc");
-  var emitter = require("../common/emitter");
   
-  if (!_cc.emit) {
-    emitter.mixin(_cc);
-  }
-  
-  module.exports = _cc;
-
-});
-define('cc/common/emitter', function(require, exports, module) {
-
-  var Emitter = (function() {
-    function Emitter(context) {
-      this.__context   = context || this;
-      this.__callbacks = {};
-    }
-    Emitter.prototype.getListeners = function(event) {
-      return this.__callbacks[event] || (this.__callbacks[event] = []);
-    };
-    Emitter.prototype.hasListeners = function(event) {
-      return this.getListeners(event).length > 0;
-    };
-    Emitter.prototype.on = function(event, callback) {
-      var __callbacks = this.getListeners(event);
-      if (__callbacks.indexOf(callback) === -1) {
-        __callbacks.push(callback);
-      }
-      return this;
-    };
-    Emitter.prototype.once = function(event, callback) {
-      var that = this;
-      function wrapper() {
-        that.off(event, wrapper);
-        callback.apply(that.__context, arguments);
-      }
-      wrapper.callback = callback;
-      this.on(event, wrapper);
-      return this;
-    };
-    Emitter.prototype.off = function(event, callback) {
-      if (arguments.length === 0) {
-        this.__callbacks = {};
-        return this;
-      }
-      var __callbacks = this.getListeners(event);
-      if (arguments.length === 1) {
-        __callbacks.splice(0);
-        return this;
-      }
-      var index = __callbacks.indexOf(callback);
-      if (index === -1) {
-        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-          if (__callbacks[i].callback === callback) {
-            index = i;
-            break;
-          }
-        }
-      }
-      if (index !== -1) {
-        __callbacks.splice(index, 1);
-      }
-      return this;
-    };
-    Emitter.prototype.emit = function(event) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      var __callbacks = this.getListeners(event).slice(0);
-      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.__context, args);
-      }
-      return this;
-    };
-    return Emitter;
-  })();
-  
-  var mixin = function(obj) {
-    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
-      if (!obj[method]) {
-        obj[method] = Emitter.prototype[method];
-      }
-    });
-    Emitter.call(obj);
-    return obj;
-  };
-  
-  module.exports = {
-    Emitter: Emitter,
-    mixin: mixin
-  };
+  module.exports = require("../cc");
 
 });
 define('cc/common/extend', function(require, exports, module) {
@@ -993,13 +914,19 @@ define('cc/client/buffer', function(require, exports, module) {
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
   
-  var reset = function() {
+  var resetBuffer = function() {
     bufferSrcCache = {};
     bufSrcId = 0;
   };
   
   var use = function() {
-    cc.resetBuffer = reset;
+    cc.createAudioBuffer = function() {
+      return new AudioBuffer();
+    };
+    cc.instanceOfAudioBuffer = function(obj) {
+      return obj instanceof AudioBuffer;
+    };
+    cc.resetBuffer = resetBuffer;
   };
 
   exports = function() {
@@ -1010,7 +937,7 @@ define('cc/client/buffer', function(require, exports, module) {
   };
   
   module.exports = {
-    AudioBuffer : AudioBuffer,
+    AudioBuffer: AudioBuffer,
     use:use, exports:exports,
   };
 
@@ -1194,13 +1121,93 @@ define('cc/client/utils', function(require, exports, module) {
   };
 
 });
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter(context) {
+      this.__context   = context || this;
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.__context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.__context, args);
+      }
+      return this;
+    };
+    return Emitter;
+  })();
+  
+  var mixin = function(obj) {
+    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+      if (!obj[method]) {
+        obj[method] = Emitter.prototype[method];
+      }
+    });
+    Emitter.call(obj);
+    return obj;
+  };
+  
+  module.exports = {
+    Emitter: Emitter,
+    mixin: mixin
+  };
+
+});
 define('cc/client/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var extend = require("../common/extend");
-  var utils = require("./utils");
-  var ugen  = require("./ugen/ugen");
+  var extend  = require("../common/extend");
+  var utils   = require("./utils");
   var emitter = require("../common/emitter");
 
   var nodes = {};
@@ -1349,9 +1356,9 @@ define('cc/client/node', function(require, exports, module) {
       } else {
         args = { keys:[], vals:[] };
       }
-      
+
       var children = [];
-      ugen.setSynthDef(function(ugen) {
+      cc.setSynthDef(function(ugen) {
         children.push(ugen);
       });
       
@@ -1367,7 +1374,7 @@ define('cc/client/node', function(require, exports, module) {
         flatten = flatten.concat(args.vals[i]);
       }
       var reshaped = [];
-      var controls = new ugen.Control(1).init(flatten);
+      var controls = cc.createControl(1).init(flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
@@ -1385,7 +1392,7 @@ define('cc/client/node', function(require, exports, module) {
       } catch (e) {
         throw e.toString();
       } finally {
-        ugen.setSynthDef(null);
+        cc.setSynthDef(null);
       }
       // console.log(children);
       var consts = [];
@@ -1400,20 +1407,20 @@ define('cc/client/node', function(require, exports, module) {
       });
       consts.sort();
       var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+        return !(typeof x === "number" || cc.instanceOfOutputProxy(x));
       });
       // console.log(ugenlist);
       var defs = ugenlist.map(function(x) {
         var inputs = [];
         if (x.inputs) {
           x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var index = ugenlist.indexOf((cc.instanceOfOutputProxy(x)) ? x.inputs[0] : x);
             var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
             inputs.push(index, subindex);
           });
         }
         var outputs;
-        if (x instanceof ugen.MultiOutUGen) {
+        if (cc.instanceOfMultiOutUGen(x)) {
           outputs = x.channels.map(function(x) {
             return x.rate;
           });
@@ -1494,7 +1501,7 @@ define('cc/client/node', function(require, exports, module) {
       return function(list) {
         var checked = [];
         list.slice().forEach(function(x) {
-          if (x instanceof ugen.Out) {
+          if (cc.instanceOfOut(x)) {
             checked.push(x);
             x.inputs.forEach(function(x) {
               _topoSort(x, list, checked);
@@ -1721,6 +1728,8 @@ define('cc/client/node', function(require, exports, module) {
   };
   
   var use = function() {
+    require("./ugen/ugen").use();
+    
     cc.createGroup = function(target, addAction) {
       return new Group(target, addAction);
     };
@@ -1746,12 +1755,8 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
-  var slice = [].slice;
-
-  var UnaryOpUGen;
-  var BinaryOpUGen;
-  var MulAdd;
-
+  var slice  = [].slice;
+  
   var addToSynthDef = null;
   
   var UGen = (function() {
@@ -1779,7 +1784,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     };
     
     UGen.prototype.madd = fn(function(mul, add) {
-      return new MulAdd().init(this, mul, add);
+      return cc.createMulAdd(this, mul, add);
     }).defaults("mul=1,add=0").multiCall().build();
     
     UGen.prototype.range = fn(function(lo, hi) {
@@ -1791,7 +1796,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
         mul = (hi - lo);
         add = lo;
       }
-      return new MulAdd().init(this, mul, add);
+      return cc.createMulAdd(this, mul, add);
     }).defaults("lo=0,hi=1").multiCall().build();
     
     UGen.prototype.unipolar = fn(function(mul) {
@@ -1931,11 +1936,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     }
   };
   
-  var setSynthDef = function(func) {
-    addToSynthDef = func;
-  };
-  
-  var register = function(name, payload) {
+  var registerUGen = function(name, payload) {
     var klass = global[name] = function() {
       return new UGen(name);
     };
@@ -1973,11 +1974,45 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     });
   };
   
-  cc.once("basic_ops.js", function(payload) {
-    UnaryOpUGen  = payload.UnaryOpUGen;
-    BinaryOpUGen = payload.BinaryOpUGen;
-    MulAdd       = payload.MulAdd;
-  });
+  var use = function() {
+    cc.createUGen = function() {
+      return new UGen();
+    };
+    cc.createOutputProxy = function(rate, source, index) {
+      return new OutputProxy(rate, source, index);
+    };
+    cc.createControl = function(rate) {
+      return new Control(rate);
+    };
+    cc.instanceOfUGen = function(obj) {
+      return obj instanceof UGen;
+    };
+    cc.instanceOfMultiOutUGen = function(obj) {
+      return obj instanceof MultiOutUGen;
+    };
+    cc.instanceOfOutputProxy = function(obj) {
+      return obj instanceof OutputProxy;
+    };
+    cc.instanceOfOut = function(obj) {
+      return obj instanceof Out;
+    };
+    cc.setSynthDef = function(func) {
+      if (func && addToSynthDef !== null) {
+        throw new Error("nested Synth.def");
+      }
+      addToSynthDef = func;
+    };
+
+    // redefinition for tests
+    cc.UGen = UGen;
+    cc.MultiOutUGen = MultiOutUGen;
+    cc.registerUGen = registerUGen;
+  };
+  
+  // exports for prototype extending
+  cc.UGen = UGen;
+  cc.MultiOutUGen = MultiOutUGen;
+  cc.registerUGen = registerUGen;
   
   module.exports = {
     UGen: UGen,
@@ -1985,11 +2020,10 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     OutputProxy : OutputProxy,
     Control     : Control,
     Out         : Out,
-    setSynthDef : setSynthDef,
-    register: register,
+    use:use,
     exports: function() {
-      register("Out", iOut);
-      register("In" , iIn );
+      registerUGen("Out", iOut);
+      registerUGen("In" , iIn );
     }
   };
 
@@ -2591,6 +2625,9 @@ define('cc/client/sched', function(require, exports, module) {
       });
       return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
     };
+    cc.instanceOfWaitToken = function(obj) {
+      return obj instanceof TaskWaitToken;
+    };
   };
   
   exports = function() {
@@ -2617,298 +2654,65 @@ define('cc/client/sched', function(require, exports, module) {
   };
   
   module.exports = {
+    Timeline: Timeline,
+    TaskWaitToken        : TaskWaitToken,
+    TaskWaitTokenNumber  : TaskWaitTokenNumber,
+    TaskWaitTokenFunction: TaskWaitTokenFunction,
+    TaskWaitTokenBoolean : TaskWaitTokenBoolean,
+    TaskWaitTokenBlock   : TaskWaitTokenBlock,
+    TaskWaitAND : TaskWaitAND,
+    TaskWaitOR  : TaskWaitOR,
+    TaskContext : TaskContext,
+    Task        : Task,
+    TaskGlobal  : TaskGlobal,
+    TaskDo      : TaskDo,
+    TaskLoop    : TaskLoop,
+    TaskEach    : TaskEach,
+    TaskTimeout : TaskTimeout,
+    TaskInterval: TaskInterval,
+    TaskBlock   : TaskBlock,
     use:use, exports:exports,
   };
 
 });
-define('cc/client/exports', function(require, exports, module) {
+define('cc/client/ugen/exports', function(require, exports, module) {
 
-  var cc = require("./cc");
+  exports = function() {
+    require("./ugen").exports();
+    require("./madd").exports();
+    require("./uop").exports();
+    require("./bop").exports();
+    require("./bufio").exports();
+    require("./delay").exports();
+    require("./line").exports();
+    require("./osc").exports();
+    require("./pan").exports();
+    require("./ui").exports();
+  };
 
   var use = function() {
-    cc.client_exports = function() {
-      exports();
-    };
-  };
-  exports = function() {
-    require("./object").exports();
-    require("./bop").exports();
-    require("./uop").exports();
-    require("./buffer").exports();
-    require("./node").exports();
-    require("./sched").exports();
-    require("./scale").exports();
-    require("./ugen/exports").exports();
+    require("./ugen").use();
+    require("./madd").use();
+    require("./uop").use();
+    require("./bop").use();
+    require("./bufio").use();
+    require("./delay").use();
+    require("./line").use();
+    require("./osc").use();
+    require("./pan").use();
+    require("./ui").use();
   };
   
   module.exports = {
-    use:use, exports:exports
+    use:use, exports: exports
   };
 
 });
-define('cc/client/object', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var fn = require("./fn");
-  var utils = require("./utils");
+define('cc/client/ugen/madd', function(require, exports, module) {
   
-  var MulAdd;
-  
-  var setup = function(key, func) {
-    [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
-      fn.definePrototypeProperty(Klass, key, func);
-    });
-  };
-  
-  exports = function() {
-    setup("__plus__", function() {
-      return +this;
-    });
-    setup("__minus__", function() {
-      return -this;
-    });
-    setup("__add__", function(b) {
-      return this + b;
-    });
-    setup("__sub__", function(b) {
-      return this - b;
-    });
-    setup("__mul__", function(b) {
-      return this * b;
-    });
-    setup("__div__", function(b) {
-      return this / b;
-    });
-    setup("__mod__", function(b) {
-      return this % b;
-    });
-    setup("__and__", function(b) {
-      return this && b;
-    });
-    setup("__or__", function(b) {
-      return this || b;
-    });
-    setup("next", function() {
-      return this;
-    });
-    setup("to_i", function() {
-      return this|0;
-    });
-    setup("to_f", function() {
-      return +this;
-    });
-    setup("to_s", function() {
-      return this.toString();
-    });
-    setup("to_a", function() {
-      return [this];
-    });
-    
-    fn.definePrototypeProperty(String, "__mul__", function(b) {
-      if (typeof b === "number") {
-        var result = new Array(Math.max(0, b));
-        for (var i = 0; i < b; i++) {
-          result[i] = this;
-        }
-        return result.join("");
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mul__(b);
-        }, this);
-      }
-      return this * b;
-    });
-    
-    fn.definePrototypeProperty(Function, "__mul__", function(b) {
-      if (typeof b === "function") {
-        var f = this, g = b;
-        return function() {
-          return f.call(null, g.apply(null, arguments));
-        };
-      }
-      return this * b;
-    });
-    
-    fn.definePrototypeProperty(String, "__div__", function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__div__(b);
-        }, this);
-      }
-      return this / b;
-    });
-    
-    fn.definePrototypeProperty(String, "__mod__", function(b) {
-      if (typeof b === "number") {
-        return utils.clump(this.split(""), b|0).map(function(items) {
-          return items.join("");
-        });
-      } else if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this.__mod__(b);
-        }, this);
-      }
-      return this % b;
-    });
-    
-    fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
-      return new MulAdd().init(this, mul, add);
-    }).defaults("mul=1,add=0").multiCall().build());
-    
-    fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-      return utils.flop([this, mul, add]).map(function(items) {
-        var _in = items[0], mul = items[1], add = items[2];
-        return new MulAdd().init(_in, mul, add);
-      });
-    }).defaults("mul=1,add=0").multiCall().build());
-
-    fn.definePrototypeProperty(Array, "to_i", function() {
-      return this.map(function(x) {
-        return x.to_i();
-      });
-    });
-    fn.definePrototypeProperty(Array, "to_f", function() {
-      return this.map(function(x) {
-        return x.to_f();
-      });
-    });
-    fn.definePrototypeProperty(Array, "to_s", function() {
-      return this.map(function(x) {
-        return x.to_s();
-      });
-    });
-    fn.definePrototypeProperty(Array, "to_a", function() {
-      return this;
-    });
-
-    setup("__and__",function(b) {
-      return cc.createTaskWaitLogic("and", [this].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__and__", function(b) {
-      return cc.createTaskWaitLogic("and", this.concat(b));
-    });
-    
-    setup("__or__", function(b) {
-      return cc.createTaskWaitLogic("or", [this].concat(b));
-    });
-    fn.definePrototypeProperty(Array, "__or__", function(b) {
-      return cc.createTaskWaitLogic("or", this.concat(b));
-    });
-  };
-  
-  cc.once("basic_ops.js", function(payload) {
-    MulAdd = payload.MulAdd;
-  });
-  
-  module.exports = {
-    exports: exports
-  };
-
-});
-define('cc/client/bop', function(require, exports, module) {
-
-  var fn = require("./fn");
-  var UGen  = require("./ugen/ugen").UGen;
-  var BinaryOpUGen = require("./ugen/basic_ops").BinaryOpUGen;
-
-  var setupNumberFunction = function(func, selector, ugenSelector) {
-    return function(b) {
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this[selector](b);
-        }, this);
-      } else if (b instanceof UGen) {
-        return new BinaryOpUGen().init(ugenSelector, this, b);
-      }
-      return func(this, b);
-    };
-  };
-  var setupArrayFunction = function(selector, ugenSelector) {
-    return function(b) {
-      var a = this;
-      if (Array.isArray(b)) {
-        if (a.length === b.length) {
-          return a.map(function(a, index) {
-            return a[selector](b[index]);
-          });
-        } else if (a.length > b.length) {
-          return a.map(function(a, index) {
-            return a[selector](b[index % b.length]);
-          });
-        } else {
-          return b.map(function(b, index) {
-            return a[index % a.length][selector](b);
-          });
-        }
-      } else if (b instanceof UGen) {
-        return a.map(function(a) {
-          return new BinaryOpUGen().init(ugenSelector, a, b);
-        });
-      }
-      return a.map(function(a) {
-        return a[selector](b);
-      });
-    };
-  };
-  var setupUGenFunction = function(selector) {
-    return function(b) {
-      var a = this;
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return new BinaryOpUGen().init(selector, a, b);
-        });
-      }
-      return new BinaryOpUGen().init(selector, a, b);
-    };
-  };
-  
-  var setup = function(selector, func, ugenSelector) {
-    ugenSelector = ugenSelector || selector;
-    fn.definePrototypeProperty(
-      Number, selector, setupNumberFunction(func, selector, ugenSelector)
-    );
-    fn.definePrototypeProperty(
-      Array, selector, setupArrayFunction(selector, ugenSelector)
-    );
-    fn.definePrototypeProperty(
-      UGen, selector, setupUGenFunction(ugenSelector)
-    );
-  };
-  
-  exports = function() {
-    setup("__add__", function(a, b) {
-      return a + b;
-    }, "+");
-    setup("__sub__", function(a, b) {
-      return a - b;
-    }, "-");
-    setup("__mul__", function(a, b) {
-      return a * b;
-    }, "*");
-    setup("__div__", function(a, b) {
-      return a / b;
-    }, "/");
-    setup("__mod__", function(a, b) {
-      return a % b;
-    }, "%");
-  };
-  
-  module.exports = {
-    exports: exports
-  };
-
-});
-define('cc/client/ugen/basic_ops', function(require, exports, module) {
-
   var cc = require("../cc");
   var extend = require("../../common/extend");
-  var utils = require("../utils");
-  var UGen  = require("./ugen").UGen;
-
+  
   var asRate = function(obj) {
     if (Array.isArray(obj)) {
       return obj.reduce(function(rate, obj) {
@@ -2917,22 +2721,176 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
     }
     return (obj && obj.rate) || 0;
   };
-
-  var UNARY_OP_UGEN_MAP = "num neg not tilde".split(" ");
-
-  var UnaryOpUGen = (function() {
-    function UnaryOpUGen() {
-      UGen.call(this, "UnaryOpUGen");
+  
+  var MulAdd = (function() {
+    function MulAdd(_in, mul, add) {
+      cc.UGen.call(this, "MulAdd");
+      init.call(this, _in, mul, add);
     }
-    extend(UnaryOpUGen, UGen);
+    extend(MulAdd, cc.UGen);
 
-    UnaryOpUGen.prototype.init = function(selector, a) {
-      var index = UNARY_OP_UGEN_MAP.indexOf(selector);
+    var init = function(_in, mul, add) {
+      var t, minus, nomul, noadd, rate;
+      if (_in.rate - mul.rate < 0) {
+        t = _in; _in = mul; mul = t;
+      }
+      if (mul === 0) {
+        return add;
+      }
+      minus = mul === -1;
+      nomul = mul ===  1;
+      noadd = add ===  0;
+
+      if (nomul && noadd) {
+        return _in;
+      }
+      if (minus && noadd) {
+        return cc.createBinaryOpUGen("*", _in, -1);
+      }
+      if (noadd) {
+        return cc.createBinaryOpUGen("*", _in, mul);
+      }
+      if (minus) {
+        return cc.createBinaryOpUGen("-", add, _in);
+      }
+      if (nomul) {
+        return cc.createBinaryOpUGen("+", _in, add);
+      }
+      if (validate(_in, mul, add)) {
+        rate = asRate([_in, mul, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
+      }
+      if (validate(mul, _in, add)) {
+        rate = asRate([mul, _in, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
+      }
+      return _in * mul + add;
+    };
+    
+    var validate = function(_in, mul, add) {
+      _in = asRate(_in);
+      mul = asRate(mul);
+      add = asRate(add);
+      if (_in === 2) {
+        return true;
+      }
+      if (_in === 1 &&
+          (mul === 1 || mul === 0) &&
+          (add === 1 || add === 0)) {
+        return true;
+      }
+      return false;
+    };
+    
+    return MulAdd;
+  })();
+  
+  var Sum3 = (function() {
+    function Sum3(in0, in1, in2) {
+      cc.UGen.call(this, "Sum3");
+      init.call(this, in0, in1, in2);
+    }
+    extend(Sum3, cc.UGen);
+    
+    var init = function(in0, in1, in2) {
+      if (in0 === 0) {
+        return cc.createBinaryOpUGen("+", in1, in2);
+      }
+      if (in1 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in2);
+      }
+      if (in2 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in1);
+      }
+      var rate = asRate([in0, in1, in2]);
+      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
+    };
+    
+    return Sum3;
+  })();
+
+  var Sum4 = (function() {
+    function Sum4(in0, in1, in2, in3) {
+      cc.UGen.call(this, "Sum4");
+      init.call(this, in0, in1, in2, in3);
+    }
+    extend(Sum4, cc.UGen);
+    
+    var init = function(in0, in1, in2, in3) {
+      if (in0 === 0) {
+        return cc.createSum3(in1, in2, in3);
+      }
+      if (in1 === 0) {
+        return cc.createSum3(in0, in2, in3);
+      }
+      if (in2 === 0) {
+        return cc.createSum3(in0, in1, in3);
+      }
+      if (in3 === 0) {
+        return cc.createSum3(in0, in1, in2);
+      }
+      var rate = asRate([in0, in1, in2, in3]);
+      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
+    };
+    
+    return Sum4;
+  })();
+  
+  var use = function() {
+    cc.createMulAdd = function(_in, mul, add) {
+      return new MulAdd(_in, mul, add);
+    };
+    cc.createSum3 = function(in0, in1, in2) {
+      return new Sum3(in0, in1, in2);
+    };
+    cc.createSum4 = function(in0, in1, in2, in3) {
+      return new Sum4(in0, in1, in2, in3);
+    };
+    cc.instanceOfMulAdd = function(obj) {
+      return obj instanceof MulAdd;
+    };
+    cc.instanceOfSum3 = function(obj) {
+      return obj instanceof Sum3;
+    };
+    cc.instanceOfSum4 = function(obj) {
+      return obj instanceof Sum4;
+    };
+  };
+
+  exports = function() {
+  };
+  
+  module.exports = {
+    use:use, exports:exports
+  };
+
+});
+define('cc/client/ugen/uop', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  var ops    = require("../../common/ops");
+  
+  var UnaryOpUGen = (function() {
+    function UnaryOpUGen(selector, a) {
+      cc.UGen.call(this, "UnaryOpUGen");
+      init.call(this, selector, a);
+    }
+    extend(UnaryOpUGen, cc.UGen);
+
+    var init = function(selector, a) {
+      var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
         throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
       }
       var rate = a.rate|0;
-      UGen.prototype.init.call(rate);
+      cc.UGen.prototype.init.call(this, rate);
       this.op = selector;
       this.specialIndex = index;
       this.inputs = [a];
@@ -2942,16 +2900,50 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
 
     return UnaryOpUGen;
   })();
+  
+  var use = function() {
+    cc.createUnaryOpUGen = function(selector, a) {
+      return new UnaryOpUGen(selector, a);
+    };
+    cc.instanceOfUnaryOpUGen = function(obj) {
+      return obj instanceof UnaryOpUGen;
+    };
+  };
+  
+  exports = function() {
+  };
 
+  module.exports = {
+    use:use, exports:exports
+  };
+
+});
+define('cc/common/ops', function(require, exports, module) {
+
+  var UNARY_OP_UGEN_MAP = "num neg not tilde pi abs midicps cpsmidi ampdb dbamp coin".split(" ");
   var BINARY_OP_UGEN_MAP = "+ - * / %".split(" ");
+  
+  module.exports = {
+    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
+    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
+  };
 
+});
+define('cc/client/ugen/bop', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  var ops    = require("../../common/ops");
+  var utils  = require("../utils");
+  
   var BinaryOpUGen = (function() {
-    function BinaryOpUGen() {
-      UGen.call(this, "BinaryOpUGen");
+    function BinaryOpUGen(selector, a, b) {
+      cc.UGen.call(this, "BinaryOpUGen");
+      init.call(this, selector, a, b);
     }
-    extend(BinaryOpUGen, UGen);
+    extend(BinaryOpUGen, cc.UGen);
 
-    BinaryOpUGen.prototype.init = function(selector, a, b) {
+    var init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -2975,22 +2967,22 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
           return b;
         } else if (b === 0) {
           return a;
-        } else if (a instanceof BinaryOpUGen) {
+        } else if (cc.instanceOfBinaryOpUGen(a)) {
           if (a.op === "*") {
-            return new MulAdd().init(a.inputs[0], a.inputs[1], b);
+            return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
-        } else if (a instanceof MulAdd) {
+        } else if (cc.instancrOfMulAdd(a)) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
-              return new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
+              return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
             } else {
               a.inputs[2] += b;
               return a;
             }
           }
-          b = new BinaryOpUGen().init("+", a.inputs[2], b);
-          a = new BinaryOpUGen().init("*!", a.inputs[0], a.inputs[1]);
-          return new BinaryOpUGen().init("+", a, b);
+          b = cc.createBinaryOpUGen("+", a.inputs[2], b);
+          a = cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
+          return cc.createBinaryOpUGen("+", a, b);
         }
         return optimizeSumObjects(a, b);
       }
@@ -3000,12 +2992,12 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
         selector = "*";
       }
       
-      var index = BINARY_OP_UGEN_MAP.indexOf(selector);
+      var index = ops.BINARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
         throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
       }
       var rate = Math.max(a.rate|0, b.rate|0);
-      UGen.prototype.init.call(this, rate);
+      cc.UGen.prototype.init.call(this, rate);
       this.op = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
@@ -3015,126 +3007,6 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
 
     return BinaryOpUGen;
   })();
-
-  var MulAdd = (function() {
-    function MulAdd() {
-      UGen.call(this, "MulAdd");
-    }
-    extend(MulAdd, UGen);
-
-    MulAdd.prototype.init = function(_in, mul, add) {
-      var t, minus, nomul, noadd;
-      if (_in.rate - mul.rate < 0) {
-        t = _in; _in = mul; mul = t;
-      }
-      if (mul === 0) {
-        return add;
-      }
-      minus = mul === -1;
-      nomul = mul ===  1;
-      noadd = add ===  0;
-
-      if (nomul && noadd) {
-        return _in;
-      }
-      if (minus && noadd) {
-        return new BinaryOpUGen().init("*", _in, -1);
-      }
-      if (noadd) {
-        return new BinaryOpUGen().init("*", _in, mul);
-      }
-      if (minus) {
-        return new BinaryOpUGen().init("-", add, _in);
-      }
-      if (nomul) {
-        return new BinaryOpUGen().init("+", _in, add);
-      }
-      if (validate(_in, mul, add)) {
-        return init.call(this, _in, mul, add);
-      }
-      if (validate(mul, _in, add)) {
-        return init.call(this, mul, _in, add);
-      }
-      return _in * mul + add;
-    };
-
-    var init = function(_in, mul, add) {
-      var rate = asRate([_in, mul, add]);
-      return UGen.prototype.init.apply(this, [rate, _in, mul, add]);
-    };
-    
-    var validate = function(_in, mul, add) {
-      _in = asRate(_in);
-      mul = asRate(mul);
-      add = asRate(add);
-      if (_in === 2) {
-        return true;
-      }
-      if (_in === 1 &&
-          (mul === 1 || mul === 0) &&
-          (add === 1 || add === 0)) {
-        return true;
-      }
-      return false;
-    };
-    
-    return MulAdd;
-  })();
-
-  var Sum3 = (function() {
-    function Sum3() {
-      UGen.call(this, "Sum3");
-    }
-    extend(Sum3, UGen);
-    
-    Sum3.prototype.init = function(in0, in1, in2) {
-      if (in0 === 0) {
-        return new BinaryOpUGen().init("+", in1, in2);
-      }
-      if (in1 === 0) {
-        return new BinaryOpUGen().init("+", in0, in2);
-      }
-      if (in2 === 0) {
-        return new BinaryOpUGen().init("+", in0, in1);
-      }
-      var rate = asRate([in0, in1, in2]);
-      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum3;
-  })();
-
-  var Sum4 = (function() {
-    function Sum4() {
-      UGen.call(this, "Sum4");
-    }
-    extend(Sum4, UGen);
-    
-    Sum4.prototype.init = function(in0, in1, in2, in3) {
-      if (in0 === 0) {
-        return new Sum3().init(in1, in2, in3);
-      }
-      if (in1 === 0) {
-        return new Sum3().init(in0, in2, in3);
-      }
-      if (in2 === 0) {
-        return new Sum3().init(in0, in1, in3);
-      }
-      if (in3 === 0) {
-        return new Sum3().init(in0, in1, in2);
-      }
-      var rate = asRate([in0, in1, in2, in3]);
-      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum4;
-  })();
   
   var optimizeSumObjects = (function() {
     var collect = function(obj) {
@@ -3142,11 +3014,11 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
         return obj;
       }
       var i = obj.inputs;
-      if (obj instanceof BinaryOpUGen && obj.op === "+") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "+") {
         return [ collect(i[0]), collect(i[1]) ];
-      } else if (obj instanceof Sum3) {
+      } else if (cc.instanceOfSum3(obj)) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
-      } else if (obj instanceof Sum4) {
+      } else if (cc.instanceOfSum4(obj)) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]), collect(i[3]) ];
       }
       return obj;
@@ -3154,16 +3026,16 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         switch (a.length) {
-        case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
-        case 3: return new Sum3().init(a[0], a[1], a[2]);
-        case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
+        case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+        case 3: return cc.createSum3(a[0], a[1], a[2]);
+        case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
         case 1: return a[0];
         }
       });
       switch (a.length) {
-      case 4: return new Sum4().init(a[0], a[1], a[2], a[3]);
-      case 3: return new Sum4().init(a[0], a[1], a[2]);
-      case 2: return new BinaryOpUGen().init("+!", a[0], a[1]);
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum4(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
       case 1: return a[0];
       default: return work(utils.clump(a, 4));
       }
@@ -3183,17 +3055,17 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
       }
       list = utils.clump(list, 4);
       if (list.length === 1 && list[0].length === 2) {
-        return new BinaryOpUGen().init("+!", list[0][0], list[0][1]);
+        return cc.createBinaryOpUGen("+!", list[0][0], list[0][1]);
       }
       return work(list);
     };
   })();
-
+  
   var optimizeMulObjects = (function() {
     var collect = function(obj) {
       if (typeof obj === "number") { return obj; }
       var i = obj.inputs;
-      if (obj instanceof BinaryOpUGen && obj.op === "*") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "*") {
         return [ collect(i[0]), collect(i[1]) ];
       }
       return obj;
@@ -3201,14 +3073,14 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
     var work = function(a) {
       a = a.map(function(a) {
         if (a.length === 2) {
-          return new BinaryOpUGen().init("*!", a[0], a[1]);
+          return cc.createBinaryOpUGen("*!", a[0], a[1]);
         } else {
           return a[0];
         }
       });
       switch (a.length) {
       case 2:
-        return new BinaryOpUGen().init("*!", a[0], a[1]);
+        return cc.createBinaryOpUGen("*!", a[0], a[1]);
       case 1:
         return a[0];
       default:
@@ -3230,55 +3102,536 @@ define('cc/client/ugen/basic_ops', function(require, exports, module) {
       }
       list = utils.clump(list, 2);
       if (list.length === 1 && list[0].length === 2) {
-        return new BinaryOpUGen().init("*!", list[0][0], list[0][1]);
+        return cc.createBinaryOpUGen("*!", list[0][0], list[0][1]);
       }
       return work(list);
     };
   })();
   
+  var use = function() {
+    cc.createBinaryOpUGen = function(selector, a, b) {
+      return new BinaryOpUGen(selector, a, b);
+    };
+    cc.instanceOfBinaryOpUGen = function(obj) {
+      return obj instanceof BinaryOpUGen;
+    };
+  };
+  
   exports = function() {
   };
-
-  cc.emit("basic_ops.js", {
-    UnaryOpUGen : UnaryOpUGen,
-    BinaryOpUGen: BinaryOpUGen,
-    MulAdd      : MulAdd,
-  });
   
   module.exports = {
-    UnaryOpUGen : UnaryOpUGen,
-    BinaryOpUGen: BinaryOpUGen,
-    MulAdd: MulAdd,
-    Sum3: Sum3,
-    Sum4: Sum4,
-    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
-    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
-    exports: exports,
+    use:use, exports:exports
   };
 
 });
-define('cc/client/uop', function(require, exports, module) {
+define('cc/client/ugen/bufio', function(require, exports, module) {
 
+  var cc = require("../cc");
+  var slice = [].slice;
+  
+  var playBuf_ctor = function(rate) {
+    return function(numChannels, buffer) {
+      if (typeof numChannels !== "number") {
+        throw new TypeError("Buffer: arguments[0] should be an integer.");
+      }
+      if (!cc.instanceOfAudioBuffer(buffer)) {
+        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      }
+      numChannels = Math.max(0, numChannels|0);
+      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
+      this.specialIndex = buffer._bufId;
+      return this.initOutputs(numChannels, this.rate);
+    };
+  };
+  
+  var iPlayBuf = {
+    ar: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playBuf_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use: use,
+    exports: function() {
+      cc.registerUGen("PlayBuf", iPlayBuf);
+    }
+  };
+
+});
+define('cc/client/ugen/delay', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  var iComb = {
+    ar: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use: use,
+    exports: function() {
+      cc.registerUGen("CombN", iComb);
+      cc.registerUGen("CombL", iComb);
+      cc.registerUGen("CombC", iComb);
+    }
+  };
+
+});
+define('cc/client/ugen/line', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iLine = {
+    ar: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use:use,
+    exports: function() {
+      cc.registerUGen("Line", iLine);
+    }
+  };
+
+});
+define('cc/client/ugen/osc', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iSinOsc = {
+    ar: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
+    }
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use:use,
+    exports: function() {
+      cc.registerUGen("SinOsc", iSinOsc);
+    }
+  };
+
+});
+define('cc/client/ugen/pan', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var pan2_ctor = function(rate) {
+    return function(_in, pos, level) {
+      this.init.call(this, rate, _in, pos, level);
+      this.channels = [
+        cc.createOutputProxy(this.rate, this, 0),
+        cc.createOutputProxy(this.rate, this, 1),
+      ];
+      this.numOfOutputs = 2;
+      return this.channels;
+    };
+  };
+  
+  var iPan2 = {
+    ar: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use:use,
+    exports: function() {
+      cc.registerUGen("Pan2", iPan2);
+    }
+  };
+
+});
+define('cc/client/ugen/ui', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  var iMouseXY = {
+    kr: {
+      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
+      ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential") {
+          warp = 1;
+        } else if (typeof warp !== "number") {
+          warp = 0;
+        }
+        return this.init(1, minval, maxval, warp, lag);
+      }
+    }
+  };
+  var iMouseButton = {
+    kr: {
+      defaults: "minval=0,maxval=1,lag=0.2",
+      ctor: function(minval, maxval, lag) {
+        return this.init(1, minval, maxval, lag);
+      }
+    }
+  };
+
+  var use = function() {
+  };
+  
+  module.exports = {
+    use:use,
+    exports: function() {
+      cc.registerUGen("MouseX", iMouseXY);
+      cc.registerUGen("MouseY", iMouseXY);
+      cc.registerUGen("MouseButton", iMouseButton);
+    }
+  };
+
+});
+define('cc/client/object', function(require, exports, module) {
+
+  var cc = require("./cc");
   var fn = require("./fn");
-  var UGen = require("./ugen/ugen").UGen;
-  var UnaryOpUGen = require("./ugen/basic_ops").UnaryOpUGen;
+  var utils = require("./utils");
+  
+  var setup = function(key, func) {
+    [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      fn.definePrototypeProperty(Klass, key, func);
+    });
+  };
+
+  var setupUnaryOperator = function(selector, func, ugenSelector) {
+    ugenSelector = ugenSelector || selector;
+    [cc.Object, Boolean, Date, Function, Number, String].forEach(function(Klass) {
+      fn.definePrototypeProperty(Klass, selector, func);
+    });
+    fn.definePrototypeProperty(Array, selector, function() {
+      return this.map(function(x) {
+        return x[selector]();
+      });
+    });
+    fn.definePrototypeProperty(cc.UGen, selector, function() {
+      return cc.createUnaryOpUGen(ugenSelector, this);
+    });
+  };
+
+  var makeBinaryOpFunction = function(func, selector) {
+    return function(b) {
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this[selector](b);
+        }, this);
+      }
+      return func(this, b);
+    };
+  };
+  
+  var makeBinaryOpNumberFunction = function(func, selector, ugenSelector) {
+    return function(b) {
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this[selector](b);
+        }, this);
+      } else if (cc.instanceOfUGen(b)) {
+        return cc.createBinaryOpUGen(ugenSelector, this, b);
+      }
+      return func(this, b);
+    };
+  };
+  var makeBinaryOpArrayFunction = function(selector, ugenSelector) {
+    return function(b) {
+      var a = this;
+      if (Array.isArray(b)) {
+        if (a.length === b.length) {
+          return a.map(function(a, index) {
+            return a[selector](b[index]);
+          });
+        } else if (a.length > b.length) {
+          return a.map(function(a, index) {
+            return a[selector](b[index % b.length]);
+          });
+        } else {
+          return b.map(function(b, index) {
+            return a[index % a.length][selector](b);
+          });
+        }
+      } else if (cc.instanceOfUGen(b)) {
+        return a.map(function(a) {
+          return cc.createBinaryOpUGen(ugenSelector, a, b);
+        });
+      }
+      return a.map(function(a) {
+        return a[selector](b);
+      });
+    };
+  };
+  var makeBinaryOpUGenFunction = function(selector) {
+    return function(b) {
+      var a = this;
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return cc.createBinaryOpUGen(selector, a, b);
+        });
+      }
+      return cc.createBinaryOpUGen(selector, a, b);
+    };
+  };
+  
+  var setupBinaryOperator = function(selector, func, ugenSelector) {
+    ugenSelector = ugenSelector || selector;
+    [cc.Object, Boolean, Date, Function, String].forEach(function(Klass) {
+      fn.definePrototypeProperty(
+        Klass, selector, makeBinaryOpFunction(func, selector)
+      );
+    });
+    fn.definePrototypeProperty(
+      Number, selector, makeBinaryOpNumberFunction(func, selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      Array, selector, makeBinaryOpArrayFunction(selector, ugenSelector)
+    );
+    fn.definePrototypeProperty(
+      cc.UGen, selector, makeBinaryOpUGenFunction(ugenSelector)
+    );
+  };
   
   exports = function() {
-    fn.definePrototypeProperty(Array, "__plus__", function() {
+    setupUnaryOperator("__plus__", function() {
+      return +this;
+    }, "+");
+    setupUnaryOperator("__minus__", function() {
+      return -this;
+    }, "-");
+    
+    setupBinaryOperator("__add__", function(a, b) {
+      return a + b;
+    }, "+");
+    
+    setupBinaryOperator("__sub__", function(a, b) {
+      return a - b;
+    }, "-");
+    
+    setupBinaryOperator("__mul__", function(a, b) {
+      return a * b;
+    }, "*");
+    fn.definePrototypeProperty(String, "__mul__", function(b) {
+      if (typeof b === "number") {
+        var result = new Array(Math.max(0, b));
+        for (var i = 0; i < b; i++) {
+          result[i] = this;
+        }
+        return result.join("");
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mul__(b);
+        }, this);
+      }
+      return this * b;
+    });
+    fn.definePrototypeProperty(Function, "__mul__", function(b) {
+      if (typeof b === "function") {
+        var f = this, g = b;
+        return function() {
+          return f.call(null, g.apply(null, arguments));
+        };
+      }
+      if (Array.isArray(b)) {
+        return b.map(function() {
+          return NaN;
+        });
+      }
+      return this * b;
+    });
+
+    
+    setupBinaryOperator("__div__", function(a, b) {
+      return a / b;
+    }, "/");
+    fn.definePrototypeProperty(String, "__div__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__div__(b);
+        }, this);
+      }
+      return this / b;
+    });
+    
+    setupBinaryOperator("__mod__", function(a, b) {
+      return a % b;
+    }, "%");
+    fn.definePrototypeProperty(String, "__mod__", function(b) {
+      if (typeof b === "number") {
+        return utils.clump(this.split(""), b|0).map(function(items) {
+          return items.join("");
+        });
+      } else if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this.__mod__(b);
+        }, this);
+      }
+      return this % b;
+    });
+    
+    
+    setup("__and__",function(b) {
+      return cc.createTaskWaitLogic("and", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__and__", function(b) {
+      return cc.createTaskWaitLogic("and", this.concat(b));
+    });
+    
+    setup("__or__", function(b) {
+      return cc.createTaskWaitLogic("or", [this].concat(b));
+    });
+    fn.definePrototypeProperty(Array, "__or__", function(b) {
+      return cc.createTaskWaitLogic("or", this.concat(b));
+    });
+    
+    
+    setup("to_i", function() {
+      return this|0;
+    });
+    fn.definePrototypeProperty(Array, "to_i", function() {
       return this.map(function(x) {
-        return x.__plus__();
+        return x.to_i();
       });
     });
-    fn.definePrototypeProperty(UGen, "__plus__", function() {
-      return new UnaryOpUGen("+", this);
+    
+    setup("to_f", function() {
+      return +this;
     });
-    fn.definePrototypeProperty(Array, "__minus__", function() {
+    fn.definePrototypeProperty(Array, "to_f", function() {
       return this.map(function(x) {
-        return x.__minus__();
+        return x.to_f();
       });
     });
-    fn.definePrototypeProperty(UGen, "__minus__", function() {
-      return new UnaryOpUGen("-", this);
+    
+    setup("to_s", function() {
+      return this.toString();
+    });
+    fn.definePrototypeProperty(Array, "to_s", function() {
+      return this.map(function(x) {
+        return x.to_s();
+      });
+    });
+    
+    setup("to_a", function() {
+      return [this];
+    });
+    fn.definePrototypeProperty(Array, "to_a", function() {
+      return this;
+    });
+    
+    
+    fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+      return cc.createMulAdd(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build());
+    
+    fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+      return utils.flop([this, mul, add]).map(function(items) {
+        var _in = items[0], mul = items[1], add = items[2];
+        return cc.createMulAdd(_in, mul, add);
+      });
+    }).defaults("mul=1,add=0").multiCall().build());
+  };
+  
+  module.exports = {
+    exports: exports
+  };
+
+});
+define('cc/client/number', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  
+  var setup = function(selector, func) {
+    fn.definePrototypeProperty(Number, selector, func);
+    fn.definePrototypeProperty(Array, selector, function() {
+      return this.map(function(x) { return x[selector](); });
+    });
+    fn.definePrototypeProperty(cc.UGen, selector, function() {
+      return cc.createUnaryOpUGen(selector, this);
+    });
+  };
+  
+  exports = function() {
+    setup("pi", function() {
+      return this * Math.PI;
+    });
+    setup("abs", function() {
+      return Math.abs(this);
+    });
+    setup("midicps", function() {
+      return 440 * Math.pow(2, (this - 69) * 1/12);
+    });
+    setup("cpsmidi", function() {
+      return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
+    });
+    setup("ampdb", function() {
+      return Math.log(this) * Math.LOG10E * 20;
+    });
+    setup("dbamp", function() {
+      return Math.pow(10, this * 0.05);
+    });
+    setup("coin", function() {
+      return Math.random() < this;
     });
   };
   
@@ -4114,217 +4467,6 @@ define('cc/client/scale', function(require, exports, module) {
     Scale  : Scale,
     Tuning : Tuning,
     exports: exports,
-  };
-
-});
-define('cc/client/ugen/exports', function(require, exports, module) {
-
-  exports = function() {
-    require("./ugen").exports();
-    require("./basic_ops").exports();
-    require("./bufio").exports();
-    require("./delay").exports();
-    require("./line").exports();
-    require("./osc").exports();
-    require("./pan").exports();
-    require("./ui").exports();
-  };
-  
-  module.exports = {
-    exports: exports
-  };
- 
-});
-define('cc/client/ugen/bufio', function(require, exports, module) {
-
-  var ugen = require("./ugen");
-  var AudioBuffer = require("../buffer").AudioBuffer;
-  var slice = [].slice;
-  
-  var playBuf_ctor = function(rate) {
-    return function(numChannels, buffer) {
-      if (typeof numChannels !== "number") {
-        throw new TypeError("Buffer: arguments[0] should be an integer.");
-      }
-      if (!(buffer instanceof AudioBuffer)) {
-        throw new TypeError("Buffer: arguments[1] should be a buffer.");
-      }
-      numChannels = Math.max(0, numChannels|0);
-      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
-      this.specialIndex = buffer._bufId;
-      return this.initOutputs(numChannels, this.rate);
-    };
-  };
-  
-  var iPlayBuf = {
-    ar: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(2),
-      Klass: ugen.MultiOutUGen
-    },
-    kr: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(1),
-      Klass: ugen.MultiOutUGen
-    },
-  };
-
-  module.exports = {
-    exports: function() {
-      ugen.register("PlayBuf", iPlayBuf);
-    }
-  };
-
-});
-define('cc/client/ugen/delay', function(require, exports, module) {
-
-  var ugen = require("./ugen");
-
-  var iComb = {
-    ar: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
-      }
-    },
-  };
-  
-  module.exports = {
-    exports: function() {
-      ugen.register("CombN", iComb);
-      ugen.register("CombL", iComb);
-      ugen.register("CombC", iComb);
-    }
-  };
-
-});
-define('cc/client/ugen/line', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  var iLine = {
-    ar: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(2, start, end, dur, doneAction).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(1, start, end, dur, doneAction).madd(mul, add);
-      }
-    }
-  };
-  
-  module.exports = {
-    exports: function() {
-      ugen.register("Line", iLine);
-    }
-  };
-
-});
-define('cc/client/ugen/osc', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  var iSinOsc = {
-    ar: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(2, freq, phase).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(1, freq, phase).madd(mul, add);
-      }
-    }
-  };
-  
-  module.exports = {
-    exports: function() {
-      ugen.register("SinOsc", iSinOsc);
-    }
-  };
-
-});
-define('cc/client/ugen/pan', function(require, exports, module) {
-
-  var ugen = require("./ugen");
-  var OutputProxy = ugen.OutputProxy;
-
-  var pan2_ctor = function(rate) {
-    return function(_in, pos, level) {
-      this.init.call(this, rate, _in, pos, level);
-      this.channels = [
-        new OutputProxy(this.rate, this, 0),
-        new OutputProxy(this.rate, this, 1),
-      ];
-      this.numOfOutputs = 2;
-      return this.channels;
-    };
-  };
-  
-  var iPan2 = {
-    ar: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(2),
-      Klass: ugen.MultiOutUGen
-    },
-    kr: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(1),
-      Klass: ugen.MultiOutUGen
-    },
-  };
-  
-  module.exports = {
-    exports: function() {
-      ugen.register("Pan2", iPan2);
-    }
-  };
-
-});
-define('cc/client/ugen/ui', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  var iMouseXY = {
-    kr: {
-      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
-      ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
-        return this.init(1, minval, maxval, warp, lag);
-      }
-    }
-  };
-  var iMouseButton = {
-    kr: {
-      defaults: "minval=0,maxval=1,lag=0.2",
-      ctor: function(minval, maxval, lag) {
-        return this.init(1, minval, maxval, lag);
-      }
-    }
-  };
-  
-  module.exports = {
-    exports: function() {
-      ugen.register("MouseX", iMouseXY);
-      ugen.register("MouseY", iMouseXY);
-      ugen.register("MouseButton", iMouseButton);
-    }
   };
 
 });
@@ -5607,7 +5749,8 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
         tokens = replaceTimeValue(tokens);
-        tokens = replacePi(tokens);
+        // removed: use instead of using number#pi()
+        // tokens = replacePi(tokens);
         tokens = replaceUnaryOp(tokens);
         tokens = replacePrecedence(tokens);
         tokens = replaceBinaryOp(tokens);
@@ -6205,6 +6348,7 @@ define('cc/server/server', function(require, exports, module) {
     return SocketSynthServerExports;
   })();
   
+  
   commands["/init"] = function(msg, userId) {
     this.init(msg, userId);
   };
@@ -6229,32 +6373,16 @@ define('cc/server/server', function(require, exports, module) {
     }
   };
   
-  var Rate = (function() {
-    var twopi = 2 * Math.PI;
-    function Rate(sampleRate, bufLength) {
-      this.sampleRate = sampleRate;
-      this.sampleDur  = 1 / sampleRate;
-      this.radiansPerSample = twopi / sampleRate;
-      this.bufLength   = bufLength;
-      this.bufDuration = bufLength / sampleRate;
-      this.bufRate = 1 / this.bufDuration;
-      this.slopeFactor = 1 / bufLength;
-      this.filterLoops  = (bufLength / 3)|0;
-      this.filterRemain = (bufLength % 3)|0;
-      if (this.filterLoops === 0) {
-        this.filterSlope = 0;
-      } else {
-        this.filterSlope = 1 / this.filterLoops;
-      }
-    }
-    return Rate;
-  })();
   
   var use = function() {
     require("../common/timer").use();
     require("./instance").use();
-    require("./exports").use();
+    require("./rate").use();
+    require("./unit/unit").use();
     
+    cc.unit_install = function() {
+      require("./unit/installer").install();
+    };
     cc.createSynthServer = function() {
       cc.unit_install();
       switch (cc.opmode) {
@@ -6290,25 +6418,6 @@ define('cc/server/server', function(require, exports, module) {
       cc.opmode = "socket";
       return server;
     };
-    cc.createRate = function(sampleRate, bufLength) {
-      return new Rate(sampleRate, bufLength);
-    };
-    cc.getRateInstance = (function() {
-      var rates = {};
-      return function(rate) {
-        if (!rates[rate]) {
-          switch (rate) {
-          case 2:
-            rates[2] = new Rate(cc.server.sampleRate, cc.server.bufLength);
-            break;
-          case 1:
-            rates[1] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
-            break;
-          }
-        }
-        return rates[rate];
-      };
-    })();
     
     if (typeof global.console === "undefined") {
       global.console = (function() {
@@ -6329,18 +6438,16 @@ define('cc/server/server', function(require, exports, module) {
   };
   
   module.exports = {
-    Rate: Rate,
-    use : use
+    use:use
   };
 
 });
 define('cc/server/cc', function(require, exports, module) {
 
   var _cc = require("../cc");
-  var emitter = require("../common/emitter");
 
-  if (!_cc.emit) {
-    emitter.mixin(_cc);
+  if (!_cc.UGen) {
+    _cc.UGen = Object;
   }
   
   module.exports = _cc;
@@ -7094,10 +7201,17 @@ define('cc/server/unit/unit', function(require, exports, module) {
     };
     return ctor;
   })();
+
+  var use = function() {
+    cc.createUnit = function(parent, specs) {
+      return new Unit(parent, specs);
+    };
+  };
   
   module.exports = {
     Unit : Unit,
     specs: specs,
+    use  : use,
   };
 
 });
@@ -7267,18 +7381,51 @@ define('cc/server/buffer', function(require, exports, module) {
   };
 
 });
-define('cc/server/exports', function(require, exports, module) {
+define('cc/server/rate', function(require, exports, module) {
   
   var cc = require("./cc");
   
+  var Rate = (function() {
+    var twopi = 2 * Math.PI;
+    function Rate(sampleRate, bufLength) {
+      this.sampleRate = sampleRate;
+      this.sampleDur  = 1 / sampleRate;
+      this.radiansPerSample = twopi / sampleRate;
+      this.bufLength   = bufLength;
+      this.bufDuration = bufLength / sampleRate;
+      this.bufRate = 1 / this.bufDuration;
+      this.slopeFactor = 1 / bufLength;
+      this.filterLoops  = (bufLength / 3)|0;
+      this.filterRemain = (bufLength % 3)|0;
+      if (this.filterLoops === 0) {
+        this.filterSlope = 0;
+      } else {
+        this.filterSlope = 1 / this.filterLoops;
+      }
+    }
+    return Rate;
+  })();
+  
   var use = function() {
-    cc.unit_install = function() {
-      exports();
+    cc.createRate = function(sampleRate, bufLength) {
+      return new Rate(sampleRate, bufLength);
     };
-    
-  };
-  exports = function() {
-    require("./unit/installer").install();
+    cc.getRateInstance = (function() {
+      var rates = {};
+      return function(rate) {
+        if (!rates[rate]) {
+          switch (rate) {
+          case 2:
+            rates[2] = new Rate(cc.server.sampleRate, cc.server.bufLength);
+            break;
+          case 1:
+            rates[1] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
+            break;
+          }
+        }
+        return rates[rate];
+      };
+    })();
   };
   
   module.exports = {
@@ -7290,7 +7437,9 @@ define('cc/server/unit/installer', function(require, exports, module) {
 
   var install = function() {
     require("./unit");
-    require("./basic_ops");
+    require("./madd");
+    require("./uop");
+    require("./bop");
     require("./bufio");
     require("./delay");
     require("./line");
@@ -7304,496 +7453,9 @@ define('cc/server/unit/installer', function(require, exports, module) {
   };
 
 });
-define('cc/server/unit/basic_ops', function(require, exports, module) {
+define('cc/server/unit/madd', function(require, exports, module) {
 
   var unit = require("./unit");
-  var ops  = require("../../client/ugen/basic_ops");
-
-  unit.specs.UnaryOpUGen = (function() {
-    var UNARY_OP_UGEN_MAP = ops.UNARY_OP_UGEN_MAP;
-    var calcFunc = {};
-    
-    var ctor = function() {
-      var func = calcFunc[UNARY_OP_UGEN_MAP[this.specialIndex]];
-      var process;
-      if (func) {
-        switch (this.inRates[0]) {
-        case 2  : process = func.a; break;
-        case 1: process = func.k; break;
-        }
-        this.process = process;
-        if (this.process) {
-          this.process(1);
-        } else {
-          this.outs[0][0] = func(this.inputs[0][0]);
-        }
-      } else {
-        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
-      }
-    };
-    
-    var unary_k = function(func) {
-      return function() {
-        this.outs[0][0] = func(this.inputs[0][0]);
-      };
-    };
-    var unary_a = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var out = this.outs[0];
-        var a = this.inputs[0];
-        for (var i = 0; i < inNumSamples; i += 8) {
-          out[i  ] = func(a[i  ]); out[i+1] = func(a[i+1]);
-          out[i+2] = func(a[i+2]); out[i+3] = func(a[i+3]);
-          out[i+4] = func(a[i+4]); out[i+5] = func(a[i+5]);
-          out[i+6] = func(a[i+6]); out[i+7] = func(a[i+7]);
-        }
-      };
-    };
-
-    calcFunc.num = function(a) {
-      return +a;
-    };
-    calcFunc.neg = function(a) {
-      return -a;
-    };
-    calcFunc.not = function(a) {
-      return a > 0 ? 0 : 1;
-    };
-    calcFunc.tilde = function(a) {
-      return ~a;
-    };
-    
-    Object.keys(calcFunc).forEach(function(key) {
-      var func = calcFunc[key];
-      if (!func.a) { func.a = unary_a(func); }
-      if (!func.k) { func.k = unary_k(func); }
-    });
-    
-    return ctor;
-  })();
-
-  unit.specs.BinaryOpUGen = (function() {
-    var BINARY_OP_UGEN_MAP = ops.BINARY_OP_UGEN_MAP;
-    
-    var AA = 2   * 10 + 2;
-    var AK = 2   * 10 + 1;
-    var AI = 2   * 10 + 0;
-    var KA = 1 * 10 + 2;
-    var KK = 1 * 10 + 1;
-    var KI = 1 * 10 + 0;
-    var IA = 0  * 10 + 2;
-    var IK = 0  * 10 + 1;
-    var II = 0  * 10 + 0;
-
-    var calcFunc = {};
-    
-    var ctor = function() {
-      var func = calcFunc[BINARY_OP_UGEN_MAP[this.specialIndex]];
-      var process;
-      if (func) {
-        switch (this.inRates[0] * 10 + this.inRates[1]) {
-        case AA: process = func.aa; break;
-        case AK: process = func.ak; break;
-        case AI: process = func.ai; break;
-        case KA: process = func.ka; break;
-        case KK: process = func.kk; break;
-        case KI: process = func.ki; break;
-        case IA: process = func.ia; break;
-        case IK: process = func.ik; break;
-        case II: process = func.ii; break;
-        }
-        this.process = process;
-        this._a = this.inputs[0][0];
-        this._b = this.inputs[1][0];
-        if (this.process) {
-          this.process(1);
-        } else {
-          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
-        }
-      } else {
-        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
-      }
-    };
-    
-    var binary_aa = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var out = this.outs[0];
-        var aIn = this.inputs[0], bIn = this.inputs[1];
-        for (var i = 0; i < inNumSamples; i += 8) {
-          out[i  ] = func(aIn[i  ], bIn[i  ]); out[i+1] = func(aIn[i+1], bIn[i+1]);
-          out[i+2] = func(aIn[i+2], bIn[i+2]); out[i+3] = func(aIn[i+3], bIn[i+3]);
-          out[i+4] = func(aIn[i+4], bIn[i+4]); out[i+5] = func(aIn[i+5], bIn[i+5]);
-          out[i+6] = func(aIn[i+6], bIn[i+6]); out[i+7] = func(aIn[i+7], bIn[i+7]);
-        }
-      };
-    };
-    var binary_ak = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var outs = this.outs[0];
-        var aIn  = this.inputs[0], b = this._b;
-        var nextB  = this.inputs[1][0];
-        var b_slope = (nextB - this._b) * this.rate.slopeFactor;
-        for (var i = 0; i < inNumSamples; i += 8) {
-          outs[i  ] = func(aIn[i  ], b); b += b_slope;
-          outs[i+1] = func(aIn[i+1], b); b += b_slope;
-          outs[i+2] = func(aIn[i+2], b); b += b_slope;
-          outs[i+3] = func(aIn[i+3], b); b += b_slope;
-          outs[i+4] = func(aIn[i+4], b); b += b_slope;
-          outs[i+5] = func(aIn[i+5], b); b += b_slope;
-          outs[i+6] = func(aIn[i+6], b); b += b_slope;
-          outs[i+7] = func(aIn[i+7], b); b += b_slope;
-        }
-        this._b = nextB;
-      };
-    };
-    var binary_ai = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var outs = this.outs[0];
-        var aIn = this.inputs[0], b = this._b;
-        for (var i = 0; i < inNumSamples; i += 8) {
-          outs[i  ] = func(aIn[i  ], b);
-          outs[i+1] = func(aIn[i+1], b);
-          outs[i+2] = func(aIn[i+2], b);
-          outs[i+3] = func(aIn[i+3], b);
-          outs[i+4] = func(aIn[i+4], b);
-          outs[i+5] = func(aIn[i+5], b);
-          outs[i+6] = func(aIn[i+6], b);
-          outs[i+7] = func(aIn[i+7], b);
-        }
-      };
-    };
-    var binary_ka = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var outs = this.outs[0];
-        var a = this._a, bIn = this.inputs[1];
-        var nextA  = this.inputs[0][0];
-        var a_slope = (nextA - this._a) * this.rate.slopeFactor;
-        for (var i = 0; i < inNumSamples; i += 8) {
-          outs[i  ] = func(a, bIn[i  ]); a += a_slope;
-          outs[i+1] = func(a, bIn[i+1]); a += a_slope;
-          outs[i+2] = func(a, bIn[i+2]); a += a_slope;
-          outs[i+3] = func(a, bIn[i+3]); a += a_slope;
-          outs[i+4] = func(a, bIn[i+4]); a += a_slope;
-          outs[i+5] = func(a, bIn[i+5]); a += a_slope;
-          outs[i+6] = func(a, bIn[i+6]); a += a_slope;
-          outs[i+7] = func(a, bIn[i+7]); a += a_slope;
-        }
-        this._a = nextA;
-      };
-    };
-    var binary_kk = function(func) {
-      return function() {
-        this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
-      };
-    };
-    var binary_ia = function(func) {
-      return function(inNumSamples) {
-        inNumSamples = inNumSamples|0;
-        var outs = this.outs[0];
-        var a = this._a, bIn = this.inputs[1];
-        for (var i = 0; i < inNumSamples; i += 8) {
-          outs[i  ] = func(a, bIn[i  ]);
-          outs[i+1] = func(a, bIn[i+1]);
-          outs[i+2] = func(a, bIn[i+2]);
-          outs[i+3] = func(a, bIn[i+3]);
-          outs[i+4] = func(a, bIn[i+4]);
-          outs[i+5] = func(a, bIn[i+5]);
-          outs[i+6] = func(a, bIn[i+6]);
-          outs[i+7] = func(a, bIn[i+7]);
-        }
-      };
-    };
-    
-    calcFunc["+"] = function(a, b) {
-      return a + b;
-    };
-    calcFunc["+"].aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn = this.inputs[0], bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] + bIn[i  ];
-        out[i+1] = aIn[i+1] + bIn[i+1];
-        out[i+2] = aIn[i+2] + bIn[i+2];
-        out[i+3] = aIn[i+3] + bIn[i+3];
-        out[i+4] = aIn[i+4] + bIn[i+4];
-        out[i+5] = aIn[i+5] + bIn[i+5];
-        out[i+6] = aIn[i+6] + bIn[i+6];
-        out[i+7] = aIn[i+7] + bIn[i+7];
-      }
-    };
-    calcFunc["+"].ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      var nextB  = this.inputs[1][0];
-      var b_slope = (nextB - this._b) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] + b; b += b_slope;
-        out[i+1] = aIn[i+1] + b; b += b_slope;
-        out[i+2] = aIn[i+2] + b; b += b_slope;
-        out[i+3] = aIn[i+3] + b; b += b_slope;
-        out[i+4] = aIn[i+4] + b; b += b_slope;
-        out[i+5] = aIn[i+5] + b; b += b_slope;
-        out[i+6] = aIn[i+6] + b; b += b_slope;
-        out[i+7] = aIn[i+7] + b; b += b_slope;
-      }
-      this._b = nextB;
-    };
-    calcFunc["+"].ai = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] + b;
-        out[i+1] = aIn[i+1] + b;
-        out[i+2] = aIn[i+2] + b;
-        out[i+3] = aIn[i+3] + b;
-        out[i+4] = aIn[i+4] + b;
-        out[i+5] = aIn[i+5] + b;
-        out[i+6] = aIn[i+6] + b;
-        out[i+7] = aIn[i+7] + b;
-      }
-    };
-    calcFunc["+"].ka = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      var nextA  = this.inputs[0][0];
-      var a_slope = (nextA - this._a) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a + bIn[i  ]; a += a_slope;
-        out[i+1] = a + bIn[i+1]; a += a_slope;
-        out[i+2] = a + bIn[i+2]; a += a_slope;
-        out[i+3] = a + bIn[i+3]; a += a_slope;
-        out[i+4] = a + bIn[i+4]; a += a_slope;
-        out[i+5] = a + bIn[i+5]; a += a_slope;
-        out[i+6] = a + bIn[i+6]; a += a_slope;
-        out[i+7] = a + bIn[i+7]; a += a_slope;
-      }
-      this._a = nextA;
-    };
-    calcFunc["+"].kk = function() {
-      this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0];
-    };
-    calcFunc["+"].ia = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a + bIn[i  ];
-        out[i+1] = a + bIn[i+1];
-        out[i+2] = a + bIn[i+2];
-        out[i+3] = a + bIn[i+3];
-        out[i+4] = a + bIn[i+4];
-        out[i+5] = a + bIn[i+5];
-        out[i+6] = a + bIn[i+6];
-        out[i+7] = a + bIn[i+7];
-      }
-    };
-    
-    calcFunc["-"] = function(a, b) {
-      return a - b;
-    };
-    calcFunc["-"].aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn = this.inputs[0], bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] - bIn[i  ];
-        out[i+1] = aIn[i+1] - bIn[i+1];
-        out[i+2] = aIn[i+2] - bIn[i+2];
-        out[i+3] = aIn[i+3] - bIn[i+3];
-        out[i+4] = aIn[i+4] - bIn[i+4];
-        out[i+5] = aIn[i+5] - bIn[i+5];
-        out[i+6] = aIn[i+6] - bIn[i+6];
-        out[i+7] = aIn[i+7] - bIn[i+7];
-      }
-    };
-    calcFunc["-"].ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      var nextB  = this.inputs[1][0];
-      var b_slope = (nextB - this._b) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] - b; b += b_slope;
-        out[i+1] = aIn[i+1] - b; b += b_slope;
-        out[i+2] = aIn[i+2] - b; b += b_slope;
-        out[i+3] = aIn[i+3] - b; b += b_slope;
-        out[i+4] = aIn[i+4] - b; b += b_slope;
-        out[i+5] = aIn[i+5] - b; b += b_slope;
-        out[i+6] = aIn[i+6] - b; b += b_slope;
-        out[i+7] = aIn[i+7] - b; b += b_slope;
-      }
-      this._b = nextB;
-    };
-    calcFunc["-"].ai = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] - b;
-        out[i+1] = aIn[i+1] - b;
-        out[i+2] = aIn[i+2] - b;
-        out[i+3] = aIn[i+3] - b;
-        out[i+4] = aIn[i+4] - b;
-        out[i+5] = aIn[i+5] - b;
-        out[i+6] = aIn[i+6] - b;
-        out[i+7] = aIn[i+7] - b;
-      }
-    };
-    calcFunc["-"].ka = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      var nextA  = this.inputs[0][0];
-      var a_slope = (nextA - this._a) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a - bIn[i  ]; a += a_slope;
-        out[i+1] = a - bIn[i+1]; a += a_slope;
-        out[i+2] = a - bIn[i+2]; a += a_slope;
-        out[i+3] = a - bIn[i+3]; a += a_slope;
-        out[i+4] = a - bIn[i+4]; a += a_slope;
-        out[i+5] = a - bIn[i+5]; a += a_slope;
-        out[i+6] = a - bIn[i+6]; a += a_slope;
-        out[i+7] = a - bIn[i+7]; a += a_slope;
-      }
-      this._a = nextA;
-    };
-    calcFunc["-"].kk = function() {
-      this.outs[0][0] = this.inputs[0][0] - this.inputs[1][0];
-    };
-    calcFunc["-"].ia = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a - bIn[i  ];
-        out[i+1] = a - bIn[i+1];
-        out[i+2] = a - bIn[i+2];
-        out[i+3] = a - bIn[i+3];
-        out[i+4] = a - bIn[i+4];
-        out[i+5] = a - bIn[i+5];
-        out[i+6] = a - bIn[i+6];
-        out[i+7] = a - bIn[i+7];
-      }
-    };
-
-    calcFunc["*"] = function(a, b) {
-      return a * b;
-    };
-    calcFunc["*"].aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn = this.inputs[0], bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] * bIn[i  ];
-        out[i+1] = aIn[i+1] * bIn[i+1];
-        out[i+2] = aIn[i+2] * bIn[i+2];
-        out[i+3] = aIn[i+3] * bIn[i+3];
-        out[i+4] = aIn[i+4] * bIn[i+4];
-        out[i+5] = aIn[i+5] * bIn[i+5];
-        out[i+6] = aIn[i+6] * bIn[i+6];
-        out[i+7] = aIn[i+7] * bIn[i+7];
-      }
-    };
-    calcFunc["*"].ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      var nextB  = this.inputs[1][0];
-      var b_slope = (nextB - this._b) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] * b; b += b_slope;
-        out[i+1] = aIn[i+1] * b; b += b_slope;
-        out[i+2] = aIn[i+2] * b; b += b_slope;
-        out[i+3] = aIn[i+3] * b; b += b_slope;
-        out[i+4] = aIn[i+4] * b; b += b_slope;
-        out[i+5] = aIn[i+5] * b; b += b_slope;
-        out[i+6] = aIn[i+6] * b; b += b_slope;
-        out[i+7] = aIn[i+7] * b; b += b_slope;
-      }
-      this._b = nextB;
-    };
-    calcFunc["*"].ai = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = aIn[i  ] * b;
-        out[i+1] = aIn[i+1] * b;
-        out[i+2] = aIn[i+2] * b;
-        out[i+3] = aIn[i+3] * b;
-        out[i+4] = aIn[i+4] * b;
-        out[i+5] = aIn[i+5] * b;
-        out[i+6] = aIn[i+6] * b;
-        out[i+7] = aIn[i+7] * b;
-      }
-    };
-    calcFunc["*"].ka = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      var nextA  = this.inputs[0][0];
-      var a_slope = (nextA - this._a) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a * bIn[i  ]; a += a_slope;
-        out[i+1] = a * bIn[i+1]; a += a_slope;
-        out[i+2] = a * bIn[i+2]; a += a_slope;
-        out[i+3] = a * bIn[i+3]; a += a_slope;
-        out[i+4] = a * bIn[i+4]; a += a_slope;
-        out[i+5] = a * bIn[i+5]; a += a_slope;
-        out[i+6] = a * bIn[i+6]; a += a_slope;
-        out[i+7] = a * bIn[i+7]; a += a_slope;
-      }
-      this._a = nextA;
-    };
-    calcFunc["*"].kk = function() {
-      this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0];
-    };
-    calcFunc["*"].ia = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
-      var a = this._a, bIn = this.inputs[1];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = a * bIn[i  ];
-        out[i+1] = a * bIn[i+1];
-        out[i+2] = a * bIn[i+2];
-        out[i+3] = a * bIn[i+3];
-        out[i+4] = a * bIn[i+4];
-        out[i+5] = a * bIn[i+5];
-        out[i+6] = a * bIn[i+6];
-        out[i+7] = a * bIn[i+7];
-      }
-    };
-
-    calcFunc["/"] = function(a, b) {
-      return b === 0 ? 0 : a / b;
-    };
-    calcFunc["%"] = function(a, b) {
-      return b === 0 ? 0 : a % b;
-    };
-    
-    Object.keys(calcFunc).forEach(function(key) {
-      var func = calcFunc[key];
-      if (!func.aa) { func.aa = binary_aa(func); }
-      if (!func.ak) { func.ak = binary_ak(func); }
-      if (!func.ai) { func.ai = binary_ai(func); }
-      if (!func.ka) { func.ka = binary_ka(func); }
-      if (!func.kk) { func.kk = binary_kk(func); }
-      if (!func.ki) { func.ki = func.kk; }
-      if (!func.ia) { func.ia = binary_ia(func); }
-      if (!func.ik) { func.ik = func.kk; }
-    });
-    
-    return ctor;
-  })();
   
   unit.specs.MulAdd = (function() {
     var ctor = function() {
@@ -8156,7 +7818,7 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
     
     return ctor;
   })();
-  
+
   unit.specs.Sum3 = (function() {
     var ctor = function() {
       var rates = this.inRates;
@@ -8466,6 +8128,507 @@ define('cc/server/unit/basic_ops', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/server/unit/uop', function(require, exports, module) {
+
+  var unit = require("./unit");
+  var ops  = require("../../common/ops");
+  
+  var calcFunc = {};
+  
+  unit.specs.UnaryOpUGen = (function() {
+    
+    var ctor = function() {
+      var func = calcFunc[ops.UNARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0]) {
+        case 2  : process = func.a; break;
+        case 1: process = func.k; break;
+        }
+        this.process = process;
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0]);
+        }
+      } else {
+        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  var unary_k = function(func) {
+    return function() {
+      this.outs[0][0] = func(this.inputs[0][0]);
+    };
+  };
+  var unary_a = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outs[0];
+      var a = this.inputs[0];
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = func(a[i  ]); out[i+1] = func(a[i+1]);
+        out[i+2] = func(a[i+2]); out[i+3] = func(a[i+3]);
+        out[i+4] = func(a[i+4]); out[i+5] = func(a[i+5]);
+        out[i+6] = func(a[i+6]); out[i+7] = func(a[i+7]);
+      }
+    };
+  };
+
+  calcFunc.num = function(a) {
+    return +a;
+  };
+  calcFunc.neg = function(a) {
+    return -a;
+  };
+  calcFunc.not = function(a) {
+    return a > 0 ? 0 : 1;
+  };
+  calcFunc.tilde = function(a) {
+    return ~a;
+  };
+  
+  Object.keys(calcFunc).forEach(function(key) {
+    var func = calcFunc[key];
+    if (!func.a) { func.a = unary_a(func); }
+    if (!func.k) { func.k = unary_k(func); }
+  });
+  
+  module.exports = {};
+
+});
+define('cc/server/unit/bop', function(require, exports, module) {
+
+  var unit = require("./unit");
+  var ops  = require("../../common/ops");
+
+  var calcFunc = {};
+  
+  unit.specs.BinaryOpUGen = (function() {
+    var AA = 2   * 10 + 2;
+    var AK = 2   * 10 + 1;
+    var AI = 2   * 10 + 0;
+    var KA = 1 * 10 + 2;
+    var KK = 1 * 10 + 1;
+    var KI = 1 * 10 + 0;
+    var IA = 0  * 10 + 2;
+    var IK = 0  * 10 + 1;
+    var II = 0  * 10 + 0;
+    
+    var ctor = function() {
+      var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var process;
+      if (func) {
+        switch (this.inRates[0] * 10 + this.inRates[1]) {
+        case AA: process = func.aa; break;
+        case AK: process = func.ak; break;
+        case AI: process = func.ai; break;
+        case KA: process = func.ka; break;
+        case KK: process = func.kk; break;
+        case KI: process = func.ki; break;
+        case IA: process = func.ia; break;
+        case IK: process = func.ik; break;
+        case II: process = func.ii; break;
+        }
+        this.process = process;
+        this._a = this.inputs[0][0];
+        this._b = this.inputs[1][0];
+        if (this.process) {
+          this.process(1);
+        } else {
+          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+        }
+      } else {
+        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  var binary_aa = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outs[0];
+      var aIn = this.inputs[0], bIn = this.inputs[1];
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = func(aIn[i  ], bIn[i  ]); out[i+1] = func(aIn[i+1], bIn[i+1]);
+        out[i+2] = func(aIn[i+2], bIn[i+2]); out[i+3] = func(aIn[i+3], bIn[i+3]);
+        out[i+4] = func(aIn[i+4], bIn[i+4]); out[i+5] = func(aIn[i+5], bIn[i+5]);
+        out[i+6] = func(aIn[i+6], bIn[i+6]); out[i+7] = func(aIn[i+7], bIn[i+7]);
+      }
+    };
+  };
+  var binary_ak = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var aIn  = this.inputs[0], b = this._b;
+      var nextB  = this.inputs[1][0];
+      var b_slope = (nextB - this._b) * this.rate.slopeFactor;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        outs[i  ] = func(aIn[i  ], b); b += b_slope;
+        outs[i+1] = func(aIn[i+1], b); b += b_slope;
+        outs[i+2] = func(aIn[i+2], b); b += b_slope;
+        outs[i+3] = func(aIn[i+3], b); b += b_slope;
+        outs[i+4] = func(aIn[i+4], b); b += b_slope;
+        outs[i+5] = func(aIn[i+5], b); b += b_slope;
+        outs[i+6] = func(aIn[i+6], b); b += b_slope;
+        outs[i+7] = func(aIn[i+7], b); b += b_slope;
+      }
+      this._b = nextB;
+    };
+  };
+  var binary_ai = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var aIn = this.inputs[0], b = this._b;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        outs[i  ] = func(aIn[i  ], b);
+        outs[i+1] = func(aIn[i+1], b);
+        outs[i+2] = func(aIn[i+2], b);
+        outs[i+3] = func(aIn[i+3], b);
+        outs[i+4] = func(aIn[i+4], b);
+        outs[i+5] = func(aIn[i+5], b);
+        outs[i+6] = func(aIn[i+6], b);
+        outs[i+7] = func(aIn[i+7], b);
+      }
+    };
+  };
+  var binary_ka = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var a = this._a, bIn = this.inputs[1];
+      var nextA  = this.inputs[0][0];
+      var a_slope = (nextA - this._a) * this.rate.slopeFactor;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        outs[i  ] = func(a, bIn[i  ]); a += a_slope;
+        outs[i+1] = func(a, bIn[i+1]); a += a_slope;
+        outs[i+2] = func(a, bIn[i+2]); a += a_slope;
+        outs[i+3] = func(a, bIn[i+3]); a += a_slope;
+        outs[i+4] = func(a, bIn[i+4]); a += a_slope;
+        outs[i+5] = func(a, bIn[i+5]); a += a_slope;
+        outs[i+6] = func(a, bIn[i+6]); a += a_slope;
+        outs[i+7] = func(a, bIn[i+7]); a += a_slope;
+      }
+      this._a = nextA;
+    };
+  };
+  var binary_kk = function(func) {
+    return function() {
+      this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+    };
+  };
+  var binary_ia = function(func) {
+    return function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var outs = this.outs[0];
+      var a = this._a, bIn = this.inputs[1];
+      for (var i = 0; i < inNumSamples; i += 8) {
+        outs[i  ] = func(a, bIn[i  ]);
+        outs[i+1] = func(a, bIn[i+1]);
+        outs[i+2] = func(a, bIn[i+2]);
+        outs[i+3] = func(a, bIn[i+3]);
+        outs[i+4] = func(a, bIn[i+4]);
+        outs[i+5] = func(a, bIn[i+5]);
+        outs[i+6] = func(a, bIn[i+6]);
+        outs[i+7] = func(a, bIn[i+7]);
+      }
+    };
+  };
+  
+  
+  calcFunc["+"] = function(a, b) {
+    return a + b;
+  };
+  calcFunc["+"].aa = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn = this.inputs[0], bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] + bIn[i  ];
+      out[i+1] = aIn[i+1] + bIn[i+1];
+      out[i+2] = aIn[i+2] + bIn[i+2];
+      out[i+3] = aIn[i+3] + bIn[i+3];
+      out[i+4] = aIn[i+4] + bIn[i+4];
+      out[i+5] = aIn[i+5] + bIn[i+5];
+      out[i+6] = aIn[i+6] + bIn[i+6];
+      out[i+7] = aIn[i+7] + bIn[i+7];
+    }
+  };
+  calcFunc["+"].ak = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    var nextB  = this.inputs[1][0];
+    var b_slope = (nextB - this._b) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] + b; b += b_slope;
+      out[i+1] = aIn[i+1] + b; b += b_slope;
+      out[i+2] = aIn[i+2] + b; b += b_slope;
+      out[i+3] = aIn[i+3] + b; b += b_slope;
+      out[i+4] = aIn[i+4] + b; b += b_slope;
+      out[i+5] = aIn[i+5] + b; b += b_slope;
+      out[i+6] = aIn[i+6] + b; b += b_slope;
+      out[i+7] = aIn[i+7] + b; b += b_slope;
+    }
+    this._b = nextB;
+  };
+  calcFunc["+"].ai = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] + b;
+      out[i+1] = aIn[i+1] + b;
+      out[i+2] = aIn[i+2] + b;
+      out[i+3] = aIn[i+3] + b;
+      out[i+4] = aIn[i+4] + b;
+      out[i+5] = aIn[i+5] + b;
+      out[i+6] = aIn[i+6] + b;
+      out[i+7] = aIn[i+7] + b;
+    }
+  };
+  calcFunc["+"].ka = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    var nextA  = this.inputs[0][0];
+    var a_slope = (nextA - this._a) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a + bIn[i  ]; a += a_slope;
+      out[i+1] = a + bIn[i+1]; a += a_slope;
+      out[i+2] = a + bIn[i+2]; a += a_slope;
+      out[i+3] = a + bIn[i+3]; a += a_slope;
+      out[i+4] = a + bIn[i+4]; a += a_slope;
+      out[i+5] = a + bIn[i+5]; a += a_slope;
+      out[i+6] = a + bIn[i+6]; a += a_slope;
+      out[i+7] = a + bIn[i+7]; a += a_slope;
+    }
+    this._a = nextA;
+  };
+  calcFunc["+"].kk = function() {
+    this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0];
+  };
+  calcFunc["+"].ia = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a + bIn[i  ];
+      out[i+1] = a + bIn[i+1];
+      out[i+2] = a + bIn[i+2];
+      out[i+3] = a + bIn[i+3];
+      out[i+4] = a + bIn[i+4];
+      out[i+5] = a + bIn[i+5];
+      out[i+6] = a + bIn[i+6];
+      out[i+7] = a + bIn[i+7];
+    }
+  };
+  
+  calcFunc["-"] = function(a, b) {
+    return a - b;
+  };
+  calcFunc["-"].aa = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn = this.inputs[0], bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] - bIn[i  ];
+      out[i+1] = aIn[i+1] - bIn[i+1];
+      out[i+2] = aIn[i+2] - bIn[i+2];
+      out[i+3] = aIn[i+3] - bIn[i+3];
+      out[i+4] = aIn[i+4] - bIn[i+4];
+      out[i+5] = aIn[i+5] - bIn[i+5];
+      out[i+6] = aIn[i+6] - bIn[i+6];
+      out[i+7] = aIn[i+7] - bIn[i+7];
+    }
+  };
+  calcFunc["-"].ak = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    var nextB  = this.inputs[1][0];
+    var b_slope = (nextB - this._b) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] - b; b += b_slope;
+      out[i+1] = aIn[i+1] - b; b += b_slope;
+      out[i+2] = aIn[i+2] - b; b += b_slope;
+      out[i+3] = aIn[i+3] - b; b += b_slope;
+      out[i+4] = aIn[i+4] - b; b += b_slope;
+      out[i+5] = aIn[i+5] - b; b += b_slope;
+      out[i+6] = aIn[i+6] - b; b += b_slope;
+      out[i+7] = aIn[i+7] - b; b += b_slope;
+    }
+    this._b = nextB;
+  };
+  calcFunc["-"].ai = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] - b;
+      out[i+1] = aIn[i+1] - b;
+      out[i+2] = aIn[i+2] - b;
+      out[i+3] = aIn[i+3] - b;
+      out[i+4] = aIn[i+4] - b;
+      out[i+5] = aIn[i+5] - b;
+      out[i+6] = aIn[i+6] - b;
+      out[i+7] = aIn[i+7] - b;
+    }
+  };
+  calcFunc["-"].ka = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    var nextA  = this.inputs[0][0];
+    var a_slope = (nextA - this._a) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a - bIn[i  ]; a += a_slope;
+      out[i+1] = a - bIn[i+1]; a += a_slope;
+      out[i+2] = a - bIn[i+2]; a += a_slope;
+      out[i+3] = a - bIn[i+3]; a += a_slope;
+      out[i+4] = a - bIn[i+4]; a += a_slope;
+      out[i+5] = a - bIn[i+5]; a += a_slope;
+      out[i+6] = a - bIn[i+6]; a += a_slope;
+      out[i+7] = a - bIn[i+7]; a += a_slope;
+    }
+    this._a = nextA;
+  };
+  calcFunc["-"].kk = function() {
+    this.outs[0][0] = this.inputs[0][0] - this.inputs[1][0];
+  };
+  calcFunc["-"].ia = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a - bIn[i  ];
+      out[i+1] = a - bIn[i+1];
+      out[i+2] = a - bIn[i+2];
+      out[i+3] = a - bIn[i+3];
+      out[i+4] = a - bIn[i+4];
+      out[i+5] = a - bIn[i+5];
+      out[i+6] = a - bIn[i+6];
+      out[i+7] = a - bIn[i+7];
+    }
+  };
+
+  calcFunc["*"] = function(a, b) {
+    return a * b;
+  };
+  calcFunc["*"].aa = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn = this.inputs[0], bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] * bIn[i  ];
+      out[i+1] = aIn[i+1] * bIn[i+1];
+      out[i+2] = aIn[i+2] * bIn[i+2];
+      out[i+3] = aIn[i+3] * bIn[i+3];
+      out[i+4] = aIn[i+4] * bIn[i+4];
+      out[i+5] = aIn[i+5] * bIn[i+5];
+      out[i+6] = aIn[i+6] * bIn[i+6];
+      out[i+7] = aIn[i+7] * bIn[i+7];
+    }
+  };
+  calcFunc["*"].ak = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    var nextB  = this.inputs[1][0];
+    var b_slope = (nextB - this._b) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] * b; b += b_slope;
+      out[i+1] = aIn[i+1] * b; b += b_slope;
+      out[i+2] = aIn[i+2] * b; b += b_slope;
+      out[i+3] = aIn[i+3] * b; b += b_slope;
+      out[i+4] = aIn[i+4] * b; b += b_slope;
+      out[i+5] = aIn[i+5] * b; b += b_slope;
+      out[i+6] = aIn[i+6] * b; b += b_slope;
+      out[i+7] = aIn[i+7] * b; b += b_slope;
+    }
+    this._b = nextB;
+  };
+  calcFunc["*"].ai = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var aIn  = this.inputs[0], b = this._b;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = aIn[i  ] * b;
+      out[i+1] = aIn[i+1] * b;
+      out[i+2] = aIn[i+2] * b;
+      out[i+3] = aIn[i+3] * b;
+      out[i+4] = aIn[i+4] * b;
+      out[i+5] = aIn[i+5] * b;
+      out[i+6] = aIn[i+6] * b;
+      out[i+7] = aIn[i+7] * b;
+    }
+  };
+  calcFunc["*"].ka = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    var nextA  = this.inputs[0][0];
+    var a_slope = (nextA - this._a) * this.rate.slopeFactor;
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a * bIn[i  ]; a += a_slope;
+      out[i+1] = a * bIn[i+1]; a += a_slope;
+      out[i+2] = a * bIn[i+2]; a += a_slope;
+      out[i+3] = a * bIn[i+3]; a += a_slope;
+      out[i+4] = a * bIn[i+4]; a += a_slope;
+      out[i+5] = a * bIn[i+5]; a += a_slope;
+      out[i+6] = a * bIn[i+6]; a += a_slope;
+      out[i+7] = a * bIn[i+7]; a += a_slope;
+    }
+    this._a = nextA;
+  };
+  calcFunc["*"].kk = function() {
+    this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0];
+  };
+  calcFunc["*"].ia = function(inNumSamples) {
+    inNumSamples = inNumSamples|0;
+    var out = this.outs[0];
+    var a = this._a, bIn = this.inputs[1];
+    for (var i = 0; i < inNumSamples; i += 8) {
+      out[i  ] = a * bIn[i  ];
+      out[i+1] = a * bIn[i+1];
+      out[i+2] = a * bIn[i+2];
+      out[i+3] = a * bIn[i+3];
+      out[i+4] = a * bIn[i+4];
+      out[i+5] = a * bIn[i+5];
+      out[i+6] = a * bIn[i+6];
+      out[i+7] = a * bIn[i+7];
+    }
+  };
+
+  calcFunc["/"] = function(a, b) {
+    return b === 0 ? 0 : a / b;
+  };
+  calcFunc["%"] = function(a, b) {
+    return b === 0 ? 0 : a % b;
+  };
+  
+  Object.keys(calcFunc).forEach(function(key) {
+    var func = calcFunc[key];
+    if (!func.aa) { func.aa = binary_aa(func); }
+    if (!func.ak) { func.ak = binary_ak(func); }
+    if (!func.ai) { func.ai = binary_ai(func); }
+    if (!func.ka) { func.ka = binary_ka(func); }
+    if (!func.kk) { func.kk = binary_kk(func); }
+    if (!func.ki) { func.ki = func.kk; }
+    if (!func.ia) { func.ia = binary_ia(func); }
+    if (!func.ik) { func.ik = func.kk; }
+  });
+  
+  module.exports = {};
+
+});
 define('cc/server/unit/bufio', function(require, exports, module) {
   
   var unit = require("./unit");
@@ -8729,12 +8892,12 @@ define('cc/server/unit/delay', function(require, exports, module) {
       var dsamp    = this._dsamp;
       var feedbk   = this._feedbk;
       var mask     = this._mask;
-      var irdphase, frac, value, d1, d2;
+      var frac     = dsamp - (dsamp|0);
+      var irdphase, value, d1, d2;
       var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
       var i;
       if (delaytime === this._delaytime) {
         irdphase = iwrphase - (dsamp|0);
-        frac     = dsamp - (dsamp|0);
         if (decaytime === this._decaytime) {
           for (i = 0; i < inNumSamples; ++i) {
             d1 = dlybuf[(irdphase  )&mask];
@@ -8805,12 +8968,12 @@ define('cc/server/unit/delay', function(require, exports, module) {
       var dsamp    = this._dsamp;
       var feedbk   = this._feedbk;
       var mask     = this._mask;
-      var irdphase, frac, value, d0, d1, d2, d3;
+      var frac     = dsamp - (dsamp|0);
+      var irdphase, value, d0, d1, d2, d3;
       var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
       var i;
       if (delaytime === this._delaytime) {
         irdphase = iwrphase - (dsamp|0);
-        frac     = dsamp - (dsamp|0);
         if (decaytime === this._decaytime) {
           for (i = 0; i < inNumSamples; ++i) {
             d0 = dlybuf[(irdphase+1)&mask];

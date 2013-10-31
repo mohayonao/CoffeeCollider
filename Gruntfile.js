@@ -1,21 +1,27 @@
 module.exports = function(grunt) {
   "use strict";
 
+  var path = require("path");
+  
   grunt.loadNpmTasks("grunt-contrib-connect");
   grunt.loadNpmTasks("grunt-contrib-jshint");
   grunt.loadNpmTasks("grunt-contrib-uglify");
   grunt.loadNpmTasks("grunt-este-watch");
 
   var testFailed = [];
-  var checkExclusiveTest = function() {
-    var files = grunt.file.expand("src/cc/**/*_test.js");
+  var isDebugging = function() {
+    var files = grunt.file.expand("src/cc/**/*.js");
     return files.some(function(file) {
       var code = grunt.file.read(file);
-      return/^\s*(describe|it)\.only\(\"/m.test(code);
+      if (/_test\.js/.test(file)) {
+        return/^\s*(describe|it)\.only\(\"/m.test(code);
+      } else {
+        return/console\.debug\(/m.test(code);
+      }
     });
   };
-
-  var resetPrototype = (function() {
+  
+  var resetBuitInPrototype = (function() {
     var builtins = {};
     [Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
       builtins[Klass.toString()] = Object.getOwnPropertyNames(Klass.prototype);
@@ -131,8 +137,8 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("dryice", function() {
-    if (checkExclusiveTest()) {
-      grunt.fail.warn("NOT builded, '.only' attribute is detected in any tests.");
+    if (isDebugging()) {
+      grunt.fail.warn("NOT built with debug mode.");
       return;
     }
     var copy = require("dryice").copy;
@@ -221,94 +227,100 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("test", function() {
+    // reset the test environment
     Object.keys(require.cache).forEach(function(filepath) {
       if (!/\/node_modules\//.test(filepath)) {
         delete require.cache[filepath];
       }
     });
-    resetPrototype();
-
-    var path     = require("path");
-    var istanbul = require("istanbul");
-    var Instrumenter = istanbul.Instrumenter;
-    var Collector    = istanbul.Collector;
-    var Report       = istanbul.Report;
-    var hook         = istanbul.hook;
-
-    var coverageVar = "$$cov_" + Date.now() + "$$";
-    var instrumenter = new Instrumenter({
-      coverageVariable:coverageVar
-    });
-    var transformer = instrumenter.instrumentSync.bind(instrumenter);
-    var matchFn;
+    resetBuitInPrototype();
     
-    var hasExclusive = checkExclusiveTest();
+    var istanbul, Instrumenter, Collector, Report, hook;
+    var coverageVar, instrumenter, transformer;
     
-    var reporter = "dot";
-    var args  = arguments[0];
-    var files = [];
-    var covFile = null;
-    if (args) {
-      if (args === "travis") {
-        reporter = "list";
-      } else if (args === "test") {
-        files = grunt.file.expand("src/cc/test/*_test.js");
-      } else {
-        if (grunt.file.exists(args)) {
-          files.push(args);
-          covFile = path.resolve(args.replace(/_test\.js$/, ".js"));
-          matchFn = function(file) {
-            return covFile === file;
-          };
+    var reporter = "min";
+    var arg0     = arguments[0];
+    var tstFiles = [];
+    var covFiles = [];
+    var matchFn = function(file) {
+      return covFiles.indexOf(file) !== -1;
+    };
+
+    if (typeof arg0 === "undefined") {
+      arg0 = "test";
+    }
+    
+    if (arg0 === "travis") {
+      reporter = "list";
+      tstFiles = grunt.file.expand("src/cc/**/*_test.js");
+    } else if (arg0 === "test") {
+      tstFiles = grunt.file.expand("src/cc/**/*_test.js");
+      reporter = "dot";
+    } else {
+      grunt.file.expand("src/cc/**/*_test.js").forEach(function(file) {
+        if (file.indexOf(arg0) !== -1) {
+          tstFiles.push(file);
+          covFiles.push(path.resolve(file.replace(/_test\.js$/, ".js")));
         }
-        var related = args.replace(/\.js$/, "_test.js");
+      });
+      if (tstFiles.length === 0) {
+        var related = arg0.replace(/\.js$/, "_test.js");
         if (grunt.file.exists(related)) {
-          files.push(related);
+          tstFiles.push(related);
         }
       }
+      if (/_test\.js$/.test(arg0)) {
+        reporter = "nyan";
+        tstFiles = tstFiles.concat(
+          grunt.file.expand("src/cc/test/*_test.js")
+        );
+      } else if (/\.js$/.test(arg0)) {
+        reporter = "min";
+      } else {
+        reporter = "spec";
+      }
     }
-    if (reporter === "dot" && hasExclusive) {
-      reporter = "nyan";
-    }
-    
-    if (!files.length) {
-      files = grunt.file.expand("src/cc/**/*_test.js");
-    } else {
-      files = files.concat(
-        grunt.file.expand("src/cc/test/*_test.js")
-      );
-    }
-    files = files.concat(testFailed);
+    tstFiles = tstFiles.concat(testFailed);
     
     var set = {};
-    files = files.filter(function(file) {
+    tstFiles = tstFiles.filter(function(file) {
       if (!set[file] && /_test\.js$/.test(file)) {
-        set[file] = true;
-        return true;
+        return (set[file] = true);
       }
       return false;
     });
-
-    if (covFile) {
-      reporter = "nyan";
+    
+    if (covFiles.length) {
+      istanbul = require("istanbul");
+      Instrumenter = istanbul.Instrumenter;
+      Collector    = istanbul.Collector;
+      Report       = istanbul.Report;
+      hook         = istanbul.hook;
+      
+      coverageVar = "$$cov_" + Date.now() + "$$";
+      instrumenter = new Instrumenter({
+        coverageVariable:coverageVar
+      });
+      transformer = instrumenter.instrumentSync.bind(instrumenter);
       hook.hookRequire(matchFn, transformer);
+      
       global[coverageVar] = {};
     }
     
     var done = this.async();
-    doMochaTest(reporter, files, function(failures) {
+    doMochaTest(reporter, tstFiles, function(failures) {
       if (failures) {
         grunt.fail.fatal("test failed.");
-        testFailed = files;
+        testFailed = tstFiles;
       } else {
         testFailed = [];
       }
-      if (args === "travis") {
-        if (hasExclusive) {
+      if (arg0 === "travis") {
+        if (isDebugging()) {
           grunt.fail.warn("test succeeded, but not completely.");
         }
       }
-      if (covFile) {
+      if (covFiles.length) {
         var collector = new Collector();
         collector.add(global[coverageVar]);
         Report.create("text").writeReport(collector, true);
@@ -318,7 +330,6 @@ module.exports = function(grunt) {
   });
   
   grunt.registerTask("coverage", function() {
-    var path     = require("path");
     var istanbul = require("istanbul");
     var Instrumenter = istanbul.Instrumenter;
     var Collector    = istanbul.Collector;
@@ -331,25 +342,25 @@ module.exports = function(grunt) {
     });
     var transformer = instrumenter.instrumentSync.bind(instrumenter);
     
-    var testFiles = [];
-    var srcFiles  = [];
+    var tstFiles = [];
+    var covFiles = [];
     grunt.file.expand("src/cc/**/*.*").forEach(function(file) {
       var filepath = path.resolve(file);
       if (/_test\.js$/.test(filepath)) {
-        testFiles.push(filepath);
+        tstFiles.push(filepath);
       } else {
-        srcFiles[filepath] = true;
+        covFiles[filepath] = true;
       }
     });
     var matchFn = function(filepath) {
-      return srcFiles[filepath];
+      return covFiles[filepath];
     };
     hook.hookRequire(matchFn, transformer);
     
     global[coverageVar] = {};
     
     var done = this.async();
-    doMochaTest("nyan", testFiles, function() {
+    doMochaTest("nyan", tstFiles, function() {
       var reports = [];
       reports.push(Report.create("text-summary"));
       reports.push(Report.create("lcov", { dir:"coverage" }));
@@ -376,7 +387,8 @@ module.exports = function(grunt) {
     
     global.require = require;
     global.C = grunt.file.readJSON("src/const.json");
-
+    console.debug = console.log.bind(console);
+    
     files.forEach(function(file) {
       mocha.addFile(file);
     });

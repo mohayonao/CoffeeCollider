@@ -3,7 +3,9 @@ define(function(require, exports, module) {
 
   exports = function() {
     require("./ugen").exports();
-    require("./basic_ops").exports();
+    require("./madd").exports();
+    require("./uop").exports();
+    require("./bop").exports();
     require("./bufio").exports();
     require("./delay").exports();
     require("./line").exports();
@@ -11,9 +13,22 @@ define(function(require, exports, module) {
     require("./pan").exports();
     require("./ui").exports();
   };
+
+  var use = function() {
+    require("./ugen").use();
+    require("./madd").use();
+    require("./uop").use();
+    require("./bop").use();
+    require("./bufio").use();
+    require("./delay").use();
+    require("./line").use();
+    require("./osc").use();
+    require("./pan").use();
+    require("./ui").use();
+  };
   
   module.exports = {
-    exports: exports
+    use:use, exports: exports
   };
- 
+
 });

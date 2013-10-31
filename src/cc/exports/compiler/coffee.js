@@ -578,7 +578,8 @@ define(function(require, exports, module) {
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
         tokens = replaceTimeValue(tokens);
-        tokens = replacePi(tokens);
+        // removed: use instead of using number#pi()
+        // tokens = replacePi(tokens);
         tokens = replaceUnaryOp(tokens);
         tokens = replacePrecedence(tokens);
         tokens = replaceBinaryOp(tokens);

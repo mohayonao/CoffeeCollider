@@ -12,16 +12,24 @@ define(function(require, exports, module) {
         unitTestSuite([
           "Line", C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
         ], [
-          unitTestSuite.inputSpec("start", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "start",
+            rate : C.SCALAR,
             value: 0
           }),
-          unitTestSuite.inputSpec("end", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "end",
+            rate : C.SCALAR,
             value: 1
           }),
-          unitTestSuite.inputSpec("dur", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "dur",
+            rate : C.SCALAR,
             value: 0.5
           }),
-          unitTestSuite.inputSpec("doneAction", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "doneAction",
+            rate : C.SCALAR,
             value: 0
           }),
         ]);
@@ -30,16 +38,24 @@ define(function(require, exports, module) {
         unitTestSuite([
           "Line", C.CONTROL, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.CONTROL ]
         ], [
-          unitTestSuite.inputSpec("start", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "start",
+            rate : C.SCALAR,
             value: 0
           }),
-          unitTestSuite.inputSpec("end", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "end",
+            rate : C.SCALAR,
             value: 1
           }),
-          unitTestSuite.inputSpec("dur", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "dur",
+            rate : C.SCALAR,
             value: 0.5
           }),
-          unitTestSuite.inputSpec("doneAction", C.SCALAR, {
+          unitTestSuite.inputSpec({
+            name : "doneAction",
+            rate : C.SCALAR,
             value: 0
           }),
         ]);

@@ -3,10 +3,10 @@ define(function(require, exports, module) {
 
   var fs = require("fs");
   var assert = require("chai").assert;
-  var Compiler = require("../exports/compiler/coffee").Compiler;
-  var object = require("../client/object");
-  var uop = require("../client/uop");
-  var bop = require("../client/bop");
+
+  var cc = require("../cc");
+  var compiler = require("../exports/compiler/compiler");
+  var client = require("../client/client");
   
   assert.deepCloseTo = function(expected, actual, delta) {
     expected.forEach(function(x, i) {
@@ -17,13 +17,15 @@ define(function(require, exports, module) {
   describe("eval.js", function() {
     var calc;
     before(function() {
-      var compiler = new Compiler();
       global._gltc_ = null;
-      object.exports();
-      uop.exports();
-      bop.exports();
+      
+      compiler.use();
+      client.use();
+      cc.client_exports();
+      
+      var _compiler = cc.createCompiler("coffee");
       calc = function(code) {
-        code = compiler.compile(code);
+        code = _compiler.compile(code);
         return eval.call(null, code);
       };
     });

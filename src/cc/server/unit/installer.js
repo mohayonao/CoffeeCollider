@@ -3,7 +3,9 @@ define(function(require, exports, module) {
 
   var install = function() {
     require("./unit");
-    require("./basic_ops");
+    require("./madd");
+    require("./uop");
+    require("./bop");
     require("./bufio");
     require("./delay");
     require("./line");

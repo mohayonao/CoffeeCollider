@@ -596,6 +596,9 @@ define(function(require, exports, module) {
       });
       return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
     };
+    cc.instanceOfWaitToken = function(obj) {
+      return obj instanceof TaskWaitToken;
+    };
   };
   
   exports = function() {
@@ -622,6 +625,23 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
+    Timeline: Timeline,
+    TaskWaitToken        : TaskWaitToken,
+    TaskWaitTokenNumber  : TaskWaitTokenNumber,
+    TaskWaitTokenFunction: TaskWaitTokenFunction,
+    TaskWaitTokenBoolean : TaskWaitTokenBoolean,
+    TaskWaitTokenBlock   : TaskWaitTokenBlock,
+    TaskWaitAND : TaskWaitAND,
+    TaskWaitOR  : TaskWaitOR,
+    TaskContext : TaskContext,
+    Task        : Task,
+    TaskGlobal  : TaskGlobal,
+    TaskDo      : TaskDo,
+    TaskLoop    : TaskLoop,
+    TaskEach    : TaskEach,
+    TaskTimeout : TaskTimeout,
+    TaskInterval: TaskInterval,
+    TaskBlock   : TaskBlock,
     use:use, exports:exports,
   };
 

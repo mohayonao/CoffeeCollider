@@ -7,52 +7,36 @@ define(function(require, exports, module) {
   var delay = require("./delay");
   
   describe("unit/delay.js", function() {
-    describe("CombN", function() {
-      it("ar", function() {
-        unitTestSuite([
-          "CombN", C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
-        ], [
-          unitTestSuite.inputSpec("in"          , C.AUDIO, {
-            process: unitTestSuite.writeWhiteNoise
-          }),
-          unitTestSuite.inputSpec("maxdelaytime", C.SCALAR, {
-            value: 1
-          }),
-          unitTestSuite.inputSpec("delaytime"   , C.CONTROL),
-          unitTestSuite.inputSpec("decaytime"   , C.CONTROL),
-        ]);
-      });
-    });
-    describe("CombL", function() {
-      it("ar", function() {
-        unitTestSuite([
-          "CombL", C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
-        ], [
-          unitTestSuite.inputSpec("in"          , C.AUDIO, {
-            process: unitTestSuite.writeWhiteNoise
-          }),
-          unitTestSuite.inputSpec("maxdelaytime", C.SCALAR, {
-            value: 1
-          }),
-          unitTestSuite.inputSpec("delaytime"   , C.CONTROL),
-          unitTestSuite.inputSpec("decaytime"   , C.CONTROL),
-        ]);
-      });
-    });
-    describe("CombC", function() {
-      it("ar", function() {
-        unitTestSuite([
-          "CombC", C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
-        ], [
-          unitTestSuite.inputSpec("in"          , C.AUDIO, {
-            process: unitTestSuite.writeWhiteNoise
-          }),
-          unitTestSuite.inputSpec("maxdelaytime", C.SCALAR, {
-            value: 1
-          }),
-          unitTestSuite.inputSpec("delaytime"   , C.CONTROL),
-          unitTestSuite.inputSpec("decaytime"   , C.CONTROL),
-        ]);
+    ["CombN", "CombL", "CombC"].forEach(function(name) {
+      describe(name, function() {
+        unitTestSuite.ratesCombination(2).forEach(function(items, i) {
+          it("case " + i, function() {
+            unitTestSuite([
+              name, C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
+            ], [
+              unitTestSuite.inputSpec({
+                name   : "in",
+                rate   : C.AUDIO,
+                process: unitTestSuite.writer.whiteNoise()
+              }),
+              unitTestSuite.inputSpec({
+                name : "maxdelaytime",
+                rate : C.SCALAR,
+                value: 1
+              }),
+              unitTestSuite.inputSpec({
+                name   : "delaytime",
+                rate   : items[0],
+                process: unitTestSuite.writer.liner(0, 2, 2)
+              }),
+              unitTestSuite.inputSpec({
+                name   :"decaytime",
+                rate   : items[1],
+                process: unitTestSuite.writer.liner(0, 2, 2)
+              }),
+            ]);
+          });
+        });
       });
     });
   });

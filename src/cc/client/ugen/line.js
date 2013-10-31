@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var ugen = require("./ugen");
+  var cc = require("../cc");
   
   var iLine = {
     ar: {
@@ -17,10 +17,14 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  var use = function() {
+  };
   
   module.exports = {
+    use:use,
     exports: function() {
-      ugen.register("Line", iLine);
+      cc.registerUGen("Line", iLine);
     }
   };
 

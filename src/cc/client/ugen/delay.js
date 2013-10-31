@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var ugen = require("./ugen");
+  var cc = require("../cc");
 
   var iComb = {
     ar: {
@@ -17,12 +17,16 @@ define(function(require, exports, module) {
       }
     },
   };
+
+  var use = function() {
+  };
   
   module.exports = {
+    use: use,
     exports: function() {
-      ugen.register("CombN", iComb);
-      ugen.register("CombL", iComb);
-      ugen.register("CombC", iComb);
+      cc.registerUGen("CombN", iComb);
+      cc.registerUGen("CombL", iComb);
+      cc.registerUGen("CombC", iComb);
     }
   };
 

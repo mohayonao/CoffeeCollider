@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var ugen = require("./ugen");
+  var cc = require("../cc");
   
   var iMouseXY = {
     kr: {
@@ -24,12 +24,16 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  var use = function() {
+  };
   
   module.exports = {
+    use:use,
     exports: function() {
-      ugen.register("MouseX", iMouseXY);
-      ugen.register("MouseY", iMouseXY);
-      ugen.register("MouseButton", iMouseButton);
+      cc.registerUGen("MouseX", iMouseXY);
+      cc.registerUGen("MouseY", iMouseXY);
+      cc.registerUGen("MouseButton", iMouseButton);
     }
   };
 

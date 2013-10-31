@@ -3,9 +3,8 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var extend = require("../common/extend");
-  var utils = require("./utils");
-  var ugen  = require("./ugen/ugen");
+  var extend  = require("../common/extend");
+  var utils   = require("./utils");
   var emitter = require("../common/emitter");
 
   var nodes = {};
@@ -154,9 +153,9 @@ define(function(require, exports, module) {
       } else {
         args = { keys:[], vals:[] };
       }
-      
+
       var children = [];
-      ugen.setSynthDef(function(ugen) {
+      cc.setSynthDef(function(ugen) {
         children.push(ugen);
       });
       
@@ -172,7 +171,7 @@ define(function(require, exports, module) {
         flatten = flatten.concat(args.vals[i]);
       }
       var reshaped = [];
-      var controls = new ugen.Control(C.CONTROL).init(flatten);
+      var controls = cc.createControl(C.CONTROL).init(flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
@@ -190,7 +189,7 @@ define(function(require, exports, module) {
       } catch (e) {
         throw e.toString();
       } finally {
-        ugen.setSynthDef(null);
+        cc.setSynthDef(null);
       }
       // console.log(children);
       var consts = [];
@@ -205,20 +204,20 @@ define(function(require, exports, module) {
       });
       consts.sort();
       var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || x instanceof ugen.OutputProxy);
+        return !(typeof x === "number" || cc.instanceOfOutputProxy(x));
       });
       // console.log(ugenlist);
       var defs = ugenlist.map(function(x) {
         var inputs = [];
         if (x.inputs) {
           x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((x instanceof ugen.OutputProxy) ? x.inputs[0] : x);
+            var index = ugenlist.indexOf((cc.instanceOfOutputProxy(x)) ? x.inputs[0] : x);
             var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
             inputs.push(index, subindex);
           });
         }
         var outputs;
-        if (x instanceof ugen.MultiOutUGen) {
+        if (cc.instanceOfMultiOutUGen(x)) {
           outputs = x.channels.map(function(x) {
             return x.rate;
           });
@@ -299,7 +298,7 @@ define(function(require, exports, module) {
       return function(list) {
         var checked = [];
         list.slice().forEach(function(x) {
-          if (x instanceof ugen.Out) {
+          if (cc.instanceOfOut(x)) {
             checked.push(x);
             x.inputs.forEach(function(x) {
               _topoSort(x, list, checked);
@@ -526,6 +525,8 @@ define(function(require, exports, module) {
   };
   
   var use = function() {
+    require("./ugen/ugen").use();
+    
     cc.createGroup = function(target, addAction) {
       return new Group(target, addAction);
     };

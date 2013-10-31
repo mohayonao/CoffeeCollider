@@ -19,33 +19,25 @@ define(function(require, exports, module) {
         unitTestSuite([
           "MouseX", C.CONTROL, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.CONTROL ]
         ], [
-          unitTestSuite.inputSpec("minval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, i / imax);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "minval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 1, 2)
           }),
-          unitTestSuite.inputSpec("maxval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, 1 - (i / imax));
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "maxval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(1, 0, 2)
           }),
-          unitTestSuite.inputSpec("warp", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 128 === 0) {
-                unitTestSuite.writeScalarValue(inp, (i / imax) * 10);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "warp",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 5, 2)
           }),
-          unitTestSuite.inputSpec("lag", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 128 === 0) {
-                unitTestSuite.writeScalarValue(inp, (i / imax) * 10);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "lag",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 5, 2)
           }),
         ], {
           instance: instance,
@@ -62,33 +54,25 @@ define(function(require, exports, module) {
         unitTestSuite([
           "MouseY", C.CONTROL, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.CONTROL ]
         ], [
-          unitTestSuite.inputSpec("minval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, i / imax);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "minval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 1, 2)
           }),
-          unitTestSuite.inputSpec("maxval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, 1 - (i / imax));
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "maxval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(1, 0, 2)
           }),
-          unitTestSuite.inputSpec("warp", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 128 === 0) {
-                unitTestSuite.writeScalarValue(inp, (i / imax) * 10);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "warp",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 5, 2)
           }),
-          unitTestSuite.inputSpec("lag", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 128 === 0) {
-                unitTestSuite.writeScalarValue(inp, (i / imax) * 10);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "lag",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 5, 2)
           }),
         ], {
           instance: instance,
@@ -105,26 +89,20 @@ define(function(require, exports, module) {
         unitTestSuite([
           "MouseButton", C.CONTROL, 0, [ 0,0, 0,0, 0,0 ], [ C.CONTROL ]
         ], [
-          unitTestSuite.inputSpec("minval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, i / imax);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "minval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 1, 2)
           }),
-          unitTestSuite.inputSpec("maxval", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 4 === 0) {
-                unitTestSuite.writeScalarValue(inp, 1 - (i / imax));
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "maxval",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(1, 0, 2)
           }),
-          unitTestSuite.inputSpec("lag", C.CONTROL, {
-            process: function(inp, i, imax) {
-              if (i % 128 === 0) {
-                unitTestSuite.writeScalarValue(inp, (i / imax) * 10);
-              }
-            }
+          unitTestSuite.inputSpec({
+            name   : "lag",
+            rate   : C.CONTROL,
+            process: unitTestSuite.writer.liner(0, 5, 2)
           }),
         ], {
           instance: instance,

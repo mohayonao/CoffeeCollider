@@ -308,8 +308,17 @@ define(function(require, exports, module) {
     require("./buffer").use();
     require("./node").use();
     require("./sched").use();
-    require("./exports").use();
+    require("./ugen/exports").use();
     
+    cc.client_exports = function() {
+      require("./object").exports();
+      require("./number").exports();
+      require("./buffer").exports();
+      require("./node").exports();
+      require("./sched").exports();
+      require("./scale").exports();
+      require("./ugen/exports").exports();
+    };
     cc.createSynthClient = function() {
       cc.client_exports();
       switch (cc.opmode) {
