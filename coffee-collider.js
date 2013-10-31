@@ -1748,6 +1748,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
+  var utils  = require("../utils");
   var slice  = [].slice;
   
   var addToSynthDef = null;
@@ -1874,6 +1875,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
       if (!Array.isArray(channelsArray)) {
         channelsArray = [ channelsArray ];
       }
+      channelsArray = utils.flatten(channelsArray);
       channelsArray = channelsArray.filter(function(x) {
         return x !== 0;
       });
