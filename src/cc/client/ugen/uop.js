@@ -6,13 +6,12 @@ define(function(require, exports, module) {
   var ops    = require("../../common/ops");
   
   var UnaryOpUGen = (function() {
-    function UnaryOpUGen(selector, a) {
+    function UnaryOpUGen() {
       cc.UGen.call(this, "UnaryOpUGen");
-      init.call(this, selector, a);
     }
     extend(UnaryOpUGen, cc.UGen);
 
-    var init = function(selector, a) {
+    UnaryOpUGen.prototype.init = function(selector, a) {
       var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
         throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
@@ -31,7 +30,7 @@ define(function(require, exports, module) {
   
   var use = function() {
     cc.createUnaryOpUGen = function(selector, a) {
-      return new UnaryOpUGen(selector, a);
+      return new UnaryOpUGen().init(selector, a);
     };
     cc.instanceOfUnaryOpUGen = function(obj) {
       return obj instanceof UnaryOpUGen;

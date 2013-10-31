@@ -7,13 +7,12 @@ define(function(require, exports, module) {
   var utils  = require("../utils");
   
   var BinaryOpUGen = (function() {
-    function BinaryOpUGen(selector, a, b) {
+    function BinaryOpUGen() {
       cc.UGen.call(this, "BinaryOpUGen");
-      init.call(this, selector, a, b);
     }
     extend(BinaryOpUGen, cc.UGen);
-
-    var init = function(selector, a, b) {
+    
+    BinaryOpUGen.prototype.init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -180,7 +179,7 @@ define(function(require, exports, module) {
   
   var use = function() {
     cc.createBinaryOpUGen = function(selector, a, b) {
-      return new BinaryOpUGen(selector, a, b);
+      return new BinaryOpUGen().init(selector, a, b);
     };
     cc.instanceOfBinaryOpUGen = function(obj) {
       return obj instanceof BinaryOpUGen;

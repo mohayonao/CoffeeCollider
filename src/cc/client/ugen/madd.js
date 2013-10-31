@@ -14,13 +14,12 @@ define(function(require, exports, module) {
   };
   
   var MulAdd = (function() {
-    function MulAdd(_in, mul, add) {
+    function MulAdd() {
       cc.UGen.call(this, "MulAdd");
-      init.call(this, _in, mul, add);
     }
     extend(MulAdd, cc.UGen);
 
-    var init = function(_in, mul, add) {
+    MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd, rate;
       if (_in.rate - mul.rate < 0) {
         t = _in; _in = mul; mul = t;
@@ -31,7 +30,7 @@ define(function(require, exports, module) {
       minus = mul === -1;
       nomul = mul ===  1;
       noadd = add ===  0;
-
+      
       if (nomul && noadd) {
         return _in;
       }
@@ -77,13 +76,12 @@ define(function(require, exports, module) {
   })();
   
   var Sum3 = (function() {
-    function Sum3(in0, in1, in2) {
+    function Sum3() {
       cc.UGen.call(this, "Sum3");
-      init.call(this, in0, in1, in2);
-    }
+       }
     extend(Sum3, cc.UGen);
     
-    var init = function(in0, in1, in2) {
+    Sum3.prototype.init = function(in0, in1, in2) {
       if (in0 === 0) {
         return cc.createBinaryOpUGen("+", in1, in2);
       }
@@ -104,13 +102,12 @@ define(function(require, exports, module) {
   })();
 
   var Sum4 = (function() {
-    function Sum4(in0, in1, in2, in3) {
+    function Sum4() {
       cc.UGen.call(this, "Sum4");
-      init.call(this, in0, in1, in2, in3);
     }
     extend(Sum4, cc.UGen);
     
-    var init = function(in0, in1, in2, in3) {
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
       if (in0 === 0) {
         return cc.createSum3(in1, in2, in3);
       }
@@ -135,13 +132,13 @@ define(function(require, exports, module) {
   
   var use = function() {
     cc.createMulAdd = function(_in, mul, add) {
-      return new MulAdd(_in, mul, add);
+      return new MulAdd().init(_in, mul, add);
     };
     cc.createSum3 = function(in0, in1, in2) {
-      return new Sum3(in0, in1, in2);
+      return new Sum3().init(in0, in1, in2);
     };
     cc.createSum4 = function(in0, in1, in2, in3) {
-      return new Sum4(in0, in1, in2, in3);
+      return new Sum4().init(in0, in1, in2, in3);
     };
     cc.instanceOfMulAdd = function(obj) {
       return obj instanceof MulAdd;

@@ -2723,13 +2723,12 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   };
   
   var MulAdd = (function() {
-    function MulAdd(_in, mul, add) {
+    function MulAdd() {
       cc.UGen.call(this, "MulAdd");
-      init.call(this, _in, mul, add);
     }
     extend(MulAdd, cc.UGen);
 
-    var init = function(_in, mul, add) {
+    MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd, rate;
       if (_in.rate - mul.rate < 0) {
         t = _in; _in = mul; mul = t;
@@ -2740,7 +2739,7 @@ define('cc/client/ugen/madd', function(require, exports, module) {
       minus = mul === -1;
       nomul = mul ===  1;
       noadd = add ===  0;
-
+      
       if (nomul && noadd) {
         return _in;
       }
@@ -2786,13 +2785,12 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   })();
   
   var Sum3 = (function() {
-    function Sum3(in0, in1, in2) {
+    function Sum3() {
       cc.UGen.call(this, "Sum3");
-      init.call(this, in0, in1, in2);
-    }
+       }
     extend(Sum3, cc.UGen);
     
-    var init = function(in0, in1, in2) {
+    Sum3.prototype.init = function(in0, in1, in2) {
       if (in0 === 0) {
         return cc.createBinaryOpUGen("+", in1, in2);
       }
@@ -2813,13 +2811,12 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   })();
 
   var Sum4 = (function() {
-    function Sum4(in0, in1, in2, in3) {
+    function Sum4() {
       cc.UGen.call(this, "Sum4");
-      init.call(this, in0, in1, in2, in3);
     }
     extend(Sum4, cc.UGen);
     
-    var init = function(in0, in1, in2, in3) {
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
       if (in0 === 0) {
         return cc.createSum3(in1, in2, in3);
       }
@@ -2844,13 +2841,13 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   
   var use = function() {
     cc.createMulAdd = function(_in, mul, add) {
-      return new MulAdd(_in, mul, add);
+      return new MulAdd().init(_in, mul, add);
     };
     cc.createSum3 = function(in0, in1, in2) {
-      return new Sum3(in0, in1, in2);
+      return new Sum3().init(in0, in1, in2);
     };
     cc.createSum4 = function(in0, in1, in2, in3) {
-      return new Sum4(in0, in1, in2, in3);
+      return new Sum4().init(in0, in1, in2, in3);
     };
     cc.instanceOfMulAdd = function(obj) {
       return obj instanceof MulAdd;
@@ -2878,13 +2875,12 @@ define('cc/client/ugen/uop', function(require, exports, module) {
   var ops    = require("../../common/ops");
   
   var UnaryOpUGen = (function() {
-    function UnaryOpUGen(selector, a) {
+    function UnaryOpUGen() {
       cc.UGen.call(this, "UnaryOpUGen");
-      init.call(this, selector, a);
     }
     extend(UnaryOpUGen, cc.UGen);
 
-    var init = function(selector, a) {
+    UnaryOpUGen.prototype.init = function(selector, a) {
       var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
       if (index === -1) {
         throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
@@ -2903,7 +2899,7 @@ define('cc/client/ugen/uop', function(require, exports, module) {
   
   var use = function() {
     cc.createUnaryOpUGen = function(selector, a) {
-      return new UnaryOpUGen(selector, a);
+      return new UnaryOpUGen().init(selector, a);
     };
     cc.instanceOfUnaryOpUGen = function(obj) {
       return obj instanceof UnaryOpUGen;
@@ -2937,13 +2933,12 @@ define('cc/client/ugen/bop', function(require, exports, module) {
   var utils  = require("../utils");
   
   var BinaryOpUGen = (function() {
-    function BinaryOpUGen(selector, a, b) {
+    function BinaryOpUGen() {
       cc.UGen.call(this, "BinaryOpUGen");
-      init.call(this, selector, a, b);
     }
     extend(BinaryOpUGen, cc.UGen);
-
-    var init = function(selector, a, b) {
+    
+    BinaryOpUGen.prototype.init = function(selector, a, b) {
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -3110,7 +3105,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
   
   var use = function() {
     cc.createBinaryOpUGen = function(selector, a, b) {
-      return new BinaryOpUGen(selector, a, b);
+      return new BinaryOpUGen().init(selector, a, b);
     };
     cc.instanceOfBinaryOpUGen = function(obj) {
       return obj instanceof BinaryOpUGen;
@@ -7460,6 +7455,7 @@ define('cc/server/unit/madd', function(require, exports, module) {
   unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
+      console.log(rates[0], rates[1], rates[2]);
       var process = next[rates[0]][rates[1]][rates[2]];
       this.process = process;
       this._in  = this.inputs[0][0];
