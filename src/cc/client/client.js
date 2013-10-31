@@ -253,7 +253,7 @@ define(function(require, exports, module) {
     if (!append) {
       this.reset(["/reset"]);
     }
-    global.DATA   = data;
+    cc.DATA = data;
     global._gltc_ = this.timeline.context;
     var result = eval.call(global, code);
     if (callback) {
@@ -313,6 +313,7 @@ define(function(require, exports, module) {
     cc.client_exports = function() {
       require("./object").exports();
       require("./number").exports();
+      require("./data").exports();
       require("./buffer").exports();
       require("./node").exports();
       require("./sched").exports();

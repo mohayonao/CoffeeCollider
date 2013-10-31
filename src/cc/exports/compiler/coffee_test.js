@@ -11,35 +11,6 @@ define(function(require, exports, module) {
   };
   
   describe("coffee.js", function() {
-    describe("splitCodeAndData", function() {
-      it("__END__ does not exist", function() {
-        var code = [
-          "this is code",
-          "this is too",
-        ].join("\n");
-        var expected = [
-          "this is code\nthis is too",
-          ""
-        ];
-        var actual = compiler.splitCodeAndData(code);
-        assert.deepEqual(actual, expected);
-      });
-      it("__END__ exists", function() {
-        var code = [
-          "this is code",
-          "this is too",
-          "__END__",
-          "this is data",
-          "this is too",
-        ].join("\n");
-        var expected = [
-          "this is code\nthis is too",
-          "this is data\nthis is too"
-        ];
-        var actual = compiler.splitCodeAndData(code);
-        assert.deepEqual(actual, expected);
-      });
-    });
     describe("findOperandHead", function() {
       it("Unary operator", function() {
         /*
@@ -223,87 +194,6 @@ define(function(require, exports, module) {
         var expected = 10;
         var actual = compiler.findOperandTail(tokens, 1);
         assert.equal(actual, expected);
-      });
-    });
-    describe("replacePi", function() {
-      it("case 1", function() {
-        /*
-          source:
-          pi
-
-          replaced:
-          Math.PI
-        */
-        var tokens = [
-          ["IDENTIFIER", "pi"],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["IDENTIFIER", "Math"],
-          ["."         , "."   ],
-          ["IDENTIFIER", "PI"  ],
-          ["TERMINATOR", "\n"  ],
-        ];
-        var actual = compiler.replacePi(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("case 2", function() {
-        /*
-          source:
-          [ 10pi ]
-
-          replaced:
-          [ (10 * Math.PI) ]
-         */
-        var tokens = [
-          ["["           , "["   ],
-          [  "NUMBER"    ,   "10"],
-          [  "IDENTIFIER",   "pi"],
-          ["]"           , "]"   ],
-          ["TERMINATOR"  , "\n"  ],
-        ];
-        var expected = [
-          ["["             , "["      ],
-          [  "("           ,   "("     ],
-          [    "NUMBER"    ,     "10"  ],
-          [    "MATH"      ,     "*"   ],
-          [    "IDENTIFIER",     "Math"],
-          [    "."         ,     "."   ],
-          [    "IDENTIFIER",     "PI"  ],
-          [  ")"           ,   ")"     ],
-          ["]"             , "]"       ],
-          ["TERMINATOR"    , "\n"      ],
-        ];
-        var actual = compiler.replacePi(tokens).erode();
-        assert.deepEqual(actual, expected);
-      });
-      it("case 3", function() {
-        /*
-          source:
-          -10pi
-
-          replaced:
-          (-10 * Math.PI)
-         */
-        var tokens = [
-          ["-"         , "-" ],
-          ["NUMBER"    , "10"],
-          ["IDENTIFIER", "pi"],
-          ["TERMINATOR", "\n"],
-        ];
-        var expected = [
-          ["("           , "("     ],
-          [  "-"         ,   "-"   ],
-          [  "NUMBER"    ,   "10"  ],
-          [  "MATH"      ,   "*"   ],
-          [  "IDENTIFIER",   "Math"],
-          [  "."         ,   "."   ],
-          [  "IDENTIFIER",   "PI"  ],
-          [")"           , ")"     ],
-          ["TERMINATOR"  , "\n"    ],
-        ];
-        var actual = compiler.replacePi(tokens).erode();
-        assert.deepEqual(actual, expected);
       });
     });
     describe("replacePrecedence", function() {

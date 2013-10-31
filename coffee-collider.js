@@ -369,7 +369,7 @@ define('cc/client/client', function(require, exports, module) {
     if (!append) {
       this.reset(["/reset"]);
     }
-    global.DATA   = data;
+    cc.DATA = data;
     global._gltc_ = this.timeline.context;
     var result = eval.call(global, code);
     if (callback) {
@@ -429,6 +429,7 @@ define('cc/client/client', function(require, exports, module) {
     cc.client_exports = function() {
       require("./object").exports();
       require("./number").exports();
+      require("./data").exports();
       require("./buffer").exports();
       require("./node").exports();
       require("./sched").exports();
@@ -3635,6 +3636,23 @@ define('cc/client/number', function(require, exports, module) {
   };
 
 });
+define('cc/client/data', function(require, exports, module) {
+
+  var cc = require("./cc");
+  
+  exports = function() {
+    global.DATA = {
+      get: function(n) {
+        return cc.DATA[n] || "";
+      }
+    };
+  };
+  
+  module.exports = {
+    exports:exports
+  };
+
+});
 define('cc/client/scale', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -5246,17 +5264,6 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     return t;
   };
 
-  var splitCodeAndData = function(text) {
-    var re = /^(\s*)__END__(\s*)$/gm;
-    var m = re.exec(text);
-    if (m === null) {
-      return [ text, "" ];
-    }
-    var code = text.substr(0, m.index - 1);
-    var data = text.substr(m.index + m[0].length + 1);
-    return [ code, data ];
-  };
-  
   var findOperandHead = function(tokens, index) {
     var bracket = 0;
     var indent  = 0;
@@ -5402,43 +5409,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     // dumpTokens(tokens);
     return tokens;
   };
-
-  var replacePi = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
-      var a, b, token = tokens[i];
-      if (token[VALUE] === "pi") {
-        tokens.splice(i, 1);
-        token = tokens[i - 1];
-        if (token && token[TAG] === "NUMBER") {
-          a = i - 1;
-          token = tokens[i - 2];
-          if (token) {
-            switch (token[TAG]) {
-              case "UNARY": case "+": case "-":
-              a -= 1;
-            }
-          }
-          tokens.splice(i, 0, ["MATH", "*", _]);
-          b = i;
-        } else {
-          a = -1;
-          b = i - 1;
-        }
-        tokens.splice(b+1, 0, ["IDENTIFIER", "Math", _]);
-        tokens.splice(b+2, 0, ["."         , "."   , _]);
-        tokens.splice(b+3, 0, ["IDENTIFIER", "PI"  , _]);
-        if (a !== -1) {
-          tokens.splice(b+4, 0, [")", ")", _]);
-          tokens.splice(a, 0, ["(", "(", _]);
-        }
-      }
-      i -= 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
-  };
-
+  
   var replacePrecedence = function(tokens) {
     var i = tokens.length - 1;
     while (0 <= i) {
@@ -5737,15 +5708,16 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   var Compiler = (function() {
     function Compiler() {
     }
-    Compiler.prototype.tokens = function(text) {
-      var items = splitCodeAndData(text);
-      var code  = items[0];
-      var data  = items[1];
+    Compiler.prototype.tokens = function(code) {
+      var data = [];
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
+        tokens.forEach(function(token) {
+          if (token[TAG] === "HERECOMMENT") {
+            data.push(token[VALUE].trim());
+          }
+        });
         tokens = replaceTimeValue(tokens);
-        // removed: use instead of using number#pi()
-        // tokens = replacePi(tokens);
         tokens = replaceUnaryOp(tokens);
         tokens = replacePrecedence(tokens);
         tokens = replaceBinaryOp(tokens);
@@ -5811,11 +5783,9 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   module.exports = {
     Compiler  : Compiler,
     dumpTokens: dumpTokens,
-    splitCodeAndData: splitCodeAndData,
     findOperandHead : findOperandHead,
     findOperandTail : findOperandTail,
     replaceTimeValue     : replaceTimeValue,
-    replacePi            : replacePi,
     replacePrecedence    : replacePrecedence,
     replaceUnaryOp       : replaceUnaryOp,
     replaceBinaryOp      : replaceBinaryOp,
@@ -7455,7 +7425,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
   unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
-      console.log(rates[0], rates[1], rates[2]);
       var process = next[rates[0]][rates[1]][rates[2]];
       this.process = process;
       this._in  = this.inputs[0][0];
