@@ -62,7 +62,7 @@ define(function(require, exports, module) {
     return -a;
   };
   calcFunc.not = function(a) {
-    return a > 0 ? 0 : 1;
+    return a === 0 ? 1 : 0;
   };
   calcFunc.abs = function(a) {
     return Math.abs(a);
@@ -143,6 +143,26 @@ define(function(require, exports, module) {
   };
   calcFunc.tan = function(a) {
     return Math.tan(a);
+  };
+  calcFunc.asin = function(a) {
+    return Math.asin(Math.max(-1, Math.min(a, 1)));
+  };
+  calcFunc.acos = function(a) {
+    return Math.acos(Math.max(-1, Math.min(a, 1)));
+  };
+  calcFunc.atan = function(a) {
+    return Math.atan(a);
+  };
+  calcFunc.sinh = function(a) {
+    return (Math.pow(Math.E, a) - Math.pow(Math.E, -a)) * 0.5;
+  };
+  calcFunc.cosh = function(a) {
+    return (Math.pow(Math.E, a) + Math.pow(Math.E, -a)) * 0.5;
+  };
+  calcFunc.tanh = function(a) {
+    var sinh = (Math.pow(Math.E, a) - Math.pow(Math.E, -a)) * 0.5;
+    var cosh = (Math.pow(Math.E, a) + Math.pow(Math.E, -a)) * 0.5;
+    return sinh / cosh;
   };
   calcFunc.rand = function(a) {
     return Math.random() * a;

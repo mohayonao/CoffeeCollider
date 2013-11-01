@@ -24,6 +24,16 @@ define(function(require, exports, module) {
       ugen = new UGen();
       number.exports();
     });
+    it("neg", function() {
+      assert.closeTo((+5.2).neg(), -5.2, 1e-6);
+      assert.closeTo(( 0.0).neg(),  0.0, 1e-6);
+      assert.closeTo((-5.2).neg(), +5.2, 1e-6);
+    });
+    it("not", function() {
+      assert.closeTo((+5.2).not(), 0, 1e-6);
+      assert.closeTo(( 0.0).not(), 1, 1e-6);
+      assert.closeTo((-5.2).not(), 0, 1e-6);
+    });
     it("abs", function() {
       assert.closeTo((+5.2).abs(), 5.2, 1e-6);
       assert.closeTo(( 0.0).abs(), 0.0, 1e-6);
@@ -143,6 +153,36 @@ define(function(require, exports, module) {
       assert.closeTo((+2.2).tan(), -1.3738230567688, 1e-6);
       assert.closeTo(( 0.0).tan(),  0, 1e-6);
       assert.closeTo((-2.2).tan(),  1.3738230567688, 1e-6);
+    });
+    it("asin", function() {
+      assert.closeTo((+1).asin(),  1.5707963267949, 1e-6);
+      assert.closeTo(( 0).asin(),  0, 1e-6);
+      assert.closeTo((-1).asin(), -1.5707963267949, 1e-6);
+    });
+    it("acos", function() {
+      assert.closeTo((+1).acos(), 0, 1e-6);
+      assert.closeTo(( 0).acos(), 1.5707963267949, 1e-6);
+      assert.closeTo((-1).acos(), 3.1415926535898, 1e-6);
+    });
+    it("atan", function() {
+      assert.closeTo((+1).atan(),  0.78539816339745, 1e-6);
+      assert.closeTo(( 0).atan(),  0, 1e-6);
+      assert.closeTo((-1).atan(), -0.78539816339745, 1e-6);
+    });
+    it("sinh", function() {
+      assert.closeTo((+1).sinh(),  1.1752011936438, 1e-6);
+      assert.closeTo(( 0).sinh(),  0, 1e-6);
+      assert.closeTo((-1).sinh(), -1.1752011936438, 1e-6);
+    });
+    it("cosh", function() {
+      assert.closeTo((+1).cosh(), 1.5430806348152, 1e-6);
+      assert.closeTo(( 0).cosh(), 1, 1e-6);
+      assert.closeTo((-1).cosh(), 1.5430806348152, 1e-6);
+    });
+    it("tanh", function() {
+      assert.closeTo((+1).tanh(),  0.76159415595576, 1e-6);
+      assert.closeTo(( 0).tanh(),  0, 1e-6);
+      assert.closeTo((-1).tanh(), -0.76159415595576, 1e-6);
     });
     it("rand", function() {
       assert.isNumber((1).rand());

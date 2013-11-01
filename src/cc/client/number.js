@@ -17,6 +17,12 @@ define(function(require, exports, module) {
   
   module.exports = {
     exports: function() {
+      setup("neg", function() {
+        return -this;
+      });
+      setup("not", function() {
+        return this === 0 ? 1 : 0;
+      });
       setup("abs", function() {
         return Math.abs(this);
       });
@@ -97,12 +103,24 @@ define(function(require, exports, module) {
       setup("tan", function() {
         return Math.tan(this);
       });
-      // asin
-      // acos
-      // atan
-      // sinh
-      // cosh
-      // tanh
+      setup("asin", function() {
+        return Math.asin(Math.max(-1, Math.min(this, 1)));
+      });
+      setup("acos", function() {
+        return Math.acos(Math.max(-1, Math.min(this, 1)));
+      });
+      setup("atan", function() {
+        return Math.atan(this);
+      });
+      setup("sinh", function() {
+        return (Math.pow(Math.E, this) - Math.pow(Math.E, -this)) * 0.5;
+      });
+      setup("cosh", function() {
+        return (Math.pow(Math.E, this) + Math.pow(Math.E, -this)) * 0.5;
+      });
+      setup("tanh", function() {
+        return this.sinh() / this.cosh();
+      });
       setup("rand", function() {
         return Math.random() * this;
       });
