@@ -16,8 +16,10 @@
     "bower_components",
     "coverage",
     "documents",
+    "examples",
     "files",
-    "Gruntfile.js"
+    "Gruntfile.js",
+    "index.html"
   ],
   "dependencies": {
     "coffee-script": "~1.6.3"

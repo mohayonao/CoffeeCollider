@@ -74,7 +74,7 @@ $(function() {
   $("a", "#example-list").each(function(i, a) {
     var $a = $(a);
     $a.on("click", function() {
-      $.get("./documents/examples/" + $(this).attr("data-path")).then(function(res) {
+      $.get("./examples/" + $(this).attr("data-path")).then(function(res) {
         $code.val(res);
       });
       return false;
