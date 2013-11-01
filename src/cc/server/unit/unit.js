@@ -19,19 +19,19 @@ define(function(require, exports, module) {
       this.outRates = specs[4];
       this.rate     = cc.getRateInstance(this.calcRate || C.CONTROL);
       var bufLength = this.rate.bufLength;
-      var allOuts  = new Float32Array(bufLength * this.numOfOutputs);
-      var outs     = new Array(this.numOfOutputs);
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i] = new Float32Array(
-          allOuts.buffer,
-          bufLength * i * allOuts.BYTES_PER_ELEMENT,
+      var allOutputs = new Float32Array(bufLength * this.numOfOutputs);
+      var outputs    = new Array(this.numOfOutputs);
+      for (var i = 0, imax = outputs.length; i < imax; ++i) {
+        outputs[i] = new Float32Array(
+          allOutputs.buffer,
+          bufLength * i * allOutputs.BYTES_PER_ELEMENT,
           bufLength
         );
       }
-      this.outs      = outs;
-      this.allOuts   = allOuts;
-      this.bufLength = bufLength;
-      this.done      = false;
+      this.outputs    = outputs;
+      this.allOutputs = allOutputs;
+      this.bufLength  = bufLength;
+      this.done       = false;
     }
     Unit.prototype.init = function(tag) {
       var ctor = specs[this.name];

@@ -20,11 +20,11 @@ define(function(require, exports, module) {
       }
       this._endLevel = end;
       this._doneAction = this.inputs[3][0];
-      this.outs[0][0] = this._level;
+      this.outputs[0][0] = this._level;
     };
     var next_kkk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var level   = this._level;
       var counter = this._counter;
       var slope   = this._slope;
@@ -36,14 +36,14 @@ define(function(require, exports, module) {
           remain = 0;
           var endLevel = this._endLevel;
           for (i = 0; i < nsmps; ++i) {
-            outs[i] = endLevel;
+            out[i] = endLevel;
           }
         } else {
           nsmps = Math.min(remain, counter);
           counter -= nsmps;
           remain  -= nsmps;
           for (i = 0; i < nsmps; ++i) {
-            outs[i] = level;
+            out[i] = level;
             level += slope;
           }
           if (counter === 0) {

@@ -20,7 +20,7 @@ define(function(require, exports, module) {
         if (this.process) {
           this.process(1);
         } else {
-          this.outs[0][0] = func(this.inputs[0][0]);
+          this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
         console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
@@ -32,13 +32,13 @@ define(function(require, exports, module) {
   
   var unary_k = function(func) {
     return function() {
-      this.outs[0][0] = func(this.inputs[0][0]);
+      this.outputs[0][0] = func(this.inputs[0][0]);
     };
   };
   var unary_a = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
+      var out = this.outputs[0];
       var a = this.inputs[0];
       for (var i = 0; i < inNumSamples; i += 8) {
         out[i  ] = func(a[i  ]); out[i+1] = func(a[i+1]);

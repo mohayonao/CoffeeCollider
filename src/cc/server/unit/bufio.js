@@ -69,7 +69,7 @@ define(function(require, exports, module) {
     var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var buf = this._buffer;
-      var outs = this.outs;
+      var outputs = this.outputs;
       var phase = this._phase;
       var rate  = this.inputs[1][0];
       var trig  = this.inputs[2][0];
@@ -114,12 +114,12 @@ define(function(require, exports, module) {
           }
         }
         frac = phase - (phase|0);
-        for (var j = 0, jmax = outs.length; j < jmax; ++j) {
+        for (var j = 0, jmax = outputs.length; j < jmax; ++j) {
           a = samples[index0 * channels + j];
           b = samples[index1 * channels + j];
           c = samples[index2 * channels + j];
           d = samples[index3 * channels + j];
-          outs[j][i] = cubicinterp(frac, a, b, c, d);
+          outputs[j][i] = cubicinterp(frac, a, b, c, d);
         }
         phase += rate;
       }

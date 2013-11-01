@@ -48,7 +48,7 @@ define(function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -66,7 +66,7 @@ define(function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -76,7 +76,7 @@ define(function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -93,7 +93,7 @@ define(function(require, exports, module) {
           irdphase = iwrphase - (dsamp|0);
           value = dlybuf[irdphase & mask];
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;
@@ -117,7 +117,7 @@ define(function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -138,7 +138,7 @@ define(function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -150,7 +150,7 @@ define(function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -169,7 +169,7 @@ define(function(require, exports, module) {
           d2 = dlybuf[(irdphase-1)&mask];
           value = d1 + frac * (d2 - d1);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;
@@ -193,7 +193,7 @@ define(function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -216,7 +216,7 @@ define(function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -230,7 +230,7 @@ define(function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -251,7 +251,7 @@ define(function(require, exports, module) {
           d3 = dlybuf[(irdphase-2)&mask];
           value = cubicinterp(frac, d0, d1, d2, d3);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;

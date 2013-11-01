@@ -2565,6 +2565,21 @@ define('cc/client/ugen/osc', function(require, exports, module) {
       }
     }
   };
+
+  ugen.specs.LFSaw = {
+    ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(2, freq, iphase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(1, freq, iphase).madd(mul, add);
+      }
+    }
+  };
   
   module.exports = {};
 
@@ -6527,7 +6542,7 @@ define('cc/server/instance', function(require, exports, module) {
     Instance.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;
       return fixNums[value] || (fixNums[value] = {
-        outs: [ new Float32Array([value]) ]
+        outputs: [ new Float32Array([value]) ]
       });
     };
     Instance.prototype.process = function(bufLength) {
@@ -6921,10 +6936,10 @@ define('cc/server/node', function(require, exports, module) {
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
+            inputs[i]  = fixNumList[inSpec[i2+1]].outputs[0];
             inRates[i] = 0;
           } else {
-            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
+            inputs[i]  = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
             inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
           }
         }
@@ -6985,19 +7000,19 @@ define('cc/server/unit/unit', function(require, exports, module) {
       this.outRates = specs[4];
       this.rate     = cc.getRateInstance(this.calcRate || 1);
       var bufLength = this.rate.bufLength;
-      var allOuts  = new Float32Array(bufLength * this.numOfOutputs);
-      var outs     = new Array(this.numOfOutputs);
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i] = new Float32Array(
-          allOuts.buffer,
-          bufLength * i * allOuts.BYTES_PER_ELEMENT,
+      var allOutputs = new Float32Array(bufLength * this.numOfOutputs);
+      var outputs    = new Array(this.numOfOutputs);
+      for (var i = 0, imax = outputs.length; i < imax; ++i) {
+        outputs[i] = new Float32Array(
+          allOutputs.buffer,
+          bufLength * i * allOutputs.BYTES_PER_ELEMENT,
           bufLength
         );
       }
-      this.outs      = outs;
-      this.allOuts   = allOuts;
-      this.bufLength = bufLength;
-      this.done      = false;
+      this.outputs    = outputs;
+      this.allOutputs = allOutputs;
+      this.bufLength  = bufLength;
+      this.done       = false;
     }
     Unit.prototype.init = function(tag) {
       var ctor = specs[this.name];
@@ -7306,7 +7321,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
         if (this.process) {
           this.process(1);
         } else {
-          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+          this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
         console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
@@ -7319,7 +7334,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   var binary_aa = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
+      var out = this.outputs[0];
       var aIn = this.inputs[0], bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
         out[i  ] = func(aIn[i  ], bIn[i  ]); out[i+1] = func(aIn[i+1], bIn[i+1]);
@@ -7332,19 +7347,19 @@ define('cc/server/unit/bop', function(require, exports, module) {
   var binary_ak = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
+      var out = this.outputs[0];
+      var aIn = this.inputs[0], b = this._b;
       var nextB  = this.inputs[1][0];
       var b_slope = (nextB - this._b) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(aIn[i  ], b); b += b_slope;
-        outs[i+1] = func(aIn[i+1], b); b += b_slope;
-        outs[i+2] = func(aIn[i+2], b); b += b_slope;
-        outs[i+3] = func(aIn[i+3], b); b += b_slope;
-        outs[i+4] = func(aIn[i+4], b); b += b_slope;
-        outs[i+5] = func(aIn[i+5], b); b += b_slope;
-        outs[i+6] = func(aIn[i+6], b); b += b_slope;
-        outs[i+7] = func(aIn[i+7], b); b += b_slope;
+        out[i  ] = func(aIn[i  ], b); b += b_slope;
+        out[i+1] = func(aIn[i+1], b); b += b_slope;
+        out[i+2] = func(aIn[i+2], b); b += b_slope;
+        out[i+3] = func(aIn[i+3], b); b += b_slope;
+        out[i+4] = func(aIn[i+4], b); b += b_slope;
+        out[i+5] = func(aIn[i+5], b); b += b_slope;
+        out[i+6] = func(aIn[i+6], b); b += b_slope;
+        out[i+7] = func(aIn[i+7], b); b += b_slope;
       }
       this._b = nextB;
     };
@@ -7352,59 +7367,59 @@ define('cc/server/unit/bop', function(require, exports, module) {
   var binary_ai = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(aIn[i  ], b);
-        outs[i+1] = func(aIn[i+1], b);
-        outs[i+2] = func(aIn[i+2], b);
-        outs[i+3] = func(aIn[i+3], b);
-        outs[i+4] = func(aIn[i+4], b);
-        outs[i+5] = func(aIn[i+5], b);
-        outs[i+6] = func(aIn[i+6], b);
-        outs[i+7] = func(aIn[i+7], b);
+        out[i  ] = func(aIn[i  ], b);
+        out[i+1] = func(aIn[i+1], b);
+        out[i+2] = func(aIn[i+2], b);
+        out[i+3] = func(aIn[i+3], b);
+        out[i+4] = func(aIn[i+4], b);
+        out[i+5] = func(aIn[i+5], b);
+        out[i+6] = func(aIn[i+6], b);
+        out[i+7] = func(aIn[i+7], b);
       }
     };
   };
   var binary_ka = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       var nextA  = this.inputs[0][0];
       var a_slope = (nextA - this._a) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(a, bIn[i  ]); a += a_slope;
-        outs[i+1] = func(a, bIn[i+1]); a += a_slope;
-        outs[i+2] = func(a, bIn[i+2]); a += a_slope;
-        outs[i+3] = func(a, bIn[i+3]); a += a_slope;
-        outs[i+4] = func(a, bIn[i+4]); a += a_slope;
-        outs[i+5] = func(a, bIn[i+5]); a += a_slope;
-        outs[i+6] = func(a, bIn[i+6]); a += a_slope;
-        outs[i+7] = func(a, bIn[i+7]); a += a_slope;
+        out[i  ] = func(a, bIn[i  ]); a += a_slope;
+        out[i+1] = func(a, bIn[i+1]); a += a_slope;
+        out[i+2] = func(a, bIn[i+2]); a += a_slope;
+        out[i+3] = func(a, bIn[i+3]); a += a_slope;
+        out[i+4] = func(a, bIn[i+4]); a += a_slope;
+        out[i+5] = func(a, bIn[i+5]); a += a_slope;
+        out[i+6] = func(a, bIn[i+6]); a += a_slope;
+        out[i+7] = func(a, bIn[i+7]); a += a_slope;
       }
       this._a = nextA;
     };
   };
   var binary_kk = function(func) {
     return function() {
-      this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+      this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
     };
   };
   var binary_ia = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(a, bIn[i  ]);
-        outs[i+1] = func(a, bIn[i+1]);
-        outs[i+2] = func(a, bIn[i+2]);
-        outs[i+3] = func(a, bIn[i+3]);
-        outs[i+4] = func(a, bIn[i+4]);
-        outs[i+5] = func(a, bIn[i+5]);
-        outs[i+6] = func(a, bIn[i+6]);
-        outs[i+7] = func(a, bIn[i+7]);
+        out[i  ] = func(a, bIn[i  ]);
+        out[i+1] = func(a, bIn[i+1]);
+        out[i+2] = func(a, bIn[i+2]);
+        out[i+3] = func(a, bIn[i+3]);
+        out[i+4] = func(a, bIn[i+4]);
+        out[i+5] = func(a, bIn[i+5]);
+        out[i+6] = func(a, bIn[i+6]);
+        out[i+7] = func(a, bIn[i+7]);
       }
     };
   };
@@ -7415,7 +7430,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["+"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] + bIn[i  ];
@@ -7430,8 +7445,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["+"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7448,8 +7463,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["+"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] + b;
       out[i+1] = aIn[i+1] + b;
@@ -7463,7 +7478,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["+"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -7480,11 +7495,11 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["+"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0];
   };
   calcFunc["+"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a + bIn[i  ];
@@ -7503,7 +7518,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["-"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] - bIn[i  ];
@@ -7518,8 +7533,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["-"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7536,8 +7551,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["-"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] - b;
       out[i+1] = aIn[i+1] - b;
@@ -7551,7 +7566,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["-"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -7568,11 +7583,11 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["-"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] - this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] - this.inputs[1][0];
   };
   calcFunc["-"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a - bIn[i  ];
@@ -7591,7 +7606,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["*"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] * bIn[i  ];
@@ -7606,8 +7621,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["*"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7624,8 +7639,8 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["*"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] * b;
       out[i+1] = aIn[i+1] * b;
@@ -7639,7 +7654,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   calcFunc["*"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -7656,11 +7671,11 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["*"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0];
   };
   calcFunc["*"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a * bIn[i  ];
@@ -7766,7 +7781,7 @@ define('cc/server/unit/bufio', function(require, exports, module) {
     var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
       var buf = this._buffer;
-      var outs = this.outs;
+      var outputs = this.outputs;
       var phase = this._phase;
       var rate  = this.inputs[1][0];
       var trig  = this.inputs[2][0];
@@ -7811,12 +7826,12 @@ define('cc/server/unit/bufio', function(require, exports, module) {
           }
         }
         frac = phase - (phase|0);
-        for (var j = 0, jmax = outs.length; j < jmax; ++j) {
+        for (var j = 0, jmax = outputs.length; j < jmax; ++j) {
           a = samples[index0 * channels + j];
           b = samples[index1 * channels + j];
           c = samples[index2 * channels + j];
           d = samples[index3 * channels + j];
-          outs[j][i] = cubicinterp(frac, a, b, c, d);
+          outputs[j][i] = cubicinterp(frac, a, b, c, d);
         }
         phase += rate;
       }
@@ -7881,7 +7896,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -7899,7 +7914,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -7909,7 +7924,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -7926,7 +7941,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
           irdphase = iwrphase - (dsamp|0);
           value = dlybuf[irdphase & mask];
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;
@@ -7950,7 +7965,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -7971,7 +7986,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -7983,7 +7998,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -8002,7 +8017,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d2 = dlybuf[(irdphase-1)&mask];
           value = d1 + frac * (d2 - d1);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;
@@ -8026,7 +8041,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
     };
     var next_akk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
       var decaytime = this.inputs[3][0];
@@ -8049,7 +8064,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             irdphase++;
             iwrphase++;
           }
@@ -8063,7 +8078,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            outs[i] = value;
+            out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
             iwrphase++;
@@ -8084,7 +8099,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d3 = dlybuf[(irdphase-2)&mask];
           value = cubicinterp(frac, d0, d1, d2, d3);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          outs[i] = value;
+          out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
           irdphase++;
@@ -8119,14 +8134,14 @@ define('cc/server/unit/inout', function(require, exports, module) {
       this.process(1);
     };
     var next_1 = function() {
-      this.outs[0][0] = this.parent.controls[this.specialIndex];
+      this.outputs[0][0] = this.parent.controls[this.specialIndex];
     };
     var next_k = function() {
       var controls = this.parent.controls;
-      var outs = this.outs;
+      var outputs = this.outputs;
       var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i][0] = controls[i + specialIndex];
+      for (var i = 0, imax = outputs.length; i < imax; ++i) {
+        outputs[i][0] = controls[i + specialIndex];
       }
     };
     return ctor;
@@ -8145,20 +8160,20 @@ define('cc/server/unit/inout', function(require, exports, module) {
     };
     var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var bus  = instance.bus;
       var bufLength = this._bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = bus[offset + i];
+        out[i] = bus[offset + i];
       }
     };
     var next_k = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
-      var outs  = this.outs[0];
+      var out = this.outputs[0];
       var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = value;
+        out[i] = value;
       }
     };
     return ctor;
@@ -8225,11 +8240,11 @@ define('cc/server/unit/line', function(require, exports, module) {
       }
       this._endLevel = end;
       this._doneAction = this.inputs[3][0];
-      this.outs[0][0] = this._level;
+      this.outputs[0][0] = this._level;
     };
     var next_kkk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var level   = this._level;
       var counter = this._counter;
       var slope   = this._slope;
@@ -8241,14 +8256,14 @@ define('cc/server/unit/line', function(require, exports, module) {
           remain = 0;
           var endLevel = this._endLevel;
           for (i = 0; i < nsmps; ++i) {
-            outs[i] = endLevel;
+            out[i] = endLevel;
           }
         } else {
           nsmps = Math.min(remain, counter);
           counter -= nsmps;
           remain  -= nsmps;
           for (i = 0; i < nsmps; ++i) {
-            outs[i] = level;
+            out[i] = level;
             level += slope;
           }
           if (counter === 0) {
@@ -8281,7 +8296,7 @@ define('cc/server/unit/madd', function(require, exports, module) {
       if (this.process) {
         this.process(1);
       } else {
-        this.outs[0][0] = this._in * this._mul + this._add;
+        this.outputs[0][0] = this._in * this._mul + this._add;
       }
     };
 
@@ -8301,181 +8316,181 @@ define('cc/server/unit/madd', function(require, exports, module) {
 
     next[2][2][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
       var addIn = this.inputs[2];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mulIn[i  ] + addIn[i  ];
-        outs[i+1] = inIn[i+1] * mulIn[i+1] + addIn[i+1];
-        outs[i+2] = inIn[i+2] * mulIn[i+2] + addIn[i+2];
-        outs[i+3] = inIn[i+3] * mulIn[i+3] + addIn[i+3];
-        outs[i+4] = inIn[i+4] * mulIn[i+4] + addIn[i+4];
-        outs[i+5] = inIn[i+5] * mulIn[i+5] + addIn[i+5];
-        outs[i+6] = inIn[i+6] * mulIn[i+6] + addIn[i+6];
-        outs[i+7] = inIn[i+7] * mulIn[i+7] + addIn[i+7];
+        out[i  ] = inIn[i  ] * mulIn[i  ] + addIn[i  ];
+        out[i+1] = inIn[i+1] * mulIn[i+1] + addIn[i+1];
+        out[i+2] = inIn[i+2] * mulIn[i+2] + addIn[i+2];
+        out[i+3] = inIn[i+3] * mulIn[i+3] + addIn[i+3];
+        out[i+4] = inIn[i+4] * mulIn[i+4] + addIn[i+4];
+        out[i+5] = inIn[i+5] * mulIn[i+5] + addIn[i+5];
+        out[i+6] = inIn[i+6] * mulIn[i+6] + addIn[i+6];
+        out[i+7] = inIn[i+7] * mulIn[i+7] + addIn[i+7];
       }
     };
     next[2][2][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
       var add = this._add;
       var nextAdd = this.inputs[2][0];
       var add_slope = (nextAdd - add) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mulIn[i  ] + add; add += add_slope;
-        outs[i+1] = inIn[i+1] * mulIn[i+1] + add; add += add_slope;
-        outs[i+2] = inIn[i+2] * mulIn[i+2] + add; add += add_slope;
-        outs[i+3] = inIn[i+3] * mulIn[i+3] + add; add += add_slope;
-        outs[i+4] = inIn[i+4] * mulIn[i+4] + add; add += add_slope;
-        outs[i+5] = inIn[i+5] * mulIn[i+5] + add; add += add_slope;
-        outs[i+6] = inIn[i+6] * mulIn[i+6] + add; add += add_slope;
-        outs[i+7] = inIn[i+7] * mulIn[i+7] + add; add += add_slope;
+        out[i  ] = inIn[i  ] * mulIn[i  ] + add; add += add_slope;
+        out[i+1] = inIn[i+1] * mulIn[i+1] + add; add += add_slope;
+        out[i+2] = inIn[i+2] * mulIn[i+2] + add; add += add_slope;
+        out[i+3] = inIn[i+3] * mulIn[i+3] + add; add += add_slope;
+        out[i+4] = inIn[i+4] * mulIn[i+4] + add; add += add_slope;
+        out[i+5] = inIn[i+5] * mulIn[i+5] + add; add += add_slope;
+        out[i+6] = inIn[i+6] * mulIn[i+6] + add; add += add_slope;
+        out[i+7] = inIn[i+7] * mulIn[i+7] + add; add += add_slope;
       }
       this._add = nextAdd;
     };
     next[2][2][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
       var add = this._add;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mulIn[i  ] + add;
-        outs[i+1] = inIn[i+1] * mulIn[i+1] + add;
-        outs[i+2] = inIn[i+2] * mulIn[i+2] + add;
-        outs[i+3] = inIn[i+3] * mulIn[i+3] + add;
-        outs[i+4] = inIn[i+4] * mulIn[i+4] + add;
-        outs[i+5] = inIn[i+5] * mulIn[i+5] + add;
-        outs[i+6] = inIn[i+6] * mulIn[i+6] + add;
-        outs[i+7] = inIn[i+7] * mulIn[i+7] + add;
+        out[i  ] = inIn[i  ] * mulIn[i  ] + add;
+        out[i+1] = inIn[i+1] * mulIn[i+1] + add;
+        out[i+2] = inIn[i+2] * mulIn[i+2] + add;
+        out[i+3] = inIn[i+3] * mulIn[i+3] + add;
+        out[i+4] = inIn[i+4] * mulIn[i+4] + add;
+        out[i+5] = inIn[i+5] * mulIn[i+5] + add;
+        out[i+6] = inIn[i+6] * mulIn[i+6] + add;
+        out[i+7] = inIn[i+7] * mulIn[i+7] + add;
       }
     };
     next[2][1][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out   = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
       var addIn = this.inputs[2];
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + addIn[i  ]; mul += mul_slope;
-        outs[i+1] = inIn[i+1] * mul + addIn[i+1]; mul += mul_slope;
-        outs[i+2] = inIn[i+2] * mul + addIn[i+2]; mul += mul_slope;
-        outs[i+3] = inIn[i+3] * mul + addIn[i+3]; mul += mul_slope;
-        outs[i+4] = inIn[i+4] * mul + addIn[i+4]; mul += mul_slope;
-        outs[i+5] = inIn[i+5] * mul + addIn[i+5]; mul += mul_slope;
-        outs[i+6] = inIn[i+6] * mul + addIn[i+6]; mul += mul_slope;
-        outs[i+7] = inIn[i+7] * mul + addIn[i+7]; mul += mul_slope;
+        out[i  ] = inIn[i  ] * mul + addIn[i  ]; mul += mul_slope;
+        out[i+1] = inIn[i+1] * mul + addIn[i+1]; mul += mul_slope;
+        out[i+2] = inIn[i+2] * mul + addIn[i+2]; mul += mul_slope;
+        out[i+3] = inIn[i+3] * mul + addIn[i+3]; mul += mul_slope;
+        out[i+4] = inIn[i+4] * mul + addIn[i+4]; mul += mul_slope;
+        out[i+5] = inIn[i+5] * mul + addIn[i+5]; mul += mul_slope;
+        out[i+6] = inIn[i+6] * mul + addIn[i+6]; mul += mul_slope;
+        out[i+7] = inIn[i+7] * mul + addIn[i+7]; mul += mul_slope;
       }
       this._mul = nextMul;
     };
     next[2][1][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var inIn  = this.inputs[0];
-      var mul   = this._mul;
-      var add   = this._add;
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var mul  = this._mul;
+      var add  = this._add;
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       var nextAdd = this.inputs[2][0];
       var add_slope = (nextAdd - add) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+1] = inIn[i+1] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+2] = inIn[i+2] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+3] = inIn[i+3] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+4] = inIn[i+4] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+5] = inIn[i+5] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+6] = inIn[i+6] * mul + add; mul += mul_slope; add += add_slope;
-        outs[i+7] = inIn[i+7] * mul + add; mul += mul_slope; add += add_slope;
+        out[i  ] = inIn[i  ] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+1] = inIn[i+1] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+2] = inIn[i+2] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+3] = inIn[i+3] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+4] = inIn[i+4] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+5] = inIn[i+5] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+6] = inIn[i+6] * mul + add; mul += mul_slope; add += add_slope;
+        out[i+7] = inIn[i+7] * mul + add; mul += mul_slope; add += add_slope;
       }
       this._mul = nextMul;
       this._add = nextAdd;
     };
     next[2][1][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
       var add = this._add;
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + add; mul += mul_slope;
-        outs[i+1] = inIn[i+1] * mul + add; mul += mul_slope;
-        outs[i+2] = inIn[i+2] * mul + add; mul += mul_slope;
-        outs[i+3] = inIn[i+3] * mul + add; mul += mul_slope;
-        outs[i+4] = inIn[i+4] * mul + add; mul += mul_slope;
-        outs[i+5] = inIn[i+5] * mul + add; mul += mul_slope;
-        outs[i+6] = inIn[i+6] * mul + add; mul += mul_slope;
-        outs[i+7] = inIn[i+7] * mul + add; mul += mul_slope;
+        out[i  ] = inIn[i  ] * mul + add; mul += mul_slope;
+        out[i+1] = inIn[i+1] * mul + add; mul += mul_slope;
+        out[i+2] = inIn[i+2] * mul + add; mul += mul_slope;
+        out[i+3] = inIn[i+3] * mul + add; mul += mul_slope;
+        out[i+4] = inIn[i+4] * mul + add; mul += mul_slope;
+        out[i+5] = inIn[i+5] * mul + add; mul += mul_slope;
+        out[i+6] = inIn[i+6] * mul + add; mul += mul_slope;
+        out[i+7] = inIn[i+7] * mul + add; mul += mul_slope;
       }
       this._mul = nextMul;
     };
     next[2][0][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var inIn  = this.inputs[0];
-      var mul   = this._mul;
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var mul  = this._mul;
       var addIn = this.inputs[2];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + addIn[i  ];
-        outs[i+1] = inIn[i+1] * mul + addIn[i+1];
-        outs[i+2] = inIn[i+2] * mul + addIn[i+2];
-        outs[i+3] = inIn[i+3] * mul + addIn[i+3];
-        outs[i+4] = inIn[i+4] * mul + addIn[i+4];
-        outs[i+5] = inIn[i+5] * mul + addIn[i+5];
-        outs[i+6] = inIn[i+6] * mul + addIn[i+6];
-        outs[i+7] = inIn[i+7] * mul + addIn[i+7];
+        out[i  ] = inIn[i  ] * mul + addIn[i  ];
+        out[i+1] = inIn[i+1] * mul + addIn[i+1];
+        out[i+2] = inIn[i+2] * mul + addIn[i+2];
+        out[i+3] = inIn[i+3] * mul + addIn[i+3];
+        out[i+4] = inIn[i+4] * mul + addIn[i+4];
+        out[i+5] = inIn[i+5] * mul + addIn[i+5];
+        out[i+6] = inIn[i+6] * mul + addIn[i+6];
+        out[i+7] = inIn[i+7] * mul + addIn[i+7];
       }
     };
     next[2][0][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var inIn  = this.inputs[0];
-      var mul   = this._mul;
-      var add   = this._add;
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var mul  = this._mul;
+      var add  = this._add;
       var nextAdd = this.inputs[2][0];
       var add_slope = (nextAdd - add) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + add; add += add_slope;
-        outs[i+1] = inIn[i+1] * mul + add; add += add_slope;
-        outs[i+2] = inIn[i+2] * mul + add; add += add_slope;
-        outs[i+3] = inIn[i+3] * mul + add; add += add_slope;
-        outs[i+4] = inIn[i+4] * mul + add; add += add_slope;
-        outs[i+5] = inIn[i+5] * mul + add; add += add_slope;
-        outs[i+6] = inIn[i+6] * mul + add; add += add_slope;
-        outs[i+7] = inIn[i+7] * mul + add; add += add_slope;
+        out[i  ] = inIn[i  ] * mul + add; add += add_slope;
+        out[i+1] = inIn[i+1] * mul + add; add += add_slope;
+        out[i+2] = inIn[i+2] * mul + add; add += add_slope;
+        out[i+3] = inIn[i+3] * mul + add; add += add_slope;
+        out[i+4] = inIn[i+4] * mul + add; add += add_slope;
+        out[i+5] = inIn[i+5] * mul + add; add += add_slope;
+        out[i+6] = inIn[i+6] * mul + add; add += add_slope;
+        out[i+7] = inIn[i+7] * mul + add; add += add_slope;
       }
       this._add = nextAdd;
     };
     next[2][0][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var inIn  = this.inputs[0];
-      var mul   = this._mul;
-      var add = this._add;
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var mul  = this._mul;
+      var add  = this._add;
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn[i  ] * mul + add; mul += mul_slope;
-        outs[i+1] = inIn[i+1] * mul + add; mul += mul_slope;
-        outs[i+2] = inIn[i+2] * mul + add; mul += mul_slope;
-        outs[i+3] = inIn[i+3] * mul + add; mul += mul_slope;
-        outs[i+4] = inIn[i+4] * mul + add; mul += mul_slope;
-        outs[i+5] = inIn[i+5] * mul + add; mul += mul_slope;
-        outs[i+6] = inIn[i+6] * mul + add; mul += mul_slope;
-        outs[i+7] = inIn[i+7] * mul + add; mul += mul_slope;
+        out[i  ] = inIn[i  ] * mul + add; mul += mul_slope;
+        out[i+1] = inIn[i+1] * mul + add; mul += mul_slope;
+        out[i+2] = inIn[i+2] * mul + add; mul += mul_slope;
+        out[i+3] = inIn[i+3] * mul + add; mul += mul_slope;
+        out[i+4] = inIn[i+4] * mul + add; mul += mul_slope;
+        out[i+5] = inIn[i+5] * mul + add; mul += mul_slope;
+        out[i+6] = inIn[i+6] * mul + add; mul += mul_slope;
+        out[i+7] = inIn[i+7] * mul + add; mul += mul_slope;
       }
       this._mul = nextMul;
     };
     next[1][1][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out   = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
       var addIn = this.inputs[2];
@@ -8484,149 +8499,149 @@ define('cc/server/unit/madd', function(require, exports, module) {
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mul + addIn[i  ]; _in += in_slope; mul += mul_slope;
-        outs[i+1] = _in * mul + addIn[i+1]; _in += in_slope; mul += mul_slope;
-        outs[i+2] = _in * mul + addIn[i+2]; _in += in_slope; mul += mul_slope;
-        outs[i+3] = _in * mul + addIn[i+3]; _in += in_slope; mul += mul_slope;
-        outs[i+4] = _in * mul + addIn[i+4]; _in += in_slope; mul += mul_slope;
-        outs[i+5] = _in * mul + addIn[i+5]; _in += in_slope; mul += mul_slope;
-        outs[i+6] = _in * mul + addIn[i+6]; _in += in_slope; mul += mul_slope;
-        outs[i+7] = _in * mul + addIn[i+7]; _in += in_slope; mul += mul_slope;
+        out[i  ] = _in * mul + addIn[i  ]; _in += in_slope; mul += mul_slope;
+        out[i+1] = _in * mul + addIn[i+1]; _in += in_slope; mul += mul_slope;
+        out[i+2] = _in * mul + addIn[i+2]; _in += in_slope; mul += mul_slope;
+        out[i+3] = _in * mul + addIn[i+3]; _in += in_slope; mul += mul_slope;
+        out[i+4] = _in * mul + addIn[i+4]; _in += in_slope; mul += mul_slope;
+        out[i+5] = _in * mul + addIn[i+5]; _in += in_slope; mul += mul_slope;
+        out[i+6] = _in * mul + addIn[i+6]; _in += in_slope; mul += mul_slope;
+        out[i+7] = _in * mul + addIn[i+7]; _in += in_slope; mul += mul_slope;
       }
       this._in  = nextIn;
       this._mul = nextMul;
     };
     next[1][1][1] = function() {
-      this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this.inputs[2][0];
+      this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this.inputs[2][0];
     };
     next[1][1][0] = function() {
-      this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this._add;
+      this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this._add;
     };
     next[1][0][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
       var addIn = this.inputs[2];
       var nextIn = this.inputs[0][0];
       var in_slope = (nextIn - _in) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mul + addIn[i  ]; _in += in_slope;
-        outs[i+1] = _in * mul + addIn[i+1]; _in += in_slope;
-        outs[i+2] = _in * mul + addIn[i+2]; _in += in_slope;
-        outs[i+3] = _in * mul + addIn[i+3]; _in += in_slope;
-        outs[i+4] = _in * mul + addIn[i+4]; _in += in_slope;
-        outs[i+5] = _in * mul + addIn[i+5]; _in += in_slope;
-        outs[i+6] = _in * mul + addIn[i+6]; _in += in_slope;
-        outs[i+7] = _in * mul + addIn[i+7]; _in += in_slope;
+        out[i  ] = _in * mul + addIn[i  ]; _in += in_slope;
+        out[i+1] = _in * mul + addIn[i+1]; _in += in_slope;
+        out[i+2] = _in * mul + addIn[i+2]; _in += in_slope;
+        out[i+3] = _in * mul + addIn[i+3]; _in += in_slope;
+        out[i+4] = _in * mul + addIn[i+4]; _in += in_slope;
+        out[i+5] = _in * mul + addIn[i+5]; _in += in_slope;
+        out[i+6] = _in * mul + addIn[i+6]; _in += in_slope;
+        out[i+7] = _in * mul + addIn[i+7]; _in += in_slope;
       }
       this._in  = nextIn;
     };
     next[1][0][1] = function() {
-      this.outs[0][0] = this.inputs[0][0] * this._mul + this.inputs[2][0];
+      this.outputs[0][0] = this.inputs[0][0] * this._mul + this.inputs[2][0];
     };
     next[1][0][0] = function() {
-      this.outs[0][0] = this.inputs[0][0] * this._mul + this._add;
+      this.outputs[0][0] = this.inputs[0][0] * this._mul + this._add;
     };
     next[0][2][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
       var addIn = this.inputs[2];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mulIn[i  ] + addIn[i  ];
-        outs[i+1] = _in * mulIn[i+1] + addIn[i+1];
-        outs[i+2] = _in * mulIn[i+2] + addIn[i+2];
-        outs[i+3] = _in * mulIn[i+3] + addIn[i+3];
-        outs[i+4] = _in * mulIn[i+4] + addIn[i+4];
-        outs[i+5] = _in * mulIn[i+5] + addIn[i+5];
-        outs[i+6] = _in * mulIn[i+6] + addIn[i+6];
-        outs[i+7] = _in * mulIn[i+7] + addIn[i+7];
+        out[i  ] = _in * mulIn[i  ] + addIn[i  ];
+        out[i+1] = _in * mulIn[i+1] + addIn[i+1];
+        out[i+2] = _in * mulIn[i+2] + addIn[i+2];
+        out[i+3] = _in * mulIn[i+3] + addIn[i+3];
+        out[i+4] = _in * mulIn[i+4] + addIn[i+4];
+        out[i+5] = _in * mulIn[i+5] + addIn[i+5];
+        out[i+6] = _in * mulIn[i+6] + addIn[i+6];
+        out[i+7] = _in * mulIn[i+7] + addIn[i+7];
       }
     };
     next[0][2][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
       var add = this._add;
       var nextAdd = this.inputs[2][0];
       var add_slope = (nextAdd - add) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mulIn[i  ] + add; add += add_slope;
-        outs[i+1] = _in * mulIn[i+1] + add; add += add_slope;
-        outs[i+2] = _in * mulIn[i+2] + add; add += add_slope;
-        outs[i+3] = _in * mulIn[i+3] + add; add += add_slope;
-        outs[i+4] = _in * mulIn[i+4] + add; add += add_slope;
-        outs[i+5] = _in * mulIn[i+5] + add; add += add_slope;
-        outs[i+6] = _in * mulIn[i+6] + add; add += add_slope;
-        outs[i+7] = _in * mulIn[i+7] + add; add += add_slope;
+        out[i  ] = _in * mulIn[i  ] + add; add += add_slope;
+        out[i+1] = _in * mulIn[i+1] + add; add += add_slope;
+        out[i+2] = _in * mulIn[i+2] + add; add += add_slope;
+        out[i+3] = _in * mulIn[i+3] + add; add += add_slope;
+        out[i+4] = _in * mulIn[i+4] + add; add += add_slope;
+        out[i+5] = _in * mulIn[i+5] + add; add += add_slope;
+        out[i+6] = _in * mulIn[i+6] + add; add += add_slope;
+        out[i+7] = _in * mulIn[i+7] + add; add += add_slope;
       }
       this._add = nextAdd;
     };
     next[0][2][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
       var add = this._add;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mulIn[i  ] + add;
-        outs[i+1] = _in * mulIn[i+1] + add;
-        outs[i+2] = _in * mulIn[i+2] + add;
-        outs[i+3] = _in * mulIn[i+3] + add;
-        outs[i+4] = _in * mulIn[i+4] + add;
-        outs[i+5] = _in * mulIn[i+5] + add;
-        outs[i+6] = _in * mulIn[i+6] + add;
-        outs[i+7] = _in * mulIn[i+7] + add;
+        out[i  ] = _in * mulIn[i  ] + add;
+        out[i+1] = _in * mulIn[i+1] + add;
+        out[i+2] = _in * mulIn[i+2] + add;
+        out[i+3] = _in * mulIn[i+3] + add;
+        out[i+4] = _in * mulIn[i+4] + add;
+        out[i+5] = _in * mulIn[i+5] + add;
+        out[i+6] = _in * mulIn[i+6] + add;
+        out[i+7] = _in * mulIn[i+7] + add;
       }
     };
     next[0][1][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
       var addIn = this.inputs[2];
       var nextMul = this.inputs[1][0];
       var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mul + addIn[i  ]; mul += mul_slope;
-        outs[i+1] = _in * mul + addIn[i+1]; mul += mul_slope;
-        outs[i+2] = _in * mul + addIn[i+2]; mul += mul_slope;
-        outs[i+3] = _in * mul + addIn[i+3]; mul += mul_slope;
-        outs[i+4] = _in * mul + addIn[i+4]; mul += mul_slope;
-        outs[i+5] = _in * mul + addIn[i+5]; mul += mul_slope;
-        outs[i+6] = _in * mul + addIn[i+6]; mul += mul_slope;
-        outs[i+7] = _in * mul + addIn[i+7]; mul += mul_slope;
+        out[i  ] = _in * mul + addIn[i  ]; mul += mul_slope;
+        out[i+1] = _in * mul + addIn[i+1]; mul += mul_slope;
+        out[i+2] = _in * mul + addIn[i+2]; mul += mul_slope;
+        out[i+3] = _in * mul + addIn[i+3]; mul += mul_slope;
+        out[i+4] = _in * mul + addIn[i+4]; mul += mul_slope;
+        out[i+5] = _in * mul + addIn[i+5]; mul += mul_slope;
+        out[i+6] = _in * mul + addIn[i+6]; mul += mul_slope;
+        out[i+7] = _in * mul + addIn[i+7]; mul += mul_slope;
       }
       this._mul = nextMul;
     };
     next[0][1][1] = function() {
-      this.outs[0][0] = this._in * this.inputs[1][0] + this.inputs[2][0];
+      this.outputs[0][0] = this._in * this.inputs[1][0] + this.inputs[2][0];
     };
     next[0][1][0] = function() {
-      this.outs[0][0] = this._in * this.inputs[1][0] + this._add;
+      this.outputs[0][0] = this._in * this.inputs[1][0] + this._add;
     };
     next[0][0][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
       var addIn = this.inputs[2];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = _in * mul + addIn[i  ];
-        outs[i+1] = _in * mul + addIn[i+1];
-        outs[i+2] = _in * mul + addIn[i+2];
-        outs[i+3] = _in * mul + addIn[i+3];
-        outs[i+4] = _in * mul + addIn[i+4];
-        outs[i+5] = _in * mul + addIn[i+5];
-        outs[i+6] = _in * mul + addIn[i+6];
-        outs[i+7] = _in * mul + addIn[i+7];
+        out[i  ] = _in * mul + addIn[i  ];
+        out[i+1] = _in * mul + addIn[i+1];
+        out[i+2] = _in * mul + addIn[i+2];
+        out[i+3] = _in * mul + addIn[i+3];
+        out[i+4] = _in * mul + addIn[i+4];
+        out[i+5] = _in * mul + addIn[i+5];
+        out[i+6] = _in * mul + addIn[i+6];
+        out[i+7] = _in * mul + addIn[i+7];
       }
     };
     next[0][0][1] = function() {
-      this.outs[0][0] = this._in * this._mul + this.inputs[2][0];
+      this.outputs[0][0] = this._in * this._mul + this.inputs[2][0];
     };
     
     return ctor;
@@ -8643,7 +8658,7 @@ define('cc/server/unit/madd', function(require, exports, module) {
       if (this.process) {
         this.process(1);
       } else {
-        this.outs[0][0] = this._in0 * this._in1 + this._in2;
+        this.outputs[0][0] = this._in0 * this._in1 + this._in2;
       }
     };
     
@@ -8658,74 +8673,74 @@ define('cc/server/unit/madd', function(require, exports, module) {
 
     next[2][2][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var inIn2 = this.inputs[2];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ];
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1];
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2];
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3];
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4];
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5];
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6];
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7];
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ];
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1];
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2];
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3];
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4];
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5];
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6];
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7];
       }
     };
     next[2][2][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var in2   = this._in2;
       var nextIn2 = this.inputs[2][0];
       var in2_slope = (nextIn2 - in2) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + in2; in2 += in2_slope;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + in2; in2 += in2_slope;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + in2; in2 += in2_slope;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + in2; in2 += in2_slope;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + in2; in2 += in2_slope;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + in2; in2 += in2_slope;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + in2; in2 += in2_slope;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + in2; in2 += in2_slope;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + in2; in2 += in2_slope;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + in2; in2 += in2_slope;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + in2; in2 += in2_slope;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + in2; in2 += in2_slope;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + in2; in2 += in2_slope;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + in2; in2 += in2_slope;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + in2; in2 += in2_slope;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + in2; in2 += in2_slope;
       }
       this._in2 = nextIn2;
     };
     next[2][2][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var in2   = this._in2;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + in2;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + in2;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + in2;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + in2;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + in2;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + in2;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + in2;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + in2;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + in2;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + in2;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + in2;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + in2;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + in2;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + in2;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + in2;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + in2;
       }
     };
     next[2][1][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
       var nextIn12 = this.inputs[1][0] + this.inputs[2][0];
       var in12_slope = (nextIn12 - in12) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + in12; in12 += in12_slope;
-        outs[i+1] = inIn0[i+1] + in12; in12 += in12_slope;
-        outs[i+2] = inIn0[i+2] + in12; in12 += in12_slope;
-        outs[i+3] = inIn0[i+3] + in12; in12 += in12_slope;
-        outs[i+4] = inIn0[i+4] + in12; in12 += in12_slope;
-        outs[i+5] = inIn0[i+5] + in12; in12 += in12_slope;
-        outs[i+6] = inIn0[i+6] + in12; in12 += in12_slope;
-        outs[i+7] = inIn0[i+7] + in12; in12 += in12_slope;
+        out[i  ] = inIn0[i  ] + in12; in12 += in12_slope;
+        out[i+1] = inIn0[i+1] + in12; in12 += in12_slope;
+        out[i+2] = inIn0[i+2] + in12; in12 += in12_slope;
+        out[i+3] = inIn0[i+3] + in12; in12 += in12_slope;
+        out[i+4] = inIn0[i+4] + in12; in12 += in12_slope;
+        out[i+5] = inIn0[i+5] + in12; in12 += in12_slope;
+        out[i+6] = inIn0[i+6] + in12; in12 += in12_slope;
+        out[i+7] = inIn0[i+7] + in12; in12 += in12_slope;
       }
       this._in1 = this.inputs[1][0];
       this._in2 = this.inputs[2][0];
@@ -8733,22 +8748,22 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[2][1][0] = next[2][1][1];
     next[2][0][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + in12;
-        outs[i+1] = inIn0[i+1] + in12;
-        outs[i+2] = inIn0[i+2] + in12;
-        outs[i+3] = inIn0[i+3] + in12;
-        outs[i+4] = inIn0[i+4] + in12;
-        outs[i+5] = inIn0[i+5] + in12;
-        outs[i+6] = inIn0[i+6] + in12;
-        outs[i+7] = inIn0[i+7] + in12;
+        out[i  ] = inIn0[i  ] + in12;
+        out[i+1] = inIn0[i+1] + in12;
+        out[i+2] = inIn0[i+2] + in12;
+        out[i+3] = inIn0[i+3] + in12;
+        out[i+4] = inIn0[i+4] + in12;
+        out[i+5] = inIn0[i+5] + in12;
+        out[i+6] = inIn0[i+6] + in12;
+        out[i+7] = inIn0[i+7] + in12;
       }
     };
     next[1][1][1] = function() {
-      this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0] + this.inputs[2][0];
+      this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0] + this.inputs[2][0];
     };
     next[1][1][0] = next[1][1][1];
     next[1][0][0] = next[1][1][1];
@@ -8768,7 +8783,7 @@ define('cc/server/unit/madd', function(require, exports, module) {
       if (this.process) {
         this.process(1);
       } else {
-        this.outs[0][0] = this._in0 * this._in1 + this._in2 + this._in3;
+        this.outputs[0][0] = this._in0 * this._in1 + this._in2 + this._in3;
       }
     };
 
@@ -8795,25 +8810,25 @@ define('cc/server/unit/madd', function(require, exports, module) {
     
     next[2][2][2][2] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var inIn2 = this.inputs[2];
       var inIn3 = this.inputs[3];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + inIn3[i  ];
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + inIn3[i+1];
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + inIn3[i+2];
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + inIn3[i+3];
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + inIn3[i+4];
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + inIn3[i+5];
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + inIn3[i+6];
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + inIn3[i+7];
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + inIn3[i  ];
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + inIn3[i+1];
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + inIn3[i+2];
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + inIn3[i+3];
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + inIn3[i+4];
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + inIn3[i+5];
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + inIn3[i+6];
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + inIn3[i+7];
       }
     };
     next[2][2][2][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var inIn2 = this.inputs[2];
@@ -8821,52 +8836,52 @@ define('cc/server/unit/madd', function(require, exports, module) {
       var nextIn3 = this.inputs[3][0];
       var in3_slope = (nextIn3 - in3) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + in3; in3 += in3_slope;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + in3; in3 += in3_slope;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + in3; in3 += in3_slope;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + in3; in3 += in3_slope;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + in3; in3 += in3_slope;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + in3; in3 += in3_slope;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + in3; in3 += in3_slope;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + in3; in3 += in3_slope;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + in3; in3 += in3_slope;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + in3; in3 += in3_slope;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + in3; in3 += in3_slope;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + in3; in3 += in3_slope;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + in3; in3 += in3_slope;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + in3; in3 += in3_slope;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + in3; in3 += in3_slope;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + in3; in3 += in3_slope;
       }
       this._in3 = nextIn3;
     };
     next[2][2][2][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var inIn2 = this.inputs[2];
       var in3   = this._in3;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + in3;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + in3;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + in3;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + in3;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + in3;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + in3;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + in3;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + in3;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + inIn2[i  ] + in3;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + inIn2[i+1] + in3;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + inIn2[i+2] + in3;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + inIn2[i+3] + in3;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + inIn2[i+4] + in3;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + inIn2[i+5] + in3;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + inIn2[i+6] + in3;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + inIn2[i+7] + in3;
       }
     };
     next[2][2][1][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var in23  = this._in2 + this._in3;
       var nextIn23 = this.inputs[2][0] + this.inputs[3][0];
       var in23_slope = (nextIn23 - in23) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + in23; in23 += in23_slope;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + in23; in23 += in23_slope;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + in23; in23 += in23_slope;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + in23; in23 += in23_slope;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + in23; in23 += in23_slope;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + in23; in23 += in23_slope;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + in23; in23 += in23_slope;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + in23; in23 += in23_slope;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + in23; in23 += in23_slope;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + in23; in23 += in23_slope;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + in23; in23 += in23_slope;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + in23; in23 += in23_slope;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + in23; in23 += in23_slope;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + in23; in23 += in23_slope;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + in23; in23 += in23_slope;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + in23; in23 += in23_slope;
       }
       this._in2 = this.inputs[2][0];
       this._in3 = this.inputs[2][0];
@@ -8874,37 +8889,37 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[2][2][1][0] = next[2][2][1][1];
     next[2][2][0][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
       var in23  = this._in2 + this._in3;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + inIn1[i  ] + in23;
-        outs[i+1] = inIn0[i+1] + inIn1[i+1] + in23;
-        outs[i+2] = inIn0[i+2] + inIn1[i+2] + in23;
-        outs[i+3] = inIn0[i+3] + inIn1[i+3] + in23;
-        outs[i+4] = inIn0[i+4] + inIn1[i+4] + in23;
-        outs[i+5] = inIn0[i+5] + inIn1[i+5] + in23;
-        outs[i+6] = inIn0[i+6] + inIn1[i+6] + in23;
-        outs[i+7] = inIn0[i+7] + inIn1[i+7] + in23;
+        out[i  ] = inIn0[i  ] + inIn1[i  ] + in23;
+        out[i+1] = inIn0[i+1] + inIn1[i+1] + in23;
+        out[i+2] = inIn0[i+2] + inIn1[i+2] + in23;
+        out[i+3] = inIn0[i+3] + inIn1[i+3] + in23;
+        out[i+4] = inIn0[i+4] + inIn1[i+4] + in23;
+        out[i+5] = inIn0[i+5] + inIn1[i+5] + in23;
+        out[i+6] = inIn0[i+6] + inIn1[i+6] + in23;
+        out[i+7] = inIn0[i+7] + inIn1[i+7] + in23;
       }
     };
     next[2][1][1][1] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;
       var nextIn123 = this.inputs[1][0] + this.inputs[2][0] + this.inputs[3][0];
       var in123_slope = (nextIn123 - in123) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + in123; in123 += in123_slope;
-        outs[i+1] = inIn0[i+1] + in123; in123 += in123_slope;
-        outs[i+2] = inIn0[i+2] + in123; in123 += in123_slope;
-        outs[i+3] = inIn0[i+3] + in123; in123 += in123_slope;
-        outs[i+4] = inIn0[i+4] + in123; in123 += in123_slope;
-        outs[i+5] = inIn0[i+5] + in123; in123 += in123_slope;
-        outs[i+6] = inIn0[i+6] + in123; in123 += in123_slope;
-        outs[i+7] = inIn0[i+7] + in123; in123 += in123_slope;
+        out[i  ] = inIn0[i  ] + in123; in123 += in123_slope;
+        out[i+1] = inIn0[i+1] + in123; in123 += in123_slope;
+        out[i+2] = inIn0[i+2] + in123; in123 += in123_slope;
+        out[i+3] = inIn0[i+3] + in123; in123 += in123_slope;
+        out[i+4] = inIn0[i+4] + in123; in123 += in123_slope;
+        out[i+5] = inIn0[i+5] + in123; in123 += in123_slope;
+        out[i+6] = inIn0[i+6] + in123; in123 += in123_slope;
+        out[i+7] = inIn0[i+7] + in123; in123 += in123_slope;
       }
       this._in1 = this.inputs[1][0];
       this._in2 = this.inputs[2][0];
@@ -8914,22 +8929,22 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[2][1][0][0] = next[2][1][1][1];
     next[2][0][0][0] = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = inIn0[i  ] + in123;
-        outs[i+1] = inIn0[i+1] + in123;
-        outs[i+2] = inIn0[i+2] + in123;
-        outs[i+3] = inIn0[i+3] + in123;
-        outs[i+4] = inIn0[i+4] + in123;
-        outs[i+5] = inIn0[i+5] + in123;
-        outs[i+6] = inIn0[i+6] + in123;
-        outs[i+7] = inIn0[i+7] + in123;
+        out[i  ] = inIn0[i  ] + in123;
+        out[i+1] = inIn0[i+1] + in123;
+        out[i+2] = inIn0[i+2] + in123;
+        out[i+3] = inIn0[i+3] + in123;
+        out[i+4] = inIn0[i+4] + in123;
+        out[i+5] = inIn0[i+5] + in123;
+        out[i+6] = inIn0[i+6] + in123;
+        out[i+7] = inIn0[i+7] + in123;
       }
     };
     next[1][1][1][1] = function() {
-      this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0] + this.inputs[2][0] + this.inputs[3][0];
+      this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0] + this.inputs[2][0] + this.inputs[3][0];
     };
     next[1][1][1][0] = next[1][1][1][1];
     next[1][1][0][0] = next[1][1][1][1];
@@ -8981,7 +8996,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
     };
     var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn  = this.inputs[0];
       var phaseIn = this.inputs[1];
       var mask  = this._mask;
@@ -8992,14 +9007,14 @@ define('cc/server/unit/osc', function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         pphase = x + radtoinc * phaseIn[i];
         index  = (pphase & mask) << 1;
-        outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
         x += freqIn[i] * cpstoinc;
       }
       this._x = x;
     };
     var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn    = this.inputs[0];
       var nextPhase = this.inputs[1][0];
       var mask  = this._mask;
@@ -9013,7 +9028,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freqIn[i] * cpstoinc;
         }
       } else {
@@ -9021,7 +9036,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           phase += phase_slope;
           x += freqIn[i] * cpstoinc;
         }
@@ -9031,7 +9046,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
     };
     var next_ai = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn = this.inputs[0];
       var phase  = this._phase * this._radtoinc;
       var mask  = this._mask;
@@ -9041,14 +9056,14 @@ define('cc/server/unit/osc', function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         pphase = x + phase;
         index  = (pphase & mask) << 1;
-        outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
         x += cpstoinc * freqIn[i];
       }
       this._x = x;
     };
     var next_ka = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var nextFreq = this.inputs[0][0];
       var phaseIn = this.inputs[1];
       var mask  = this._mask;
@@ -9062,7 +9077,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phaseIn[i];
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq;
         }
       } else {
@@ -9070,7 +9085,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phaseIn[i];
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq * cpstoinc;
           freq += freq_slope;
         }
@@ -9080,7 +9095,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
     };
     var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var nextFreq  = this.inputs[0][0];
       var nextPhase = this.inputs[1][0];
       var mask  = this._mask;
@@ -9096,7 +9111,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq;
         }
       } else {
@@ -9105,7 +9120,7 @@ define('cc/server/unit/osc', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq * cpstoinc;
           freq  += freq_slope;
           phase += phase_slope;
@@ -9114,6 +9129,63 @@ define('cc/server/unit/osc', function(require, exports, module) {
         this._phase = nextPhase;
       }
       this._x = x;
+    };
+    
+    return ctor;
+  })();
+
+  unit.specs.LFSaw = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 2 * this.rate.sampleDur;
+      this._phase    = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase;
+        phase += freqIn[i] * cpstoinc;
+        if (phase >= 1) {
+          phase -= 2;
+        } else if (phase <= -1) {
+          phase += 2;
+        }
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var i;
+      if (freq >= 0) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = phase;
+          phase += freq;
+          if (phase >= 1) {
+            phase -= 2;
+          }
+        }
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = phase;
+          phase += freq;
+          if (phase <= -1) {
+            phase += 2;
+          }
+        }
+      }
+      this._phase = phase;
     };
     
     return ctor;
@@ -9194,8 +9266,8 @@ define('cc/server/unit/pan', function(require, exports, module) {
     };
     var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var leftOut  = this.outs[0];
-      var rightOut = this.outs[1];
+      var leftOut  = this.outputs[0];
+      var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
       var pos   = this.inputs[1][0];
       var level = this.inputs[2][0];
@@ -9231,8 +9303,8 @@ define('cc/server/unit/pan', function(require, exports, module) {
     };
     var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var leftOut  = this.outs[0];
-      var rightOut = this.outs[1];
+      var leftOut  = this.outputs[0];
+      var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
       var posIn = this.inputs[1];
       var nextLevel = this.inputs[2][0];
@@ -9302,7 +9374,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         y0 = Math.pow(maxval / minval, y0) * minval;
         if (isNaN(y0)) { y0 = 0; }
       }
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
@@ -9334,7 +9406,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         y0 = Math.pow(maxval / minval, y0) * minval;
         if (isNaN(y0)) { y0 = 0; }
       }
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
@@ -9359,7 +9431,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._lag = lag;
       }
       var y0 = instance ? (instance.syncItems[3] ? maxval : minval) : minval;
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
@@ -9389,7 +9461,7 @@ define('cc/server/unit/uop', function(require, exports, module) {
         if (this.process) {
           this.process(1);
         } else {
-          this.outs[0][0] = func(this.inputs[0][0]);
+          this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
         console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
@@ -9401,13 +9473,13 @@ define('cc/server/unit/uop', function(require, exports, module) {
   
   var unary_k = function(func) {
     return function() {
-      this.outs[0][0] = func(this.inputs[0][0]);
+      this.outputs[0][0] = func(this.inputs[0][0]);
     };
   };
   var unary_a = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
+      var out = this.outputs[0];
       var a = this.inputs[0];
       for (var i = 0; i < inNumSamples; i += 8) {
         out[i  ] = func(a[i  ]); out[i+1] = func(a[i+1]);

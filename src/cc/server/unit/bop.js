@@ -38,7 +38,7 @@ define(function(require, exports, module) {
         if (this.process) {
           this.process(1);
         } else {
-          this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+          this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
         console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
@@ -51,7 +51,7 @@ define(function(require, exports, module) {
   var binary_aa = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
+      var out = this.outputs[0];
       var aIn = this.inputs[0], bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
         out[i  ] = func(aIn[i  ], bIn[i  ]); out[i+1] = func(aIn[i+1], bIn[i+1]);
@@ -64,19 +64,19 @@ define(function(require, exports, module) {
   var binary_ak = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
-      var aIn  = this.inputs[0], b = this._b;
+      var out = this.outputs[0];
+      var aIn = this.inputs[0], b = this._b;
       var nextB  = this.inputs[1][0];
       var b_slope = (nextB - this._b) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(aIn[i  ], b); b += b_slope;
-        outs[i+1] = func(aIn[i+1], b); b += b_slope;
-        outs[i+2] = func(aIn[i+2], b); b += b_slope;
-        outs[i+3] = func(aIn[i+3], b); b += b_slope;
-        outs[i+4] = func(aIn[i+4], b); b += b_slope;
-        outs[i+5] = func(aIn[i+5], b); b += b_slope;
-        outs[i+6] = func(aIn[i+6], b); b += b_slope;
-        outs[i+7] = func(aIn[i+7], b); b += b_slope;
+        out[i  ] = func(aIn[i  ], b); b += b_slope;
+        out[i+1] = func(aIn[i+1], b); b += b_slope;
+        out[i+2] = func(aIn[i+2], b); b += b_slope;
+        out[i+3] = func(aIn[i+3], b); b += b_slope;
+        out[i+4] = func(aIn[i+4], b); b += b_slope;
+        out[i+5] = func(aIn[i+5], b); b += b_slope;
+        out[i+6] = func(aIn[i+6], b); b += b_slope;
+        out[i+7] = func(aIn[i+7], b); b += b_slope;
       }
       this._b = nextB;
     };
@@ -84,59 +84,59 @@ define(function(require, exports, module) {
   var binary_ai = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(aIn[i  ], b);
-        outs[i+1] = func(aIn[i+1], b);
-        outs[i+2] = func(aIn[i+2], b);
-        outs[i+3] = func(aIn[i+3], b);
-        outs[i+4] = func(aIn[i+4], b);
-        outs[i+5] = func(aIn[i+5], b);
-        outs[i+6] = func(aIn[i+6], b);
-        outs[i+7] = func(aIn[i+7], b);
+        out[i  ] = func(aIn[i  ], b);
+        out[i+1] = func(aIn[i+1], b);
+        out[i+2] = func(aIn[i+2], b);
+        out[i+3] = func(aIn[i+3], b);
+        out[i+4] = func(aIn[i+4], b);
+        out[i+5] = func(aIn[i+5], b);
+        out[i+6] = func(aIn[i+6], b);
+        out[i+7] = func(aIn[i+7], b);
       }
     };
   };
   var binary_ka = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       var nextA  = this.inputs[0][0];
       var a_slope = (nextA - this._a) * this.rate.slopeFactor;
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(a, bIn[i  ]); a += a_slope;
-        outs[i+1] = func(a, bIn[i+1]); a += a_slope;
-        outs[i+2] = func(a, bIn[i+2]); a += a_slope;
-        outs[i+3] = func(a, bIn[i+3]); a += a_slope;
-        outs[i+4] = func(a, bIn[i+4]); a += a_slope;
-        outs[i+5] = func(a, bIn[i+5]); a += a_slope;
-        outs[i+6] = func(a, bIn[i+6]); a += a_slope;
-        outs[i+7] = func(a, bIn[i+7]); a += a_slope;
+        out[i  ] = func(a, bIn[i  ]); a += a_slope;
+        out[i+1] = func(a, bIn[i+1]); a += a_slope;
+        out[i+2] = func(a, bIn[i+2]); a += a_slope;
+        out[i+3] = func(a, bIn[i+3]); a += a_slope;
+        out[i+4] = func(a, bIn[i+4]); a += a_slope;
+        out[i+5] = func(a, bIn[i+5]); a += a_slope;
+        out[i+6] = func(a, bIn[i+6]); a += a_slope;
+        out[i+7] = func(a, bIn[i+7]); a += a_slope;
       }
       this._a = nextA;
     };
   };
   var binary_kk = function(func) {
     return function() {
-      this.outs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+      this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
     };
   };
   var binary_ia = function(func) {
     return function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
-        outs[i  ] = func(a, bIn[i  ]);
-        outs[i+1] = func(a, bIn[i+1]);
-        outs[i+2] = func(a, bIn[i+2]);
-        outs[i+3] = func(a, bIn[i+3]);
-        outs[i+4] = func(a, bIn[i+4]);
-        outs[i+5] = func(a, bIn[i+5]);
-        outs[i+6] = func(a, bIn[i+6]);
-        outs[i+7] = func(a, bIn[i+7]);
+        out[i  ] = func(a, bIn[i  ]);
+        out[i+1] = func(a, bIn[i+1]);
+        out[i+2] = func(a, bIn[i+2]);
+        out[i+3] = func(a, bIn[i+3]);
+        out[i+4] = func(a, bIn[i+4]);
+        out[i+5] = func(a, bIn[i+5]);
+        out[i+6] = func(a, bIn[i+6]);
+        out[i+7] = func(a, bIn[i+7]);
       }
     };
   };
@@ -147,7 +147,7 @@ define(function(require, exports, module) {
   };
   calcFunc["+"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] + bIn[i  ];
@@ -162,8 +162,8 @@ define(function(require, exports, module) {
   };
   calcFunc["+"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -180,8 +180,8 @@ define(function(require, exports, module) {
   };
   calcFunc["+"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] + b;
       out[i+1] = aIn[i+1] + b;
@@ -195,7 +195,7 @@ define(function(require, exports, module) {
   };
   calcFunc["+"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -212,11 +212,11 @@ define(function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["+"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] + this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0];
   };
   calcFunc["+"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a + bIn[i  ];
@@ -235,7 +235,7 @@ define(function(require, exports, module) {
   };
   calcFunc["-"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] - bIn[i  ];
@@ -250,8 +250,8 @@ define(function(require, exports, module) {
   };
   calcFunc["-"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -268,8 +268,8 @@ define(function(require, exports, module) {
   };
   calcFunc["-"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] - b;
       out[i+1] = aIn[i+1] - b;
@@ -283,7 +283,7 @@ define(function(require, exports, module) {
   };
   calcFunc["-"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -300,11 +300,11 @@ define(function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["-"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] - this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] - this.inputs[1][0];
   };
   calcFunc["-"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a - bIn[i  ];
@@ -323,7 +323,7 @@ define(function(require, exports, module) {
   };
   calcFunc["*"].aa = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] * bIn[i  ];
@@ -338,8 +338,8 @@ define(function(require, exports, module) {
   };
   calcFunc["*"].ak = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
     var b_slope = (nextB - this._b) * this.rate.slopeFactor;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -356,8 +356,8 @@ define(function(require, exports, module) {
   };
   calcFunc["*"].ai = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
-    var aIn  = this.inputs[0], b = this._b;
+    var out = this.outputs[0];
+    var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = aIn[i  ] * b;
       out[i+1] = aIn[i+1] * b;
@@ -371,7 +371,7 @@ define(function(require, exports, module) {
   };
   calcFunc["*"].ka = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
     var a_slope = (nextA - this._a) * this.rate.slopeFactor;
@@ -388,11 +388,11 @@ define(function(require, exports, module) {
     this._a = nextA;
   };
   calcFunc["*"].kk = function() {
-    this.outs[0][0] = this.inputs[0][0] * this.inputs[1][0];
+    this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0];
   };
   calcFunc["*"].ia = function(inNumSamples) {
     inNumSamples = inNumSamples|0;
-    var out = this.outs[0];
+    var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
       out[i  ] = a * bIn[i  ];

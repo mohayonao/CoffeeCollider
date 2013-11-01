@@ -134,8 +134,8 @@ define(function(require, exports, module) {
       }
       if (u.process) {
         u.process(u.rate.bufLength, opts.instance);
-        for (j = u.allOuts.length; j--; ) {
-          var x = u.allOuts[j];
+        for (j = u.allOutputs.length; j--; ) {
+          var x = u.allOutputs[j];
           if (isNaN(x)) {
             throw new Error("NaN");
           }
@@ -144,7 +144,7 @@ define(function(require, exports, module) {
           }
         }
         if (opts.validator) {
-          opts.validator.call(u, u.inputs, u.outs);
+          opts.validator.call(u, u.inputs, u.outputs);
         }
       }
       if (opts.postProcess) {

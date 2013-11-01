@@ -14,14 +14,14 @@ define(function(require, exports, module) {
       this.process(1);
     };
     var next_1 = function() {
-      this.outs[0][0] = this.parent.controls[this.specialIndex];
+      this.outputs[0][0] = this.parent.controls[this.specialIndex];
     };
     var next_k = function() {
       var controls = this.parent.controls;
-      var outs = this.outs;
+      var outputs = this.outputs;
       var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outs.length; i < imax; ++i) {
-        outs[i][0] = controls[i + specialIndex];
+      for (var i = 0, imax = outputs.length; i < imax; ++i) {
+        outputs[i][0] = controls[i + specialIndex];
       }
     };
     return ctor;
@@ -40,20 +40,20 @@ define(function(require, exports, module) {
     };
     var next_a = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var bus  = instance.bus;
       var bufLength = this._bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = bus[offset + i];
+        out[i] = bus[offset + i];
       }
     };
     var next_k = function(inNumSamples, instance) {
       inNumSamples = inNumSamples|0;
-      var outs  = this.outs[0];
+      var out = this.outputs[0];
       var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
-        outs[i] = value;
+        out[i] = value;
       }
     };
     return ctor;

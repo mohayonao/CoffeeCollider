@@ -39,7 +39,7 @@ define(function(require, exports, module) {
     };
     var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn  = this.inputs[0];
       var phaseIn = this.inputs[1];
       var mask  = this._mask;
@@ -50,14 +50,14 @@ define(function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         pphase = x + radtoinc * phaseIn[i];
         index  = (pphase & mask) << 1;
-        outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
         x += freqIn[i] * cpstoinc;
       }
       this._x = x;
     };
     var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn    = this.inputs[0];
       var nextPhase = this.inputs[1][0];
       var mask  = this._mask;
@@ -71,7 +71,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freqIn[i] * cpstoinc;
         }
       } else {
@@ -79,7 +79,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           phase += phase_slope;
           x += freqIn[i] * cpstoinc;
         }
@@ -89,7 +89,7 @@ define(function(require, exports, module) {
     };
     var next_ai = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var freqIn = this.inputs[0];
       var phase  = this._phase * this._radtoinc;
       var mask  = this._mask;
@@ -99,14 +99,14 @@ define(function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         pphase = x + phase;
         index  = (pphase & mask) << 1;
-        outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
         x += cpstoinc * freqIn[i];
       }
       this._x = x;
     };
     var next_ka = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var nextFreq = this.inputs[0][0];
       var phaseIn = this.inputs[1];
       var mask  = this._mask;
@@ -120,7 +120,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phaseIn[i];
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq;
         }
       } else {
@@ -128,7 +128,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phaseIn[i];
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq * cpstoinc;
           freq += freq_slope;
         }
@@ -138,7 +138,7 @@ define(function(require, exports, module) {
     };
     var next_kk = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var outs = this.outs[0];
+      var out = this.outputs[0];
       var nextFreq  = this.inputs[0][0];
       var nextPhase = this.inputs[1][0];
       var mask  = this._mask;
@@ -154,7 +154,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq;
         }
       } else {
@@ -163,7 +163,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           pphase = x + radtoinc * phase;
           index  = (pphase & mask) << 1;
-          outs[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
           x += freq * cpstoinc;
           freq  += freq_slope;
           phase += phase_slope;
@@ -207,7 +207,7 @@ define(function(require, exports, module) {
     };
     var next_k = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      var out = this.outs[0];
+      var out = this.outputs[0];
       var freq = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
       var i;

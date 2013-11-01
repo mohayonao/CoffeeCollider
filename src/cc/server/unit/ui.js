@@ -31,7 +31,7 @@ define(function(require, exports, module) {
         y0 = Math.pow(maxval / minval, y0) * minval;
         if (isNaN(y0)) { y0 = 0; }
       }
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
@@ -63,7 +63,7 @@ define(function(require, exports, module) {
         y0 = Math.pow(maxval / minval, y0) * minval;
         if (isNaN(y0)) { y0 = 0; }
       }
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;
@@ -88,7 +88,7 @@ define(function(require, exports, module) {
         this._lag = lag;
       }
       var y0 = instance ? (instance.syncItems[C.BUTTON] ? maxval : minval) : minval;
-      this.outs[0][0] = y1 = y0 + b1 * (y1 - y0);
+      this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
     return ctor;

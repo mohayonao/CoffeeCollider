@@ -360,10 +360,10 @@ define(function(require, exports, module) {
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outs[0];
+            inputs[i]  = fixNumList[inSpec[i2+1]].outputs[0];
             inRates[i] = C.SCALAR;
           } else {
-            inputs[i]  = unitList[inSpec[i2]].outs[inSpec[i2+1]];
+            inputs[i]  = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
             inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
           }
         }

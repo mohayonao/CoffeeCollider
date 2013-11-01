@@ -171,7 +171,7 @@ define(function(require, exports, module) {
     Instance.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;
       return fixNums[value] || (fixNums[value] = {
-        outs: [ new Float32Array([value]) ]
+        outputs: [ new Float32Array([value]) ]
       });
     };
     Instance.prototype.process = function(bufLength) {
