@@ -47,7 +47,6 @@ define(function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -116,7 +115,6 @@ define(function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -192,7 +190,6 @@ define(function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];

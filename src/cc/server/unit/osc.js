@@ -38,7 +38,6 @@ define(function(require, exports, module) {
       next_kk.call(this, 1);
     };
     var next_aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn  = this.inputs[0];
       var phaseIn = this.inputs[1];
@@ -56,7 +55,6 @@ define(function(require, exports, module) {
       this._x = x;
     };
     var next_ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn    = this.inputs[0];
       var nextPhase = this.inputs[1][0];
@@ -88,7 +86,6 @@ define(function(require, exports, module) {
       this._x = x;
     };
     var next_ai = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn = this.inputs[0];
       var phase  = this._phase * this._radtoinc;
@@ -105,7 +102,6 @@ define(function(require, exports, module) {
       this._x = x;
     };
     var next_ka = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var nextFreq = this.inputs[0][0];
       var phaseIn = this.inputs[1];
@@ -137,7 +133,6 @@ define(function(require, exports, module) {
       this._x = x;
     };
     var next_kk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var nextFreq  = this.inputs[0][0];
       var nextPhase = this.inputs[1][0];
@@ -189,7 +184,6 @@ define(function(require, exports, module) {
       this.process(1);
     };
     var next_a = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn   = this.inputs[0];
       var cpstoinc = this._cpstoinc;
@@ -206,7 +200,6 @@ define(function(require, exports, module) {
       this._phase = phase;
     };
     var next_k = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freq = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;

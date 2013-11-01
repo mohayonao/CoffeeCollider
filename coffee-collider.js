@@ -7333,7 +7333,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
   
   var binary_aa = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -7346,7 +7345,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   var binary_ak = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       var nextB  = this.inputs[1][0];
@@ -7366,7 +7364,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   var binary_ai = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -7383,7 +7380,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   var binary_ka = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       var nextA  = this.inputs[0][0];
@@ -7408,7 +7404,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
   };
   var binary_ia = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -7429,7 +7424,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     return a + b;
   };
   calcFunc["+"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7444,7 +7438,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["+"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -7462,7 +7455,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["+"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7477,7 +7469,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["+"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -7498,7 +7489,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0];
   };
   calcFunc["+"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7517,7 +7507,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     return a - b;
   };
   calcFunc["-"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7532,7 +7521,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["-"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -7550,7 +7538,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["-"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7565,7 +7552,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["-"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -7586,7 +7572,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] - this.inputs[1][0];
   };
   calcFunc["-"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7605,7 +7590,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     return a * b;
   };
   calcFunc["*"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7620,7 +7604,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["*"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -7638,7 +7621,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["*"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7653,7 +7635,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     }
   };
   calcFunc["*"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -7674,7 +7655,6 @@ define('cc/server/unit/bop', function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0];
   };
   calcFunc["*"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -7779,7 +7759,6 @@ define('cc/server/unit/bufio', function(require, exports, module) {
       }
     };
     var next_kk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var buf = this._buffer;
       var outputs = this.outputs;
       var phase = this._phase;
@@ -7895,7 +7874,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -7964,7 +7942,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -8040,7 +8017,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
       feedbackdelay_ctor.call(this);
     };
     var next_akk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -8159,7 +8135,6 @@ define('cc/server/unit/inout', function(require, exports, module) {
       }
     };
     var next_a = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var bus  = instance.bus;
       var bufLength = this._bufLength;
@@ -8169,7 +8144,6 @@ define('cc/server/unit/inout', function(require, exports, module) {
       }
     };
     var next_k = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
@@ -8191,7 +8165,6 @@ define('cc/server/unit/inout', function(require, exports, module) {
       }
     };
     var next_a = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var inputs = this.inputs;
       var bus    = instance.bus;
       var bufLength = this._bufLength;
@@ -8243,7 +8216,6 @@ define('cc/server/unit/line', function(require, exports, module) {
       this.outputs[0][0] = this._level;
     };
     var next_kkk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var level   = this._level;
       var counter = this._counter;
@@ -8315,7 +8287,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[0][0] = {};
 
     next[2][2][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -8332,7 +8303,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][2][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -8352,7 +8322,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._add = nextAdd;
     };
     next[2][2][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -8369,7 +8338,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][1][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out   = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
@@ -8389,7 +8357,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._mul = nextMul;
     };
     next[2][1][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -8412,7 +8379,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._add = nextAdd;
     };
     next[2][1][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
@@ -8432,7 +8398,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._mul = nextMul;
     };
     next[2][0][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -8449,7 +8414,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][0][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -8469,7 +8433,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._add = nextAdd;
     };
     next[2][0][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -8489,7 +8452,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._mul = nextMul;
     };
     next[1][1][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out   = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -8518,7 +8480,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this._add;
     };
     next[1][0][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -8544,7 +8505,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this.outputs[0][0] = this.inputs[0][0] * this._mul + this._add;
     };
     next[0][2][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -8561,7 +8521,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[0][2][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -8581,7 +8540,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._add = nextAdd;
     };
     next[0][2][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -8598,7 +8556,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[0][1][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -8624,7 +8581,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this.outputs[0][0] = this._in * this.inputs[1][0] + this._add;
     };
     next[0][0][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -8672,7 +8628,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[1][0] = {};
 
     next[2][2][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8689,7 +8644,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][2][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8709,7 +8663,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._in2 = nextIn2;
     };
     next[2][2][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8726,7 +8679,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][1][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
@@ -8747,7 +8699,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     };
     next[2][1][0] = next[2][1][1];
     next[2][0][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
@@ -8809,7 +8760,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[0][0][0] = {};
     
     next[2][2][2][2] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8827,7 +8777,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][2][2][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8848,7 +8797,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       this._in3 = nextIn3;
     };
     next[2][2][2][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8866,7 +8814,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][2][1][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8888,7 +8835,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     };
     next[2][2][1][0] = next[2][2][1][1];
     next[2][2][0][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -8905,7 +8851,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
       }
     };
     next[2][1][1][1] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;
@@ -8928,7 +8873,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[2][1][1][0] = next[2][1][1][1];
     next[2][1][0][0] = next[2][1][1][1];
     next[2][0][0][0] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;
@@ -8995,7 +8939,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       next_kk.call(this, 1);
     };
     var next_aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn  = this.inputs[0];
       var phaseIn = this.inputs[1];
@@ -9013,7 +8956,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._x = x;
     };
     var next_ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn    = this.inputs[0];
       var nextPhase = this.inputs[1][0];
@@ -9045,7 +8987,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._x = x;
     };
     var next_ai = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn = this.inputs[0];
       var phase  = this._phase * this._radtoinc;
@@ -9062,7 +9003,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._x = x;
     };
     var next_ka = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var nextFreq = this.inputs[0][0];
       var phaseIn = this.inputs[1];
@@ -9094,7 +9034,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._x = x;
     };
     var next_kk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var nextFreq  = this.inputs[0][0];
       var nextPhase = this.inputs[1][0];
@@ -9146,7 +9085,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this.process(1);
     };
     var next_a = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freqIn   = this.inputs[0];
       var cpstoinc = this._cpstoinc;
@@ -9163,7 +9101,6 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._phase = phase;
     };
     var next_k = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var freq = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
@@ -9265,7 +9202,6 @@ define('cc/server/unit/pan', function(require, exports, module) {
       next_aa.call(this, 1);
     };
     var next_ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var leftOut  = this.outputs[0];
       var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
@@ -9302,7 +9238,6 @@ define('cc/server/unit/pan', function(require, exports, module) {
       }
     };
     var next_aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var leftOut  = this.outputs[0];
       var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
@@ -9478,7 +9413,6 @@ define('cc/server/unit/uop', function(require, exports, module) {
   };
   var unary_a = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this.inputs[0];
       for (var i = 0; i < inNumSamples; i += 8) {

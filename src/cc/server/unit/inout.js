@@ -39,7 +39,6 @@ define(function(require, exports, module) {
       }
     };
     var next_a = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var bus  = instance.bus;
       var bufLength = this._bufLength;
@@ -49,7 +48,6 @@ define(function(require, exports, module) {
       }
     };
     var next_k = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
       for (var i = 0; i < inNumSamples; ++i) {
@@ -71,7 +69,6 @@ define(function(require, exports, module) {
       }
     };
     var next_a = function(inNumSamples, instance) {
-      inNumSamples = inNumSamples|0;
       var inputs = this.inputs;
       var bus    = instance.bus;
       var bufLength = this._bufLength;

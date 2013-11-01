@@ -37,7 +37,6 @@ define(function(require, exports, module) {
   };
   var unary_a = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this.inputs[0];
       for (var i = 0; i < inNumSamples; i += 8) {

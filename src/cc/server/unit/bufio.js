@@ -67,7 +67,6 @@ define(function(require, exports, module) {
       }
     };
     var next_kk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var buf = this._buffer;
       var outputs = this.outputs;
       var phase = this._phase;

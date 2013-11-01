@@ -23,7 +23,6 @@ define(function(require, exports, module) {
       this.outputs[0][0] = this._level;
     };
     var next_kkk = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var level   = this._level;
       var counter = this._counter;

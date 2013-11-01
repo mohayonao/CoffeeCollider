@@ -33,7 +33,6 @@ define(function(require, exports, module) {
     next[C.SCALAR][C.SCALAR] = {};
 
     next[C.AUDIO][C.AUDIO][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -50,7 +49,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.AUDIO][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -70,7 +68,6 @@ define(function(require, exports, module) {
       this._add = nextAdd;
     };
     next[C.AUDIO][C.AUDIO][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mulIn = this.inputs[1];
@@ -87,7 +84,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.CONTROL][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out   = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
@@ -107,7 +103,6 @@ define(function(require, exports, module) {
       this._mul = nextMul;
     };
     next[C.AUDIO][C.CONTROL][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -130,7 +125,6 @@ define(function(require, exports, module) {
       this._add = nextAdd;
     };
     next[C.AUDIO][C.CONTROL][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn  = this.inputs[0];
       var mul   = this._mul;
@@ -150,7 +144,6 @@ define(function(require, exports, module) {
       this._mul = nextMul;
     };
     next[C.AUDIO][C.SCALAR][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -167,7 +160,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.SCALAR][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -187,7 +179,6 @@ define(function(require, exports, module) {
       this._add = nextAdd;
     };
     next[C.AUDIO][C.SCALAR][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var mul  = this._mul;
@@ -207,7 +198,6 @@ define(function(require, exports, module) {
       this._mul = nextMul;
     };
     next[C.CONTROL][C.CONTROL][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out   = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -236,7 +226,6 @@ define(function(require, exports, module) {
       this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0] + this._add;
     };
     next[C.CONTROL][C.SCALAR][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -262,7 +251,6 @@ define(function(require, exports, module) {
       this.outputs[0][0] = this.inputs[0][0] * this._mul + this._add;
     };
     next[C.SCALAR][C.AUDIO][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -279,7 +267,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.SCALAR][C.AUDIO][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -299,7 +286,6 @@ define(function(require, exports, module) {
       this._add = nextAdd;
     };
     next[C.SCALAR][C.AUDIO][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mulIn = this.inputs[1];
@@ -316,7 +302,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.SCALAR][C.CONTROL][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -342,7 +327,6 @@ define(function(require, exports, module) {
       this.outputs[0][0] = this._in * this.inputs[1][0] + this._add;
     };
     next[C.SCALAR][C.SCALAR][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var _in   = this._in;
       var mul   = this._mul;
@@ -390,7 +374,6 @@ define(function(require, exports, module) {
     next[C.CONTROL][C.SCALAR] = {};
 
     next[C.AUDIO][C.AUDIO][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -407,7 +390,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.AUDIO][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -427,7 +409,6 @@ define(function(require, exports, module) {
       this._in2 = nextIn2;
     };
     next[C.AUDIO][C.AUDIO][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -444,7 +425,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.CONTROL][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
@@ -465,7 +445,6 @@ define(function(require, exports, module) {
     };
     next[C.AUDIO][C.CONTROL][C.SCALAR] = next[C.AUDIO][C.CONTROL][C.CONTROL];
     next[C.AUDIO][C.SCALAR][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in12  = this._in1 + this._in2;
@@ -527,7 +506,6 @@ define(function(require, exports, module) {
     next[C.SCALAR][C.SCALAR][C.SCALAR] = {};
     
     next[C.AUDIO][C.AUDIO][C.AUDIO][C.AUDIO] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -545,7 +523,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.AUDIO][C.AUDIO][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -566,7 +543,6 @@ define(function(require, exports, module) {
       this._in3 = nextIn3;
     };
     next[C.AUDIO][C.AUDIO][C.AUDIO][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -584,7 +560,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.AUDIO][C.CONTROL][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -606,7 +581,6 @@ define(function(require, exports, module) {
     };
     next[C.AUDIO][C.AUDIO][C.CONTROL][C.SCALAR] = next[C.AUDIO][C.AUDIO][C.CONTROL][C.CONTROL];
     next[C.AUDIO][C.AUDIO][C.SCALAR][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var inIn1 = this.inputs[1];
@@ -623,7 +597,6 @@ define(function(require, exports, module) {
       }
     };
     next[C.AUDIO][C.CONTROL][C.CONTROL][C.CONTROL] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;
@@ -646,7 +619,6 @@ define(function(require, exports, module) {
     next[C.AUDIO][C.CONTROL][C.CONTROL][C.SCALAR] = next[C.AUDIO][C.CONTROL][C.CONTROL][C.CONTROL];
     next[C.AUDIO][C.CONTROL][C.SCALAR][C.SCALAR] = next[C.AUDIO][C.CONTROL][C.CONTROL][C.CONTROL];
     next[C.AUDIO][C.SCALAR][C.SCALAR][C.SCALAR] = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var inIn0 = this.inputs[0];
       var in123 = this._in1 + this._in2 + this._in3;

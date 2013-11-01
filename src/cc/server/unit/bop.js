@@ -50,7 +50,6 @@ define(function(require, exports, module) {
   
   var binary_aa = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -63,7 +62,6 @@ define(function(require, exports, module) {
   };
   var binary_ak = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       var nextB  = this.inputs[1][0];
@@ -83,7 +81,6 @@ define(function(require, exports, module) {
   };
   var binary_ai = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var aIn = this.inputs[0], b = this._b;
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -100,7 +97,6 @@ define(function(require, exports, module) {
   };
   var binary_ka = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       var nextA  = this.inputs[0][0];
@@ -125,7 +121,6 @@ define(function(require, exports, module) {
   };
   var binary_ia = function(func) {
     return function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var out = this.outputs[0];
       var a = this._a, bIn = this.inputs[1];
       for (var i = 0; i < inNumSamples; i += 8) {
@@ -146,7 +141,6 @@ define(function(require, exports, module) {
     return a + b;
   };
   calcFunc["+"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -161,7 +155,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["+"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -179,7 +172,6 @@ define(function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["+"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -194,7 +186,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["+"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -215,7 +206,6 @@ define(function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0];
   };
   calcFunc["+"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -234,7 +224,6 @@ define(function(require, exports, module) {
     return a - b;
   };
   calcFunc["-"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -249,7 +238,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["-"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -267,7 +255,6 @@ define(function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["-"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -282,7 +269,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["-"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -303,7 +289,6 @@ define(function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] - this.inputs[1][0];
   };
   calcFunc["-"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -322,7 +307,6 @@ define(function(require, exports, module) {
     return a * b;
   };
   calcFunc["*"].aa = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -337,7 +321,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["*"].ak = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     var nextB  = this.inputs[1][0];
@@ -355,7 +338,6 @@ define(function(require, exports, module) {
     this._b = nextB;
   };
   calcFunc["*"].ai = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var aIn = this.inputs[0], b = this._b;
     for (var i = 0; i < inNumSamples; i += 8) {
@@ -370,7 +352,6 @@ define(function(require, exports, module) {
     }
   };
   calcFunc["*"].ka = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     var nextA  = this.inputs[0][0];
@@ -391,7 +372,6 @@ define(function(require, exports, module) {
     this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0];
   };
   calcFunc["*"].ia = function(inNumSamples) {
-    inNumSamples = inNumSamples|0;
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
     for (var i = 0; i < inNumSamples; i += 8) {

@@ -21,7 +21,6 @@ define(function(require, exports, module) {
       next_aa.call(this, 1);
     };
     var next_ak = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var leftOut  = this.outputs[0];
       var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
@@ -58,7 +57,6 @@ define(function(require, exports, module) {
       }
     };
     var next_aa = function(inNumSamples) {
-      inNumSamples = inNumSamples|0;
       var leftOut  = this.outputs[0];
       var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];
