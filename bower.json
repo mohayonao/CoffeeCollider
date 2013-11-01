@@ -18,6 +18,8 @@
     "documents",
     "examples",
     "files",
+    "bin",
+    "test",
     "Gruntfile.js",
     "index.html"
   ],

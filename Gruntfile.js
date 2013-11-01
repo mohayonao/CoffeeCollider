@@ -239,6 +239,12 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("test", function() {
+    var arg0 = arguments[0];
+    if (arg0 === "integration") {
+      doMochaTest("list", grunt.file.expand("test/**/*.coffee"), this.async());
+      return;
+    }
+    
     // reset the test environment
     Object.keys(require.cache).forEach(function(filepath) {
       if (!/\/node_modules\//.test(filepath)) {
@@ -251,7 +257,6 @@ module.exports = function(grunt) {
     var coverageVar, instrumenter, transformer;
     
     var reporter = "min";
-    var arg0     = arguments[0];
     var tstFiles = [];
     var covFiles = [];
     var matchFn = function(file) {
@@ -283,9 +288,6 @@ module.exports = function(grunt) {
       }
       if (/_test\.js$/.test(arg0)) {
         reporter = "nyan";
-        tstFiles = tstFiles.concat(
-          grunt.file.expand("src/cc/test/*_test.js")
-        );
       } else if (/\.js$/.test(arg0)) {
         reporter = "min";
       } else {
@@ -390,7 +392,7 @@ module.exports = function(grunt) {
       done();
     });
   });
-
+  
   var doMochaTest = function(reporter, files, callback) {
     require("amd-loader");
     
@@ -413,6 +415,6 @@ module.exports = function(grunt) {
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
   grunt.registerTask("build"  , ["typo", "jshint", "test", "dryice", "uglify"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
-  grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
+  grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 
 };

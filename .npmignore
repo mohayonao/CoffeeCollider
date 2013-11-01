@@ -5,6 +5,7 @@
 .jshintignore
 .jshintrc
 .travis.yml
+test/
 coverage/
 documents/
 examples/
