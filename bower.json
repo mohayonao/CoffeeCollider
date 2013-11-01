@@ -1,0 +1,25 @@
+{
+  "name": "coffee-collider",
+  "version": "0.0.0",
+  "authors": [
+    "Nao Yonamine <mohayonao@gmail.com>"
+  ],
+  "description": "lang",
+  "main": "./build/coffee-collider.js",
+  "keywords": [
+    "language", "coffeescript", "supercollider", "music"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "coverage",
+    "documents",
+    "files",
+    "Gruntfile.js"
+  ],
+  "dependencies": {
+    "coffee-script": "~1.6.3"
+  }
+}

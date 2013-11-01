@@ -3,6 +3,9 @@ CoffeeCollider is a language for real time audio synthesis and algorithmic compo
 
 *This is under development.*
 
+## Concept
+Write like a CoffeeScript, be processed like a SuperCollider.
+
 ## Examples
 
 [play it](http://goo.gl/yXLlGj)
@@ -30,9 +33,3 @@ Task.loop ->
 ## Documents
 
 [imperfect documents](https://github.com/mohayonao/CoffeeCollider/wiki/_pages)
-
-## Supports
-
-- Web Audio API
-- Audio Data API
-- Flash fallback

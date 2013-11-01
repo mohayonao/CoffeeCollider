@@ -14,9 +14,9 @@ module.exports = function(grunt) {
     return files.some(function(file) {
       var code = grunt.file.read(file);
       if (/_test\.js/.test(file)) {
-        return/^\s*(describe|it)\.only\(\"/m.test(code);
+        return /^\s*(describe|it)\.only\(\"/m.test(code);
       } else {
-        return/console\.debug\(/m.test(code);
+        return /console\.debug\(.*\)/m.test(code);
       }
     });
   };
@@ -42,12 +42,9 @@ module.exports = function(grunt) {
     pkg: grunt.file.readJSON("package.json"),
     esteWatch: {
       options: {
-        dirs: [ "./", "src/**/", "documents/**/" ],
+        dirs: [ "src/**/"  ],
       },
       js: function(filepath) {
-        if (/documents\//.test(filepath)) {
-          return;
-        }
         if (/src\//.test(filepath)) {
           if (/_test\.js$/.test(filepath)) {
             return "test:" + filepath;
@@ -87,10 +84,10 @@ module.exports = function(grunt) {
     uglify: {
       cc: {
         files: {
-          "coffee-collider-min.js": [ "coffee-collider.js" ]
+          "build/coffee-collider-min.js": [ "build/coffee-collider.js" ]
         },
         options: {
-          sourceMap: "coffee-collider-min.map",
+          sourceMap: "build/coffee-collider-min.map",
           report: "min"
         }
       }
@@ -144,7 +141,7 @@ module.exports = function(grunt) {
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
-    var dest = "coffee-collider";
+    var dest = "build/coffee-collider";
     
     var coffeeColliderProject = {
       roots: [srcroot]
@@ -215,7 +212,7 @@ module.exports = function(grunt) {
     var done = this.async();
     var child = grunt.util.spawn({
       cmd : "mxmlc",
-      args: ["-o", "coffee-collider-fallback.swf", "./src/fallback.as"]
+      args: ["-o", "build/coffee-collider-fallback.swf", "src/fallback.as"]
     }, function(err, result) {
       if (result.code !== 0) {
         grunt.fail.fatal("Compile failed. See the above error message.");
@@ -399,7 +396,7 @@ module.exports = function(grunt) {
   };
   
   grunt.registerTask("check"  , ["typo", "jshint", "test"]);
-  grunt.registerTask("build"  , ["check", "dryice", "uglify"]);
+  grunt.registerTask("build"  , ["typo", "jshint", "test", "dryice", "uglify"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis"]);
 

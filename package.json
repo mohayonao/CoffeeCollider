@@ -1,12 +1,31 @@
 {
-  "name": "CoffeeCollider",
-  "version": 0,
+  "name"   : "coffee-collider",
+  "version": "0.0.0",
+  "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
+  "keywords": [ "language", "coffeescript", "supercollider", "music" ],
+  "author"  : "Nao Yonamine <mohayonao@gmail.com>",
+  "homepage": "http://mohayonao.github.io/CoffeeCollider/",
+  "bugs"    : "https://github.com/mohayonao/CoffeeCollider/issues",
+  "repository": {
+    "type": "git",
+    "url" : "git://github.com/mohayonao/CoffeeCollider.git"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url" : "https://raw.github.com/mohayonao/CoffeeCollider/master/LICENSE"
+    }
+  ],
+  "engines": {
+    "node": ">=0.8.0"
+  },  
+  "main": "./build/coffee-collider.js",
   "dependencies": {
+    "coffee-script": "~1.6.3",
     "ws": "~0.4.31",
     "speaker": "0.0.10"
   },
   "devDependencies": {
-    "coffee-script": "~1.6.3",
     "amd-loader": "0.0.5",
     "mocha": "~1.13.0",
     "chai": "~1.8.0",

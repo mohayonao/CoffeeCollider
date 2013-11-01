@@ -1,0 +1,12 @@
+.git
+.DS_Store
+.editorconfig
+.gitignore
+.jshintignore
+.jshintrc
+.travis.yml
+coverage/
+documents/
+files/
+Gruntfile.js
+index.html
