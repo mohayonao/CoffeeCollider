@@ -96,31 +96,30 @@ define('cc/loader', function(require, exports, module) {
       cc.server.connect();
     }
   } else if (typeof global.GLOBAL !== "undefined") {
-    module.exports = {
-      CoffeeCollider: function() {
-        cc.opmode  = "nodejs";
-        cc.context = "exports/client/server";
-        require("./exports/coffeecollider").use();
-        require("./client/client").use();
-        require("./server/server").use();
-        cc.exports = cc.createCoffeeCollider({nodejs:true});
-        cc.client  = cc.createSynthClient();
-        cc.server  = cc.createSynthServer();
-        cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
-        cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
-        cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
-        cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
-        cc.server.connect();
-        return cc.exports;
-      },
-      SocketSynthServer: function(opts) {
-        cc.opmode  = "socket";
-        cc.context = "server";
-        require("./server/server").use();
-        cc.server = cc.createSynthServer();
-        return cc.server.exports.createServer(opts);
-      }
+    cc.global.CoffeeCollider = function() {
+      cc.opmode  = "nodejs";
+      cc.context = "exports/client/server";
+      require("./exports/coffeecollider").use();
+      require("./client/client").use();
+      require("./server/server").use();
+      cc.exports = cc.createCoffeeCollider({nodejs:true});
+      cc.client  = cc.createSynthClient();
+      cc.server  = cc.createSynthServer();
+      cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
+      cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
+      cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
+      cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
+      cc.server.connect();
+      return cc.exports;
     };
+    cc.global.SocketSynthServer = function(opts) {
+      cc.opmode  = "socket";
+      cc.context = "server";
+      require("./server/server").use();
+      cc.server = cc.createSynthServer();
+      return cc.server.exports.createServer(opts);
+    };
+    module.exports = cc.global;
   }
 
 });
@@ -131,6 +130,7 @@ define('cc/cc', function(require, exports, module) {
   
   module.exports = {
     version: "0.0.0",
+    global: {},
     Object: CCObject
   };
 
@@ -369,6 +369,9 @@ define('cc/client/client', function(require, exports, module) {
   
   
   commands["/connected"] = function(msg) {
+    if (cc.opmode !== "nodejs") {
+      msg.push(Object.keys(cc.global));
+    }
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
@@ -413,6 +416,9 @@ define('cc/client/client', function(require, exports, module) {
     }
     cc.DATA = data;
     global._gltc_ = this.timeline.context;
+    if (cc.global !== global) {
+      global.cc = cc.global;
+    }
     var result = eval.call(global, code);
     if (callback) {
       this.sendToIF(["/executed", execId, pack(result)]);
@@ -977,9 +983,9 @@ define('cc/client/buffer', function(require, exports, module) {
       cc.resetBuffer = resetBuffer;
     },
     exports: function() {
+      // TODO: rename????
       if (typeof Buffer === "undefined") {
-        // TODO: rename????
-        global.Buffer = BufferInterface;
+        cc.global.Buffer = BufferInterface;
       }
     }
   };
@@ -1786,8 +1792,8 @@ define('cc/client/node', function(require, exports, module) {
       cc.resetNode = reset;
     },
     exports: function() {
-      global.Group = GroupInterface;
-      global.Synth = SynthInterface;
+      cc.global.Group = GroupInterface;
+      cc.global.Synth = SynthInterface;
     }
   };
 
@@ -1895,7 +1901,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   
   
   var registerUGen = function(name, spec) {
-    var klass = global[name] = function() {
+    var klass = cc.global[name] = function() {
       return new UGen(name);
     };
     
@@ -3320,7 +3326,7 @@ define('cc/client/sched', function(require, exports, module) {
       };
     },
     exports: function() {
-      global.Task = {
+      cc.global.Task = {
         "do": function(func) {
           return cc.createTaskDo(func);
         },
@@ -4599,8 +4605,8 @@ define('cc/client/scale', function(require, exports, module) {
     Scale  : Scale,
     Tuning : Tuning,
     exports: function() {
-      global.Scale  = ScaleInterface;
-      global.Tuning = TuningInterface;
+      cc.global.Scale  = ScaleInterface;
+      cc.global.Tuning = TuningInterface;
     }
   };
 
@@ -4785,12 +4791,12 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       }
       if (typeof code === "string") {
         code = this.compiler.compile(code.trim());
-        this.sendToClient([
-          "/execute", this.execId, code, append, this.compiler.data, !!callback
-        ]);
         if (callback) {
           this.execCallbacks[this.execId] = callback;
         }
+        this.sendToClient([
+          "/execute", this.execId, code, append, this.compiler.data, !!callback
+        ]);
         this.execId += 1;
       }
     };
@@ -4951,7 +4957,13 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   })();
 
     
-  commands["/connected"] = function() {
+  commands["/connected"] = function(msg) {
+    var globalIds = msg[3];
+    if (globalIds) {
+      globalIds.forEach(function(key) {
+        cc.global[key] = true;
+      });
+    }
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);
@@ -5774,17 +5786,25 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     var i = tokens.length - 2;
     while (i >= 0) {
       var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
-        var name = token[VALUE];
-        if (!/\d/.test(name.charAt(1))) {
-          name = name.substr(1);
-        }
-        if (name !== "") {
-          token = tokens[i - 1];
-          if (!token || token[TAG] !== ".") {
-            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
-            tokens.splice(i+1, 0, ["."         , "."     , _]);
-            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+      if (token[TAG] === "IDENTIFIER") {
+        if (i && tokens[i-1][TAG] !== "." && cc.global.hasOwnProperty(token[VALUE])) {
+          if (token[VALUE] !== "CoffeeCollider" && token[VALUE] !== "SocketSynthServer") {
+            tokens.splice(i  , 1, ["IDENTIFIER", "cc"        , _]);
+            tokens.splice(i+1, 0, ["."         , "."         , _]);
+            tokens.splice(i+2, 0, ["IDENTIFIER", token[VALUE], _]);
+          }
+        } else if (token[VALUE].charAt(0) === "$") {
+          var name = token[VALUE];
+          if (!/\d/.test(name.charAt(1))) {
+            name = name.substr(1);
+          }
+          if (name !== "") {
+            token = tokens[i - 1];
+            if (!token || token[TAG] !== ".") {
+              tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
+              tokens.splice(i+1, 0, ["."         , "."     , _]);
+              tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+            }
           }
         }
       }

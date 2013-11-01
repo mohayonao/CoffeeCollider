@@ -6,6 +6,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     version: "#{VERSION}",
+    global: {},
     Object: CCObject
   };
 

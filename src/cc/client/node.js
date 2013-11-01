@@ -540,8 +540,8 @@ define(function(require, exports, module) {
       cc.resetNode = reset;
     },
     exports: function() {
-      global.Group = GroupInterface;
-      global.Synth = SynthInterface;
+      cc.global.Group = GroupInterface;
+      cc.global.Synth = SynthInterface;
     }
   };
 

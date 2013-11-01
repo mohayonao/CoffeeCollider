@@ -112,7 +112,7 @@ define(function(require, exports, module) {
       };
     },
     exports: function() {
-      global.PSequence = fn(function(list, repeats, offset) {
+      cc.global.PSequence = fn(function(list, repeats, offset) {
         return cc.createPSequence(list, repeats, offset);
       }).defaults("list,repeats=1,offset=0").build();
     }

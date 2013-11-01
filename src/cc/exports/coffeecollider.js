@@ -345,7 +345,13 @@ define(function(require, exports, module) {
   })();
 
     
-  commands["/connected"] = function() {
+  commands["/connected"] = function(msg) {
+    var globalIds = msg[3];
+    if (globalIds) {
+      globalIds.forEach(function(key) {
+        cc.global[key] = true;
+      });
+    }
     this.sendToClient([
       "/init", this.sampleRate, this.channels
     ]);

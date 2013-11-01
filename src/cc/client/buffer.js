@@ -116,9 +116,9 @@ define(function(require, exports, module) {
       cc.resetBuffer = resetBuffer;
     },
     exports: function() {
+      // TODO: rename????
       if (typeof Buffer === "undefined") {
-        // TODO: rename????
-        global.Buffer = BufferInterface;
+        cc.global.Buffer = BufferInterface;
       }
     }
   };

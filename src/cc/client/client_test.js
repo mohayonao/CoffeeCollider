@@ -112,7 +112,10 @@ define(function(require, exports, module) {
         });
         it("/connected", function() {
           instance.recvFromServer(["/connected", 96000, 4]);
-          assert.deepEqual(sendToIF, ["/connected", 96000, 4]);
+          assert.equal(sendToIF[0], "/connected");
+          assert.equal(sendToIF[1], 96000);
+          assert.equal(sendToIF[2], 4);
+          assert.isArray(sendToIF[3]);
         });
         it("/init", function() {
           instance.recvFromIF(["/init", 44100, 2]);

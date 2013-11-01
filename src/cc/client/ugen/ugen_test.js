@@ -29,21 +29,21 @@ define(function(require, exports, module) {
     });
     describe("UGen", function() {
       it("create", function() {
-        var instance = Test.ar();
+        var instance = cc.global.Test.ar();
         assert.instanceOf(instance, ugen.UGen);
         assert.equal("Test", instance.klassName);
       });
       it("inputs", function() {
-        var instance = Test.ar();
+        var instance = cc.global.Test.ar();
         assert.equal(2, instance.numOfInputs);
         assert.deepEqual([1, 2], instance.inputs);
       });
       it("rate", function() {
-        assert.equal(C.AUDIO  , Test.ar().rate);
-        assert.equal(C.CONTROL, Test.kr().rate);
+        assert.equal(C.AUDIO  , cc.global.Test.ar().rate);
+        assert.equal(C.CONTROL, cc.global.Test.kr().rate);
       });
       it("args", function() {
-        var instance = Test.ar(10, {tag:"TEST"});
+        var instance = cc.global.Test.ar(10, {tag:"TEST"});
         assert.equal(2, instance.numOfInputs);
         assert.deepEqual([10, 2], instance.inputs);
         assert.equal("TEST", instance.tag);

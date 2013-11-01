@@ -2,6 +2,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
+  var cc    = require("./cc");
   var scale = require("./scale");
   var _Scale  = scale.Scale;
   var _Tuning = scale.Tuning;
@@ -13,12 +14,12 @@ define(function(require, exports, module) {
     describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {
-        et12 = Tuning.et12;
-        just = Tuning.just;
+        et12 = cc.global.Tuning.et12;
+        just = cc.global.Tuning.just;
       });
       it("create", function() {
         var list = [0,1,2,3,4,5,6,7,8,9,10,11];
-        var t = Tuning(list, 2, "test");
+        var t = cc.global.Tuning(list, 2, "test");
         assert.instanceOf(t, _Tuning);
         assert.equal(t.name, "test");
       });
@@ -91,21 +92,21 @@ define(function(require, exports, module) {
     describe("Scale", function() {
       var major, kumoi, expected, actual;
       before(function() {
-        major = Scale.major;
-        kumoi = Scale.kumoi;
+        major = cc.global.Scale.major;
+        kumoi = cc.global.Scale.kumoi;
       });
       it("create", function() {
         var list = [0,2,4,5,7,9,11];
-        var s = Scale(list, 12, null, "test");
+        var s = cc.global.Scale(list, 12, null, "test");
         assert.instanceOf(s, _Scale);
         assert.equal(s.name, "test");
       });
       it("tuning", function() {
-        major.tuning(Tuning.just);
-        assert.notOk(major.tuning().equals(Tuning.et12));
-        major.tuning(Tuning.at("et12"));
-        assert.notEqual(major.tuning(), Tuning.et12);
-        assert.ok(major.tuning().equals(Tuning.et12));
+        major.tuning(cc.global.Tuning.just);
+        assert.notOk(major.tuning().equals(cc.global.Tuning.et12));
+        major.tuning(cc.global.Tuning.at("et12"));
+        assert.notEqual(major.tuning(), cc.global.Tuning.et12);
+        assert.ok(major.tuning().equals(cc.global.Tuning.et12));
       });
       it("semitones", function() {
         actual = major.semitones();

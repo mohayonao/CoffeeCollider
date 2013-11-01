@@ -209,7 +209,7 @@ define(function(require, exports, module) {
         });
         describe("messaging", function() {
           it("/connected", function() {
-            instance.recvFromClient(["/connected", 96000, 4]);
+            instance.recvFromClient(["/connected", 96000, 4, []]);
             assert.equal(event, "connected");
             assert.deepEqual(posted, ["/init", 8000, 1]);
           });

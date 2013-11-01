@@ -621,7 +621,7 @@ define(function(require, exports, module) {
       };
     },
     exports: function() {
-      global.Task = {
+      cc.global.Task = {
         "do": function(func) {
           return cc.createTaskDo(func);
         },

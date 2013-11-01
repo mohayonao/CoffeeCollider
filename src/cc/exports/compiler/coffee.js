@@ -443,17 +443,25 @@ define(function(require, exports, module) {
     var i = tokens.length - 2;
     while (i >= 0) {
       var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE].charAt(0) === "$") {
-        var name = token[VALUE];
-        if (!/\d/.test(name.charAt(1))) {
-          name = name.substr(1);
-        }
-        if (name !== "") {
-          token = tokens[i - 1];
-          if (!token || token[TAG] !== ".") {
-            tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
-            tokens.splice(i+1, 0, ["."         , "."     , _]);
-            tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+      if (token[TAG] === "IDENTIFIER") {
+        if (i && tokens[i-1][TAG] !== "." && cc.global.hasOwnProperty(token[VALUE])) {
+          if (token[VALUE] !== "CoffeeCollider" && token[VALUE] !== "SocketSynthServer") {
+            tokens.splice(i  , 1, ["IDENTIFIER", "cc"        , _]);
+            tokens.splice(i+1, 0, ["."         , "."         , _]);
+            tokens.splice(i+2, 0, ["IDENTIFIER", token[VALUE], _]);
+          }
+        } else if (token[VALUE].charAt(0) === "$") {
+          var name = token[VALUE];
+          if (!/\d/.test(name.charAt(1))) {
+            name = name.substr(1);
+          }
+          if (name !== "") {
+            token = tokens[i - 1];
+            if (!token || token[TAG] !== ".") {
+              tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
+              tokens.splice(i+1, 0, ["."         , "."     , _]);
+              tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
+            }
           }
         }
       }

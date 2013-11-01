@@ -822,8 +822,8 @@ define(function(require, exports, module) {
     Scale  : Scale,
     Tuning : Tuning,
     exports: function() {
-      global.Scale  = ScaleInterface;
-      global.Tuning = TuningInterface;
+      cc.global.Scale  = ScaleInterface;
+      cc.global.Tuning = TuningInterface;
     }
   };
 

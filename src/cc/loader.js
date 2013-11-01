@@ -53,31 +53,30 @@ define(function(require, exports, module) {
       cc.server.connect();
     }
   } else if (typeof global.GLOBAL !== "undefined") {
-    module.exports = {
-      CoffeeCollider: function() {
-        cc.opmode  = "nodejs";
-        cc.context = "exports/client/server";
-        require("./exports/coffeecollider").use();
-        require("./client/client").use();
-        require("./server/server").use();
-        cc.exports = cc.createCoffeeCollider({nodejs:true});
-        cc.client  = cc.createSynthClient();
-        cc.server  = cc.createSynthServer();
-        cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
-        cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
-        cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
-        cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
-        cc.server.connect();
-        return cc.exports;
-      },
-      SocketSynthServer: function(opts) {
-        cc.opmode  = "socket";
-        cc.context = "server";
-        require("./server/server").use();
-        cc.server = cc.createSynthServer();
-        return cc.server.exports.createServer(opts);
-      }
+    cc.global.CoffeeCollider = function() {
+      cc.opmode  = "nodejs";
+      cc.context = "exports/client/server";
+      require("./exports/coffeecollider").use();
+      require("./client/client").use();
+      require("./server/server").use();
+      cc.exports = cc.createCoffeeCollider({nodejs:true});
+      cc.client  = cc.createSynthClient();
+      cc.server  = cc.createSynthServer();
+      cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
+      cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
+      cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
+      cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
+      cc.server.connect();
+      return cc.exports;
     };
+    cc.global.SocketSynthServer = function(opts) {
+      cc.opmode  = "socket";
+      cc.context = "server";
+      require("./server/server").use();
+      cc.server = cc.createSynthServer();
+      return cc.server.exports.createServer(opts);
+    };
+    module.exports = cc.global;
   }
 
 });

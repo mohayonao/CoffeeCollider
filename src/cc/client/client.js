@@ -233,6 +233,9 @@ define(function(require, exports, module) {
   
   
   commands["/connected"] = function(msg) {
+    if (cc.opmode !== "nodejs") {
+      msg.push(Object.keys(cc.global));
+    }
     this.sendToIF(msg);
   };
   commands["/init"] = function(msg) {
@@ -277,6 +280,9 @@ define(function(require, exports, module) {
     }
     cc.DATA = data;
     global._gltc_ = this.timeline.context;
+    if (cc.global !== global) {
+      global.cc = cc.global;
+    }
     var result = eval.call(global, code);
     if (callback) {
       this.sendToIF(["/executed", execId, pack(result)]);

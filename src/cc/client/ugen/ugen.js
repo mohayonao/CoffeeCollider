@@ -102,7 +102,7 @@ define(function(require, exports, module) {
   
   
   var registerUGen = function(name, spec) {
-    var klass = global[name] = function() {
+    var klass = cc.global[name] = function() {
       return new UGen(name);
     };
     
