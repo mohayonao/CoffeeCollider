@@ -176,6 +176,63 @@ define(function(require, exports, module) {
     
     return ctor;
   })();
+
+  unit.specs.LFSaw = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 2 * this.rate.sampleDur;
+      this._phase    = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase;
+        phase += freqIn[i] * cpstoinc;
+        if (phase >= 1) {
+          phase -= 2;
+        } else if (phase <= -1) {
+          phase += 2;
+        }
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var i;
+      if (freq >= 0) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = phase;
+          phase += freq;
+          if (phase >= 1) {
+            phase -= 2;
+          }
+        }
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = phase;
+          phase += freq;
+          if (phase <= -1) {
+            phase += 2;
+          }
+        }
+      }
+      this._phase = phase;
+    };
+    
+    return ctor;
+  })();
   
   module.exports = {};
 

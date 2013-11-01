@@ -17,6 +17,21 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  ugen.specs.LFSaw = {
+    ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(C.AUDIO, freq, iphase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(C.CONTROL, freq, iphase).madd(mul, add);
+      }
+    }
+  };
   
   module.exports = {};
 
