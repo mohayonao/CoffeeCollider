@@ -5,12 +5,6 @@ define(function(require, exports, module) {
   var scale = require("./scale");
   var _Scale  = scale.Scale;
   var _Tuning = scale.Tuning;
-
-  assert.deepCloseTo = function(expected, actual, delta) {
-    expected.forEach(function(x, i) {
-      assert.closeTo(x, actual[i], delta);
-    });
-  };
   
   describe("scale.js", function() {
     before(function() {

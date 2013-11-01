@@ -1,7 +1,22 @@
 module.exports = function(grunt) {
   "use strict";
 
-  var path = require("path");
+  var path   = require("path");
+  var assert = require("chai").assert;
+  
+  assert.deepCloseTo = function(expected, actual, delta) {
+    expected.forEach(function(x, i) {
+      if (isNaN(x)) {
+        assert.isTrue(isNaN(actual[i]), "NaN");
+      } else if (x === +Infinity) {
+        assert.equal(actual[i], +Infinity);
+      } else if (x === -Infinity) {
+        assert.equal(actual[i], -Infinity);
+      } else {
+        assert.closeTo(actual[i], x, delta);
+      }
+    });
+  };
   
   grunt.loadNpmTasks("grunt-contrib-connect");
   grunt.loadNpmTasks("grunt-contrib-jshint");
