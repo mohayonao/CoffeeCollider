@@ -4951,7 +4951,7 @@ define('cc/common/audioapi', function(require, exports, module) {
           var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
-            if (written > Date.now() - start) {
+            if (written - 60 > Date.now() - start) {
               return;
             }
             var i = interleaved.length;
@@ -6007,7 +6007,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - 60 > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;
@@ -6055,7 +6055,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     IFrameSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - 60 > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;
@@ -6206,7 +6206,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - 60 > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;
@@ -6388,7 +6388,7 @@ define('cc/server/instance', function(require, exports, module) {
       if (this.server) {
         return;
       }
-      var busLength  = server.bufLength * 128 + 4096;
+      var busLength  = server.bufLength * 16 + 128;
       var bufLength  = server.bufLength;
       var bufLength4 = server.bufLength << 2;
       this.server    = server;
@@ -6491,7 +6491,7 @@ define('cc/server/instance', function(require, exports, module) {
   
   var Instance = (function() {
     function Instance(manager, userId) {
-      var busLength = manager.server.bufLength * 128 + 4096;
+      var busLength = manager.server.bufLength * 16 + 128;
       this.manager = manager;
       this.userId  = userId|0;
       this.bus     = new Float32Array(busLength);
@@ -8131,7 +8131,7 @@ define('cc/server/unit/inout', function(require, exports, module) {
         this._busOffset = 0;
       } else {
         this.process = next_k;
-        this._busOffset = this._bufLength * 128;
+        this._busOffset = this._bufLength * 16;
       }
     };
     var next_a = function(inNumSamples, instance) {
@@ -8161,7 +8161,7 @@ define('cc/server/unit/inout', function(require, exports, module) {
         this._busOffset = 0;
       } else {
         this.process = next_k;
-        this._busOffset = this._bufLength * 128;
+        this._busOffset = this._bufLength * 16;
       }
     };
     var next_a = function(inNumSamples, instance) {

@@ -112,7 +112,7 @@ define(function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;
@@ -160,7 +160,7 @@ define(function(require, exports, module) {
       ]);
     };
     IFrameSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;
@@ -311,7 +311,7 @@ define(function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.processDone - 25 > Date.now() - this.processStart) {
+      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
         return;
       }
       var strm = this.strm;

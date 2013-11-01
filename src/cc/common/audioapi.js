@@ -129,7 +129,7 @@ define(function(require, exports, module) {
           var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
-            if (written > Date.now() - start) {
+            if (written - C.PROCESS_MARGIN > Date.now() - start) {
               return;
             }
             var i = interleaved.length;
