@@ -53,11 +53,15 @@ define(function(require, exports, module) {
       cc.server.connect();
     }
   } else if (typeof global.GLOBAL !== "undefined") {
-    cc.opmode  = "socket";
-    cc.context = "server";
-    require("./server/server").use();
-    cc.server = cc.createSynthServer();
-    module.exports.createServer = cc.server.exports.createServer;
+    module.exports = {
+      SocketSynthServer: function(opts) {
+        cc.opmode  = "socket";
+        cc.context = "server";
+        require("./server/server").use();
+        cc.server = cc.createSynthServer();
+        return cc.server.exports.createServer(opts);
+      }
+    };
   }
 
 });

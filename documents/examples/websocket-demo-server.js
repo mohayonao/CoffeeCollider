@@ -1,6 +1,6 @@
-var fs = require("fs");
 var http = require("http");
-var cc = require("../../coffee-collider");
+var fs = require("fs");
+var cc = require("../../build/coffee-collider");
 
 var app = http.createServer();
 var speaker = true;
@@ -32,7 +32,7 @@ app.on("request", function(req, res) {
   case "/coffee-collider.js":
     res.writeHead(200, { "Content-Type": "application/javascript" });
     res.end(fs.readFileSync(
-      __dirname + "/../../coffee-collider.js", "utf-8"
+      __dirname + "/../../build/coffee-collider.js", "utf-8"
     ), "utf-8");
     break;
   case "/waveviewer.js":
@@ -57,7 +57,7 @@ app.on("request", function(req, res) {
 }).listen(process.env.PORT||8888, function() {
   var sessions = {};
   
-  var synthServer = cc.createServer({
+  var synthServer = new cc.SocketSynthServer({
     server:app, path:"/socket", speaker:speaker
   });
   synthServer.on("open", function(userId) {
