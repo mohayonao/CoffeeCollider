@@ -22,7 +22,7 @@ define(function(require, exports, module) {
     }
     
     SynthClient.prototype.sendToIF = function() {
-      throw "should be overridden";
+      throw "SynthClient#sendToIF: should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
       if (msg) {
@@ -33,7 +33,7 @@ define(function(require, exports, module) {
       }
     };
     SynthClient.prototype.sendToServer = function() {
-      throw "should be overridden";
+      throw "SynthClient#sendToServer: should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
       if (msg instanceof Int16Array) {
@@ -73,7 +73,7 @@ define(function(require, exports, module) {
       this.sendToIF(["/buffer/request", path, requestId]);
     };
     SynthClient.prototype.process = function() {
-      throw "should be overridden";
+      throw "SynthClient#process: should be overridden";
     };
     
     return SynthClient;
@@ -138,19 +138,39 @@ define(function(require, exports, module) {
     
     return IFrameSynthClient;
   })();
+  
+  
+  var NodeJSSynthClient = (function() {
+    function NodeJSSynthClient() {
+      SynthClient.call(this);
+      this.sampleRate = C.NODEJS_SAMPLERATE;
+      this.channels   = C.NODEJS_CHANNELS;
+      this.strmLength = C.NODEJS_STRM_LENGTH;
+      this.bufLength  = C.NODEJS_BUF_LENGTH;
+    }
+    extend(NodeJSSynthClient, SynthClient);
 
-
+    NodeJSSynthClient.prototype.process = function() {
+      this.timeline.process();
+      var timelineResult = this.timelineResult.splice(0);
+      this.sendToServer(["/processed", timelineResult]);
+    };
+    
+    return NodeJSSynthClient;
+  })();
+  
+  
   var SocketSynthClient = (function() {
     require("../common/browser").use();
     function SocketSynthClient() {
-      SynthClient.call(this);
+      NodeJSSynthClient.call(this);
       this.sampleRate = C.SOCKET_SAMPLERATE;
       this.channels   = C.SOCKET_CHANNELS;
       this.strmLength = C.SOCKET_STRM_LENGTH;
       this.bufLength  = C.SOCKET_BUF_LENGTH;
       this.socketPath = null;
     }
-    extend(SocketSynthClient, SynthClient);
+    extend(SocketSynthClient, NodeJSSynthClient);
 
     SocketSynthClient.prototype.openSocket = function() {
       var that = this;
@@ -194,6 +214,7 @@ define(function(require, exports, module) {
       this.socket.close();
       this.socket = null;
     };
+    
     SocketSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
@@ -209,6 +230,7 @@ define(function(require, exports, module) {
     
     return SocketSynthClient;
   })();
+  
   
   commands["/connected"] = function(msg) {
     this.sendToIF(msg);
@@ -329,6 +351,8 @@ define(function(require, exports, module) {
           return cc.createWorkerSynthClient();
         case "iframe":
           return cc.createIFrameSynthClient();
+        case "nodejs":
+          return cc.createNodeJSSynthClient();
         case "socket":
           return cc.createSocketSynthClient();
         }
@@ -360,6 +384,11 @@ define(function(require, exports, module) {
           };
         }
         cc.opmode = "iframe";
+        return client;
+      };
+      cc.createNodeJSSynthClient = function() {
+        var client = new NodeJSSynthClient();
+        cc.opmode = "nodejs";
         return client;
       };
       cc.createSocketSynthClient = function() {

@@ -96,11 +96,31 @@ define('cc/loader', function(require, exports, module) {
       cc.server.connect();
     }
   } else if (typeof global.GLOBAL !== "undefined") {
-    cc.opmode  = "socket";
-    cc.context = "server";
-    require("./server/server").use();
-    cc.server = cc.createSynthServer();
-    module.exports.createServer = cc.server.exports.createServer;
+    module.exports = {
+      CoffeeCollider: function() {
+        cc.opmode  = "nodejs";
+        cc.context = "exports/client/server";
+        require("./exports/coffeecollider").use();
+        require("./client/client").use();
+        require("./server/server").use();
+        cc.exports = cc.createCoffeeCollider({nodejs:true});
+        cc.client  = cc.createSynthClient();
+        cc.server  = cc.createSynthServer();
+        cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
+        cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
+        cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
+        cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
+        cc.server.connect();
+        return cc.exports;
+      },
+      SocketSynthServer: function(opts) {
+        cc.opmode  = "socket";
+        cc.context = "server";
+        require("./server/server").use();
+        cc.server = cc.createSynthServer();
+        return cc.server.exports.createServer(opts);
+      }
+    };
   }
 
 });
@@ -138,7 +158,7 @@ define('cc/client/client', function(require, exports, module) {
     }
     
     SynthClient.prototype.sendToIF = function() {
-      throw "should be overridden";
+      throw "SynthClient#sendToIF: should be overridden";
     };
     SynthClient.prototype.recvFromIF = function(msg) {
       if (msg) {
@@ -149,7 +169,7 @@ define('cc/client/client', function(require, exports, module) {
       }
     };
     SynthClient.prototype.sendToServer = function() {
-      throw "should be overridden";
+      throw "SynthClient#sendToServer: should be overridden";
     };
     SynthClient.prototype.recvFromServer = function(msg) {
       if (msg instanceof Int16Array) {
@@ -189,7 +209,7 @@ define('cc/client/client', function(require, exports, module) {
       this.sendToIF(["/buffer/request", path, requestId]);
     };
     SynthClient.prototype.process = function() {
-      throw "should be overridden";
+      throw "SynthClient#process: should be overridden";
     };
     
     return SynthClient;
@@ -254,19 +274,39 @@ define('cc/client/client', function(require, exports, module) {
     
     return IFrameSynthClient;
   })();
+  
+  
+  var NodeJSSynthClient = (function() {
+    function NodeJSSynthClient() {
+      SynthClient.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 4096;
+      this.bufLength  = 64;
+    }
+    extend(NodeJSSynthClient, SynthClient);
 
-
+    NodeJSSynthClient.prototype.process = function() {
+      this.timeline.process();
+      var timelineResult = this.timelineResult.splice(0);
+      this.sendToServer(["/processed", timelineResult]);
+    };
+    
+    return NodeJSSynthClient;
+  })();
+  
+  
   var SocketSynthClient = (function() {
     require("../common/browser").use();
     function SocketSynthClient() {
-      SynthClient.call(this);
+      NodeJSSynthClient.call(this);
       this.sampleRate = 44100;
       this.channels   = 2;
       this.strmLength = 4096;
       this.bufLength  = 128;
       this.socketPath = null;
     }
-    extend(SocketSynthClient, SynthClient);
+    extend(SocketSynthClient, NodeJSSynthClient);
 
     SocketSynthClient.prototype.openSocket = function() {
       var that = this;
@@ -310,6 +350,7 @@ define('cc/client/client', function(require, exports, module) {
       this.socket.close();
       this.socket = null;
     };
+    
     SocketSynthClient.prototype.process = function() {
       var timeline = this.timeline;
       var n = this.strmLength / this.bufLength;
@@ -325,6 +366,7 @@ define('cc/client/client', function(require, exports, module) {
     
     return SocketSynthClient;
   })();
+  
   
   commands["/connected"] = function(msg) {
     this.sendToIF(msg);
@@ -445,6 +487,8 @@ define('cc/client/client', function(require, exports, module) {
           return cc.createWorkerSynthClient();
         case "iframe":
           return cc.createIFrameSynthClient();
+        case "nodejs":
+          return cc.createNodeJSSynthClient();
         case "socket":
           return cc.createSocketSynthClient();
         }
@@ -476,6 +520,11 @@ define('cc/client/client', function(require, exports, module) {
           };
         }
         cc.opmode = "iframe";
+        return client;
+      };
+      cc.createNodeJSSynthClient = function() {
+        var client = new NodeJSSynthClient();
+        cc.opmode = "nodejs";
         return client;
       };
       cc.createSocketSynthClient = function() {
@@ -4588,6 +4637,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       } else if (opts.iframe) {
         this.impl = cc.createCoffeeColliderIFrameImpl(this, opts);
         cc.opmode = "iframe";
+      } else if (opts.nodejs) {
+        this.impl = cc.createCoffeeColliderNodeJSImpl(this, opts);
+        cc.opmode = "nodejs";
       } else {
         this.impl = cc.createCoffeeColliderWorkerImpl(this, opts);
         cc.opmode = "worker";
@@ -4672,14 +4724,16 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
+        if (this.api) {
+          var strm = this.strm;
+          for (var i = 0, imax = strm.length; i < imax; ++i) {
+            strm[i] = 0;
+          }
+          this.strmList.splice(0);
+          this.strmListReadIndex  = 0;
+          this.strmListWriteIndex = 0;
+          this.api.play();
         }
-        this.strmList.splice(0);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.api.play();
         this.sendToClient(["/play"]);
         this.exports.emit("play");
       }
@@ -4687,7 +4741,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        this.api.pause();
+        if (this.api) {
+          this.api.pause();
+        }
         this.sendToClient(["/pause"]);
         this.exports.emit("pause");
       }
@@ -4777,34 +4833,36 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
       var api = this.api;
-      if (typeof path !== "string") {
-        throw new TypeError("readAudioFile: first argument must be a String.");
-      }
-      if (typeof callback !== "function") {
-        throw new TypeError("readAudioFile: second argument must be a Function.");
-      }
-      if (!api.decodeAudioFile) {
-        callback("Audio decoding not supported", null);
-        return;
-      }
-      var xhr = cc.createXMLHttpRequest();
-      xhr.open("GET", path);
-      xhr.responseType = "arraybuffer";
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200 && xhr.response) {
-            api.decodeAudioFile(xhr.response, function(err, buffer) {
-              callback(err, buffer);
-            });
-          } else {
-            callback("error", null);
-          }
+      if (this.api) {
+        if (typeof path !== "string") {
+          throw new TypeError("readAudioFile: first argument must be a String.");
         }
-      };
-      xhr.send();
+        if (typeof callback !== "function") {
+          throw new TypeError("readAudioFile: second argument must be a Function.");
+        }
+        if (!api.decodeAudioFile) {
+          callback("Audio decoding not supported", null);
+          return;
+        }
+        var xhr = cc.createXMLHttpRequest();
+        xhr.open("GET", path);
+        xhr.responseType = "arraybuffer";
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200 && xhr.response) {
+              api.decodeAudioFile(xhr.response, function(err, buffer) {
+                callback(err, buffer);
+              });
+            } else {
+              callback("error", null);
+            }
+          }
+        };
+        xhr.send();
+      }
     };
     CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
-      if (this.api.type === "Web Audio API") {
+      if (this.api && this.api.type === "Web Audio API") {
         return [ this.api.context, this.api.jsNode ];
       }
       return [];
@@ -4854,8 +4912,21 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     
     return CoffeeColliderIFrameImpl;
   })();
-
-
+  
+  
+  var CoffeeColliderNodeJSImpl = (function() {
+    function CoffeeColliderNodeJSImpl(exports, opts) {
+      this.strmLength = 4096;
+      this.bufLength  = 64;
+      CoffeeColliderImpl.call(this, exports, opts);
+      this.api = null;
+    }
+    extend(CoffeeColliderNodeJSImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderNodeJSImpl;
+  })();
+  
+  
   var CoffeeColliderSocketImpl = (function() {
     function CoffeeColliderSocketImpl(exports, opts) {
       this.strmLength = 4096;
@@ -4878,7 +4949,8 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     
     return CoffeeColliderSocketImpl;
   })();
-  
+
+    
   commands["/connected"] = function() {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
@@ -4927,6 +4999,9 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     };
     cc.createCoffeeColliderIFrameImpl = function(exports, opts) {
       return new CoffeeColliderIFrameImpl(exports, opts);
+    };
+    cc.createCoffeeColliderNodeJSImpl = function(exports, opts) {
+      return new CoffeeColliderNodeJSImpl(exports, opts);
     };
     cc.createCoffeeColliderSocketImpl = function(exports, opts) {
       return new CoffeeColliderSocketImpl(exports, opts);
@@ -6036,7 +6111,7 @@ define('cc/server/server', function(require, exports, module) {
     }
     
     SynthServer.prototype.sendToClient = function() {
-      throw "should be overridden";
+      throw "SynthServer#sendToClient: should be overridden";
     };
     SynthServer.prototype.recvFromClient = function(msg, userId) {
       userId = userId|0;
@@ -6052,7 +6127,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SynthServer.prototype.connect = function() {
-      throw "should be overridden";
+      throw "SynthServer#connect: should be overridden";
     };
     SynthServer.prototype.init = function(msg) {
       if (!this.initialized) {
@@ -6089,16 +6164,13 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.reset(userId);
     };
-    SynthServer.prototype.process = function() {
-      throw "should be overridden";
-    };
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
       this.instanceManager.pushToTimeline(userId, timeline);
     };
     SynthServer.prototype.process = function() {
-      throw "should be overridden";
+      throw "SynthServer#process: should be overridden";
     };
     
     return SynthServer;
@@ -6199,16 +6271,114 @@ define('cc/server/server', function(require, exports, module) {
     
     return IFrameSynthServer;
   })();
+  
+  
+  var NodeJSSynthServer = (function() {
+    function NodeJSSynthServer() {
+      SynthServer.call(this);
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.strmLength = 4096;
+      this.bufLength  = 64;
+      require("../common/audioapi").use();
+    }
+    extend(NodeJSSynthServer, SynthServer);
 
-
+    NodeJSSynthServer.prototype.init = function() {
+      if (!this.initialized) {
+        SynthServer.prototype.init.call(this);
+        this.api = cc.createAudioAPI(this);
+      }
+    };
+    NodeJSSynthServer.prototype.connect = function() {
+      this.sendToClient([
+        "/connected", this.sampleRate, this.channels
+      ]);
+    };
+    NodeJSSynthServer.prototype.play = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.play(userId);
+      if (this.api) {
+        this._strm = new Int16Array(this.strmLength * this.channels);
+        this.strmList = new Array(8);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        if (!this.api.isPlaying) {
+          this.api.play();
+        }
+      }
+      if (!this.timer.isRunning()) {
+        this.processStart = Date.now();
+        this.processDone  = 0;
+        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
+        this.timer.start(this.process.bind(this), 10);
+      }
+    };
+    NodeJSSynthServer.prototype.pause = function(msg, userId) {
+      userId = userId|0;
+      this.instanceManager.pause(userId);
+      if (this.api) {
+        if (this.api.isPlaying) {
+          if (!this.instanceManager.isRunning()) {
+            this.api.pause();
+          }
+        }
+      }
+      if (this.timer.isRunning()) {
+        if (!this.instanceManager.isRunning()) {
+          this.timer.stop();
+        }
+      }
+    };
+    NodeJSSynthServer.prototype.process = function() {
+      if (this.processDone - 60 > Date.now() - this.processStart) {
+        return;
+      }
+      var strm = this.strm;
+      var instanceManager = this.instanceManager;
+      var strmLength = this.strmLength;
+      var bufLength  = this.bufLength;
+      var busOutL = instanceManager.busOutL;
+      var busOutR = instanceManager.busOutR;
+      var client = cc.client;
+      var offset = 0;
+      for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
+        client.process();
+        instanceManager.process(bufLength);
+        var j = bufLength, k = strmLength + bufLength;
+        while (k--, j--) {
+          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
+          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
+        }
+        offset += bufLength;
+      }
+      this.sendToClient(strm);
+      this.processDone += this.processInterval;
+      
+      if (this.api) {
+        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+      }
+    };
+    NodeJSSynthServer.prototype._process = function() {
+      var strm = this.strmList[this.strmListReadIndex];
+      if (strm) {
+        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this._strm.set(strm);
+      }
+    };
+    
+    return NodeJSSynthServer;
+  })();
+  
+  
   var SocketSynthServer = (function() {
     var WebSocketServer;
     if (global.require) {
       WebSocketServer = global.require("ws").Server;
     }
-    require("../common/audioapi").use();
     function SocketSynthServer() {
-      SynthServer.call(this);
+      NodeJSSynthServer.call(this);
       this.sampleRate = 44100;
       this.channels   = 2;
       this.strmLength = 4096;
@@ -6217,7 +6387,7 @@ define('cc/server/server', function(require, exports, module) {
       this.map  = {};
       this.exports = null; // bind after
     }
-    extend(SocketSynthServer, SynthServer);
+    extend(SocketSynthServer, NodeJSSynthServer);
     
     SocketSynthServer.prototype._init = function(opts) {
       var that = this;
@@ -6288,41 +6458,6 @@ define('cc/server/server', function(require, exports, module) {
         }
       }
     };
-    SocketSynthServer.prototype.play = function(msg, userId) {
-      userId = userId|0;
-      this.instanceManager.play(userId);
-      if (this.api) {
-        this._strm = new Int16Array(this.strmLength * this.channels);
-        this.strmList = new Array(8);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        if (!this.api.isPlaying) {
-          this.api.play();
-        }
-      }
-      if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
-        this.timer.start(this.process.bind(this), 10);
-      }
-    };
-    SocketSynthServer.prototype.pause = function(msg, userId) {
-      userId = userId|0;
-      this.instanceManager.pause(userId);
-      if (this.api) {
-        if (this.api.isPlaying) {
-          if (!this.instanceManager.isRunning()) {
-            this.api.pause();
-          }
-        }
-      }
-      if (this.timer.isRunning()) {
-        if (!this.instanceManager.isRunning()) {
-          this.timer.stop();
-        }
-      }
-    };
     SocketSynthServer.prototype.process = function() {
       if (this.processDone - 60 > Date.now() - this.processStart) {
         return;
@@ -6350,13 +6485,6 @@ define('cc/server/server', function(require, exports, module) {
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
-      }
-    };
-    SocketSynthServer.prototype._process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
-      if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
-        this._strm.set(strm);
       }
     };
     
@@ -6428,6 +6556,8 @@ define('cc/server/server', function(require, exports, module) {
           return cc.createWorkerSynthServer();
         case "iframe":
           return cc.createIFrameSynthServer();
+        case "nodejs":
+          return cc.createNodeJSSynthServer();
         case "socket":
           return cc.createSocketSynthServer();
         }
@@ -6444,6 +6574,11 @@ define('cc/server/server', function(require, exports, module) {
           server.recvFromClient(e.data, 0);
         };
         cc.opmode = "iframe";
+        return server;
+      };
+      cc.createNodeJSSynthServer = function() {
+        var server = new NodeJSSynthServer();
+        cc.opmode = "nodejs";
         return server;
       };
       cc.createSocketSynthServer = function() {

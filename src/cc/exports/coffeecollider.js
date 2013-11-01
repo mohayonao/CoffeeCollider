@@ -31,6 +31,9 @@ define(function(require, exports, module) {
       } else if (opts.iframe) {
         this.impl = cc.createCoffeeColliderIFrameImpl(this, opts);
         cc.opmode = "iframe";
+      } else if (opts.nodejs) {
+        this.impl = cc.createCoffeeColliderNodeJSImpl(this, opts);
+        cc.opmode = "nodejs";
       } else {
         this.impl = cc.createCoffeeColliderWorkerImpl(this, opts);
         cc.opmode = "worker";
@@ -115,14 +118,16 @@ define(function(require, exports, module) {
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
+        if (this.api) {
+          var strm = this.strm;
+          for (var i = 0, imax = strm.length; i < imax; ++i) {
+            strm[i] = 0;
+          }
+          this.strmList.splice(0);
+          this.strmListReadIndex  = 0;
+          this.strmListWriteIndex = 0;
+          this.api.play();
         }
-        this.strmList.splice(0);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.api.play();
         this.sendToClient(["/play"]);
         this.exports.emit("play");
       }
@@ -130,7 +135,9 @@ define(function(require, exports, module) {
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        this.api.pause();
+        if (this.api) {
+          this.api.pause();
+        }
         this.sendToClient(["/pause"]);
         this.exports.emit("pause");
       }
@@ -220,34 +227,36 @@ define(function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.readAudioFile = function(path, callback) {
       var api = this.api;
-      if (typeof path !== "string") {
-        throw new TypeError("readAudioFile: first argument must be a String.");
-      }
-      if (typeof callback !== "function") {
-        throw new TypeError("readAudioFile: second argument must be a Function.");
-      }
-      if (!api.decodeAudioFile) {
-        callback("Audio decoding not supported", null);
-        return;
-      }
-      var xhr = cc.createXMLHttpRequest();
-      xhr.open("GET", path);
-      xhr.responseType = "arraybuffer";
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200 && xhr.response) {
-            api.decodeAudioFile(xhr.response, function(err, buffer) {
-              callback(err, buffer);
-            });
-          } else {
-            callback("error", null);
-          }
+      if (this.api) {
+        if (typeof path !== "string") {
+          throw new TypeError("readAudioFile: first argument must be a String.");
         }
-      };
-      xhr.send();
+        if (typeof callback !== "function") {
+          throw new TypeError("readAudioFile: second argument must be a Function.");
+        }
+        if (!api.decodeAudioFile) {
+          callback("Audio decoding not supported", null);
+          return;
+        }
+        var xhr = cc.createXMLHttpRequest();
+        xhr.open("GET", path);
+        xhr.responseType = "arraybuffer";
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200 && xhr.response) {
+              api.decodeAudioFile(xhr.response, function(err, buffer) {
+                callback(err, buffer);
+              });
+            } else {
+              callback("error", null);
+            }
+          }
+        };
+        xhr.send();
+      }
     };
     CoffeeColliderImpl.prototype.getWebAudioComponents = function() {
-      if (this.api.type === "Web Audio API") {
+      if (this.api && this.api.type === "Web Audio API") {
         return [ this.api.context, this.api.jsNode ];
       }
       return [];
@@ -297,8 +306,21 @@ define(function(require, exports, module) {
     
     return CoffeeColliderIFrameImpl;
   })();
-
-
+  
+  
+  var CoffeeColliderNodeJSImpl = (function() {
+    function CoffeeColliderNodeJSImpl(exports, opts) {
+      this.strmLength = C.NODEJS_STRM_LENGTH;
+      this.bufLength  = C.NODEJS_BUF_LENGTH;
+      CoffeeColliderImpl.call(this, exports, opts);
+      this.api = null;
+    }
+    extend(CoffeeColliderNodeJSImpl, CoffeeColliderImpl);
+    
+    return CoffeeColliderNodeJSImpl;
+  })();
+  
+  
   var CoffeeColliderSocketImpl = (function() {
     function CoffeeColliderSocketImpl(exports, opts) {
       this.strmLength = C.SOCKET_STRM_LENGTH;
@@ -321,7 +343,8 @@ define(function(require, exports, module) {
     
     return CoffeeColliderSocketImpl;
   })();
-  
+
+    
   commands["/connected"] = function() {
     this.sendToClient([
       "/init", this.sampleRate, this.channels
@@ -370,6 +393,9 @@ define(function(require, exports, module) {
     };
     cc.createCoffeeColliderIFrameImpl = function(exports, opts) {
       return new CoffeeColliderIFrameImpl(exports, opts);
+    };
+    cc.createCoffeeColliderNodeJSImpl = function(exports, opts) {
+      return new CoffeeColliderNodeJSImpl(exports, opts);
     };
     cc.createCoffeeColliderSocketImpl = function(exports, opts) {
       return new CoffeeColliderSocketImpl(exports, opts);
