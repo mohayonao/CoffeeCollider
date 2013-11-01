@@ -310,7 +310,7 @@ define(function(require, exports, module) {
       require("./buffer").use();
       require("./node").use();
       require("./sched").use();
-      require("./ugen/exports").use();
+      require("./ugen/installer").use();
       
       cc.client_exports = function() {
         require("./object").exports();
@@ -320,7 +320,7 @@ define(function(require, exports, module) {
         require("./node").exports();
         require("./sched").exports();
         require("./scale").exports();
-        require("./ugen/exports").exports();
+        require("./ugen/ugen").exports();
       };
       cc.createSynthClient = function() {
         cc.client_exports();

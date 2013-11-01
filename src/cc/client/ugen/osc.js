@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var cc = require("../cc");
+  var ugen = require("./ugen");
   
-  var iSinOsc = {
+  ugen.specs.SinOsc = {
     ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
@@ -18,11 +18,6 @@ define(function(require, exports, module) {
     }
   };
   
-  
-  module.exports = {
-    exports: function() {
-      cc.registerUGen("SinOsc", iSinOsc);
-    }
-  };
+  module.exports = {};
 
 });

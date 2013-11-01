@@ -2,9 +2,11 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var slice = [].slice;
+  var ugen = require("./ugen");
   
-  var playBuf_ctor = function(rate) {
+  var slice = [].slice;
+
+  var playbuf_ctor = function(rate) {
     return function(numChannels, buffer) {
       if (typeof numChannels !== "number") {
         throw new TypeError("Buffer: arguments[0] should be an integer.");
@@ -19,24 +21,19 @@ define(function(require, exports, module) {
     };
   };
   
-  var iPlayBuf = {
+  ugen.specs.PlayBuf = {
     ar: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(C.AUDIO),
+      ctor: playbuf_ctor(C.AUDIO),
       Klass: cc.MultiOutUGen
     },
     kr: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playBuf_ctor(C.CONTROL),
+      ctor: playbuf_ctor(C.CONTROL),
       Klass: cc.MultiOutUGen
     },
   };
   
-  
-  module.exports = {
-    exports: function() {
-      cc.registerUGen("PlayBuf", iPlayBuf);
-    }
-  };
+  module.exports = {};
 
 });

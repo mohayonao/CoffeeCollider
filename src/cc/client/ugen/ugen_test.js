@@ -4,7 +4,8 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   var cc = require("../cc");
-  var ugen = require("./ugen");
+  var ugen  = require("./ugen");
+  var inout = require("./inout");
   
   cc.registerUGen("Test", {
     ar: {
@@ -24,6 +25,7 @@ define(function(require, exports, module) {
   describe("ugen.js", function() {
     before(function() {
       ugen.use();
+      inout.use();
     });
     describe("UGen", function() {
       it("create", function() {

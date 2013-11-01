@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var cc = require("../cc");
+  var ugen = require("./ugen");
   
-  var iLine = {
+  ugen.specs.Line = {
     ar: {
       defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
@@ -18,11 +18,6 @@ define(function(require, exports, module) {
     }
   };
   
-  
-  module.exports = {
-    exports: function() {
-      cc.registerUGen("Line", iLine);
-    }
-  };
+  module.exports = {};
 
 });

@@ -4,10 +4,10 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
-  var utils  = require("../utils");
   var slice  = [].slice;
   
   var addToSynthDef = null;
+  var specs = {};
   
   var UGen = (function() {
     function UGen(name) {
@@ -100,100 +100,14 @@ define(function(require, exports, module) {
     return OutputProxy;
   })();
   
-  var Control = (function() {
-    function Control(rate) {
-      MultiOutUGen.call(this, "Control");
-      this.rate   = rate;
-      this.values = null;
-    }
-    extend(Control, MultiOutUGen);
-    Control.prototype.init = function(list) {
-      UGen.prototype.init.apply(this, [this.rate].concat(list));
-      this.values = list.slice();
-      return this.initOutputs(this.values.length, this.rate);
-    };
-    return Control;
-  })();
-
-  var Out = (function() {
-    function Out() {
-      UGen.call(this, "Out");
-    }
-    extend(Out, UGen);
-    return Out;
-  })();
-
-  var out_ctor = function(rate) {
-    function ctor(bus, channelsArray) {
-      if (!(bus instanceof UGen || typeof bus === "number")) {
-        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
-      }
-      if (!Array.isArray(channelsArray)) {
-        channelsArray = [ channelsArray ];
-      }
-      channelsArray = utils.flatten(channelsArray);
-      channelsArray = channelsArray.filter(function(x) {
-        return x !== 0;
-      });
-      if (channelsArray.length) {
-        UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
-      }
-    }
-    return function(bus, channelsArray) {
-      if (Array.isArray(bus)) {
-        bus.forEach(function(bus) {
-          ctor(bus, channelsArray);
-        });
-      } else {
-        ctor(bus, channelsArray);
-      }
-      return 0; // Out has no output
-    };
-  };
   
-  var iOut = {
-    ar: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(C.AUDIO),
-      multiCall: false,
-      Klass: null
-    },
-    kr: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(C.CONTROL),
-      multiCall: false,
-      Klass: null
-    }
-  };
-
-  var iIn = {
-    ar: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, C.AUDIO);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: MultiOutUGen
-    },
-    kr: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, C.CONTROL);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: MultiOutUGen
-    }
-  };
-  
-  var registerUGen = function(name, payload) {
+  var registerUGen = function(name, spec) {
     var klass = global[name] = function() {
       return new UGen(name);
     };
     
-    Object.keys(payload).forEach(function(key) {
-      var setting   = payload[key];
+    Object.keys(spec).forEach(function(key) {
+      var setting   = spec[key];
       var defaults  = setting.defaults + ",tag";
       var ctor      = setting.ctor;
       var multiCall = setting.multiCall;
@@ -235,8 +149,7 @@ define(function(require, exports, module) {
     UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
     OutputProxy : OutputProxy,
-    Control     : Control,
-    Out         : Out,
+    specs       : specs,
     
     use: function() {
       cc.createUGen = function() {
@@ -244,9 +157,6 @@ define(function(require, exports, module) {
       };
       cc.createOutputProxy = function(rate, source, index) {
         return new OutputProxy(rate, source, index);
-      };
-      cc.createControl = function(rate) {
-        return new Control(rate);
       };
       cc.instanceOfUGen = function(obj) {
         return obj instanceof UGen;
@@ -256,9 +166,6 @@ define(function(require, exports, module) {
       };
       cc.instanceOfOutputProxy = function(obj) {
         return obj instanceof OutputProxy;
-      };
-      cc.instanceOfOut = function(obj) {
-        return obj instanceof Out;
       };
       cc.setSynthDef = function(func) {
         if (func && addToSynthDef !== null) {
@@ -273,8 +180,10 @@ define(function(require, exports, module) {
       cc.registerUGen = registerUGen;
     },
     exports: function() {
-      registerUGen("Out", iOut);
-      registerUGen("In" , iIn );
+      require("./installer").install();
+      Object.keys(specs).forEach(function(name) {
+        registerUGen(name, specs[name]);
+      });
     }
   };
 

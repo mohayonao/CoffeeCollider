@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  
+  var ugen = require("./ugen");
+
   var pan2_ctor = function(rate) {
     return function(_in, pos, level) {
       this.init.call(this, rate, _in, pos, level);
@@ -15,7 +16,7 @@ define(function(require, exports, module) {
     };
   };
   
-  var iPan2 = {
+  ugen.specs.Pan2 = {
     ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.AUDIO),
@@ -28,11 +29,6 @@ define(function(require, exports, module) {
     },
   };
   
-  
-  module.exports = {
-    exports: function() {
-      cc.registerUGen("Pan2", iPan2);
-    }
-  };
+  module.exports = {};
 
 });

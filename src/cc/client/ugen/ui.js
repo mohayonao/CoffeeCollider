@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
   
-  var cc = require("../cc");
+  var ugen = require("./ugen");
   
-  var iMouseXY = {
+  var MouseXY = {
     kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
@@ -16,7 +16,10 @@ define(function(require, exports, module) {
       }
     }
   };
-  var iMouseButton = {
+  ugen.specs.MouseX = MouseXY;
+  ugen.specs.MouseY = MouseXY;
+  
+  ugen.specs.MouseButton = {
     kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
@@ -25,13 +28,6 @@ define(function(require, exports, module) {
     }
   };
   
-  
-  module.exports = {
-    exports: function() {
-      cc.registerUGen("MouseX", iMouseXY);
-      cc.registerUGen("MouseY", iMouseXY);
-      cc.registerUGen("MouseButton", iMouseButton);
-    }
-  };
+  module.exports = {};
 
 });
