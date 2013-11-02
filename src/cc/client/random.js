@@ -56,6 +56,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     Random: Random,
+    
     use: function() {
       cc.createRandom = function(seed) {
         return new Random(seed);

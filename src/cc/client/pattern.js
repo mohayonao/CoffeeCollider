@@ -193,7 +193,13 @@ define(function(require, exports, module) {
     
     return PBinaryOp;
   })();
-  
+
+  cc.global.PSequence = fn(function(list, repeats, offset) {
+    return cc.createPSequence(list, repeats, offset);
+  }).defaults("list,repeats=1,offset=0").build();
+  cc.global.PShuffle = fn(function(list, repeats) {
+    return cc.createPShuffle(list, repeats);
+  }).defaults("list,repeats=1").build();
   
   module.exports = {
     Pattern  : Pattern,
@@ -209,14 +215,6 @@ define(function(require, exports, module) {
       cc.createPShuffle = function(list, repeats) {
         return new PShuffle(list, repeats);
       };
-    },
-    exports: function() {
-      cc.global.PSequence = fn(function(list, repeats, offset) {
-        return cc.createPSequence(list, repeats, offset);
-      }).defaults("list,repeats=1,offset=0").build();
-      cc.global.PShuffle = fn(function(list, repeats) {
-        return cc.createPShuffle(list, repeats);
-      }).defaults("list,repeats=1").build();
     }
   };
 

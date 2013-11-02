@@ -337,14 +337,18 @@ define(function(require, exports, module) {
       require("../common/timer").use();
       require("./buffer").use();
       require("./node").use();
-      require("./sched").use();
+      require("./pattern").use();
       require("./random").use();
+      require("./scale").use();
+      require("./sched").use();
       require("./ugen/installer").use();
       
       cc.createSynthClient = function() {
         require("./object");
         require("./number");
+        require("./array");
         require("./ugen/ugen").install();
+        require("./data");
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthClient();

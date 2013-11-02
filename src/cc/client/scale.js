@@ -823,6 +823,7 @@ define(function(require, exports, module) {
   module.exports = {
     Scale : Scale,
     Tuning: Tuning,
+    
     use: function() {
       cc.createScale = function(degrees, pitchesPerOctave, tuning, name) {
         return new Scale(degrees, pitchesPerOctave, tuning, name);
