@@ -100,21 +100,47 @@ define(function(require, exports, module) {
     
     return PSequence;
   })();
+
+  var PShuffle = (function() {
+    function PShuffle(list, repeats) {
+      if (!(Array.isArray(list) || list instanceof Pattern)) {
+        throw new TypeError("PShuffle: the first argument is invalid");
+      }
+      if (typeof repeats !== "number") {
+        throw new TypeError("PShuffle: the second argument must be a Number");
+      }
+      list.sort(shuffle);
+      PSequence.call(this, list, repeats, 0);
+      this.klassName = "PShuffle";
+    }
+    extend(PShuffle, PSequence);
+    var shuffle = function() {
+      return Math.random() - 0.5;
+    };
+    return PShuffle;
+  })();
   
   
   module.exports = {
     Pattern  : Pattern,
     PSequence: PSequence,
-    
+    PShuffle : PShuffle,
+
     use: function() {
       cc.createPSequence = function(list, repeats, offset) {
         return new PSequence(list, repeats, offset);
+      };
+      cc.createPShuffle = function(list, repeats) {
+        return new PShuffle(list, repeats);
       };
     },
     exports: function() {
       cc.global.PSequence = fn(function(list, repeats, offset) {
         return cc.createPSequence(list, repeats, offset);
       }).defaults("list,repeats=1,offset=0").build();
+      cc.global.PShuffle = fn(function(list, repeats) {
+        return cc.createPShuffle(list, repeats);
+      }).defaults("list,repeats=1").build();
     }
   };
 
