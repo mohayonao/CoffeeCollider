@@ -392,6 +392,193 @@ define(function(require, exports, module) {
   calcFunc["%"] = function(a, b) {
     return b === 0 ? 0 : a % b;
   };
+
+  calcFunc.eq = function(a, b) {
+    return a === b ? 1 : 0;
+  };
+  calcFunc.ne = function(a, b) {
+    return a !== b ? 1 : 0;
+  };
+  calcFunc.lt = function(a, b) {
+    return a < b ? 1 : 0;
+  };
+  calcFunc.gt = function(a, b) {
+    return a > b ? 1 : 0;
+  };
+  calcFunc.le = function(a, b) {
+    return a <= b ? 1 : 0;
+  };
+  calcFunc.ge = function(a, b) {
+    return a >= b ? 1 : 0;
+  };
+  calcFunc.bitAnd = function(a, b) {
+    return a & b;
+  };
+  calcFunc.bitOr = function(a, b) {
+    return a | b;
+  };
+  calcFunc.bitXor = function(a, b) {
+    return a ^ b;
+  };
+  calcFunc.min = function(a, b) {
+    return Math.min(a, b);
+  };
+  calcFunc.max = function(a, b) {
+    return Math.max(a, b);
+  };
+  var gcd = function(a, b, t) {
+    a = a|0; b = b|0;
+    while (b !== 0) {
+      t = a % b; a = b; b = t;
+    }
+    return Math.abs(a);
+  };
+  calcFunc.lcm = function(a, b) {
+    if (a === 0 && b === 0) {
+      return 0;
+    }
+    return Math.abs(a * b) / gcd(a, b);
+  };
+  calcFunc.gcd = function(a, b) {
+    return gcd(a, b);
+  };
+  calcFunc.round = function(a, b) {
+    return b === 0 ? a : Math.round(a / b) * b;
+  };
+  calcFunc.roundUp = function(a, b) {
+    return b === 0 ? a : Math.ceil(a / b) * b;
+  };
+  calcFunc.roundDown = function(a, b) {
+    return b === 0 ? a : Math.floor(a / b) * b;
+  };
+  calcFunc.trunc = function(a, b) {
+    return b === 0 ? a : Math.floor(a / b) * b;
+  };
+  calcFunc.atan2 = function(a, b) {
+    return Math.atan2(a, b);
+  };
+  calcFunc.hypot = function(a, b) {
+    return Math.sqrt((a * a) + (b * b));
+  };
+  calcFunc.hypotApx = function(a, b) {
+    var x = Math.abs(a), y = Math.abs(b);
+    var minxy = Math.min(x, y);
+    return x + y - (Math.sqrt(2) - 1) * minxy;
+  };
+  calcFunc.pow = function(a, b) {
+    return Math.pow(Math.abs(a), b);
+  };
+  calcFunc.leftShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) >> (-b|0);
+    }
+    return (a|0) << (b|0);
+  };
+  calcFunc.rightShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) << (-b|0);
+    }
+    return (a|0) >> (b|0);
+  };
+  calcFunc.unsignedRightShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) << (-b|0);
+    }
+    return (a|0) >> (b|0);
+  };
+  calcFunc.ring1 = function(a, b) {
+    return a * b + a;
+  };
+  calcFunc.ring2 = function(a, b) {
+    return a * b + a + b;
+  };
+  calcFunc.ring3 = function(a, b) {
+    return a * a * b;
+  };
+  calcFunc.ring4 = function(a, b) {
+    return a * a * b - a * b * b;
+  };
+  calcFunc.difsqr = function(a, b) {
+    return a * a - b * b;
+  };
+  calcFunc.sumsqr = function(a, b) {
+    return a * a + b * b;
+  };
+  calcFunc.sqrsum = function(a, b) {
+    return (a + b) * (a + b);
+  };
+  calcFunc.sqrdif = function(a, b) {
+    return (a - b) * (a - b);
+  };
+  calcFunc.absdif = function(a, b) {
+    return Math.abs(a - b);
+  };
+  calcFunc.thresh = function(a, b) {
+    return a < b ? 0 : a;
+  };
+  calcFunc.amclip = function(a, b) {
+    return a * 0.5 * (b + Math.abs(b));
+  };
+  calcFunc.scaleneg = function(a, b) {
+    b = 0.5 * b + 0.5;
+    return (Math.abs(a) - a) * b + a;
+  };
+  calcFunc.clip2 = function(a, b) {
+    return Math.max(-b, Math.min(a, b));
+  };
+  calcFunc.excess = function(a, b) {
+    return a - Math.max(-b, Math.min(a, b));
+  };
+  calcFunc.fold2 = function(a, b) {
+    var _in = a, x, c, range, range2;
+    x = _in + b;
+    if (_in >= b) {
+      _in = b + b - _in;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      _in = -b - b - _in;
+      if (_in < b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    range  = b + b;
+    range2 = range + range;
+    c = x - range2 * Math.floor(x / range2);
+    if (c >= range) {
+      c = range2 - c;
+    }
+    return c - b;
+  };
+  calcFunc.wrap2 = function(a, b) {
+    var _in = a, range;
+    if (_in >= b) {
+      range = b + b;
+      _in -= range;
+      if (_in < b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      range = b + b;
+      _in += range;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    return _in - range * Math.floor((_in + b) / range);
+  };
+  
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];

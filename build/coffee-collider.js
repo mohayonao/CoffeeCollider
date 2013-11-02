@@ -4746,8 +4746,8 @@ define('cc/client/number', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var utils = require("./utils");
   
+  // unary operator methods
   fn.definePrototypeProperty(Number, "neg", function() {
     return -this;
   });
@@ -4886,11 +4886,300 @@ define('cc/client/number', function(require, exports, module) {
   fn.definePrototypeProperty(Number, "pi", function() {
     return this * Math.PI;
   });
+
+  // binary operator methods
+  var setupBinaryOp = function(selector, func) {
+    fn.definePrototypeProperty(Number, selector, function(b) {
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return this[selector](b);
+        }, this);
+      } else if (cc.instanceOfUGen(b)) {
+        return cc.createBinaryOpUGen(selector, this, b);
+      }
+      return func.call(this, b || 0);
+    });
+  };
+
+  setupBinaryOp("eq", function(b) {
+    return this === b ? 1 : 0;
+  });
+  setupBinaryOp("ne", function(b) {
+    return this !== b ? 1 : 0;
+  });
+  setupBinaryOp("lt", function(b) {
+    return this < b ? 1 : 0;
+  });
+  setupBinaryOp("gt", function(b) {
+    return this > b ? 1 : 0;
+  });
+  setupBinaryOp("le", function(b) {
+    return this <= b ? 1 : 0;
+  });
+  setupBinaryOp("ge", function(b) {
+    return this >= b ? 1 : 0;
+  });
+  setupBinaryOp("bitAnd", function(b) {
+    return this & b;
+  });
+  setupBinaryOp("bitOr", function(b) {
+    return this | b;
+  });
+  setupBinaryOp("bitXor", function(b) {
+    return this ^ b;
+  });
+  setupBinaryOp("min", function(b) {
+    return Math.min(this, b);
+  });
+  setupBinaryOp("max", function(b) {
+    return Math.max(this, b);
+  });
   
+  var gcd = function(a, b, t) {
+    a = a|0; b = b|0;
+    while (b !== 0) {
+      t = a % b; a = b; b = t;
+    }
+    return Math.abs(a);
+  };
+  setupBinaryOp("lcm", function(b) {
+    if (this === 0 && b === 0) {
+      return 0;
+    }
+    return Math.abs(this * b) / gcd(this, b);
+  });
+  setupBinaryOp("gcd", function(b) {
+    return gcd(this, b);
+  });
+  setupBinaryOp("round", function(b) {
+    return b === 0 ? this : Math.round(this / b) * b;
+  });
+  setupBinaryOp("roundUp", function(b) {
+    return b === 0 ? this : Math.ceil(this / b) * b;
+  });
+  setupBinaryOp("roundDown", function(b) {
+    return b === 0 ? this : Math.floor(this / b) * b;
+  });
+  setupBinaryOp("trunc", function(b) {
+    return b === 0 ? this : Math.floor(this / b) * b;
+  });
+  setupBinaryOp("atan2", function(b) {
+    return Math.atan2(this, b);
+  });
+  setupBinaryOp("hypot", function(b) {
+    return Math.sqrt((this * this) + (b * b));
+  });
+  setupBinaryOp("hypotApx", function(b) {
+    var x = Math.abs(this), y = Math.abs(b);
+    var minxy = Math.min(x, y);
+    return x + y - (Math.sqrt(2) - 1) * minxy;
+  });
+  setupBinaryOp("pow", function(b) {
+    return Math.pow(Math.abs(this), b);
+  });
+  setupBinaryOp("leftShift", function(b) {
+    if (b < 0) {
+      return (this|0) >> (-b|0);
+    }
+    return (this|0) << (b|0);
+  });
+  setupBinaryOp("rightShift", function(b) {
+    if (b < 0) {
+      return (this|0) << (-b|0);
+    }
+    return (this|0) >> (b|0);
+  });
+  setupBinaryOp("unsignedRightShift", function(b) {
+    if (b < 0) {
+      return (this|0) << (-b|0);
+    }
+    return (this|0) >> (b|0);
+  });
+  setupBinaryOp("ring1", function(b) {
+    return this * b + this;
+  });
+  setupBinaryOp("ring2", function(b) {
+    return this * b + this + b;
+  });
+  setupBinaryOp("ring3", function(b) {
+    return this * this * b;
+  });
+  setupBinaryOp("ring4", function(b) {
+    return this * this * b - this * b * b;
+  });
+  setupBinaryOp("difsqr", function(b) {
+    return this * this - b * b;
+  });
+  setupBinaryOp("sumsqr", function(b) {
+    return this * this + b * b;
+  });
+  setupBinaryOp("sqrsum", function(b) {
+    return (this + b) * (this + b);
+  });
+  setupBinaryOp("sqrdif", function(b) {
+    return (this - b) * (this - b);
+  });
+  setupBinaryOp("absdif", function(b) {
+    return Math.abs(this - b);
+  });
+  setupBinaryOp("thresh", function(b) {
+    return this < b ? 0 : this;
+  });
+  setupBinaryOp("amclip", function(b) {
+    return this * 0.5 * (b + Math.abs(b));
+  });
+  setupBinaryOp("scaleneg", function(b) {
+    b = 0.5 * b + 0.5;
+    return (Math.abs(this) - this) * b + this;
+  });
+  setupBinaryOp("clip2", function(b) {
+    return Math.max(-b, Math.min(this, b));
+  });
+  setupBinaryOp("excess", function(b) {
+    return this - Math.max(-b, Math.min(this, b));
+  });
+  setupBinaryOp("fold2", function(b) {
+    var _in = this, x, c, range, range2;
+    x = _in + b;
+    if (_in >= b) {
+      _in = b + b - _in;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      _in = -b - b - _in;
+      if (_in < b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    range  = b + b;
+    range2 = range + range;
+    c = x - range2 * Math.floor(x / range2);
+    if (c >= range) {
+      c = range2 - c;
+    }
+    return c - b;
+  });
+  setupBinaryOp("wrap2", function(b) {
+    var _in = this, range;
+    if (_in >= b) {
+      range = b + b;
+      _in -= range;
+      if (_in < b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      range = b + b;
+      _in += range;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    return _in - range * Math.floor((_in + b) / range);
+  });
   
+  // others
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
+  
+  module.exports = {};
+
+});
+define('cc/client/array', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var ops   = require("../common/ops");
+  var utils = require("./utils");
+  
+  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+      fn.definePrototypeProperty(Array, selector, function() {
+        return this.map(function(x) { return x[selector](); });
+      });
+    }
+  });
+
+  var foldAt = function(list, index) {
+    var len = list.length;
+    index = index % (len * 2 - 2);
+    if (index >= len) {
+      index = 2 * (len - 1) - index;
+    }
+    return list[index];
+  };
+  var calc_with_adverb = function(selector, a, b, adverb) {
+    var sort = a.length - b.length;
+    switch (adverb) {
+    case 1:
+      if (sort > 0) {
+        a.splice(b.length);
+      } else if (sort < 0) {
+        b.splice(a.length);
+      }
+      break;
+    case 2:
+      if (sort > 0) {
+        return a.map(function(a, i) {
+          return a[selector](foldAt(b, i));
+        });
+      } else if (sort < 0) {
+        return b.map(function(b, i) {
+          return foldAt(a, i)[selector](b);
+        });
+      }
+      break;
+    case 3:
+    case 4:
+      var table = a.map(function(a) {
+        return b.map(function(b) {
+          return a[selector](b);
+        });
+      });
+      return (adverb === 4) ? utils.flatten(table) : table;
+    }
+    if (a.length === b.length) {
+      return a.map(function(a, index) {
+        return a[selector](b[index]);
+      });
+    } else if (a.length > b.length) {
+      return a.map(function(a, index) {
+        return a[selector](b[index % b.length]);
+      });
+    } else {
+      return b.map(function(b, index) {
+        return a[index % a.length][selector](b);
+      });
+    }
+  };
+  
+  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+      fn.definePrototypeProperty(Array, selector, function(b, adverb) {
+        if (Array.isArray(b)) {
+          return calc_with_adverb(selector, this, b, adverb);
+        } else if (cc.instanceOfUGen(b)) {
+          return this.map(function(a) {
+            return cc.createBinaryOpUGen(selector, a, b);
+          });
+        }
+        return this.map(function(a) {
+          return a[selector](b);
+        });
+      });
+    }
+  });
   
   fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
     return utils.flop([this, mul, add]).map(function(items) {
@@ -4900,23 +5189,6 @@ define('cc/client/number', function(require, exports, module) {
   }).defaults("mul=1,add=0").multiCall().build());
   
   module.exports = {};
-
-});
-define('cc/client/array', function(require, exports, module) {
-
-  var fn = require("./fn");
-  var ops = require("../common/ops");
-  
-  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-      fn.definePrototypeProperty(Array, selector, function() {
-        return this.map(function(x) { return x[selector](); });
-      });
-    }
-  });
-  
-  module.exports = {
-  };
 
 });
 define('cc/client/data', function(require, exports, module) {
@@ -8271,6 +8543,193 @@ define('cc/server/unit/bop', function(require, exports, module) {
   calcFunc["%"] = function(a, b) {
     return b === 0 ? 0 : a % b;
   };
+
+  calcFunc.eq = function(a, b) {
+    return a === b ? 1 : 0;
+  };
+  calcFunc.ne = function(a, b) {
+    return a !== b ? 1 : 0;
+  };
+  calcFunc.lt = function(a, b) {
+    return a < b ? 1 : 0;
+  };
+  calcFunc.gt = function(a, b) {
+    return a > b ? 1 : 0;
+  };
+  calcFunc.le = function(a, b) {
+    return a <= b ? 1 : 0;
+  };
+  calcFunc.ge = function(a, b) {
+    return a >= b ? 1 : 0;
+  };
+  calcFunc.bitAnd = function(a, b) {
+    return a & b;
+  };
+  calcFunc.bitOr = function(a, b) {
+    return a | b;
+  };
+  calcFunc.bitXor = function(a, b) {
+    return a ^ b;
+  };
+  calcFunc.min = function(a, b) {
+    return Math.min(a, b);
+  };
+  calcFunc.max = function(a, b) {
+    return Math.max(a, b);
+  };
+  var gcd = function(a, b, t) {
+    a = a|0; b = b|0;
+    while (b !== 0) {
+      t = a % b; a = b; b = t;
+    }
+    return Math.abs(a);
+  };
+  calcFunc.lcm = function(a, b) {
+    if (a === 0 && b === 0) {
+      return 0;
+    }
+    return Math.abs(a * b) / gcd(a, b);
+  };
+  calcFunc.gcd = function(a, b) {
+    return gcd(a, b);
+  };
+  calcFunc.round = function(a, b) {
+    return b === 0 ? a : Math.round(a / b) * b;
+  };
+  calcFunc.roundUp = function(a, b) {
+    return b === 0 ? a : Math.ceil(a / b) * b;
+  };
+  calcFunc.roundDown = function(a, b) {
+    return b === 0 ? a : Math.floor(a / b) * b;
+  };
+  calcFunc.trunc = function(a, b) {
+    return b === 0 ? a : Math.floor(a / b) * b;
+  };
+  calcFunc.atan2 = function(a, b) {
+    return Math.atan2(a, b);
+  };
+  calcFunc.hypot = function(a, b) {
+    return Math.sqrt((a * a) + (b * b));
+  };
+  calcFunc.hypotApx = function(a, b) {
+    var x = Math.abs(a), y = Math.abs(b);
+    var minxy = Math.min(x, y);
+    return x + y - (Math.sqrt(2) - 1) * minxy;
+  };
+  calcFunc.pow = function(a, b) {
+    return Math.pow(Math.abs(a), b);
+  };
+  calcFunc.leftShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) >> (-b|0);
+    }
+    return (a|0) << (b|0);
+  };
+  calcFunc.rightShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) << (-b|0);
+    }
+    return (a|0) >> (b|0);
+  };
+  calcFunc.unsignedRightShift = function(a, b) {
+    if (b < 0) {
+      return (a|0) << (-b|0);
+    }
+    return (a|0) >> (b|0);
+  };
+  calcFunc.ring1 = function(a, b) {
+    return a * b + a;
+  };
+  calcFunc.ring2 = function(a, b) {
+    return a * b + a + b;
+  };
+  calcFunc.ring3 = function(a, b) {
+    return a * a * b;
+  };
+  calcFunc.ring4 = function(a, b) {
+    return a * a * b - a * b * b;
+  };
+  calcFunc.difsqr = function(a, b) {
+    return a * a - b * b;
+  };
+  calcFunc.sumsqr = function(a, b) {
+    return a * a + b * b;
+  };
+  calcFunc.sqrsum = function(a, b) {
+    return (a + b) * (a + b);
+  };
+  calcFunc.sqrdif = function(a, b) {
+    return (a - b) * (a - b);
+  };
+  calcFunc.absdif = function(a, b) {
+    return Math.abs(a - b);
+  };
+  calcFunc.thresh = function(a, b) {
+    return a < b ? 0 : a;
+  };
+  calcFunc.amclip = function(a, b) {
+    return a * 0.5 * (b + Math.abs(b));
+  };
+  calcFunc.scaleneg = function(a, b) {
+    b = 0.5 * b + 0.5;
+    return (Math.abs(a) - a) * b + a;
+  };
+  calcFunc.clip2 = function(a, b) {
+    return Math.max(-b, Math.min(a, b));
+  };
+  calcFunc.excess = function(a, b) {
+    return a - Math.max(-b, Math.min(a, b));
+  };
+  calcFunc.fold2 = function(a, b) {
+    var _in = a, x, c, range, range2;
+    x = _in + b;
+    if (_in >= b) {
+      _in = b + b - _in;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      _in = -b - b - _in;
+      if (_in < b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    range  = b + b;
+    range2 = range + range;
+    c = x - range2 * Math.floor(x / range2);
+    if (c >= range) {
+      c = range2 - c;
+    }
+    return c - b;
+  };
+  calcFunc.wrap2 = function(a, b) {
+    var _in = a, range;
+    if (_in >= b) {
+      range = b + b;
+      _in -= range;
+      if (_in < b) {
+        return _in;
+      }
+    } else if (_in < -b) {
+      range = b + b;
+      _in += range;
+      if (_in >= -b) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    if (b === -b) {
+      return -b;
+    }
+    return _in - range * Math.floor((_in + b) / range);
+  };
+  
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
