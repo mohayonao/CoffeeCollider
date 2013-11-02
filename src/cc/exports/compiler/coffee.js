@@ -444,13 +444,14 @@ define(function(require, exports, module) {
     while (i >= 0) {
       var token = tokens[i];
       if (token[TAG] === "IDENTIFIER") {
-        if (i && tokens[i-1][TAG] !== "." && cc.global.hasOwnProperty(token[VALUE])) {
+        if ((i === 0 || tokens[i-1][TAG] !== ".") && cc.global.hasOwnProperty(token[VALUE])) {
           if (token[VALUE] !== "CoffeeCollider" && token[VALUE] !== "SocketSynthServer") {
             tokens.splice(i  , 1, ["IDENTIFIER", "cc"        , _]);
             tokens.splice(i+1, 0, ["."         , "."         , _]);
             tokens.splice(i+2, 0, ["IDENTIFIER", token[VALUE], _]);
           }
-        } else if (token[VALUE].charAt(0) === "$") {
+        }
+        if (token[VALUE].charAt(0) === "$") {
           var name = token[VALUE];
           if (!/\d/.test(name.charAt(1))) {
             name = name.substr(1);
