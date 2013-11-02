@@ -3,6 +3,10 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   
   var cc = require("./cc");
+  require("./ugen/ugen");
+  require("./object");
+  require("./number");
+
   var pattern = require("./pattern");
   
   describe.only("pattern.js", function() {
@@ -51,6 +55,28 @@ define(function(require, exports, module) {
         var expected = [ 1, 1, 1, 2, 2, 2, 3, 3, 3, null, null ];
         assert.deepEqual(actual, expected);
         assert.isTrue(emitted);
+      });
+    });
+    describe("PUnaryOperator", function() {
+      it("midicps", function() {
+        var pmidicps = cc.createPSequence([60, 62, 64], 3, 0).on("end", function() {
+          emitted = true;
+        }).midicps();
+        var actual   = pmidicps.nextN(11);
+        var expected = [ 261.6255653006, 293.66476791741, 329.62755691287,
+                         261.6255653006, 293.66476791741, 329.62755691287,
+                         261.6255653006, 293.66476791741, 329.62755691287, null, null ];
+        assert.deepCloseTo(actual, expected, 1e-6);
+        assert.isTrue(emitted);
+      });
+    });
+    describe("PBinaryOp", function() {
+      it("max", function() {
+        assert.throw(function() {
+          cc.createPSequence([60, 62, 64], 3, 0).on("end", function() {
+          emitted = true;
+          }).max(61);
+        });
       });
     });
   });

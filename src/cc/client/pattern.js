@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
+  var ops = require("../common/ops");
   
   var Pattern = (function() {
     function Pattern() {
@@ -39,6 +40,22 @@ define(function(require, exports, module) {
     Pattern.prototype.performWait = function() {
       return this._blocking;
     };
+
+    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        Pattern.prototype[selector] = function() {
+          return new PUnaryOp(this, selector);
+        };
+      }
+    });
+    
+    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        Pattern.prototype[selector] = function(b) {
+          return new PBinaryOp(this, selector, b);
+        };
+      }
+    });
     
     return Pattern;
   })();
@@ -119,13 +136,72 @@ define(function(require, exports, module) {
     };
     return PShuffle;
   })();
+
+  var PUnaryOp = (function() {
+    function PUnaryOp(pattern, selector) {
+      if (!Number.prototype.hasOwnProperty(selector)) {
+        throw new TypeError("PUnaryOp: operator '" + selector + "' not supported");
+      }
+      Pattern.call(this);
+      this.klassName = "PUnaryOp";
+      this.pattern   = pattern;
+      this.selector  = selector;
+    }
+    extend(PUnaryOp, Pattern);
+    
+    PUnaryOp.prototype.next = function() {
+      if (this._blocking) {
+        var val = this.pattern.next();
+        if (val === null || val === undefined) {
+          this.emit("end");
+          this._blocking = false;
+        } else {
+          return val[this.selector].call(val);
+        }
+      }
+      return null;
+    };
+    
+    return PUnaryOp;
+  })();
+
+  var PBinaryOp = (function() {
+    function PBinaryOp(pattern, selector, b) {
+      if (!Number.prototype.hasOwnProperty(selector)) {
+        throw new TypeError("PBinaryOp: operator '" + selector + "' not supported");
+      }
+      Pattern.call(this);
+      this.klassName = "PBinaryOp";
+      this.pattern   = pattern;
+      this.selector  = selector;
+      this.b = b;
+    }
+    extend(PBinaryOp, Pattern);
+    
+    PBinaryOp.prototype.next = function() {
+      if (this._blocking) {
+        var val = this.pattern.next();
+        if (val === null || val === undefined) {
+          this.emit("end");
+          this._blocking = false;
+        } else {
+          return val[this.selector].call(val, this.b);
+        }
+      }
+      return null;
+    };
+    
+    return PBinaryOp;
+  })();
   
   
   module.exports = {
     Pattern  : Pattern,
     PSequence: PSequence,
     PShuffle : PShuffle,
-
+    PUnaryOp : PUnaryOp,
+    PBinaryOp: PBinaryOp,
+    
     use: function() {
       cc.createPSequence = function(list, repeats, offset) {
         return new PSequence(list, repeats, offset);
