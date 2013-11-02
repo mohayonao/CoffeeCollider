@@ -9,7 +9,7 @@ define(function(require, exports, module) {
 
   var pattern = require("./pattern");
   
-  describe.only("pattern.js", function() {
+  describe("pattern.js", function() {
     var emitted;
     beforeEach(function() {
       pattern.use();

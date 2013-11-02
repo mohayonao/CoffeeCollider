@@ -3,39 +3,30 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var utils = require("./utils");
   
-  var setup = function(selector, func) {
-    fn.definePrototypeProperty(Number, selector, func);
-    fn.definePrototypeProperty(Array, selector, function() {
-      return this.map(function(x) { return x[selector](); });
-    });
-    fn.definePrototypeProperty(cc.UGen, selector, function() {
-      return cc.createUnaryOpUGen(selector, this);
-    });
-  };
-  
-  setup("neg", function() {
+  fn.definePrototypeProperty(Number, "neg", function() {
     return -this;
   });
-  setup("not", function() {
+  fn.definePrototypeProperty(Number, "not", function() {
     return this === 0 ? 1 : 0;
   });
-  setup("abs", function() {
+  fn.definePrototypeProperty(Number, "abs", function() {
     return Math.abs(this);
   });
-  setup("ceil", function() {
+  fn.definePrototypeProperty(Number, "ceil", function() {
     return Math.ceil(this);
   });
-  setup("floor", function() {
+  fn.definePrototypeProperty(Number, "floor", function() {
     return Math.floor(this);
   });
-  setup("frac", function() {
+  fn.definePrototypeProperty(Number, "frac", function() {
     if (this < 0) {
       return 1 + (this - (this|0));
     }
     return this - (this|0);
   });
-  setup("sign", function() {
+  fn.definePrototypeProperty(Number, "sign", function() {
     if (this === 0) {
       return 0;
     } else if (this > 0) {
@@ -43,116 +34,127 @@ define(function(require, exports, module) {
     }
     return -1;
   });
-  setup("squared", function() {
+  fn.definePrototypeProperty(Number, "squared", function() {
     return this * this;
   });
-  setup("cubed", function() {
+  fn.definePrototypeProperty(Number, "cubed", function() {
     return this * this * this;
   });
-  setup("sqrt", function() {
+  fn.definePrototypeProperty(Number, "sqrt", function() {
     return Math.sqrt(Math.abs(this));
   });
-  setup("exp", function() {
+  fn.definePrototypeProperty(Number, "exp", function() {
     return Math.exp(this);
   });
-  setup("reciprocal", function() {
+  fn.definePrototypeProperty(Number, "reciprocal", function() {
     return 1 / this;
   });
-  setup("midicps", function() {
+  fn.definePrototypeProperty(Number, "midicps", function() {
     return 440 * Math.pow(2, (this - 69) * 1/12);
   });
-  setup("cpsmidi", function() {
+  fn.definePrototypeProperty(Number, "cpsmidi", function() {
     return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
   });
-  setup("midiratio", function() {
+  fn.definePrototypeProperty(Number, "midiratio", function() {
     return Math.pow(2, this * 1/12);
   });
-  setup("ratiomidi", function() {
+  fn.definePrototypeProperty(Number, "ratiomidi", function() {
     return Math.log(Math.abs(this)) * Math.LOG2E * 12;
   });
-  setup("dbamp", function() {
+  fn.definePrototypeProperty(Number, "dbamp", function() {
     return Math.pow(10, this * 0.05);
   });
-  setup("ampdb", function() {
+  fn.definePrototypeProperty(Number, "ampdb", function() {
     return Math.log(Math.abs(this)) * Math.LOG10E * 20;
   });
-  setup("octcps", function() {
+  fn.definePrototypeProperty(Number, "octcps", function() {
     return 440 * Math.pow(2, this - 4.75);
   });
-  setup("cpsoct", function() {
+  fn.definePrototypeProperty(Number, "cpsoct", function() {
     return Math.log(Math.abs(this) * 1/440) * Math.LOG2E + 4.75;
   });
-  setup("log", function() {
+  fn.definePrototypeProperty(Number, "log", function() {
     return Math.log(Math.abs(this));
   });
-  setup("log2", function() {
+  fn.definePrototypeProperty(Number, "log2", function() {
     return Math.log(Math.abs(this)) * Math.LOG2E;
   });
-  setup("log10", function() {
+  fn.definePrototypeProperty(Number, "log10", function() {
     return Math.log(Math.abs(this)) * Math.LOG10E;
   });
-  setup("sin", function() {
+  fn.definePrototypeProperty(Number, "sin", function() {
     return Math.sin(this);
   });
-  setup("cos", function() {
+  fn.definePrototypeProperty(Number, "cos", function() {
     return Math.cos(this);
   });
-  setup("tan", function() {
+  fn.definePrototypeProperty(Number, "tan", function() {
     return Math.tan(this);
   });
-  setup("asin", function() {
+  fn.definePrototypeProperty(Number, "asin", function() {
     return Math.asin(Math.max(-1, Math.min(this, 1)));
   });
-  setup("acos", function() {
+  fn.definePrototypeProperty(Number, "acos", function() {
     return Math.acos(Math.max(-1, Math.min(this, 1)));
   });
-  setup("atan", function() {
+  fn.definePrototypeProperty(Number, "atan", function() {
     return Math.atan(this);
   });
-  setup("sinh", function() {
+  fn.definePrototypeProperty(Number, "sinh", function() {
     return (Math.pow(Math.E, this) - Math.pow(Math.E, -this)) * 0.5;
   });
-  setup("cosh", function() {
+  fn.definePrototypeProperty(Number, "cosh", function() {
     return (Math.pow(Math.E, this) + Math.pow(Math.E, -this)) * 0.5;
   });
-  setup("tanh", function() {
+  fn.definePrototypeProperty(Number, "tanh", function() {
     return this.sinh() / this.cosh();
   });
-  setup("rand", function() {
+  fn.definePrototypeProperty(Number, "rand", function() {
     return Math.random() * this;
   });
-  setup("rand2", function() {
+  fn.definePrototypeProperty(Number, "rand2", function() {
     return (Math.random() * 2 - 1) * this;
   });
-  setup("linrand", function() {
+  fn.definePrototypeProperty(Number, "linrand", function() {
     return Math.min(Math.random(), Math.random()) * this;
   });
-  setup("bilinrand", function() {
+  fn.definePrototypeProperty(Number, "bilinrand", function() {
     return (Math.random() - Math.random()) * this;
   });
-  setup("sum3rand", function() {
+  fn.definePrototypeProperty(Number, "sum3rand", function() {
     return (Math.random() + Math.random() + Math.random() - 1.5) * 0.666666667 * this;
   });
-  setup("distort", function() {
+  fn.definePrototypeProperty(Number, "distort", function() {
     return this / (1 + Math.abs(this));
   });
-  setup("softclip", function() {
+  fn.definePrototypeProperty(Number, "softclip", function() {
     var absa = Math.abs(this);
     return absa <= 0.5 ? this : (absa - 0.25) / this;
   });
-  setup("coin", function() {
+  fn.definePrototypeProperty(Number, "coin", function() {
     return Math.random() < this;
   });
-  
-  setup("num", function() {
+  fn.definePrototypeProperty(Number, "num", function() {
     return +this;
   });
-  setup("tilde", function() {
+  fn.definePrototypeProperty(Number, "tilde", function() {
     return ~this;
   });
-  setup("pi", function() {
+  fn.definePrototypeProperty(Number, "pi", function() {
     return this * Math.PI;
   });
+  
+  
+  fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+    return cc.createMulAdd(this, mul, add);
+  }).defaults("mul=1,add=0").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+    return utils.flop([this, mul, add]).map(function(items) {
+      var _in = items[0], mul = items[1], add = items[2];
+      return cc.createMulAdd(_in, mul, add);
+    });
+  }).defaults("mul=1,add=0").multiCall().build());
   
   module.exports = {};
 

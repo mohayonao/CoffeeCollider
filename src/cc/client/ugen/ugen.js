@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
+  var ops = require("../../common/ops");
   var slice  = [].slice;
   
   var addToSynthDef = null;
@@ -56,6 +57,22 @@ define(function(require, exports, module) {
     UGen.prototype.bipolar = fn(function(mul) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
+    
+    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function() {
+          return cc.createUnaryOpUGen(selector, this);
+        };
+      }
+    });
+    
+    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function(b) {
+          return cc.createBinaryOpUGen(selector, this, b);
+        };
+      }
+    });
     
     return UGen;
   })();

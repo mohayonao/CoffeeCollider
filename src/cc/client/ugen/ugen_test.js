@@ -5,7 +5,11 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var ugen  = require("./ugen");
+  var uop   = require("./uop");
   var inout = require("./inout");
+
+  require("../object");
+  require("../number");
   
   cc.registerUGen("Test", {
     ar: {
@@ -26,6 +30,7 @@ define(function(require, exports, module) {
     before(function() {
       ugen.use();
       inout.use();
+      uop.use();
     });
     describe("UGen", function() {
       it("create", function() {
@@ -47,6 +52,10 @@ define(function(require, exports, module) {
         assert.equal(2, instance.numOfInputs);
         assert.deepEqual([10, 2], instance.inputs);
         assert.equal("TEST", instance.tag);
+      });
+      it("uop", function() {
+        var instance = cc.global.Test.ar(10, {tag:"TEST"});
+        assert.equal(instance.abs().selector, "abs");
       });
     });
     describe("MultiOutUGen", function() {

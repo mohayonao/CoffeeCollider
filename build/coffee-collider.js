@@ -1804,6 +1804,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
+  var ops = require("../../common/ops");
   var slice  = [].slice;
   
   var addToSynthDef = null;
@@ -1856,6 +1857,22 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     UGen.prototype.bipolar = fn(function(mul) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
+    
+    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function() {
+          return cc.createUnaryOpUGen(selector, this);
+        };
+      }
+    });
+    
+    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function(b) {
+          return cc.createBinaryOpUGen(selector, this, b);
+        };
+      }
+    });
     
     return UGen;
   })();
@@ -1988,6 +2005,17 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
   };
 
 });
+define('cc/common/ops', function(require, exports, module) {
+
+  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
+  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
+  
+  module.exports = {
+    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
+    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
+  };
+
+});
 define('cc/client/ugen/installer', function(require, exports, module) {
   
   module.exports = {
@@ -2029,7 +2057,7 @@ define('cc/client/ugen/uop', function(require, exports, module) {
       }
       var rate = a.rate|0;
       cc.UGen.prototype.init.call(this, rate);
-      this.op = selector;
+      this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a];
       this.numOfInputs = 1;
@@ -2049,17 +2077,6 @@ define('cc/client/ugen/uop', function(require, exports, module) {
         return obj instanceof UnaryOpUGen;
       };
     }
-  };
-
-});
-define('cc/common/ops', function(require, exports, module) {
-
-  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
-  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
-  
-  module.exports = {
-    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
-    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
   };
 
 });
@@ -2101,7 +2118,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
         } else if (b === 0) {
           return a;
         } else if (cc.instanceOfBinaryOpUGen(a)) {
-          if (a.op === "*") {
+          if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
         } else if (cc.instancrOfMulAdd(a)) {
@@ -2131,7 +2148,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
       }
       var rate = Math.max(a.rate|0, b.rate|0);
       cc.UGen.prototype.init.call(this, rate);
-      this.op = selector;
+      this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
       this.numOfInputs = 2;
@@ -2147,7 +2164,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
         return obj;
       }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "+") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "+") {
         return [ collect(i[0]), collect(i[1]) ];
       } else if (cc.instanceOfSum3(obj)) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
@@ -2198,7 +2215,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
     var collect = function(obj) {
       if (typeof obj === "number") { return obj; }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "*") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "*") {
         return [ collect(i[0]), collect(i[1]) ];
       }
       return obj;
@@ -3655,6 +3672,154 @@ define('cc/client/object', function(require, exports, module) {
     return this;
   });
   
+  module.exports = {};
+
+});
+define('cc/client/number', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var utils = require("./utils");
+  
+  fn.definePrototypeProperty(Number, "neg", function() {
+    return -this;
+  });
+  fn.definePrototypeProperty(Number, "not", function() {
+    return this === 0 ? 1 : 0;
+  });
+  fn.definePrototypeProperty(Number, "abs", function() {
+    return Math.abs(this);
+  });
+  fn.definePrototypeProperty(Number, "ceil", function() {
+    return Math.ceil(this);
+  });
+  fn.definePrototypeProperty(Number, "floor", function() {
+    return Math.floor(this);
+  });
+  fn.definePrototypeProperty(Number, "frac", function() {
+    if (this < 0) {
+      return 1 + (this - (this|0));
+    }
+    return this - (this|0);
+  });
+  fn.definePrototypeProperty(Number, "sign", function() {
+    if (this === 0) {
+      return 0;
+    } else if (this > 0) {
+      return 1;
+    }
+    return -1;
+  });
+  fn.definePrototypeProperty(Number, "squared", function() {
+    return this * this;
+  });
+  fn.definePrototypeProperty(Number, "cubed", function() {
+    return this * this * this;
+  });
+  fn.definePrototypeProperty(Number, "sqrt", function() {
+    return Math.sqrt(Math.abs(this));
+  });
+  fn.definePrototypeProperty(Number, "exp", function() {
+    return Math.exp(this);
+  });
+  fn.definePrototypeProperty(Number, "reciprocal", function() {
+    return 1 / this;
+  });
+  fn.definePrototypeProperty(Number, "midicps", function() {
+    return 440 * Math.pow(2, (this - 69) * 1/12);
+  });
+  fn.definePrototypeProperty(Number, "cpsmidi", function() {
+    return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
+  });
+  fn.definePrototypeProperty(Number, "midiratio", function() {
+    return Math.pow(2, this * 1/12);
+  });
+  fn.definePrototypeProperty(Number, "ratiomidi", function() {
+    return Math.log(Math.abs(this)) * Math.LOG2E * 12;
+  });
+  fn.definePrototypeProperty(Number, "dbamp", function() {
+    return Math.pow(10, this * 0.05);
+  });
+  fn.definePrototypeProperty(Number, "ampdb", function() {
+    return Math.log(Math.abs(this)) * Math.LOG10E * 20;
+  });
+  fn.definePrototypeProperty(Number, "octcps", function() {
+    return 440 * Math.pow(2, this - 4.75);
+  });
+  fn.definePrototypeProperty(Number, "cpsoct", function() {
+    return Math.log(Math.abs(this) * 1/440) * Math.LOG2E + 4.75;
+  });
+  fn.definePrototypeProperty(Number, "log", function() {
+    return Math.log(Math.abs(this));
+  });
+  fn.definePrototypeProperty(Number, "log2", function() {
+    return Math.log(Math.abs(this)) * Math.LOG2E;
+  });
+  fn.definePrototypeProperty(Number, "log10", function() {
+    return Math.log(Math.abs(this)) * Math.LOG10E;
+  });
+  fn.definePrototypeProperty(Number, "sin", function() {
+    return Math.sin(this);
+  });
+  fn.definePrototypeProperty(Number, "cos", function() {
+    return Math.cos(this);
+  });
+  fn.definePrototypeProperty(Number, "tan", function() {
+    return Math.tan(this);
+  });
+  fn.definePrototypeProperty(Number, "asin", function() {
+    return Math.asin(Math.max(-1, Math.min(this, 1)));
+  });
+  fn.definePrototypeProperty(Number, "acos", function() {
+    return Math.acos(Math.max(-1, Math.min(this, 1)));
+  });
+  fn.definePrototypeProperty(Number, "atan", function() {
+    return Math.atan(this);
+  });
+  fn.definePrototypeProperty(Number, "sinh", function() {
+    return (Math.pow(Math.E, this) - Math.pow(Math.E, -this)) * 0.5;
+  });
+  fn.definePrototypeProperty(Number, "cosh", function() {
+    return (Math.pow(Math.E, this) + Math.pow(Math.E, -this)) * 0.5;
+  });
+  fn.definePrototypeProperty(Number, "tanh", function() {
+    return this.sinh() / this.cosh();
+  });
+  fn.definePrototypeProperty(Number, "rand", function() {
+    return Math.random() * this;
+  });
+  fn.definePrototypeProperty(Number, "rand2", function() {
+    return (Math.random() * 2 - 1) * this;
+  });
+  fn.definePrototypeProperty(Number, "linrand", function() {
+    return Math.min(Math.random(), Math.random()) * this;
+  });
+  fn.definePrototypeProperty(Number, "bilinrand", function() {
+    return (Math.random() - Math.random()) * this;
+  });
+  fn.definePrototypeProperty(Number, "sum3rand", function() {
+    return (Math.random() + Math.random() + Math.random() - 1.5) * 0.666666667 * this;
+  });
+  fn.definePrototypeProperty(Number, "distort", function() {
+    return this / (1 + Math.abs(this));
+  });
+  fn.definePrototypeProperty(Number, "softclip", function() {
+    var absa = Math.abs(this);
+    return absa <= 0.5 ? this : (absa - 0.25) / this;
+  });
+  fn.definePrototypeProperty(Number, "coin", function() {
+    return Math.random() < this;
+  });
+  fn.definePrototypeProperty(Number, "num", function() {
+    return +this;
+  });
+  fn.definePrototypeProperty(Number, "tilde", function() {
+    return ~this;
+  });
+  fn.definePrototypeProperty(Number, "pi", function() {
+    return this * Math.PI;
+  });
+  
   
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
@@ -3666,165 +3831,6 @@ define('cc/client/object', function(require, exports, module) {
       return cc.createMulAdd(_in, mul, add);
     });
   }).defaults("mul=1,add=0").multiCall().build());
-  
-  
-  module.exports = {};
-
-});
-define('cc/client/number', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var fn = require("./fn");
-  
-  var setup = function(selector, func) {
-    fn.definePrototypeProperty(Number, selector, func);
-    fn.definePrototypeProperty(Array, selector, function() {
-      return this.map(function(x) { return x[selector](); });
-    });
-    fn.definePrototypeProperty(cc.UGen, selector, function() {
-      return cc.createUnaryOpUGen(selector, this);
-    });
-  };
-  
-  setup("neg", function() {
-    return -this;
-  });
-  setup("not", function() {
-    return this === 0 ? 1 : 0;
-  });
-  setup("abs", function() {
-    return Math.abs(this);
-  });
-  setup("ceil", function() {
-    return Math.ceil(this);
-  });
-  setup("floor", function() {
-    return Math.floor(this);
-  });
-  setup("frac", function() {
-    if (this < 0) {
-      return 1 + (this - (this|0));
-    }
-    return this - (this|0);
-  });
-  setup("sign", function() {
-    if (this === 0) {
-      return 0;
-    } else if (this > 0) {
-      return 1;
-    }
-    return -1;
-  });
-  setup("squared", function() {
-    return this * this;
-  });
-  setup("cubed", function() {
-    return this * this * this;
-  });
-  setup("sqrt", function() {
-    return Math.sqrt(Math.abs(this));
-  });
-  setup("exp", function() {
-    return Math.exp(this);
-  });
-  setup("reciprocal", function() {
-    return 1 / this;
-  });
-  setup("midicps", function() {
-    return 440 * Math.pow(2, (this - 69) * 1/12);
-  });
-  setup("cpsmidi", function() {
-    return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
-  });
-  setup("midiratio", function() {
-    return Math.pow(2, this * 1/12);
-  });
-  setup("ratiomidi", function() {
-    return Math.log(Math.abs(this)) * Math.LOG2E * 12;
-  });
-  setup("dbamp", function() {
-    return Math.pow(10, this * 0.05);
-  });
-  setup("ampdb", function() {
-    return Math.log(Math.abs(this)) * Math.LOG10E * 20;
-  });
-  setup("octcps", function() {
-    return 440 * Math.pow(2, this - 4.75);
-  });
-  setup("cpsoct", function() {
-    return Math.log(Math.abs(this) * 1/440) * Math.LOG2E + 4.75;
-  });
-  setup("log", function() {
-    return Math.log(Math.abs(this));
-  });
-  setup("log2", function() {
-    return Math.log(Math.abs(this)) * Math.LOG2E;
-  });
-  setup("log10", function() {
-    return Math.log(Math.abs(this)) * Math.LOG10E;
-  });
-  setup("sin", function() {
-    return Math.sin(this);
-  });
-  setup("cos", function() {
-    return Math.cos(this);
-  });
-  setup("tan", function() {
-    return Math.tan(this);
-  });
-  setup("asin", function() {
-    return Math.asin(Math.max(-1, Math.min(this, 1)));
-  });
-  setup("acos", function() {
-    return Math.acos(Math.max(-1, Math.min(this, 1)));
-  });
-  setup("atan", function() {
-    return Math.atan(this);
-  });
-  setup("sinh", function() {
-    return (Math.pow(Math.E, this) - Math.pow(Math.E, -this)) * 0.5;
-  });
-  setup("cosh", function() {
-    return (Math.pow(Math.E, this) + Math.pow(Math.E, -this)) * 0.5;
-  });
-  setup("tanh", function() {
-    return this.sinh() / this.cosh();
-  });
-  setup("rand", function() {
-    return Math.random() * this;
-  });
-  setup("rand2", function() {
-    return (Math.random() * 2 - 1) * this;
-  });
-  setup("linrand", function() {
-    return Math.min(Math.random(), Math.random()) * this;
-  });
-  setup("bilinrand", function() {
-    return (Math.random() - Math.random()) * this;
-  });
-  setup("sum3rand", function() {
-    return (Math.random() + Math.random() + Math.random() - 1.5) * 0.666666667 * this;
-  });
-  setup("distort", function() {
-    return this / (1 + Math.abs(this));
-  });
-  setup("softclip", function() {
-    var absa = Math.abs(this);
-    return absa <= 0.5 ? this : (absa - 0.25) / this;
-  });
-  setup("coin", function() {
-    return Math.random() < this;
-  });
-  
-  setup("num", function() {
-    return +this;
-  });
-  setup("tilde", function() {
-    return ~this;
-  });
-  setup("pi", function() {
-    return this * Math.PI;
-  });
   
   module.exports = {};
 

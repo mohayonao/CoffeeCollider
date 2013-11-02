@@ -237,19 +237,6 @@ define(function(require, exports, module) {
     return this;
   });
   
-  
-  fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
-    return cc.createMulAdd(this, mul, add);
-  }).defaults("mul=1,add=0").multiCall().build());
-  
-  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return cc.createMulAdd(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").multiCall().build());
-  
-  
   module.exports = {};
 
 });

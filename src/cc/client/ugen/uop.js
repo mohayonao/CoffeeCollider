@@ -18,7 +18,7 @@ define(function(require, exports, module) {
       }
       var rate = a.rate|C.SCALAR;
       cc.UGen.prototype.init.call(this, rate);
-      this.op = selector;
+      this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a];
       this.numOfInputs = 1;

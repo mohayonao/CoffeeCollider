@@ -227,15 +227,6 @@ define(function(require, exports, module) {
       assert.closeTo((  0).pi(),   0, 1e-6);
       assert.closeTo((-10).pi(), -31.415926535898, 1e-6);
     });
-
-    it("ugen", function() {
-      assert.equal(u.abs().selector, "abs");
-    });
-    it("array", function() {
-      var actual   = [ -1, -0.5, 0, 0.5, 1 ].abs();
-      var expected = [ +1, +0.5, 0, 0.5, 1 ];
-      assert.deepEqual(actual, expected);
-    });
   });
 
 });

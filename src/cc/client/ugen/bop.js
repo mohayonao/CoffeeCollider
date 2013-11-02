@@ -37,7 +37,7 @@ define(function(require, exports, module) {
         } else if (b === 0) {
           return a;
         } else if (cc.instanceOfBinaryOpUGen(a)) {
-          if (a.op === "*") {
+          if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
         } else if (cc.instancrOfMulAdd(a)) {
@@ -67,7 +67,7 @@ define(function(require, exports, module) {
       }
       var rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
       cc.UGen.prototype.init.call(this, rate);
-      this.op = selector;
+      this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
       this.numOfInputs = 2;
@@ -83,7 +83,7 @@ define(function(require, exports, module) {
         return obj;
       }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "+") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "+") {
         return [ collect(i[0]), collect(i[1]) ];
       } else if (cc.instanceOfSum3(obj)) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
@@ -134,7 +134,7 @@ define(function(require, exports, module) {
     var collect = function(obj) {
       if (typeof obj === "number") { return obj; }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.op === "*") {
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "*") {
         return [ collect(i[0]), collect(i[1]) ];
       }
       return obj;
