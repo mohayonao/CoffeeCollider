@@ -415,10 +415,10 @@ define('cc/client/client', function(require, exports, module) {
       this.reset(["/reset"]);
     }
     cc.DATA = data;
-    global._gltc_ = this.timeline.context;
     if (cc.global !== global) {
       global.cc = cc.global;
     }
+    global.cc.__context__ = this.timeline.context;
     var result = eval.call(global, code);
     if (callback) {
       this.sendToIF(["/executed", execId, pack(result)]);
@@ -5067,26 +5067,30 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   };
 
   var insertReturn = function(tokens) {
-    tokens.splice(0, 0, ["("          , "("     , _]);
-    tokens.splice(1, 0, ["PARAM_START", "("     , _]);
-    tokens.splice(2, 0, ["IDENTIFIER" , "global", _]);
-    tokens.splice(3, 0, ["PARAM_END"  , ")"     , _]);
-    tokens.splice(4, 0, ["->"         , "->"    , _]);
-    tokens.splice(5, 0, ["INDENT"     , 2       , _]);
+    tokens.splice(0, 0, ["("          , "("        , _]);
+    tokens.splice(1, 0, ["PARAM_START", "("        , _]);
+    tokens.splice(2, 0, ["IDENTIFIER" , "global"   , _]);
+    tokens.splice(3, 0, [","          , ","        , _]);
+    tokens.splice(4, 0, ["IDENTIFIER" , "undefined", _]);
+    tokens.splice(5, 0, ["PARAM_END"  , ")"        , _]);
+    tokens.splice(6, 0, ["->"         , "->"       , _]);
+    tokens.splice(7, 0, ["INDENT"     , 2          , _]);
     var i = tokens.length - 1;
-    tokens.splice(i++, 0, ["OUTDENT"   , 2       , _]);
-    tokens.splice(i++, 0, [")"         , ")"     , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "call"  , _]);
-    tokens.splice(i++, 0, ["CALL_START", "("     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "_gltc_", _]);
-    tokens.splice(i++, 0, [","         , ","     , _]);
-    tokens.splice(i++, 0, ["THIS"      , "this"  , _]);
-    tokens.splice(i++, 0, ["."         , "."     , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "self"  , _]);
-    tokens.splice(i++, 0, ["LOGIC"     , "||"    , _]);
-    tokens.splice(i++, 0, ["IDENTIFIER", "global", _]);
-    tokens.splice(i++, 0, ["CALL_END"  , ")"     , _]);
+    tokens.splice(i++, 0, ["OUTDENT"   , 2            , _]);
+    tokens.splice(i++, 0, [")"         , ")"          , _]);
+    tokens.splice(i++, 0, ["."         , "."          , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "call"       , _]);
+    tokens.splice(i++, 0, ["CALL_START", "("          , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "cc"         , _]);
+    tokens.splice(i++, 0, ["."         , "."          , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "__context__", _]);
+    tokens.splice(i++, 0, [","         , ","          , _]);
+    tokens.splice(i++, 0, ["THIS"      , "this"       , _]);
+    tokens.splice(i++, 0, ["."         , "."          , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "self"       , _]);
+    tokens.splice(i++, 0, ["LOGIC"     , "||"         , _]);
+    tokens.splice(i++, 0, ["IDENTIFIER", "global"     , _]);
+    tokens.splice(i++, 0, ["CALL_END"  , ")"          , _]);
     // dumpTokens(tokens);
     return tokens;
   };

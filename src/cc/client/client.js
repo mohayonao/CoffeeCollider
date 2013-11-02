@@ -279,10 +279,10 @@ define(function(require, exports, module) {
       this.reset(["/reset"]);
     }
     cc.DATA = data;
-    global._gltc_ = this.timeline.context;
     if (cc.global !== global) {
       global.cc = cc.global;
     }
+    global.cc.__context__ = this.timeline.context;
     var result = eval.call(global, code);
     if (callback) {
       this.sendToIF(["/executed", execId, pack(result)]);

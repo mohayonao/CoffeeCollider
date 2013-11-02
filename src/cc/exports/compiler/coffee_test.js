@@ -1017,9 +1017,9 @@ define(function(require, exports, module) {
           a = 0
 
           replaced:
-          ((global)->
+          ((global, undefined)->
           a = 0
-          ).call(_gltc_, this.self||global)
+          ).call(cc.__context__, this.self||global)
         */
         var tokens = [
           ["IDENTIFIER", "a" ],
@@ -1028,29 +1028,33 @@ define(function(require, exports, module) {
           ["TERMINATOR", "\n"],
         ];
         var expected = [
-          ["("             , "("         ],
-          [  "PARAM_START" ,   "("       ],
-          [    "IDENTIFIER",     "global"],
-          [  "PARAM_END"   ,   ")"       ],
-          [  "->"          ,   "->"      ],
-          [  "INDENT"      ,   2         ],
-          [    "IDENTIFIER",     "a"     ],
-          [    "="         ,     "="     ],
-          [    "NUMBER"    ,     "0"     ],
-          [  "OUTDENT"     ,   2         ],
-          [")"             , ")"         ],
-          ["."             , "."         ],
-          ["IDENTIFIER"    , "call"      ],
-          ["CALL_START"    , "("         ],
-          [  "IDENTIFIER"  ,   "_gltc_"  ],
-          [  ","           ,   ","       ],
-          [  "THIS"        ,   "this"    ],
-          [  "."           ,   "."       ],
-          [  "IDENTIFIER"  ,   "self"    ],
-          [  "LOGIC"       ,   "||"      ],
-          [  "IDENTIFIER"  ,   "global"  ],
-          ["CALL_END"      , ")"         ],
-          ["TERMINATOR"    , "\n"        ],
+          ["("             , "("            ],
+          [  "PARAM_START" ,   "("          ],
+          [    "IDENTIFIER",     "global"   ],
+          [    ","         ,     ","        ],
+          [    "IDENTIFIER",     "undefined"],
+          [  "PARAM_END"   ,   ")"          ],
+          [  "->"          ,   "->"         ],
+          [  "INDENT"      ,   2            ],
+          [    "IDENTIFIER",     "a"        ],
+          [    "="         ,     "="        ],
+          [    "NUMBER"    ,     "0"        ],
+          [  "OUTDENT"     ,   2            ],
+          [")"             , ")"            ],
+          ["."             , "."            ],
+          ["IDENTIFIER"    , "call"         ],
+          ["CALL_START"    , "("            ],
+          [  "IDENTIFIER"  ,   "cc"         ],
+          [  "."           ,   "."          ],
+          [  "IDENTIFIER"  ,   "__context__"],
+          [  ","           ,   ","          ],
+          [  "THIS"        ,   "this"       ],
+          [  "."           ,   "."          ],
+          [  "IDENTIFIER"  ,   "self"       ],
+          [  "LOGIC"       ,   "||"         ],
+          [  "IDENTIFIER"  ,   "global"     ],
+          ["CALL_END"      , ")"            ],
+          ["TERMINATOR"    , "\n"           ],
         ];
         var actual = compiler.insertReturn(tokens).erode();
         assert.deepEqual(actual, expected);
