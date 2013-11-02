@@ -1,24 +1,29 @@
 {
-  "name"   : "coffee-collider",
+  "name": "coffee-collider",
   "version": "0.0.0",
   "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
-  "keywords": [ "language", "coffeescript", "supercollider", "music" ],
-  "author"  : "Nao Yonamine <mohayonao@gmail.com>",
+  "keywords": [
+    "language",
+    "coffeescript",
+    "supercollider",
+    "music"
+  ],
+  "author": "Nao Yonamine <mohayonao@gmail.com>",
   "homepage": "http://mohayonao.github.io/CoffeeCollider/",
-  "bugs"    : "https://github.com/mohayonao/CoffeeCollider/issues",
+  "bugs": "https://github.com/mohayonao/CoffeeCollider/issues",
   "repository": {
     "type": "git",
-    "url" : "git://github.com/mohayonao/CoffeeCollider.git"
+    "url": "git://github.com/mohayonao/CoffeeCollider.git"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url" : "https://raw.github.com/mohayonao/CoffeeCollider/master/LICENSE"
+      "url": "https://raw.github.com/mohayonao/CoffeeCollider/master/LICENSE"
     }
   ],
   "engines": {
     "node": ">=0.8.0"
-  },  
+  },
   "main": "./build/coffee-collider.js",
   "dependencies": {
     "coffee-script": "~1.6.3",
@@ -34,6 +39,7 @@
     "grunt-contrib-connect": "~0.5.0",
     "grunt-contrib-jshint": "~0.6.4",
     "grunt-contrib-uglify": "~0.2.4",
+    "grunt-contrib-compress": "~0.5.2",
     "grunt-este-watch": "~0.1.7"
   },
   "scripts": {

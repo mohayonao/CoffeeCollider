@@ -97,9 +97,8 @@ ul li a {
     color: #ecf0f1;
 }
 #canvas {
-    margin-top: 20px;
-    width: 185px;
-    height: 100px;
+    width: 180px;
+    height: 90px;
     background: #2c3e50;
 }
 .btn {

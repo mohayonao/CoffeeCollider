@@ -4,7 +4,7 @@
   "authors": [
     "Nao Yonamine <mohayonao@gmail.com>"
   ],
-  "description": "lang",
+  "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
   "main": "./build/coffee-collider.js",
   "keywords": [
     "language", "coffeescript", "supercollider", "music"

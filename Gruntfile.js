@@ -21,6 +21,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-contrib-connect");
   grunt.loadNpmTasks("grunt-contrib-jshint");
   grunt.loadNpmTasks("grunt-contrib-uglify");
+  grunt.loadNpmTasks("grunt-contrib-compress");
   grunt.loadNpmTasks("grunt-este-watch");
 
   var testFailed = [];
@@ -65,7 +66,7 @@ module.exports = function(grunt) {
             return "test:" + filepath;
           }
           grunt.config(["jshint", "files"], filepath);
-          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice", "uglify" ];
+          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice" ];
           return tasks;
         }
       },
@@ -103,12 +104,27 @@ module.exports = function(grunt) {
         },
         options: {
           sourceMap: "build/coffee-collider-min.map",
-          report: "min"
+          report: "gzip"
         }
+      }
+    },
+    compress: {
+      cc: {
+        options: {
+          archive: "build/coffee-collider.zip"
+        },
+        files: [
+          {
+            expand: true,
+            src: [ "*.js", "*.map", "*.swf" ],
+            dest: "coffee-collider",
+            cwd : "build"
+          }
+        ]
       }
     }
   });
-
+  
   grunt.registerTask("typo", function() {
     var check = 0;
     var typo  = 0;
@@ -412,8 +428,9 @@ module.exports = function(grunt) {
     });
   };
   
-  grunt.registerTask("check"  , ["typo", "jshint", "test"]);
-  grunt.registerTask("build"  , ["typo", "jshint", "test", "dryice", "uglify"]);
+  grunt.registerTask("check"    , ["typo", "jshint", "test"]);
+  grunt.registerTask("build"    , ["typo", "jshint", "test", "dryice"]);
+  grunt.registerTask("build:all", ["build", "uglify", "compress"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 
