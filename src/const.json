@@ -27,7 +27,13 @@
   "BINARY_CMD_SET_BUFSRC": 1,
 
   "BUFSRC_HEADER_SIZE": 16,
-
+  
+  "WRAP" : 0,
+  "SHORT": 1,
+  "FOLD" : 2,
+  "TABLE": 3,
+  "FLAT" : 4,
+  
   "SCALAR" : 0,
   "CONTROL": 1,
   "AUDIO"  : 2,

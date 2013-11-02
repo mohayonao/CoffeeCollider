@@ -75,7 +75,7 @@ define(function(require, exports, module) {
         assert.throw(function() {
           cc.createPSequence([60, 62, 64], 3, 0).on("end", function() {
           emitted = true;
-          }).max(61);
+          }).numbinaryselectors(61);
         });
       });
     });
