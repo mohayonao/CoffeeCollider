@@ -50,6 +50,10 @@ define(function(require, exports, module) {
     return Random;
   })();
 
+  cc.global.Random  = function(seed) {
+    return cc.createRandom(seed);
+  };
+  
   module.exports = {
     Random: Random,
     use: function() {
@@ -58,11 +62,6 @@ define(function(require, exports, module) {
       };
       cc.instanceOfRandom = function(obj) {
         return obj instanceof Random;
-      };
-    },
-    exports: function() {
-      cc.global.Random  = function(seed) {
-        return cc.createRandom(seed);
       };
     }
   };

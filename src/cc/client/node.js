@@ -524,6 +524,8 @@ define(function(require, exports, module) {
     return nodes[nodeId];
   };
   
+  cc.global.Group = GroupInterface;
+  cc.global.Synth = SynthInterface;
   
   module.exports = {
     Node : Node,
@@ -532,16 +534,27 @@ define(function(require, exports, module) {
     
     use: function() {
       require("./ugen/ugen").use();
-      
+
+      cc.createNode = function() {
+        return new Node();
+      };
       cc.createGroup = function(target, addAction) {
         return new Group(target, addAction);
       };
+      cc.createSynth = function(target, addAction, def, args) {
+        return new Synth(target, addAction, def, args);
+      };
+      cc.instanceOfNode = function(obj) {
+        return obj instanceof Node;
+      };
+      cc.instanceOfGroup = function(obj) {
+        return obj instanceof Group;
+      };
+      cc.instanceOfSynth = function(obj) {
+        return obj instanceof Synth;
+      };
       cc.getNode   = get;
       cc.resetNode = reset;
-    },
-    exports: function() {
-      cc.global.Group = GroupInterface;
-      cc.global.Synth = SynthInterface;
     }
   };
 

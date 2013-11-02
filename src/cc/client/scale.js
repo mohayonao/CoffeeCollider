@@ -816,14 +816,26 @@ define(function(require, exports, module) {
   ScaleInterface.names = function() {
     return Object.keys(scales).sort();
   };
-  
+
+  cc.global.Scale  = ScaleInterface;
+  cc.global.Tuning = TuningInterface;
   
   module.exports = {
-    Scale  : Scale,
-    Tuning : Tuning,
-    exports: function() {
-      cc.global.Scale  = ScaleInterface;
-      cc.global.Tuning = TuningInterface;
+    Scale : Scale,
+    Tuning: Tuning,
+    use: function() {
+      cc.createScale = function(degrees, pitchesPerOctave, tuning, name) {
+        return new Scale(degrees, pitchesPerOctave, tuning, name);
+      };
+      cc.createTuning = function(tuning, octaveRatio, name) {
+        return new Tuning(tuning, octaveRatio, name);
+      };
+      cc.instanceOfScale = function(obj) {
+        return obj instanceof Scale;
+      };
+      cc.instanceOfTuning = function(obj) {
+        return obj instanceof Tuning;
+      };
     }
   };
 

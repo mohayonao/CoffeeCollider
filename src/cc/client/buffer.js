@@ -102,6 +102,7 @@ define(function(require, exports, module) {
     bufSrcId = 0;
   };
   
+  cc.global.Buffer = BufferInterface;
   
   module.exports = {
     AudioBuffer: AudioBuffer,
@@ -114,12 +115,6 @@ define(function(require, exports, module) {
         return obj instanceof AudioBuffer;
       };
       cc.resetBuffer = resetBuffer;
-    },
-    exports: function() {
-      // TODO: rename????
-      if (typeof Buffer === "undefined") {
-        cc.global.Buffer = BufferInterface;
-      }
     }
   };
 

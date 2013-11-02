@@ -3,10 +3,11 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  var cc   = require("../cc");
-  var ugen = require("./ugen/ugen");
-  var object = require("./object");
-  var sched  = require("./sched");
+  var cc = require("../cc");
+  var ugen  = require("./ugen/ugen");
+  var sched = require("./sched");
+  
+  require("./object");
   
   describe("object.js", function() {
     var n = 3, a = [ 1, 2 ], b = true, s = "str", d = new Date(), f = function(x) {
@@ -15,7 +16,6 @@ define(function(require, exports, module) {
     before(function() {
       ugen.use();
       sched.use();
-      object.exports();
     });
     
     it("__plus__", function() {

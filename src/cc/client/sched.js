@@ -539,6 +539,26 @@ define(function(require, exports, module) {
     return TaskBlock;
   })();
   
+  cc.global.Task = {
+    "do": function(func) {
+      return cc.createTaskDo(func);
+    },
+    loop: function(func) {
+      return cc.createTaskLoop(func);
+    },
+    each: function(list, func) {
+      return cc.createTaskEach(list, func);
+    },
+    timeout: function(delay, func) {
+      return cc.createTaskTimeout(delay, func);
+    },
+    interval: function(delay, func) {
+      return cc.createTaskInterval(delay, func);
+    },
+    block: function() {
+      return cc.createTaskBlock();
+    }
+  };
   
   module.exports = {
     Timeline: Timeline,
@@ -618,28 +638,6 @@ define(function(require, exports, module) {
       };
       cc.instanceOfWaitToken = function(obj) {
         return obj instanceof TaskWaitToken;
-      };
-    },
-    exports: function() {
-      cc.global.Task = {
-        "do": function(func) {
-          return cc.createTaskDo(func);
-        },
-        loop: function(func) {
-          return cc.createTaskLoop(func);
-        },
-        each: function(list, func) {
-          return cc.createTaskEach(list, func);
-        },
-        timeout: function(delay, func) {
-          return cc.createTaskTimeout(delay, func);
-        },
-        interval: function(delay, func) {
-          return cc.createTaskInterval(delay, func);
-        },
-        block: function() {
-          return cc.createTaskBlock();
-        }
       };
     }
   };

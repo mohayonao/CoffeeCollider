@@ -458,11 +458,8 @@ define(function(require, exports, module) {
       require("./rate").use();
       require("./unit/unit").use();
       
-      cc.unit_install = function() {
-        require("./unit/installer").install();
-      };
       cc.createSynthServer = function() {
-        cc.unit_install();
+        require("./unit/installer").install();
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthServer();

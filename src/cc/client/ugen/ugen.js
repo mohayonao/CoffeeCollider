@@ -179,7 +179,7 @@ define(function(require, exports, module) {
       cc.MultiOutUGen = MultiOutUGen;
       cc.registerUGen = registerUGen;
     },
-    exports: function() {
+    install: function() {
       require("./installer").install();
       Object.keys(specs).forEach(function(name) {
         registerUGen(name, specs[name]);

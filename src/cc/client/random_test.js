@@ -9,7 +9,6 @@ define(function(require, exports, module) {
   describe("random.js", function() {
     before(function() {
       random.use();
-      random.exports();
     });
     describe("Random", function() {
       it("create", function() {

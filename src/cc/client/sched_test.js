@@ -4,14 +4,14 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var cc = require("./cc");
   var fn = require("./fn");
-  var object    = require("./object");
-  var ugen      = require("./ugen/ugen");
-  var sched     = require("./sched");
+  var ugen  = require("./ugen/ugen");
+  var sched = require("./sched");
+  
+  require("./object");
   
   describe("sched.js", function() {
     var timeline, procN, procT;
     before(function() {
-      object.exports();
       ugen.use();
       sched.use();
     });

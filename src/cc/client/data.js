@@ -3,15 +3,12 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   
-  
-  module.exports = {
-    exports: function() {
-      global.DATA = {
-        get: function(n) {
-          return cc.DATA[n] || "";
-        }
-      };
+  cc.global.DATA = {
+    get: function(n) {
+      return cc.DATA[n] || "";
     }
   };
+  
+  module.exports = {};
 
 });

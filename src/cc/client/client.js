@@ -341,19 +341,10 @@ define(function(require, exports, module) {
       require("./random").use();
       require("./ugen/installer").use();
       
-      cc.client_exports = function() {
-        require("./object").exports();
-        require("./number").exports();
-        require("./data").exports();
-        require("./buffer").exports();
-        require("./node").exports();
-        require("./sched").exports();
-        require("./scale").exports();
-        require("./random").exports();
-        require("./ugen/ugen").exports();
-      };
       cc.createSynthClient = function() {
-        cc.client_exports();
+        require("./object");
+        require("./number");
+        require("./ugen/ugen").install();
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthClient();

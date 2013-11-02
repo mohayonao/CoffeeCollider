@@ -3,26 +3,25 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  var cc     = require("./cc");
-  var number = require("./number");
-
+  var cc   = require("./cc");
+  var ugen = require("./ugen/ugen");
+  require("./object");
+  require("./number");
   
-  function UGen() {
-  }
   function UnaryOpUGen(selector, a) {
-    assert.instanceOf(a, UGen);
+    assert.instanceOf(a, cc.UGen);
     this.selector = selector;
   }
   
   describe("number.js", function() {
-    var ugen;
+    var u;
     before(function() {
-      cc.UGen = UGen;
+      ugen.use();
       cc.createUnaryOpUGen = function(selector, a) {
         return new UnaryOpUGen(selector, a);
       };
-      ugen = new UGen();
-      number.exports();
+      
+      u = cc.createUGen();
     });
     it("neg", function() {
       assert.closeTo((+5.2).neg(), -5.2, 1e-6);
@@ -230,7 +229,7 @@ define(function(require, exports, module) {
     });
 
     it("ugen", function() {
-      assert.equal(ugen.abs().selector, "abs");
+      assert.equal(u.abs().selector, "abs");
     });
     it("array", function() {
       var actual   = [ -1, -0.5, 0, 0.5, 1 ].abs();

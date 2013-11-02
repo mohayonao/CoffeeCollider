@@ -8,9 +8,6 @@ define(function(require, exports, module) {
   var _Tuning = scale.Tuning;
   
   describe("scale.js", function() {
-    before(function() {
-      scale.exports();
-    });
     describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {
