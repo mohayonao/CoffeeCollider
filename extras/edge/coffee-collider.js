@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131104153900",
+    version: "0.0.0+20131105000200",
     global : {},
     Object : function CCObject() {}
   };
@@ -249,7 +249,7 @@ define('cc/client/client', function(require, exports, module) {
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
       };
-      require("../common/console").bindConsoleApply(commands);
+      require("../common/console").bind(commands);
     }
     extend(IFrameSynthClient, SynthClient);
     
@@ -468,6 +468,7 @@ define('cc/client/client', function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./buffer").use();
       require("./node").use();
       require("./pattern").use();
@@ -703,10 +704,11 @@ define('cc/common/browser', function(require, exports, module) {
 
 });
 define('cc/common/console', function(require, exports, module) {
-  
+
+  var cc = require("../cc");
   var unpack = require("./pack").unpack;
   
-  var bindConsoleApply = function(commands) {
+  var bind = function(commands) {
     commands["/console/log"] = function(msg) {
       console.log.apply(console, unpack(msg[1]));
     };
@@ -725,7 +727,23 @@ define('cc/common/console', function(require, exports, module) {
   };
   
   module.exports = {
-    bindConsoleApply: bindConsoleApply
+    bind: bind,
+    use : function() {
+      cc.console = {
+        log: function() {
+          global.console.log.apply(global.console, arguments);
+        },
+        info: function() {
+          global.console.info.apply(global.console, arguments);
+        },
+        warn: function() {
+          global.console.warn.apply(global.console, arguments);
+        },
+        error: function() {
+          global.console.error.apply(global.console, arguments);
+        }
+      };
+    }
   };
 
 });
@@ -1195,7 +1213,7 @@ define('cc/client/utils', function(require, exports, module) {
 define('cc/common/ops', function(require, exports, module) {
 
   var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
-  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
+  var BINARY_OP_UGEN_MAP = "+ - * / / % eq ne lt gt le ge min max bitAnd bitOr bitXor lcm gcd round roundUp trunc atan2 hypot hypotApx pow leftShift rightShift unsignedRightShift fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors roundDown".split(" ");
 
   var UGEN_OP_ALIASES = {
     __plus__ : "num",
@@ -3477,7 +3495,7 @@ define('cc/client/synthdef', function(require, exports, module) {
   var topoSort = (function() {
     var _topoSort = function(x, list, checked, stack) {
       if (stack.indexOf(x) !== stack.length-1) {
-        console.warn("UGen graph contains recursion.");
+        cc.console.warn("UGen graph contains recursion.");
         return;
       }
       checked.push(x);
@@ -5642,7 +5660,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
-  require("../common/console").bindConsoleApply(commands);
+  require("../common/console").bind(commands);
   
   var use = function() {
     require("../common/browser").use();
@@ -7092,7 +7110,7 @@ define('cc/server/server', function(require, exports, module) {
     var instance = null;
     function SocketSynthServerExports(server, opts) {
       if (instance) {
-        console.warn("CoffeeColliderSocketServer has been created already.");
+        cc.console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
       emitter.mixin(this);
@@ -7139,6 +7157,7 @@ define('cc/server/server', function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./instance").use();
       require("./rate").use();
       require("./unit/unit").use();
@@ -7866,9 +7885,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
-        console.warn(this.name + "'s ctor is not found.");
+        cc.console.warn(this.name + "'s ctor is not found.");
       }
-      this.tag = tag;
+      this.tag = tag || "";
       return this;
     };
     Unit.prototype.doneAction = function(action) {
@@ -7876,16 +7895,28 @@ define('cc/server/unit/unit', function(require, exports, module) {
         this.done = true;
         this.parent.doneAction(action, this.tag);
       }
+      action = 0;
     };
     return Unit;
   })();
   
+  var avoidzero = function(a) {
+    if (-1e-6 < a && a < 0) {
+      a = -1e-6;
+    }
+    if (0 <= a && a < +1e-6) {
+      a = +1e-6;
+    }
+    return a;
+  };
   
   module.exports = {
     Unit : Unit,
     specs: specs,
     
-    use  : function() {
+    avoidzero: avoidzero,
+    
+    use: function() {
       cc.createUnit = function(parent, specs) {
         return new Unit(parent, specs);
       };
@@ -8131,36 +8162,40 @@ define('cc/server/unit/installer', function(require, exports, module) {
 });
 define('cc/server/unit/bop', function(require, exports, module) {
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
 
   var calcFunc = {};
   
   unit.specs.BinaryOpUGen = (function() {
-    var AA = 2   * 10 + 2;
-    var AK = 2   * 10 + 1;
-    var AI = 2   * 10 + 0;
-    var KA = 1 * 10 + 2;
-    var KK = 1 * 10 + 1;
-    var KI = 1 * 10 + 0;
-    var IA = 0  * 10 + 2;
-    var IK = 0  * 10 + 1;
-    var II = 0  * 10 + 0;
     
     var ctor = function() {
       var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];
       var process;
       if (func) {
-        switch (this.inRates[0] * 10 + this.inRates[1]) {
-        case AA: process = func.aa; break;
-        case AK: process = func.ak; break;
-        case AI: process = func.ai; break;
-        case KA: process = func.ka; break;
-        case KK: process = func.kk; break;
-        case KI: process = func.ki; break;
-        case IA: process = func.ia; break;
-        case IK: process = func.ik; break;
-        case II: process = func.ii; break;
+        switch (this.inRates[0]) {
+        case 2:
+          switch (this.inRates[1]) {
+          case 2:   process = func.aa; break;
+          case 1: process = func.ak; break;
+          case 0:  process = func.ai; break;
+          }
+          break;
+        case 1:
+          switch (this.inRates[1]) {
+          case 2:   process = func.ka; break;
+          case 1: process = func.kk; break;
+          case 0:  process = func.kk; break;
+          }
+          break;
+        case 0:
+          switch (this.inRates[1]) {
+          case 2:   process = func.ia; break;
+          case 1: process = func.kk; break;
+          case 0:  process = null   ; break;
+          }
+          break;
         }
         this.process = process;
         this._a = this.inputs[0][0];
@@ -8171,7 +8206,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -8712,17 +8747,37 @@ define('cc/server/unit/bop', function(require, exports, module) {
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.aa) { func.aa = binary_aa(func); }
-    if (!func.ak) { func.ak = binary_ak(func); }
-    if (!func.ai) { func.ai = binary_ai(func); }
-    if (!func.ka) { func.ka = binary_ka(func); }
-    if (!func.kk) { func.kk = binary_kk(func); }
-    if (!func.ki) { func.ki = func.kk; }
-    if (!func.ia) { func.ia = binary_ia(func); }
-    if (!func.ik) { func.ik = func.kk; }
+    if (!func.aa) {
+      func.aa = binary_aa(func);
+    }
+    if (!func.ak) {
+      func.ak = binary_ak(func);
+    }
+    if (!func.ai) {
+      func.ai = binary_ai(func);
+    }
+    if (!func.ka) {
+      func.ka = binary_ka(func);
+    }
+    if (!func.kk) {
+      func.kk = binary_kk(func);
+    }
+    if (!func.ia) {
+      func.ia = binary_ia(func);
+    }
+    func.ki = func.kk;
+    func.ik = func.kk;
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc : calcFunc,
+    binary_aa: binary_aa,
+    binary_ak: binary_ak,
+    binary_ai: binary_ai,
+    binary_ka: binary_ka,
+    binary_kk: binary_kk,
+    binary_ia: binary_ia,
+  };
 
 });
 define('cc/server/unit/bufio', function(require, exports, module) {
@@ -10411,6 +10466,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
 });
 define('cc/server/unit/uop', function(require, exports, module) {
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
   
@@ -10423,8 +10479,12 @@ define('cc/server/unit/uop', function(require, exports, module) {
       var process;
       if (func) {
         switch (this.inRates[0]) {
-        case 2  : process = func.a; break;
-        case 1: process = func.k; break;
+        case 2:
+          process = func.a;
+          break;
+        case 1:
+          process = func.k;
+          break;
         }
         this.process = process;
         if (this.process) {
@@ -10433,7 +10493,7 @@ define('cc/server/unit/uop', function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
-        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("UnaryOpUGen[" + ops.UNARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -10458,15 +10518,7 @@ define('cc/server/unit/uop', function(require, exports, module) {
     };
   };
   
-  var avoidzero = function(a) {
-    if (-1e-6 < a && a < 0) {
-      a = -1e-6;
-    }
-    if (0 <= a && a < +1e-6) {
-      a = +1e-6;
-    }
-    return a;
-  };
+  var avoidzero = unit.avoidzero;
   
   calcFunc.neg = function(a) {
     return -a;
@@ -10540,10 +10592,10 @@ define('cc/server/unit/uop', function(require, exports, module) {
     return Math.log(Math.abs(avoidzero(a)));
   };
   calcFunc.log2 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG2E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG2E;
   };
   calcFunc.log10 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG10E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG10E;
   };
   calcFunc.sin = function(a) {
     return Math.sin(a);
@@ -10605,20 +10657,21 @@ define('cc/server/unit/uop', function(require, exports, module) {
   calcFunc.tilde = function(a) {
     return ~a;
   };
-  calcFunc.num = function(a) {
-    return a;
-  };
   calcFunc.pi = function(a) {
     return Math.PI * a;
   };
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.a) { func.a = unary_a(func); }
-    if (!func.k) { func.k = unary_k(func); }
+    func.a = unary_a(func);
+    func.k = unary_k(func);
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc: calcFunc,
+    unary_k : unary_k,
+    unary_a : unary_a
+  };
 
 });
 var exports = _require("cc/cc", "cc/loader");

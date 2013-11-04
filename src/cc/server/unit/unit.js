@@ -40,7 +40,7 @@ define(function(require, exports, module) {
       } else {
         cc.console.warn(this.name + "'s ctor is not found.");
       }
-      this.tag = tag;
+      this.tag = tag || "";
       return this;
     };
     Unit.prototype.doneAction = function(action) {
@@ -48,16 +48,28 @@ define(function(require, exports, module) {
         this.done = true;
         this.parent.doneAction(action, this.tag);
       }
+      action = 0;
     };
     return Unit;
   })();
   
+  var avoidzero = function(a) {
+    if (-1e-6 < a && a < 0) {
+      a = -1e-6;
+    }
+    if (0 <= a && a < +1e-6) {
+      a = +1e-6;
+    }
+    return a;
+  };
   
   module.exports = {
     Unit : Unit,
     specs: specs,
     
-    use  : function() {
+    avoidzero: avoidzero,
+    
+    use: function() {
       cc.createUnit = function(parent, specs) {
         return new Unit(parent, specs);
       };

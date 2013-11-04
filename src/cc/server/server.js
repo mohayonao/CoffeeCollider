@@ -454,6 +454,7 @@ define(function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./instance").use();
       require("./rate").use();
       require("./unit/unit").use();

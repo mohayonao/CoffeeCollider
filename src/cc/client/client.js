@@ -335,6 +335,7 @@ define(function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./buffer").use();
       require("./node").use();
       require("./pattern").use();

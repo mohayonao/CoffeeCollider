@@ -7,6 +7,85 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   
   describe("unit/unit.js", function() {
+    var parent;
+    before(function() {
+      unit.use();
+      parent = {
+        doneAction: function(action, tag) {
+          parent.doneAction.result = action;
+        }
+      };
+      cc.getRateInstance = function(rate) {
+        return {
+          bufLength: 64
+        };
+      };
+      cc.console = {
+        warn: function(str) {
+          cc.console.warn.result = str;
+        }
+      };
+      unit.specs.TestUnit = function() {
+        unit.specs.TestUnit.called = true;
+      };
+    });
+    it("create", function() {
+      var specs = [
+        "TestUnit", C.AUDIO, 1, [ 0, 0, 0, 0 ], [ 2 ], ""
+      ];
+      var u = cc.createUnit(parent, specs);
+      assert.instanceOf(u, unit.Unit);
+      assert.equal(u.name, "TestUnit");
+      assert.equal(u.calcRate, C.AUDIO);
+      assert.equal(u.specialIndex, 1);
+      assert.equal(u.numOfInputs , 2);
+      assert.equal(u.numOfOutputs, 1);
+      assert.isArray(u.inputs);
+      assert.isArray(u.outputs);
+      assert.equal(u.numOfInputs, u.inputs.length);
+      assert.equal(u.numOfOutputs, u.outputs.length);
+      assert.equal(u.bufLength   , 64);
+      assert.isFalse(u.done);
+    });
+    it("init", function() {
+      var specs = [
+        "TestUnit", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
+      ];
+      unit.specs.TestUnit.called = false;
+      var u = cc.createUnit(parent, specs).init("tag");
+      assert.isTrue(unit.specs.TestUnit.called);
+      assert.equal(u.tag, "tag");
+    });
+    it("init(not exist)", function() {
+      var specs = [
+        "TestUnit(not exist)", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
+      ];
+      cc.console.warn.result = null;
+      var u = cc.createUnit(parent, specs).init("tag");
+      assert.isString(cc.console.warn.result);
+    });
+    it("doneAction", function() {
+      var specs = [
+        "TestUnit", 0, 0, [ 0, 0, 0, 0 ], [ 2 ], ""
+      ];
+      var u = cc.createUnit(parent, specs);
+      parent.doneAction.result = null;
+      u.doneAction(2);
+      assert.equal(parent.doneAction.result, 2);
+      
+      parent.doneAction.result = null;
+      u.doneAction(2);
+      assert.isNull(parent.doneAction.result);
+    });
+    describe("utility methods", function() {
+      it("avoidzero", function() {
+        assert.equal(unit.avoidzero(-1e-2), -1e-2);
+        assert.equal(unit.avoidzero(-1e-8), -1e-6);
+        assert.equal(unit.avoidzero(0), 1e-6);
+        assert.equal(unit.avoidzero(+1e-8), +1e-6);
+        assert.equal(unit.avoidzero(+1e-2), +1e-2);
+      });
+    });
   });
 
   // unit test suite
@@ -70,6 +149,15 @@ define(function(require, exports, module) {
       return _in;
     };
   };
+  writer.tri = function(offset) {
+    var index = offset || 0;
+    var pattern = [-1.0, -0.8, -0.6, -0.4, -0.2, -0, +0.2, +0.4, +0.6, +0.8,
+                   +1.0, +0.8, +0.6, +0.4, +0.2, +0, -0.2, -0.4, -0.6, -0.8 ];
+    return function(_in) {
+      writeScalarValue(_in, pattern[(index++) % pattern.length]);
+      return _in;
+    };
+  };
   
   var inputSpec = function(opts) {
     var rate = (opts.rate === C.AUDIO) ? a_rate : k_rate;
@@ -97,8 +185,8 @@ define(function(require, exports, module) {
       return (rate === C.AUDIO) ? a_rate : k_rate;
     };
     
-    var min = typeof opts.min === "undefined" ? -1.05 : opts.min;
-    var max = typeof opts.max === "undefined" ? +1.05 : opts.max;
+    var min = typeof opts.min === "undefined" ? -Infinity : opts.min;
+    var max = typeof opts.max === "undefined" ? +Infinity : opts.max;
     var i, j, k;
     var u = cc.createUnit(parent, spec);
     for (i = 0; i < u.numOfInputs; ++i) {

@@ -14,8 +14,12 @@ define(function(require, exports, module) {
       var process;
       if (func) {
         switch (this.inRates[0]) {
-        case C.AUDIO  : process = func.a; break;
-        case C.CONTROL: process = func.k; break;
+        case C.AUDIO:
+          process = func.a;
+          break;
+        case C.CONTROL:
+          process = func.k;
+          break;
         }
         this.process = process;
         if (this.process) {
@@ -24,7 +28,7 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
-        cc.console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("UnaryOpUGen[" + ops.UNARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -49,15 +53,7 @@ define(function(require, exports, module) {
     };
   };
   
-  var avoidzero = function(a) {
-    if (-1e-6 < a && a < 0) {
-      a = -1e-6;
-    }
-    if (0 <= a && a < +1e-6) {
-      a = +1e-6;
-    }
-    return a;
-  };
+  var avoidzero = unit.avoidzero;
   
   calcFunc.neg = function(a) {
     return -a;
@@ -131,10 +127,10 @@ define(function(require, exports, module) {
     return Math.log(Math.abs(avoidzero(a)));
   };
   calcFunc.log2 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG2E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG2E;
   };
   calcFunc.log10 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG10E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG10E;
   };
   calcFunc.sin = function(a) {
     return Math.sin(a);
@@ -196,19 +192,20 @@ define(function(require, exports, module) {
   calcFunc.tilde = function(a) {
     return ~a;
   };
-  calcFunc.num = function(a) {
-    return a;
-  };
   calcFunc.pi = function(a) {
     return Math.PI * a;
   };
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.a) { func.a = unary_a(func); }
-    if (!func.k) { func.k = unary_k(func); }
+    func.a = unary_a(func);
+    func.k = unary_k(func);
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc: calcFunc,
+    unary_k : unary_k,
+    unary_a : unary_a
+  };
 
 });

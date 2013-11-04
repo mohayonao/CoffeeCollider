@@ -8,30 +8,33 @@ define(function(require, exports, module) {
   var calcFunc = {};
   
   unit.specs.BinaryOpUGen = (function() {
-    var AA = C.AUDIO   * 10 + C.AUDIO;
-    var AK = C.AUDIO   * 10 + C.CONTROL;
-    var AI = C.AUDIO   * 10 + C.SCALAR;
-    var KA = C.CONTROL * 10 + C.AUDIO;
-    var KK = C.CONTROL * 10 + C.CONTROL;
-    var KI = C.CONTROL * 10 + C.SCALAR;
-    var IA = C.SCALAR  * 10 + C.AUDIO;
-    var IK = C.SCALAR  * 10 + C.CONTROL;
-    var II = C.SCALAR  * 10 + C.SCALAR;
     
     var ctor = function() {
       var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];
       var process;
       if (func) {
-        switch (this.inRates[0] * 10 + this.inRates[1]) {
-        case AA: process = func.aa; break;
-        case AK: process = func.ak; break;
-        case AI: process = func.ai; break;
-        case KA: process = func.ka; break;
-        case KK: process = func.kk; break;
-        case KI: process = func.ki; break;
-        case IA: process = func.ia; break;
-        case IK: process = func.ik; break;
-        case II: process = func.ii; break;
+        switch (this.inRates[0]) {
+        case C.AUDIO:
+          switch (this.inRates[1]) {
+          case C.AUDIO:   process = func.aa; break;
+          case C.CONTROL: process = func.ak; break;
+          case C.SCALAR:  process = func.ai; break;
+          }
+          break;
+        case C.CONTROL:
+          switch (this.inRates[1]) {
+          case C.AUDIO:   process = func.ka; break;
+          case C.CONTROL: process = func.kk; break;
+          case C.SCALAR:  process = func.kk; break;
+          }
+          break;
+        case C.SCALAR:
+          switch (this.inRates[1]) {
+          case C.AUDIO:   process = func.ia; break;
+          case C.CONTROL: process = func.kk; break;
+          case C.SCALAR:  process = null   ; break;
+          }
+          break;
         }
         this.process = process;
         this._a = this.inputs[0][0];
@@ -42,7 +45,7 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        cc.console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -583,16 +586,36 @@ define(function(require, exports, module) {
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.aa) { func.aa = binary_aa(func); }
-    if (!func.ak) { func.ak = binary_ak(func); }
-    if (!func.ai) { func.ai = binary_ai(func); }
-    if (!func.ka) { func.ka = binary_ka(func); }
-    if (!func.kk) { func.kk = binary_kk(func); }
-    if (!func.ki) { func.ki = func.kk; }
-    if (!func.ia) { func.ia = binary_ia(func); }
-    if (!func.ik) { func.ik = func.kk; }
+    if (!func.aa) {
+      func.aa = binary_aa(func);
+    }
+    if (!func.ak) {
+      func.ak = binary_ak(func);
+    }
+    if (!func.ai) {
+      func.ai = binary_ai(func);
+    }
+    if (!func.ka) {
+      func.ka = binary_ka(func);
+    }
+    if (!func.kk) {
+      func.kk = binary_kk(func);
+    }
+    if (!func.ia) {
+      func.ia = binary_ia(func);
+    }
+    func.ki = func.kk;
+    func.ik = func.kk;
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc : calcFunc,
+    binary_aa: binary_aa,
+    binary_ak: binary_ak,
+    binary_ai: binary_ai,
+    binary_ka: binary_ka,
+    binary_kk: binary_kk,
+    binary_ia: binary_ia,
+  };
 
 });
