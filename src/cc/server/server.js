@@ -407,7 +407,7 @@ define(function(require, exports, module) {
     var instance = null;
     function SocketSynthServerExports(server, opts) {
       if (instance) {
-        console.warn("CoffeeColliderSocketServer has been created already.");
+        cc.console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
       emitter.mixin(this);

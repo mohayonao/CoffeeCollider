@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
   
@@ -23,7 +24,7 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
-        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
       }
     };
     

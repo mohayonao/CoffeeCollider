@@ -61,10 +61,16 @@ define(function(require, exports, module) {
         pushToTimeline: function(cmd) {
           tl = cmd;
         },
-      };      
+      };
+      cc.console = {
+        warn: function(str) {
+          cc.console.warn.result = str;
+        }
+      };
     });
     beforeEach(function() {
       tl = null;
+      cc.console.warn.result = null;
     });
     it("create", function() {
       var def = cc.createSynthDef(function(){});
@@ -243,6 +249,7 @@ define(function(require, exports, module) {
         a.inputs = [b]; b.inputs = [c]; c.inputs = [d]; d.inputs = [a];
         actual = synthdef.topoSort([ a, b, c, d ]);
         assert.deepEqual(actual, [ d, c, b, a ], "recursive");
+        assert.isString(cc.console.warn.result);
       });
       it("makeDefList", function() {
         var a, b, c, d, e, f, list, consts;

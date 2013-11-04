@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
 
@@ -41,7 +42,7 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
       }
     };
     

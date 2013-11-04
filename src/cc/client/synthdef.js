@@ -184,7 +184,7 @@ define(function(require, exports, module) {
   var topoSort = (function() {
     var _topoSort = function(x, list, checked, stack) {
       if (stack.indexOf(x) !== stack.length-1) {
-        console.warn("UGen graph contains recursion.");
+        cc.console.warn("UGen graph contains recursion.");
         return;
       }
       checked.push(x);

@@ -116,7 +116,7 @@ define(function(require, exports, module) {
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
       };
-      require("../common/console").bindConsoleApply(commands);
+      require("../common/console").bind(commands);
     }
     extend(IFrameSynthClient, SynthClient);
     

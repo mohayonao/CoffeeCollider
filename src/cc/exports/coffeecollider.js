@@ -381,7 +381,7 @@ define(function(require, exports, module) {
   commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
-  require("../common/console").bindConsoleApply(commands);
+  require("../common/console").bind(commands);
   
   var use = function() {
     require("../common/browser").use();
