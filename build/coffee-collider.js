@@ -124,14 +124,11 @@ define('cc/loader', function(require, exports, module) {
 
 });
 define('cc/cc', function(require, exports, module) {
-
-  function CCObject() {
-  }
   
   module.exports = {
     version: "0.0.0",
-    global: {},
-    Object: CCObject
+    global : {},
+    Object : function CCObject() {}
   };
 
 });
@@ -477,14 +474,20 @@ define('cc/client/client', function(require, exports, module) {
       require("./random").use();
       require("./scale").use();
       require("./sched").use();
-      require("./ugen/installer").use();
+      require("./synthdef").use();
+      require("./ugen/ugen").use();
       
       cc.createSynthClient = function() {
-        require("./object");
-        require("./number");
         require("./array");
-        require("./ugen/ugen").install();
+        require("./boolean");
         require("./data");
+        require("./date");
+        require("./function");
+        require("./number");
+        require("./object");
+        require("./string");
+        require("./ugen/ugen").install();
+        
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthClient();
@@ -987,6 +990,7 @@ define('cc/client/fn', function(require, exports, module) {
 
   var cc = require("./cc");
   var utils = require("./utils");
+  var ops   = require("../common/ops");
   var slice = [].slice;
   
   var fn = (function() {
@@ -1011,7 +1015,11 @@ define('cc/client/fn', function(require, exports, module) {
         this.def.split(",").forEach(function(items) {
           items = items.trim().split("=");
           keys.push( items[0].trim());
-          vals.push(items.length > 1 ? +items[1].trim() : undefined);
+          if (items.length === 2) {
+            vals.push(JSON.parse(items[1]));
+          } else {
+            vals.push(undefined);
+          }
         });
       }
       var ret = func;
@@ -1060,18 +1068,20 @@ define('cc/client/fn', function(require, exports, module) {
       var args = vals.slice();
       if (utils.isDict(given[given.length - 1])) {
         dict = given.pop();
-        for (var key in dict) {
+        Object.keys(dict).forEach(function(key) {
           var index = keys.indexOf(key);
           if (index !== -1) {
             args[index] = dict[key];
           }
-        }
+        });
       }
       for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
         args[i] = given[i];
       }
-      if (dict && args.length < keys.length - 1) {
-        args.push(dict);
+      if (dict && keys.length <= args.length) {
+        if (utils.isDict(vals[vals.length - 1])) {
+          args.splice(args.length-1, 1, dict);
+        }
       }
       return args;
     };
@@ -1093,6 +1103,26 @@ define('cc/client/fn', function(require, exports, module) {
       enumerable  : false,
       writable    : true,
       value       : func
+    });
+  };
+  
+  fn.setupBinaryOp = function(Klass, selector, func) {
+    var ugenSelector;
+    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    } else {
+      ugenSelector = selector;
+    }
+    fn.definePrototypeProperty(Klass, selector, function(b) {
+      var a = this;
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return a[selector](b);
+        });
+      } else if (cc.instanceOfUGen(b)) {
+        return cc.createBinaryOpUGen(ugenSelector, a, b);
+      }
+      return func.call(a, b);
     });
   };
   
@@ -1121,7 +1151,7 @@ define('cc/client/utils', function(require, exports, module) {
     }
     return result;
   };
-
+  
   var flatten = (function() {
     var _flatten = function(list, result) {
       for (var i = 0, imax = list.length; i < imax; ++i) {
@@ -1159,6 +1189,28 @@ define('cc/client/utils', function(require, exports, module) {
     flop   : flop,
     flatten: flatten,
     clump  : clump
+  };
+
+});
+define('cc/common/ops', function(require, exports, module) {
+
+  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
+  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
+
+  var UGEN_OP_ALIASES = {
+    __plus__ : "num",
+    __minus__: "neg",
+    __add__  : "+",
+    __sub__  : "-",
+    __mul__  : "*",
+    __div__  : "/",
+    __mod__  : "%",
+  };
+  
+  module.exports = {
+    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
+    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
+    UGEN_OP_ALIASES   : UGEN_OP_ALIASES,
   };
 
 });
@@ -1247,10 +1299,10 @@ define('cc/client/node', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var extend  = require("../common/extend");
   var utils   = require("./utils");
+  var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
-
+  
   var nodes = {};
   
   var Node = (function() {
@@ -1292,10 +1344,9 @@ define('cc/client/node', function(require, exports, module) {
     function Group(target, addAction) {
       Node.call(this);
       this.klassName = "Group";
-      if (target) {
+      if (target instanceof Node) {
         var that = this;
-        var timeline = cc.client.timeline;
-        timeline.push(function() {
+        cc.client.timeline.push(function() {
           cc.client.pushToTimeline([
             "/g_new", that.nodeId, addAction, target.nodeId
           ]);
@@ -1311,47 +1362,20 @@ define('cc/client/node', function(require, exports, module) {
     function Synth(target, addAction, def, args) {
       Node.call(this);
       this.klassName = "Synth";
-      this.params = def.specs.params;
-      if (target) {
-        var that = this;
+      if (target instanceof Node && cc.instanceOfSynthDef(def)) {
+        this.params  = def.specs.params;
+        var nodeId   = this.nodeId;
         var timeline = cc.client.timeline;
         var controls = args2controls(args, this.params);
         timeline.push(function() {
           cc.client.pushToTimeline([
-            "/s_new", that.nodeId, addAction, target.nodeId, def._defId, controls
+            "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
           ]);
         });
       }
     }
     extend(Synth, Node);
-
-    var args2controls = function(args, params) {
-      var controls = [];
-      if (utils.isDict(args)) {
-        Object.keys(args).forEach(function(key) {
-          var value  = args[key];
-          var index  = params.names.indexOf(key);
-          if (index === -1) {
-            return;
-          }
-          index = params.indices[index];
-          var length = params.length[index];
-          if (Array.isArray(value)) {
-            value.forEach(function(value, i) {
-              if (i < length) {
-                if (typeof value === "number" && !isNaN(value)) {
-                  controls.push(index + i, value);
-                }
-              }
-            });
-          } else if (typeof value === "number" && !isNaN(value)) {
-            controls.push(index, value);
-          }
-        });
-      }
-      return controls;
-    };
-
+    
     Synth.prototype._set = function(args) {
       var controls = args2controls(args, this.params);
       if (controls.length) {
@@ -1365,420 +1389,108 @@ define('cc/client/node', function(require, exports, module) {
     
     return Synth;
   })();
-
-  var SynthDef = (function() {
-    var defId = 0;
-    function SynthDef(func, args) {
-      this.klassName = "SynthDef";
-      this._defId = defId++;
-      var isVaridArgs = false;
-      if (args) {
-        if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
-          args = unpackArguments(args);
-          if (args) {
-            isVaridArgs = args.vals.every(function(item) {
-              if (typeof item === "number") {
-                return true;
-              } else if (Array.isArray(item)) {
-                return item.every(function(item) {
-                  return typeof item === "number";
-                });
-              }
-              if (item === undefined || item === null) {
-                return true;
-              }
-              return false;
-            });
-          }
-        }
-        if (!isVaridArgs) {
-          throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
-        }
-      } else {
-        args = { keys:[], vals:[] };
-      }
-
-      var children = [];
-      cc.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      var params  = { names:[], indices:[], length:[], values:[] };
-      var flatten = [];
-      var i, imax, length;
-      for (i = 0, imax = args.vals.length; i < imax; ++i) {
-        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
-        params.names  .push(args.keys[i]);
-        params.indices.push(flatten.length);
-        params.length .push(length);
-        params.values = params.values.concat(args.vals[i]);
-        flatten = flatten.concat(args.vals[i]);
-      }
-      var reshaped = [];
-      var controls = cc.createControl(1).init(flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      var saved = controls.slice();
-      for (i = 0; i < imax; ++i) {
-        if (Array.isArray(args.vals[i])) {
-          reshaped.push(saved.splice(0, args.vals[i].length));
-        } else {
-          reshaped.push(saved.shift());
-        }
-      }
-      
-      try {
-        func.apply(null, reshaped);
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        cc.setSynthDef(null);
-      }
-      // console.log(children);
-      var consts = [];
-      children.forEach(function(x) {
-        if (x.inputs) {
-          x.inputs.forEach(function(_in) {
-            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
-              consts.push(_in);
-            }
-          });
-        }
-      });
-      consts.sort();
-      var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || cc.instanceOfOutputProxy(x));
-      });
-      // console.log(ugenlist);
-      var defs = ugenlist.map(function(x) {
-        var inputs = [];
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((cc.instanceOfOutputProxy(x)) ? x.inputs[0] : x);
-            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
-            inputs.push(index, subindex);
-          });
-        }
-        var outputs;
-        if (cc.instanceOfMultiOutUGen(x)) {
-          outputs = x.channels.map(function(x) {
-            return x.rate;
-          });
-        } else if (x.numOfOutputs === 1) {
-          outputs = [ x.rate ];
-        } else {
-          outputs = [];
-        }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
-      });
-      var specs = {
-        consts: consts,
-        defs  : defs,
-        params: params,
-      };
-      this.specs = specs;
-      // console.log(specs);
-      cc.client.pushToTimeline([
-        "/s_def", this._defId, JSON.stringify(specs)
-      ]);
-      return this;
-    }
-    
-    SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      if (arguments[i] instanceof Node) {
-        target = arguments[i++];
-      } else {
-        target = cc.client.rootNode;
-      }
-      if (utils.isDict(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      } else {
-        addAction = "addToHead";
-      }
-      if (args && arguments.length === 1) {
-        if (args.target instanceof Node) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
-      switch (addAction) {
-      case "addToHead":
-        return SynthInterface.head(target, this, args);
-      case "addToTail":
-        return SynthInterface.tail(target, this, args);
-      case "addBefore":
-        return SynthInterface.before(target, this, args);
-      case "addAfter":
-        return SynthInterface.after(target, this, args);
-      default:
-        return SynthInterface.head(target, this, args);
-      }
-    }).multiCall().build();
-
-    var topoSort = (function() {
-      var _topoSort = function(x, list, checked) {
-        checked.push(x);
-        var index = list.indexOf(x);
-        if (index !== -1) {
-          list.splice(index, 1);
-        }
-        list.unshift(x);
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            _topoSort(x, list, checked);
-          });
-        }
-      };
-      return function(list) {
-        var checked = [];
-        list.slice().forEach(function(x) {
-          if (cc.instanceOfOut(x)) {
-            checked.push(x);
-            x.inputs.forEach(function(x) {
-              _topoSort(x, list, checked);
-            });
-          }
-        });
-        list = list.filter(function(x) {
-          return checked.indexOf(x) !== -1;
-        });
-        return list;
-      };
-    })();
-    
-    var splitArguments = function(args) {
-      var result  = [];
-      var begin   = 0;
-      var bracket = 0;
-      var inStr   = null;
-      for (var i = 0, imax = args.length; i < imax; ++i) {
-        var c = args.charAt(i);
-        if (args.charAt(i-1) === "\\") {
-          if (args.charAt(i-2) !== "\\") {
-            continue;
-          }
-        }
-        if (c === "\"" || c === "'") {
-          if (inStr === null) {
-            inStr = c;
-          } else if (inStr === c) {
-            inStr = null;
-          }
-        }
-        if (inStr) {
-          continue;
-        }
-        switch (c) {
-        case ",":
-          if (bracket === 0) {
-            result.push(args.slice(begin, i).trim());
-            begin = i + 1;
-          }
-          break;
-        case "[":
-          bracket += 1;
-          break;
-        case "]":
-          bracket -= 1;
-          break;
-        }
-      }
-      if (begin !== i) {
-        result.push(args.slice(begin, i).trim());
-      }
-      return result;
-    };
-    
-    var unpackArguments = function(args) {
-      var keys = [];
-      var vals = [];
-      if (args) {
-        try {
-          splitArguments(args).forEach(function(items) {
-            var i = items.indexOf("=");
-            var k, v;
-            if (i === -1) {
-              k = items;
-              v = undefined;
-            } else {
-              k = items.substr(0, i).trim();
-              v = JSON.parse(items.substr(i + 1));
-            }
-            keys.push(k);
-            vals.push(v);
-          });
-        } catch (e) {
+  
+  
+  var args2controls = function(args, params) {
+    var controls = [];
+    if (utils.isDict(args) && params) {
+      Object.keys(args).forEach(function(key) {
+        var value  = args[key];
+        var index  = params.names.indexOf(key);
+        if (index === -1) {
           return;
         }
-      }
-      return { keys:keys, vals:vals };
-    };
-    
-    return SynthDef;
-  })();
-
-  var GroupInterface = function() {
+        index = params.indices[index];
+        var length = params.length[index];
+        if (Array.isArray(value)) {
+          value.forEach(function(value, i) {
+            if (i < length) {
+              if (typeof value === "number" && !isNaN(value)) {
+                controls.push(index + i, value);
+              }
+            }
+          });
+        } else if (typeof value === "number" && !isNaN(value)) {
+          controls.push(index, value);
+        }
+      });
+    }
+    return controls;
+  };
+  
+  var sortArgs = function(list) {
+    var node, def, args;
+    if (cc.instanceOfSynthDef(list[0])) {
+      node = cc.client.rootNode;
+      def  = list[0];
+      args = list[1] || {};
+    } else if (cc.instanceOfSynthDef(list[1])) {
+      node = list[0];
+      def  = list[1];
+      args = list[2] || {};
+    } else {
+      node = cc.client.rootNode;
+      def  = null;
+      args = {};
+    }
+    return [node, def, args];
+  };
+  
+  var GroupInterface = cc.global.Group = function() {
     return new Group();
   };
   GroupInterface.after = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.after: arguments[0] is not a Node.");
-    }
-    return new Group(node, 3);
+    return new Group(node || cc.client.rootNode, 3);
   };
   GroupInterface.before = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.before: arguments[0] is not a Node.");
-    }
-    return new Group(node, 2);
+    return new Group(node || cc.client.rootNode, 2);
   };
   GroupInterface.head = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.head: arguments[0] is not a Group.");
-    }
-    return new Group(node, 0);
+    return new Group(node || cc.client.rootNode, 0);
   };
   GroupInterface.tail = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.tail: arguments[0] is not a Group.");
-    }
-    return new Group(node, 1);
+    return new Group(node || cc.client.rootNode, 1);
   };
   GroupInterface.replace = function(node) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.replace: arguments[0] is not a Node.");
-    }
     return new Group(node, 4);
   };
   
-  var SynthInterface = function() {
+  var SynthInterface = cc.global.Synth = function() {
     return new Synth();
   };
   SynthInterface.def = function(func, args) {
-    if (typeof func !== "function") {
-      throw new TypeError("Synth.def: arguments[0] is not a Function.");
-    }
-    return new SynthDef(func, args);
+    return cc.createSynthDef(func, args);
   };
   SynthInterface.after = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.after: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, 3, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], 3, list[1], list[2]);
   };
   SynthInterface.before = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.before: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, 2, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], 2, list[1], list[2]);
   };
   SynthInterface.head = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.head: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, 0, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], 0, list[1], list[2]);
   };
   SynthInterface.tail = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, 1, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], 1, list[1], list[2]);
   };
   SynthInterface.replace = function(node, def, args) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
-    }
     return new Synth(node, 4, def, args);
   };
   
-  var reset = function() {
-    nodes = {};
-  };
-
-  var get = function(nodeId) {
-    return nodes[nodeId];
-  };
-  
-  cc.global.Group = GroupInterface;
-  cc.global.Synth = SynthInterface;
   
   module.exports = {
     Node : Node,
     Group: Group,
     Synth: Synth,
+
+    // private methods
+    args2controls : args2controls,
     
     use: function() {
-      require("./ugen/ugen").use();
-
       cc.createNode = function() {
         return new Node();
       };
@@ -1797,933 +1509,14 @@ define('cc/client/node', function(require, exports, module) {
       cc.instanceOfSynth = function(obj) {
         return obj instanceof Synth;
       };
-      cc.getNode   = get;
-      cc.resetNode = reset;
-    }
-  };
-
-});
-define('cc/client/ugen/ugen', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  var fn = require("../fn");
-  var extend = require("../../common/extend");
-  var ops = require("../../common/ops");
-  var slice  = [].slice;
-  
-  var addToSynthDef = null;
-  var specs = {};
-  
-  var UGen = (function() {
-    function UGen(name) {
-      this.klassName = name;
-      this.tag  = "";
-      this.rate = 2;
-      this.signalRange = 2;
-      this.specialIndex = 0;
-      this.outputIndex  = 0;
-      this.numOfInputs  = 0;
-      this.numOfOutputs = 1;
-      this.inputs = [];
-    }
-    extend(UGen, cc.Object);
-    
-    UGen.prototype.init = function(rate) {
-      this.rate = rate;
-      if (addToSynthDef) {
-        addToSynthDef(this);
-      }
-      this.inputs = slice.call(arguments, 1);
-      this.numOfInputs = this.inputs.length;
-      return this;
-    };
-    
-    UGen.prototype.madd = fn(function(mul, add) {
-      return cc.createMulAdd(this, mul, add);
-    }).defaults("mul=1,add=0").multiCall().build();
-    
-    UGen.prototype.range = fn(function(lo, hi) {
-      var mul, add;
-      if (this.signalRange === 2) {
-        mul = (hi - lo) * 0.5;
-        add = mul + lo;
-      } else {
-        mul = (hi - lo);
-        add = lo;
-      }
-      return cc.createMulAdd(this, mul, add);
-    }).defaults("lo=0,hi=1").multiCall().build();
-    
-    UGen.prototype.unipolar = fn(function(mul) {
-      return this.range(0, mul);
-    }).defaults("mul=1").multiCall().build();
-    
-    UGen.prototype.bipolar = fn(function(mul) {
-      return this.range(mul.neg(), mul);
-    }).defaults("mul=1").multiCall().build();
-    
-    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        UGen.prototype[selector] = function() {
-          return cc.createUnaryOpUGen(selector, this);
-        };
-      }
-    });
-    
-    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        UGen.prototype[selector] = function(b) {
-          return cc.createBinaryOpUGen(selector, this, b);
-        };
-      }
-    });
-    
-    return UGen;
-  })();
-  
-  var MultiOutUGen = (function() {
-    function MultiOutUGen(name) {
-      UGen.call(this, name || "MultiOutUGen");
-      this.channels = null;
-    }
-    extend(MultiOutUGen, UGen);
-    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
-      var channels = new Array(numChannels);
-      for (var i = 0; i < numChannels; ++i) {
-        channels[i] = new OutputProxy(rate, this, i);
-      }
-      this.channels = channels;
-      this.numOfOutputs = channels.length;
-      this.inputs = this.inputs.map(function(ugen) {
-        if (!(ugen instanceof UGen)) {
-          ugen = +ugen;
-          if (isNaN(ugen)) {
-            ugen = 0;
-          }
-        }
-        return ugen;
-      });
-      this.numOfInputs = this.inputs.length;
-      return (numChannels === 1) ? channels[0] : channels;
-    };
-    return MultiOutUGen;
-  })();
-  
-  var OutputProxy = (function() {
-    function OutputProxy(rate, source, index) {
-      UGen.call(this, "OutputProxy");
-      this.init(rate);
-      this.inputs = [ source ];
-      this.numOfOutputs = 1;
-      this.outputIndex  = index;
-    }
-    extend(OutputProxy, UGen);
-    return OutputProxy;
-  })();
-  
-  
-  var registerUGen = function(name, spec) {
-    var klass = cc.global[name] = function() {
-      return new UGen(name);
-    };
-    
-    Object.keys(spec).forEach(function(key) {
-      var setting   = spec[key];
-      var defaults  = setting.defaults + ",tag";
-      var ctor      = setting.ctor;
-      var multiCall = setting.multiCall;
-      if (multiCall === undefined) {
-        multiCall = true;
-      }
-      if (setting.Klass !== null) {
-        var Klass = setting.Klass || UGen;
-        klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1);
-          var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new Klass(name, tag), args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
-        }).defaults(defaults).multiCall(multiCall).build();
-      } else {
-        klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1);
-          var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(null, args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
-        }).defaults(defaults).multiCall(multiCall).build();
-      }
-    });
-  };
-  
-  
-  // exports for prototype extending
-  cc.UGen = UGen;
-  cc.MultiOutUGen = MultiOutUGen;
-  cc.registerUGen = registerUGen;
-  
-  module.exports = {
-    UGen        : UGen,
-    MultiOutUGen: MultiOutUGen,
-    OutputProxy : OutputProxy,
-    specs       : specs,
-    
-    use: function() {
-      cc.createUGen = function() {
-        return new UGen();
+      cc.getNode   = function(nodeId) {
+        return nodes[nodeId];
       };
-      cc.createOutputProxy = function(rate, source, index) {
-        return new OutputProxy(rate, source, index);
-      };
-      cc.instanceOfUGen = function(obj) {
-        return obj instanceof UGen;
-      };
-      cc.instanceOfMultiOutUGen = function(obj) {
-        return obj instanceof MultiOutUGen;
-      };
-      cc.instanceOfOutputProxy = function(obj) {
-        return obj instanceof OutputProxy;
-      };
-      cc.setSynthDef = function(func) {
-        if (func && addToSynthDef !== null) {
-          throw new Error("nested Synth.def");
-        }
-        addToSynthDef = func;
-      };
-      
-      // redefinition for tests
-      cc.UGen = UGen;
-      cc.MultiOutUGen = MultiOutUGen;
-      cc.registerUGen = registerUGen;
-    },
-    install: function() {
-      require("./installer").install();
-      Object.keys(specs).forEach(function(name) {
-        registerUGen(name, specs[name]);
-      });
-    }
-  };
-
-});
-define('cc/common/ops', function(require, exports, module) {
-
-  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
-  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
-  
-  module.exports = {
-    UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
-    BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
-  };
-
-});
-define('cc/client/ugen/installer', function(require, exports, module) {
-  
-  module.exports = {
-    use: function() {
-      require("./ugen").use();
-      require("./uop").use();
-      require("./bop").use();
-      require("./madd").use();
-      require("./inout").use();
-    },
-    install: function() {
-      require("./bufio");
-      require("./delay");
-      require("./inout");
-      require("./line");
-      require("./osc");
-      require("./pan");
-      require("./ui");
-    }
-  };
-
-});
-define('cc/client/ugen/uop', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../../common/extend");
-  var ops    = require("../../common/ops");
-  
-  var UnaryOpUGen = (function() {
-    function UnaryOpUGen() {
-      cc.UGen.call(this, "UnaryOpUGen");
-    }
-    extend(UnaryOpUGen, cc.UGen);
-
-    UnaryOpUGen.prototype.init = function(selector, a) {
-      var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
-      if (index === -1) {
-        throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
-      }
-      var rate = a.rate|0;
-      cc.UGen.prototype.init.call(this, rate);
-      this.selector = selector;
-      this.specialIndex = index;
-      this.inputs = [a];
-      this.numOfInputs = 1;
-      return this;
-    };
-
-    return UnaryOpUGen;
-  })();
-  
-  
-  module.exports = {
-    use: function() {
-      cc.createUnaryOpUGen = function(selector, a) {
-        return new UnaryOpUGen().init(selector, a);
-      };
-      cc.instanceOfUnaryOpUGen = function(obj) {
-        return obj instanceof UnaryOpUGen;
+      cc.resetNode = function() {
+        nodes = {};
       };
     }
   };
-
-});
-define('cc/client/ugen/bop', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../../common/extend");
-  var ops    = require("../../common/ops");
-  var utils  = require("../utils");
-  
-  var BinaryOpUGen = (function() {
-    function BinaryOpUGen() {
-      cc.UGen.call(this, "BinaryOpUGen");
-    }
-    extend(BinaryOpUGen, cc.UGen);
-    
-    BinaryOpUGen.prototype.init = function(selector, a, b) {
-      if (selector === "-" && typeof b === "number") {
-        selector = "+";
-        b = -b;
-      }
-      if (selector === "/" && typeof b === "number") {
-        selector = "*";
-        b = 1 / b; // TODO: div(0) ?
-      }
-      if (selector === "*") {
-        if (typeof a === "number" && typeof b === "number") {
-          return a * b;
-        } else if (a === 0 || b === 0) {
-          return 0;
-        }
-        return optimizeMulObjects(a, b);
-      }
-      if (selector === "+") {
-        if (typeof a === "number" && typeof b === "number") {
-          return a + b;
-        } else if (a === 0) {
-          return b;
-        } else if (b === 0) {
-          return a;
-        } else if (cc.instanceOfBinaryOpUGen(a)) {
-          if (a.selector === "*") {
-            return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
-          }
-        } else if (cc.instancrOfMulAdd(a)) {
-          if (typeof a.inputs[2] === "number" && typeof b === "number") {
-            if (a.inputs[2] + b === 0) {
-              return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
-            } else {
-              a.inputs[2] += b;
-              return a;
-            }
-          }
-          b = cc.createBinaryOpUGen("+", a.inputs[2], b);
-          a = cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
-          return cc.createBinaryOpUGen("+", a, b);
-        }
-        return optimizeSumObjects(a, b);
-      }
-      if (selector === "+!") {
-        selector = "+";
-      } else if (selector === "*!") {
-        selector = "*";
-      }
-      
-      var index = ops.BINARY_OP_UGEN_MAP.indexOf(selector);
-      if (index === -1) {
-        throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
-      }
-      var rate = Math.max(a.rate|0, b.rate|0);
-      cc.UGen.prototype.init.call(this, rate);
-      this.selector = selector;
-      this.specialIndex = index;
-      this.inputs = [a, b];
-      this.numOfInputs = 2;
-      return this;
-    };
-
-    return BinaryOpUGen;
-  })();
-  
-  var optimizeSumObjects = (function() {
-    var collect = function(obj) {
-      if (typeof obj === "number") {
-        return obj;
-      }
-      var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "+") {
-        return [ collect(i[0]), collect(i[1]) ];
-      } else if (cc.instanceOfSum3(obj)) {
-        return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
-      } else if (cc.instanceOfSum4(obj)) {
-        return [ collect(i[0]), collect(i[1]), collect(i[2]), collect(i[3]) ];
-      }
-      return obj;
-    };
-    var work = function(a) {
-      a = a.map(function(a) {
-        switch (a.length) {
-        case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-        case 3: return cc.createSum3(a[0], a[1], a[2]);
-        case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
-        case 1: return a[0];
-        }
-      });
-      switch (a.length) {
-      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-      case 3: return cc.createSum4(a[0], a[1], a[2]);
-      case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
-      case 1: return a[0];
-      default: return work(utils.clump(a, 4));
-      }
-    };
-    return function(in1, in2) {
-      var list = utils.flatten([ collect(in1), collect(in2) ]);
-      var fixnum = 0;
-      list = list.filter(function(ugen) {
-        if (typeof ugen === "number") {
-          fixnum += ugen;
-          return false;
-        }
-        return true;
-      });
-      if (fixnum !== 0) {
-        list.push(fixnum);
-      }
-      list = utils.clump(list, 4);
-      if (list.length === 1 && list[0].length === 2) {
-        return cc.createBinaryOpUGen("+!", list[0][0], list[0][1]);
-      }
-      return work(list);
-    };
-  })();
-  
-  var optimizeMulObjects = (function() {
-    var collect = function(obj) {
-      if (typeof obj === "number") { return obj; }
-      var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "*") {
-        return [ collect(i[0]), collect(i[1]) ];
-      }
-      return obj;
-    };
-    var work = function(a) {
-      a = a.map(function(a) {
-        if (a.length === 2) {
-          return cc.createBinaryOpUGen("*!", a[0], a[1]);
-        } else {
-          return a[0];
-        }
-      });
-      switch (a.length) {
-      case 2:
-        return cc.createBinaryOpUGen("*!", a[0], a[1]);
-      case 1:
-        return a[0];
-      default:
-        return work(utils.clump(a, 2));
-      }
-    };
-    return function(in1, in2) {
-      var list = utils.flatten([ collect(in1), collect(in2) ]);
-      var fixnum = 1;
-      list = list.filter(function(ugen) {
-        if (typeof ugen === "number") {
-          fixnum *= ugen;
-          return false;
-        }
-        return true;
-      });
-      if (fixnum !== 1) {
-        list.push(fixnum);
-      }
-      list = utils.clump(list, 2);
-      if (list.length === 1 && list[0].length === 2) {
-        return cc.createBinaryOpUGen("*!", list[0][0], list[0][1]);
-      }
-      return work(list);
-    };
-  })();
-  
-  
-  module.exports = {
-    use: function() {
-      cc.createBinaryOpUGen = function(selector, a, b) {
-        return new BinaryOpUGen().init(selector, a, b);
-      };
-      cc.instanceOfBinaryOpUGen = function(obj) {
-        return obj instanceof BinaryOpUGen;
-      };
-    }
-  };
-
-});
-define('cc/client/ugen/madd', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  var extend = require("../../common/extend");
-  
-  var asRate = function(obj) {
-    if (Array.isArray(obj)) {
-      return obj.reduce(function(rate, obj) {
-        return Math.max(rate, asRate(obj));
-      }, 0);
-    }
-    return (obj && obj.rate) || 0;
-  };
-  
-  var MulAdd = (function() {
-    function MulAdd() {
-      cc.UGen.call(this, "MulAdd");
-    }
-    extend(MulAdd, cc.UGen);
-
-    MulAdd.prototype.init = function(_in, mul, add) {
-      var t, minus, nomul, noadd, rate;
-      if (_in.rate - mul.rate < 0) {
-        t = _in; _in = mul; mul = t;
-      }
-      if (mul === 0) {
-        return add;
-      }
-      minus = mul === -1;
-      nomul = mul ===  1;
-      noadd = add ===  0;
-      
-      if (nomul && noadd) {
-        return _in;
-      }
-      if (minus && noadd) {
-        return cc.createBinaryOpUGen("*", _in, -1);
-      }
-      if (noadd) {
-        return cc.createBinaryOpUGen("*", _in, mul);
-      }
-      if (minus) {
-        return cc.createBinaryOpUGen("-", add, _in);
-      }
-      if (nomul) {
-        return cc.createBinaryOpUGen("+", _in, add);
-      }
-      if (validate(_in, mul, add)) {
-        rate = asRate([_in, mul, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
-      }
-      if (validate(mul, _in, add)) {
-        rate = asRate([mul, _in, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
-      }
-      return _in * mul + add;
-    };
-    
-    var validate = function(_in, mul, add) {
-      _in = asRate(_in);
-      mul = asRate(mul);
-      add = asRate(add);
-      if (_in === 2) {
-        return true;
-      }
-      if (_in === 1 &&
-          (mul === 1 || mul === 0) &&
-          (add === 1 || add === 0)) {
-        return true;
-      }
-      return false;
-    };
-    
-    return MulAdd;
-  })();
-  
-  var Sum3 = (function() {
-    function Sum3() {
-      cc.UGen.call(this, "Sum3");
-       }
-    extend(Sum3, cc.UGen);
-    
-    Sum3.prototype.init = function(in0, in1, in2) {
-      if (in0 === 0) {
-        return cc.createBinaryOpUGen("+", in1, in2);
-      }
-      if (in1 === 0) {
-        return cc.createBinaryOpUGen("+", in0, in2);
-      }
-      if (in2 === 0) {
-        return cc.createBinaryOpUGen("+", in0, in1);
-      }
-      var rate = asRate([in0, in1, in2]);
-      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum3;
-  })();
-
-  var Sum4 = (function() {
-    function Sum4() {
-      cc.UGen.call(this, "Sum4");
-    }
-    extend(Sum4, cc.UGen);
-    
-    Sum4.prototype.init = function(in0, in1, in2, in3) {
-      if (in0 === 0) {
-        return cc.createSum3(in1, in2, in3);
-      }
-      if (in1 === 0) {
-        return cc.createSum3(in0, in2, in3);
-      }
-      if (in2 === 0) {
-        return cc.createSum3(in0, in1, in3);
-      }
-      if (in3 === 0) {
-        return cc.createSum3(in0, in1, in2);
-      }
-      var rate = asRate([in0, in1, in2, in3]);
-      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
-        return b.rate - a.rate;
-      });
-      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
-    };
-    
-    return Sum4;
-  })();
-  
-  
-  module.exports = {
-    use: function() {
-      cc.createMulAdd = function(_in, mul, add) {
-        return new MulAdd().init(_in, mul, add);
-      };
-      cc.createSum3 = function(in0, in1, in2) {
-        return new Sum3().init(in0, in1, in2);
-      };
-      cc.createSum4 = function(in0, in1, in2, in3) {
-        return new Sum4().init(in0, in1, in2, in3);
-      };
-      cc.instanceOfMulAdd = function(obj) {
-        return obj instanceof MulAdd;
-      };
-      cc.instanceOfSum3 = function(obj) {
-        return obj instanceof Sum3;
-      };
-      cc.instanceOfSum4 = function(obj) {
-        return obj instanceof Sum4;
-      };
-    }
-  };
-
-});
-define('cc/client/ugen/inout', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../../common/extend");
-  var ugen  = require("./ugen");
-  var utils = require("../utils");
-
-  var Control = (function() {
-    function Control(rate) {
-      cc.MultiOutUGen.call(this, "Control");
-      this.rate   = rate;
-      this.values = null;
-    }
-    extend(Control, cc.MultiOutUGen);
-    Control.prototype.init = function(list) {
-      cc.UGen.prototype.init.apply(this, [this.rate].concat(list));
-      this.values = list.slice();
-      return this.initOutputs(this.values.length, this.rate);
-    };
-    return Control;
-  })();
-  
-  ugen.specs.In = {
-    ar: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, 2);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: cc.MultiOutUGen
-    },
-    kr: {
-      defaults: "bus=0,numChannels=1",
-      ctor: function(bus, numChannels) {
-        this.init.call(this, 1);
-        this.inputs = [ bus ];
-        return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: cc.MultiOutUGen
-    }
-  };
-  
-  
-  
-  var Out = (function() {
-    function Out() {
-      cc.UGen.call(this, "Out");
-    }
-    extend(Out, cc.UGen);
-    return Out;
-  })();
-  
-  var out_ctor = function(rate) {
-    function ctor(bus, channelsArray) {
-      if (!(cc.instanceOfUGen(bus) || typeof bus === "number")) {
-        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
-      }
-      if (!Array.isArray(channelsArray)) {
-        channelsArray = [ channelsArray ];
-      }
-      channelsArray = utils.flatten(channelsArray);
-      channelsArray = channelsArray.filter(function(x) {
-        return x !== 0;
-      });
-      if (channelsArray.length) {
-        cc.UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
-      }
-    }
-    return function(bus, channelsArray) {
-      if (Array.isArray(bus)) {
-        bus.forEach(function(bus) {
-          ctor(bus, channelsArray);
-        });
-      } else {
-        ctor(bus, channelsArray);
-      }
-      return 0; // Out has no output
-    };
-  };
-  
-  ugen.specs.Out = {
-    ar: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(2),
-      multiCall: false,
-      Klass: null
-    },
-    kr: {
-      defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(1),
-      multiCall: false,
-      Klass: null
-    }
-  };
-  
-  module.exports = {
-    use: function() {
-      cc.createControl = function(rate) {
-        return new Control(rate);
-      };
-      cc.instanceOfOut = function(obj) {
-        return obj instanceof Out;
-      };
-    }
-  };
-
-});
-define('cc/client/ugen/bufio', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var ugen = require("./ugen");
-  
-  var slice = [].slice;
-
-  var playbuf_ctor = function(rate) {
-    return function(numChannels, buffer) {
-      if (typeof numChannels !== "number") {
-        throw new TypeError("Buffer: arguments[0] should be an integer.");
-      }
-      if (!cc.instanceOfAudioBuffer(buffer)) {
-        throw new TypeError("Buffer: arguments[1] should be a buffer.");
-      }
-      numChannels = Math.max(0, numChannels|0);
-      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
-      this.specialIndex = buffer._bufId;
-      return this.initOutputs(numChannels, this.rate);
-    };
-  };
-  
-  ugen.specs.PlayBuf = {
-    ar: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(2),
-      Klass: cc.MultiOutUGen
-    },
-    kr: {
-      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(1),
-      Klass: cc.MultiOutUGen
-    },
-  };
-  
-  module.exports = {};
-
-});
-define('cc/client/ugen/delay', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  var Comb = {
-    ar: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
-      }
-    },
-  };
-  ugen.specs.CombN = Comb;
-  ugen.specs.CombL = Comb;
-  ugen.specs.CombC = Comb;
-  
-  module.exports = {};
-
-});
-define('cc/client/ugen/line', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  ugen.specs.Line = {
-    ar: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(2, start, end, dur, doneAction).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
-      ctor: function(start, end, dur, mul, add, doneAction) {
-        return this.init(1, start, end, dur, doneAction).madd(mul, add);
-      }
-    }
-  };
-  
-  module.exports = {};
-
-});
-define('cc/client/ugen/osc', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  ugen.specs.SinOsc = {
-    ar: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(2, freq, phase).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "freq=440,phase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(1, freq, phase).madd(mul, add);
-      }
-    }
-  };
-
-  ugen.specs.LFSaw = {
-    ar: {
-      defaults: "freq=440,iphase=0,mul=1,add=0",
-      ctor: function(freq, iphase, mul, add) {
-        return this.init(2, freq, iphase).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "freq=440,iphase=0,mul=1,add=0",
-      ctor: function(freq, iphase, mul, add) {
-        return this.init(1, freq, iphase).madd(mul, add);
-      }
-    }
-  };
-  
-  module.exports = {};
-
-});
-define('cc/client/ugen/pan', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var ugen = require("./ugen");
-
-  var pan2_ctor = function(rate) {
-    return function(_in, pos, level) {
-      this.init.call(this, rate, _in, pos, level);
-      this.channels = [
-        cc.createOutputProxy(this.rate, this, 0),
-        cc.createOutputProxy(this.rate, this, 1),
-      ];
-      this.numOfOutputs = 2;
-      return this.channels;
-    };
-  };
-  
-  ugen.specs.Pan2 = {
-    ar: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(2),
-      Klass: cc.MultiOutUGen
-    },
-    kr: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(1),
-      Klass: cc.MultiOutUGen
-    },
-  };
-  
-  module.exports = {};
-
-});
-define('cc/client/ugen/ui', function(require, exports, module) {
-  
-  var ugen = require("./ugen");
-  
-  var MouseXY = {
-    kr: {
-      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
-      ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
-        return this.init(1, minval, maxval, warp, lag);
-      }
-    }
-  };
-  ugen.specs.MouseX = MouseXY;
-  ugen.specs.MouseY = MouseXY;
-  
-  ugen.specs.MouseButton = {
-    kr: {
-      defaults: "minval=0,maxval=1,lag=0.2",
-      ctor: function(minval, maxval, lag) {
-        return this.init(1, minval, maxval, lag);
-      }
-    }
-  };
-  
-  module.exports = {};
 
 });
 define('cc/client/pattern', function(require, exports, module) {
@@ -2769,7 +1562,7 @@ define('cc/client/pattern', function(require, exports, module) {
     };
 
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function() {
           return new PUnaryOp(this, selector);
         };
@@ -2777,7 +1570,7 @@ define('cc/client/pattern', function(require, exports, module) {
     });
     
     ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function(b) {
           return new PBinaryOp(this, selector, b);
         };
@@ -3899,12 +2692,10 @@ define('cc/client/sched', function(require, exports, module) {
       this._stack[this._stack.length - 1].push(that, func, args);
     };
     Timeline.prototype.process = function() {
-      var counterIncr = this.counterIncr;
-      if (counterIncr) {
-        var _list = this._list;
-        for (var i = 0; i < _list.length; ++i) {
-          _list[i].process(counterIncr);
-        }
+      var counterIncr = this.counterIncr || 1;
+      var _list = this._list;
+      for (var i = 0; i < _list.length; ++i) {
+        _list[i].process(counterIncr);
       }
     };
     
@@ -4501,145 +3292,1479 @@ define('cc/client/sched', function(require, exports, module) {
   };
 
 });
-define('cc/client/object', function(require, exports, module) {
+define('cc/client/synthdef', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var utils = require("./utils");
+  var utils  = require("./utils");
+  var extend = require("../common/extend");
   
-  var setup = function(key, func) {
-    [cc.Object, Array, Boolean, Date, Function, Number, String].forEach(function(Klass) {
-      fn.definePrototypeProperty(Klass, key, func);
-    });
-  };
-
-  var setupUnaryOperator = function(selector, func, ugenSelector) {
-    ugenSelector = ugenSelector || selector;
-    [cc.Object, Boolean, Date, Function, Number, String].forEach(function(Klass) {
-      fn.definePrototypeProperty(Klass, selector, func);
-    });
-    fn.definePrototypeProperty(Array, selector, function() {
-      return this.map(function(x) {
-        return x[selector]();
+  var defId = 0;
+  
+  var SynthDef = (function() {
+    function SynthDef(func, _args) {
+      this.klassName = "SynthDef";
+      this._defId = defId++;
+      if (!(func && _args)) {
+        this.specs = {
+          consts:[], defs:[], params:{ names:[], indices:[], length:[], values:[] }
+        };
+        return;
+      }
+      
+      var children = [];
+      cc.setSynthDef(function(ugen) {
+        children.push(ugen);
       });
-    });
-    fn.definePrototypeProperty(cc.UGen, selector, function() {
-      return cc.createUnaryOpUGen(ugenSelector, this);
-    });
+      
+      var args     = args2keyValues(_args);
+      var params   = args2params(args);
+      var controls = cc.createControl(1).init(params.flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      
+      try {
+        func.apply(null, reshapeArgs(args.vals, controls).concat(params.opts));
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        cc.setSynthDef(null);
+      }
+      var consts  = getConstValues(children);
+      var defList = makeDefList(topoSort(children), consts);
+      
+      var specs = {
+        consts : consts,
+        defList: defList,
+        params : params.params
+      };
+      this.specs = specs;
+      // console.log(specs);
+      
+      cc.client.pushToTimeline([
+        "/s_def", this._defId, JSON.stringify(specs)
+      ]);
+    }
+    extend(SynthDef, cc.Object);
+    
+    SynthDef.prototype.play = fn(function() {
+      var target, args, addAction;
+      var i = 0;
+      if (cc.instanceOfNode(arguments[i])) {
+        target = arguments[i++];
+      } else {
+        target = cc.client.rootNode;
+      }
+      if (utils.isDict(arguments[i])) {
+        args = arguments[i++];
+      }
+      if (typeof arguments[i] === "string") {
+        addAction = arguments[i];
+      } else {
+        addAction = "addToHead";
+      }
+      if (args && arguments.length === 1) {
+        if (cc.instanceOdNode(args.target)) {
+          target = args.target;
+          delete args.target;
+        }
+        if (typeof args.addAction === "string") {
+          addAction = args.addAction;
+          delete args.addAction;
+        }
+      }
+      switch (addAction) {
+      case "addToHead":
+        return cc.createSynth(target, 0, this, args);
+      case "addToTail":
+        return cc.createSynth(target, 1, this, args);
+      case "addBefore":
+        return cc.createSynth(target, 2, this, args);
+      case "addAfter":
+        return cc.createSynth(target, 3, this, args);
+      default:
+        return cc.createSynth(target, 0, this, args);
+      }
+    }).multiCall().build();
+    
+    return SynthDef;
+  })();
+  
+  // private methods
+  var args2keyValues = function(args) {
+    var keys = [], vals = [];
+    if (args && args.length) {
+      for (var i = 0, imax = args.length; i < imax; i += 2) {
+        keys.push(args[i+0]);
+        vals.push(args[i+1]);
+      }
+    }
+    return { keys:keys, vals:vals };
   };
 
-  var makeBinaryOpFunction = function(func, selector) {
-    return function(b) {
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this[selector](b);
-        }, this);
+  var args2params = function(args) {
+    var params  = { names:[], indices:[], length:[], values:[] };
+    var flatten = [];
+    var opts    = null;
+    for (var i = 0, imax = args.vals.length; i < imax; ++i) {
+      var value;
+      try {
+        value = JSON.parse(args.vals[i]);
+      } catch (e) {
+        throw new TypeError("SynthDefFunction's arguments should be a JSONable: " + args.vals[i]);
       }
-      return func(this, b);
-    };
+      if (isValidDefArg(value)) {
+        var length = Array.isArray(value) ? value.length : 1;
+        params.names  .push(args.keys[i]);
+        params.indices.push(flatten.length);
+        params.length .push(length);
+        params.values .push(value);
+        flatten = flatten.concat(value);
+      } else if (i === imax - 1 && utils.isDict(value)) {
+        // allow a dictionary be put the last
+        opts = value;
+      } else {
+        throw new TypeError("SynthDefFunction's arguments should be a constant number or an array that contains it.");
+      }
+      if (opts) {
+        args.keys.pop();
+        args.vals.pop();
+      }
+    }
+    return { params:params, flatten:flatten, opts:opts };
+  };
+
+  var isValidDefArg = function(obj) {
+    if (typeof obj === "number") {
+      return true;
+    }
+    if (Array.isArray(obj)) {
+      return obj.every(function(obj) {
+        return typeof obj === "number";
+      });
+    }
+    return false;
   };
   
-  var makeBinaryOpNumberFunction = function(func, selector, ugenSelector) {
-    return function(b) {
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this[selector](b);
-        }, this);
-      } else if (cc.instanceOfUGen(b)) {
-        return cc.createBinaryOpUGen(ugenSelector, this, b);
+  var reshapeArgs = function(shape, flatten) {
+    var result = [];
+    var saved = flatten.slice();
+    for (var i = 0, imax = shape.length; i < imax; ++i) {
+      if (Array.isArray(shape[i])) {
+        result.push(saved.splice(0, shape[i].length));
+      } else {
+        result.push(saved.shift());
       }
-      return func(this, b);
-    };
+    }
+    return result;
   };
-  var makeBinaryOpArrayFunction = function(selector, ugenSelector) {
-    return function(b) {
-      var a = this;
-      if (Array.isArray(b)) {
-        if (a.length === b.length) {
-          return a.map(function(a, index) {
-            return a[selector](b[index]);
-          });
-        } else if (a.length > b.length) {
-          return a.map(function(a, index) {
-            return a[selector](b[index % b.length]);
-          });
-        } else {
-          return b.map(function(b, index) {
-            return a[index % a.length][selector](b);
+
+  var getConstValues = function(list) {
+    var consts = [];
+    list.forEach(function(x) {
+      if (x.inputs) {
+        x.inputs.forEach(function(_in) {
+          if (typeof _in === "number" && consts.indexOf(_in) === -1) {
+            consts.push(_in);
+          }
+        });
+      }
+    });
+    return consts.sort();
+  };
+  
+  var topoSort = (function() {
+    var _topoSort = function(x, list, checked, stack) {
+      if (stack.indexOf(x) !== stack.length-1) {
+        console.warn("UGen graph contains recursion.");
+        return;
+      }
+      checked.push(x);
+      var index = list.indexOf(x);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
+      list.unshift(x);
+      if (x.inputs) {
+        x.inputs.forEach(function(x) {
+          stack.push(x);
+          _topoSort(x, list, checked, stack);
+          stack.pop();
+        });
+      }
+    };
+    return function(list) {
+      var checked = [];
+      var stack;
+      list.slice().forEach(function(x) {
+        if (cc.instanceOfOut(x)) {
+          checked.push(x);
+          stack = [x];
+          x.inputs.forEach(function(x) {
+            stack.push(x);
+            _topoSort(x, list, checked, stack);
+            stack.pop();
           });
         }
+      });
+      list = list.filter(function(x) {
+        return checked.indexOf(x) !== -1;
+      });
+      return list;
+    };
+  })();
+  
+  var getRate = function(ugen) {
+    return ugen.rate;
+  };
+  var discard = function(ugen) {
+    return typeof ugen !== "number" && !cc.instanceOfOutputProxy(ugen);
+  };
+  var makeDefList = function(list, consts) {
+    var result = [];
+    list = list.filter(discard);
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      var ugen = list[i];
+      var inputs = [], outputs;
+      for (var j = 0, jmax = ugen.inputs.length; j < jmax; ++j) {
+        var index, subindex;
+        if (cc.instanceOfOutputProxy(ugen.inputs[j])) {
+          index = list.indexOf(ugen.inputs[j].inputs[0]);
+        } else {
+          index = list.indexOf(ugen.inputs[j]);
+        }
+        if (index !== -1) {
+          subindex = ugen.inputs[j].outputIndex|0;
+        } else {
+          subindex = consts.indexOf(ugen.inputs[j]);
+        }
+        inputs.push(index, subindex);
+      }
+      if (cc.instanceOfMultiOutUGen(ugen)) {
+        outputs = ugen.channels.map(getRate);
+      } else if (ugen.numOfOutputs === 1) {
+        outputs = [ ugen.rate ];
+      } else {
+        outputs = [];
+      }
+      result.push(
+        [ ugen.klassName, ugen.rate, ugen.specialIndex|0, inputs, outputs, ugen.tag||"" ]
+      );
+    }
+    return result;
+  };
+  
+  module.exports = {
+    SynthDef: SynthDef,
+
+    args2keyValues: args2keyValues,
+    args2params   : args2params,
+    isValidDefArg : isValidDefArg,
+    reshapeArgs   : reshapeArgs,
+    getConstValues: getConstValues,
+    topoSort      : topoSort,
+    makeDefList   : makeDefList,
+    
+    use: function() {
+      cc.createSynthDef = function(func, args) {
+        return new SynthDef(func, args);
+      };
+      cc.instanceOfSynthDef = function(obj) {
+        return obj instanceof SynthDef;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/ugen', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  var fn = require("../fn");
+  var extend = require("../../common/extend");
+  var ops = require("../../common/ops");
+  var slice  = [].slice;
+  
+  var addToSynthDef = null;
+  var specs = {};
+  
+  var UGen = (function() {
+    function UGen(name) {
+      this.klassName = name;
+      this.tag  = "";
+      this.rate = 2;
+      this.signalRange = 2;
+      this.specialIndex = 0;
+      this.outputIndex  = 0;
+      this.numOfInputs  = 0;
+      this.numOfOutputs = 1;
+      this.inputs = [];
+    }
+    extend(UGen, cc.Object);
+    
+    UGen.prototype.init = function(rate) {
+      this.rate = rate;
+      if (addToSynthDef) {
+        addToSynthDef(this);
+      }
+      this.inputs = slice.call(arguments, 1);
+      this.numOfInputs = this.inputs.length;
+      return this;
+    };
+
+    UGen.prototype.__plus__ = function() {
+      return this;
+    };
+    UGen.prototype.__minus__ = function() {
+      return this.neg();
+    };
+    fn.setupBinaryOp(UGen, "__add__", function(b) {
+      return cc.createBinaryOpUGen("+", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__sub__", function(b) {
+      return cc.createBinaryOpUGen("-", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__mul__", function(b) {
+      return cc.createBinaryOpUGen("*", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__div__", function(b) {
+      return cc.createBinaryOpUGen("/", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__mod__", function(b) {
+      return cc.createBinaryOpUGen("%", this, b);
+    });
+    
+    UGen.prototype.madd = fn(function(mul, add) {
+      return cc.createMulAdd(this, mul, add);
+    }).defaults("mul=1,add=0").multiCall().build();
+    
+    UGen.prototype.range = fn(function(lo, hi) {
+      var mul, add;
+      if (this.signalRange === 2) {
+        mul = (hi - lo) * 0.5;
+        add = mul + lo;
+      } else {
+        mul = (hi - lo);
+        add = lo;
+      }
+      return cc.createMulAdd(this, mul, add);
+    }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.unipolar = fn(function(mul) {
+      return this.range(0, mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    UGen.prototype.bipolar = fn(function(mul) {
+      return this.range(mul.neg(), mul);
+    }).defaults("mul=1").multiCall().build();
+    
+    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function() {
+          return cc.createUnaryOpUGen(selector, this);
+        };
+      }
+    });
+    
+    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        fn.setupBinaryOp(UGen, selector, function(b) {
+          return cc.createBinaryOpUGen(selector, this, b);
+        });
+      }
+    });
+    
+    return UGen;
+  })();
+  
+  var MultiOutUGen = (function() {
+    function MultiOutUGen(name) {
+      UGen.call(this, name || "MultiOutUGen");
+      this.channels = null;
+    }
+    extend(MultiOutUGen, UGen);
+    MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
+      var channels = new Array(numChannels);
+      for (var i = 0; i < numChannels; ++i) {
+        channels[i] = new OutputProxy(rate, this, i);
+      }
+      this.channels = channels;
+      this.numOfOutputs = channels.length;
+      this.inputs = this.inputs.map(function(ugen) {
+        if (!(ugen instanceof UGen)) {
+          ugen = +ugen;
+          if (isNaN(ugen)) {
+            ugen = 0;
+          }
+        }
+        return ugen;
+      });
+      this.numOfInputs = this.inputs.length;
+      return (numChannels === 1) ? channels[0] : channels;
+    };
+    return MultiOutUGen;
+  })();
+  
+  var OutputProxy = (function() {
+    function OutputProxy(rate, source, index) {
+      UGen.call(this, "OutputProxy");
+      this.init(rate);
+      this.inputs = [ source ];
+      this.numOfOutputs = 1;
+      this.outputIndex  = index;
+    }
+    extend(OutputProxy, UGen);
+    return OutputProxy;
+  })();
+  
+  
+  var registerUGen = function(name, spec) {
+    var klass = cc.global[name] = function() {
+      return new UGen(name);
+    };
+    
+    Object.keys(spec).forEach(function(key) {
+      var setting   = spec[key];
+      var defaults  = setting.defaults + ",tag";
+      var ctor      = setting.ctor;
+      var multiCall = setting.multiCall;
+      if (multiCall === undefined) {
+        multiCall = true;
+      }
+      if (setting.Klass !== null) {
+        var Klass = setting.Klass || UGen;
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(new Klass(name, tag), args);
+          if (instance instanceof UGen) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      } else {
+        klass[key] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
+          var tag  = arguments[arguments.length - 1];
+          var instance = ctor.apply(null, args);
+          if (instance instanceof UGen) {
+            instance.tag = tag || "";
+          }
+          return instance;
+        }).defaults(defaults).multiCall(multiCall).build();
+      }
+    });
+  };
+  
+  
+  // exports for prototype extending
+  cc.UGen = UGen;
+  cc.MultiOutUGen = MultiOutUGen;
+  cc.registerUGen = registerUGen;
+  
+  module.exports = {
+    UGen        : UGen,
+    MultiOutUGen: MultiOutUGen,
+    OutputProxy : OutputProxy,
+    specs       : specs,
+    
+    use: function() {
+      cc.createUGen = function() {
+        return new UGen();
+      };
+      cc.createOutputProxy = function(rate, source, index) {
+        return new OutputProxy(rate, source, index);
+      };
+      cc.instanceOfUGen = function(obj) {
+        return obj instanceof UGen;
+      };
+      cc.instanceOfMultiOutUGen = function(obj) {
+        return obj instanceof MultiOutUGen;
+      };
+      cc.instanceOfOutputProxy = function(obj) {
+        return obj instanceof OutputProxy;
+      };
+      cc.setSynthDef = function(func) {
+        if (func && addToSynthDef !== null) {
+          throw new Error("nested Synth.def");
+        }
+        addToSynthDef = func;
+      };
+      
+      require("./uop").use();
+      require("./bop").use();
+      require("./madd").use();
+      require("./inout").use();
+      
+      // redefinition for tests
+      cc.UGen = UGen;
+      cc.MultiOutUGen = MultiOutUGen;
+      cc.registerUGen = registerUGen;
+    },
+    install: function() {
+      require("./bufio");
+      require("./delay");
+      require("./inout");
+      require("./line");
+      require("./osc");
+      require("./pan");
+      require("./ui");
+      
+      Object.keys(specs).forEach(function(name) {
+        registerUGen(name, specs[name]);
+      });
+    }
+  };
+
+});
+define('cc/client/ugen/uop', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  var ops    = require("../../common/ops");
+  
+  var UnaryOpUGen = (function() {
+    function UnaryOpUGen() {
+      cc.UGen.call(this, "UnaryOpUGen");
+    }
+    extend(UnaryOpUGen, cc.UGen);
+
+    UnaryOpUGen.prototype.init = function(selector, a) {
+      var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
+      if (index === -1) {
+        throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
+      }
+      var rate = a.rate|0;
+      cc.UGen.prototype.init.call(this, rate);
+      this.selector = selector;
+      this.specialIndex = index;
+      this.inputs = [a];
+      this.numOfInputs = 1;
+      return this;
+    };
+
+    return UnaryOpUGen;
+  })();
+  
+  
+  module.exports = {
+    use: function() {
+      cc.createUnaryOpUGen = function(selector, a) {
+        return new UnaryOpUGen().init(selector, a);
+      };
+      cc.instanceOfUnaryOpUGen = function(obj) {
+        return obj instanceof UnaryOpUGen;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/bop', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  var ops    = require("../../common/ops");
+  var utils  = require("../utils");
+  
+  var BinaryOpUGen = (function() {
+    function BinaryOpUGen() {
+      cc.UGen.call(this, "BinaryOpUGen");
+    }
+    extend(BinaryOpUGen, cc.UGen);
+    
+    BinaryOpUGen.prototype.init = function(selector, a, b) {
+      if (selector === "-" && typeof b === "number") {
+        selector = "+";
+        b = -b;
+      }
+      if (selector === "/" && typeof b === "number") {
+        selector = "*";
+        b = 1 / b; // TODO: div(0) ?
+      }
+      if (selector === "*") {
+        if (typeof a === "number" && typeof b === "number") {
+          return a * b;
+        } else if (a === 0 || b === 0) {
+          return 0;
+        }
+        return optimizeMulObjects(a, b);
+      }
+      if (selector === "+") {
+        if (typeof a === "number" && typeof b === "number") {
+          return a + b;
+        } else if (a === 0) {
+          return b;
+        } else if (b === 0) {
+          return a;
+        } else if (cc.instanceOfBinaryOpUGen(a)) {
+          if (a.selector === "*") {
+            return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
+          }
+        } else if (cc.instancrOfMulAdd(a)) {
+          if (typeof a.inputs[2] === "number" && typeof b === "number") {
+            if (a.inputs[2] + b === 0) {
+              return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
+            } else {
+              a.inputs[2] += b;
+              return a;
+            }
+          }
+          b = cc.createBinaryOpUGen("+", a.inputs[2], b);
+          a = cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
+          return cc.createBinaryOpUGen("+", a, b);
+        }
+        return optimizeSumObjects(a, b);
+      }
+      if (selector === "+!") {
+        selector = "+";
+      } else if (selector === "*!") {
+        selector = "*";
+      }
+      
+      var index = ops.BINARY_OP_UGEN_MAP.indexOf(selector);
+      if (index === -1) {
+        throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
+      }
+      var rate = Math.max(a.rate|0, b.rate|0);
+      cc.UGen.prototype.init.call(this, rate);
+      this.selector = selector;
+      this.specialIndex = index;
+      this.inputs = [a, b];
+      this.numOfInputs = 2;
+      return this;
+    };
+
+    return BinaryOpUGen;
+  })();
+  
+  var optimizeSumObjects = (function() {
+    var collect = function(obj) {
+      if (typeof obj === "number") {
+        return obj;
+      }
+      var i = obj.inputs;
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "+") {
+        return [ collect(i[0]), collect(i[1]) ];
+      } else if (cc.instanceOfSum3(obj)) {
+        return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
+      } else if (cc.instanceOfSum4(obj)) {
+        return [ collect(i[0]), collect(i[1]), collect(i[2]), collect(i[3]) ];
+      }
+      return obj;
+    };
+    var work = function(a) {
+      a = a.map(function(a) {
+        switch (a.length) {
+        case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+        case 3: return cc.createSum3(a[0], a[1], a[2]);
+        case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
+        case 1: return a[0];
+        }
+      });
+      switch (a.length) {
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum4(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
+      case 1: return a[0];
+      default: return work(utils.clump(a, 4));
+      }
+    };
+    return function(in1, in2) {
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
+      var fixnum = 0;
+      list = list.filter(function(ugen) {
+        if (typeof ugen === "number") {
+          fixnum += ugen;
+          return false;
+        }
+        return true;
+      });
+      if (fixnum !== 0) {
+        list.push(fixnum);
+      }
+      list = utils.clump(list, 4);
+      if (list.length === 1 && list[0].length === 2) {
+        return cc.createBinaryOpUGen("+!", list[0][0], list[0][1]);
+      }
+      return work(list);
+    };
+  })();
+  
+  var optimizeMulObjects = (function() {
+    var collect = function(obj) {
+      if (typeof obj === "number") { return obj; }
+      var i = obj.inputs;
+      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "*") {
+        return [ collect(i[0]), collect(i[1]) ];
+      }
+      return obj;
+    };
+    var work = function(a) {
+      a = a.map(function(a) {
+        if (a.length === 2) {
+          return cc.createBinaryOpUGen("*!", a[0], a[1]);
+        } else {
+          return a[0];
+        }
+      });
+      switch (a.length) {
+      case 2:
+        return cc.createBinaryOpUGen("*!", a[0], a[1]);
+      case 1:
+        return a[0];
+      default:
+        return work(utils.clump(a, 2));
+      }
+    };
+    return function(in1, in2) {
+      var list = utils.flatten([ collect(in1), collect(in2) ]);
+      var fixnum = 1;
+      list = list.filter(function(ugen) {
+        if (typeof ugen === "number") {
+          fixnum *= ugen;
+          return false;
+        }
+        return true;
+      });
+      if (fixnum !== 1) {
+        list.push(fixnum);
+      }
+      list = utils.clump(list, 2);
+      if (list.length === 1 && list[0].length === 2) {
+        return cc.createBinaryOpUGen("*!", list[0][0], list[0][1]);
+      }
+      return work(list);
+    };
+  })();
+  
+  
+  module.exports = {
+    use: function() {
+      cc.createBinaryOpUGen = function(selector, a, b) {
+        return new BinaryOpUGen().init(selector, a, b);
+      };
+      cc.instanceOfBinaryOpUGen = function(obj) {
+        return obj instanceof BinaryOpUGen;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/madd', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  
+  var asRate = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj.reduce(function(rate, obj) {
+        return Math.max(rate, asRate(obj));
+      }, 0);
+    }
+    return (obj && obj.rate) || 0;
+  };
+  
+  var MulAdd = (function() {
+    function MulAdd() {
+      cc.UGen.call(this, "MulAdd");
+    }
+    extend(MulAdd, cc.UGen);
+
+    MulAdd.prototype.init = function(_in, mul, add) {
+      var t, minus, nomul, noadd, rate;
+      if (_in.rate - mul.rate < 0) {
+        t = _in; _in = mul; mul = t;
+      }
+      if (mul === 0) {
+        return add;
+      }
+      minus = mul === -1;
+      nomul = mul ===  1;
+      noadd = add ===  0;
+      
+      if (nomul && noadd) {
+        return _in;
+      }
+      if (minus && noadd) {
+        return cc.createBinaryOpUGen("*", _in, -1);
+      }
+      if (noadd) {
+        return cc.createBinaryOpUGen("*", _in, mul);
+      }
+      if (minus) {
+        return cc.createBinaryOpUGen("-", add, _in);
+      }
+      if (nomul) {
+        return cc.createBinaryOpUGen("+", _in, add);
+      }
+      if (validate(_in, mul, add)) {
+        rate = asRate([_in, mul, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
+      }
+      if (validate(mul, _in, add)) {
+        rate = asRate([mul, _in, add]);
+        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
+      }
+      return _in * mul + add;
+    };
+    
+    var validate = function(_in, mul, add) {
+      _in = asRate(_in);
+      mul = asRate(mul);
+      add = asRate(add);
+      if (_in === 2) {
+        return true;
+      }
+      if (_in === 1 &&
+          (mul === 1 || mul === 0) &&
+          (add === 1 || add === 0)) {
+        return true;
+      }
+      return false;
+    };
+    
+    return MulAdd;
+  })();
+  
+  var Sum3 = (function() {
+    function Sum3() {
+      cc.UGen.call(this, "Sum3");
+       }
+    extend(Sum3, cc.UGen);
+    
+    Sum3.prototype.init = function(in0, in1, in2) {
+      if (in0 === 0) {
+        return cc.createBinaryOpUGen("+", in1, in2);
+      }
+      if (in1 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in2);
+      }
+      if (in2 === 0) {
+        return cc.createBinaryOpUGen("+", in0, in1);
+      }
+      var rate = asRate([in0, in1, in2]);
+      var sortedArgs = [in0, in1, in2].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
+    };
+    
+    return Sum3;
+  })();
+
+  var Sum4 = (function() {
+    function Sum4() {
+      cc.UGen.call(this, "Sum4");
+    }
+    extend(Sum4, cc.UGen);
+    
+    Sum4.prototype.init = function(in0, in1, in2, in3) {
+      if (in0 === 0) {
+        return cc.createSum3(in1, in2, in3);
+      }
+      if (in1 === 0) {
+        return cc.createSum3(in0, in2, in3);
+      }
+      if (in2 === 0) {
+        return cc.createSum3(in0, in1, in3);
+      }
+      if (in3 === 0) {
+        return cc.createSum3(in0, in1, in2);
+      }
+      var rate = asRate([in0, in1, in2, in3]);
+      var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
+        return b.rate - a.rate;
+      });
+      return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
+    };
+    
+    return Sum4;
+  })();
+  
+  
+  module.exports = {
+    use: function() {
+      cc.createMulAdd = function(_in, mul, add) {
+        return new MulAdd().init(_in, mul, add);
+      };
+      cc.createSum3 = function(in0, in1, in2) {
+        return new Sum3().init(in0, in1, in2);
+      };
+      cc.createSum4 = function(in0, in1, in2, in3) {
+        return new Sum4().init(in0, in1, in2, in3);
+      };
+      cc.instanceOfMulAdd = function(obj) {
+        return obj instanceof MulAdd;
+      };
+      cc.instanceOfSum3 = function(obj) {
+        return obj instanceof Sum3;
+      };
+      cc.instanceOfSum4 = function(obj) {
+        return obj instanceof Sum4;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/inout', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../../common/extend");
+  var ugen  = require("./ugen");
+  var utils = require("../utils");
+
+  var Control = (function() {
+    function Control(rate) {
+      cc.MultiOutUGen.call(this, "Control");
+      this.rate   = rate;
+      this.values = null;
+    }
+    extend(Control, cc.MultiOutUGen);
+    Control.prototype.init = function(list) {
+      cc.UGen.prototype.init.apply(this, [this.rate].concat(list));
+      this.values = list.slice();
+      return this.initOutputs(this.values.length, this.rate);
+    };
+    return Control;
+  })();
+  
+  ugen.specs.In = {
+    ar: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 2);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "bus=0,numChannels=1",
+      ctor: function(bus, numChannels) {
+        this.init.call(this, 1);
+        this.inputs = [ bus ];
+        return this.initOutputs(numChannels, this.rate);
+      },
+      Klass: cc.MultiOutUGen
+    }
+  };
+  
+  
+  
+  var Out = (function() {
+    function Out() {
+      cc.UGen.call(this, "Out");
+    }
+    extend(Out, cc.UGen);
+    return Out;
+  })();
+  
+  var out_ctor = function(rate) {
+    function ctor(bus, channelsArray) {
+      if (!(cc.instanceOfUGen(bus) || typeof bus === "number")) {
+        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
+      }
+      if (!Array.isArray(channelsArray)) {
+        channelsArray = [ channelsArray ];
+      }
+      channelsArray = utils.flatten(channelsArray);
+      channelsArray = channelsArray.filter(function(x) {
+        return x !== 0;
+      });
+      if (channelsArray.length) {
+        cc.UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
+      }
+    }
+    return function(bus, channelsArray) {
+      if (Array.isArray(bus)) {
+        bus.forEach(function(bus) {
+          ctor(bus, channelsArray);
+        });
+      } else {
+        ctor(bus, channelsArray);
+      }
+      return 0; // Out has no output
+    };
+  };
+  
+  ugen.specs.Out = {
+    ar: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: out_ctor(2),
+      multiCall: false,
+      Klass: null
+    },
+    kr: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: out_ctor(1),
+      multiCall: false,
+      Klass: null
+    }
+  };
+  
+  module.exports = {
+    use: function() {
+      cc.createControl = function(rate) {
+        return new Control(rate);
+      };
+      cc.instanceOfOut = function(obj) {
+        return obj instanceof Out;
+      };
+    }
+  };
+
+});
+define('cc/client/ugen/bufio', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var ugen = require("./ugen");
+  
+  var slice = [].slice;
+
+  var playbuf_ctor = function(rate) {
+    return function(numChannels, buffer) {
+      if (typeof numChannels !== "number") {
+        throw new TypeError("Buffer: arguments[0] should be an integer.");
+      }
+      if (!cc.instanceOfAudioBuffer(buffer)) {
+        throw new TypeError("Buffer: arguments[1] should be a buffer.");
+      }
+      numChannels = Math.max(0, numChannels|0);
+      this.init.apply(this, [rate].concat(slice.call(arguments, 1)));
+      this.specialIndex = buffer._bufId;
+      return this.initOutputs(numChannels, this.rate);
+    };
+  };
+  
+  ugen.specs.PlayBuf = {
+    ar: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playbuf_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
+      ctor: playbuf_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/ugen/delay', function(require, exports, module) {
+  
+  var ugen = require("./ugen");
+  
+  var Comb = {
+    ar: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+  };
+  ugen.specs.CombN = Comb;
+  ugen.specs.CombL = Comb;
+  ugen.specs.CombC = Comb;
+  
+  module.exports = {};
+
+});
+define('cc/client/ugen/line', function(require, exports, module) {
+  
+  var ugen = require("./ugen");
+  
+  ugen.specs.Line = {
+    ar: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/ugen/osc', function(require, exports, module) {
+  
+  var ugen = require("./ugen");
+  
+  ugen.specs.SinOsc = {
+    ar: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
+    }
+  };
+
+  ugen.specs.LFSaw = {
+    ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(2, freq, iphase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, iphase, mul, add) {
+        return this.init(1, freq, iphase).madd(mul, add);
+      }
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/ugen/pan', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var ugen = require("./ugen");
+
+  var pan2_ctor = function(rate) {
+    return function(_in, pos, level) {
+      this.init.call(this, rate, _in, pos, level);
+      this.channels = [
+        cc.createOutputProxy(this.rate, this, 0),
+        cc.createOutputProxy(this.rate, this, 1),
+      ];
+      this.numOfOutputs = 2;
+      return this.channels;
+    };
+  };
+  
+  ugen.specs.Pan2 = {
+    ar: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(2),
+      Klass: cc.MultiOutUGen
+    },
+    kr: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: pan2_ctor(1),
+      Klass: cc.MultiOutUGen
+    },
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/ugen/ui', function(require, exports, module) {
+  
+  var ugen = require("./ugen");
+  
+  var MouseXY = {
+    kr: {
+      defaults: "minval=0,maxval=1,warp=0,lag=0.2",
+      ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential") {
+          warp = 1;
+        } else if (typeof warp !== "number") {
+          warp = 0;
+        }
+        return this.init(1, minval, maxval, warp, lag);
+      }
+    }
+  };
+  ugen.specs.MouseX = MouseXY;
+  ugen.specs.MouseY = MouseXY;
+  
+  ugen.specs.MouseButton = {
+    kr: {
+      defaults: "minval=0,maxval=1,lag=0.2",
+      ctor: function(minval, maxval, lag) {
+        return this.init(1, minval, maxval, lag);
+      }
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/array', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var ops   = require("../common/ops");
+  var utils = require("./utils");
+
+  var setupUnaryOp = function(selector) {
+    fn.definePrototypeProperty(Array, selector, function() {
+      return this.map(function(x) { return x[selector](); });
+    });
+  };
+
+  setupUnaryOp("__plus__");
+  setupUnaryOp("__minus__");
+  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+      setupUnaryOp(selector);
+    }
+  });
+  
+  var foldAt = function(list, index) {
+    var len = list.length;
+    index = index % (len * 2 - 2);
+    if (index >= len) {
+      index = 2 * (len - 1) - index;
+    }
+    return list[index];
+  };
+  var calc_with_adverb = function(selector, a, b, adverb) {
+    var sort = a.length - b.length;
+    switch (adverb) {
+    case 1:
+      if (sort > 0) {
+        a.splice(b.length);
+      } else if (sort < 0) {
+        b.splice(a.length);
+      }
+      break;
+    case 2:
+      if (sort > 0) {
+        return a.map(function(a, i) {
+          return a[selector](foldAt(b, i));
+        });
+      } else if (sort < 0) {
+        return b.map(function(b, i) {
+          return foldAt(a, i)[selector](b);
+        });
+      }
+      break;
+    case 3:
+    case 4:
+      var table = a.map(function(a) {
+        return b.map(function(b) {
+          return a[selector](b);
+        });
+      });
+      return (adverb === 4) ? utils.flatten(table) : table;
+    }
+    if (a.length === b.length) {
+      return a.map(function(a, index) {
+        return a[selector](b[index]);
+      });
+    } else if (a.length > b.length) {
+      return a.map(function(a, index) {
+        return a[selector](b[index % b.length]);
+      });
+    } else {
+      return b.map(function(b, index) {
+        return a[index % a.length][selector](b);
+      });
+    }
+  };
+
+  var setupBinaryOp = function(selector) {
+    var ugenSelector;
+    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    } else {
+      ugenSelector = selector;
+    }
+    fn.definePrototypeProperty(Array, selector, function(b, adverb) {
+      if (Array.isArray(b)) {
+        return calc_with_adverb(selector, this, b, adverb);
       } else if (cc.instanceOfUGen(b)) {
-        return a.map(function(a) {
+        return this.map(function(a) {
           return cc.createBinaryOpUGen(ugenSelector, a, b);
         });
       }
-      return a.map(function(a) {
+      return this.map(function(a) {
         return a[selector](b);
       });
-    };
-  };
-  var makeBinaryOpUGenFunction = function(selector) {
-    return function(b) {
-      var a = this;
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return cc.createBinaryOpUGen(selector, a, b);
-        });
-      }
-      return cc.createBinaryOpUGen(selector, a, b);
-    };
-  };
-  
-  var setupBinaryOperator = function(selector, func, ugenSelector) {
-    ugenSelector = ugenSelector || selector;
-    [cc.Object, Boolean, Date, Function, String].forEach(function(Klass) {
-      fn.definePrototypeProperty(
-        Klass, selector, makeBinaryOpFunction(func, selector)
-      );
     });
-    fn.definePrototypeProperty(
-      Number, selector, makeBinaryOpNumberFunction(func, selector, ugenSelector)
-    );
-    fn.definePrototypeProperty(
-      Array, selector, makeBinaryOpArrayFunction(selector, ugenSelector)
-    );
-    fn.definePrototypeProperty(
-      cc.UGen, selector, makeBinaryOpUGenFunction(ugenSelector)
-    );
   };
 
-  
-  setupUnaryOperator("__plus__", function() {
-    return +this;
-  }, "+");
-  setupUnaryOperator("__minus__", function() {
-    return -this;
-  }, "-");
-  
-  setupBinaryOperator("__add__", function(a, b) {
-    return a + b;
-  }, "+");
-  
-  setupBinaryOperator("__sub__", function(a, b) {
-    return a - b;
-  }, "-");
-  
-  setupBinaryOperator("__mul__", function(a, b) {
-    return a * b;
-  }, "*");
-  fn.definePrototypeProperty(String, "__mul__", function(b) {
-    if (typeof b === "number") {
-      var result = new Array(Math.max(0, b));
-      for (var i = 0; i < b; i++) {
-        result[i] = this;
-      }
-      return result.join("");
-    } else if (Array.isArray(b)) {
-      return b.map(function(b) {
-        return this.__mul__(b);
-      }, this);
+  setupBinaryOp("__add__");
+  setupBinaryOp("__sub__");
+  setupBinaryOp("__mul__");
+  setupBinaryOp("__div__");
+  setupBinaryOp("__mod__");
+  fn.definePrototypeProperty(Array, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", this.concat(b));
+  });
+  fn.definePrototypeProperty(Array, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", this.concat(b));
+  });
+  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+      setupBinaryOp(selector);
     }
-    return this * b;
+  });
+  
+  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
+    return utils.flop([this, mul, add]).map(function(items) {
+      var _in = items[0], mul = items[1], add = items[2];
+      return cc.createMulAdd(_in, mul, add);
+    });
+  }).defaults("mul=1,add=0").multiCall().build());
+  
+  module.exports = {};
+
+});
+define('cc/client/boolean', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+
+  // unary operator methods
+  fn.definePrototypeProperty(Boolean, "__plus__", function() {
+    return +this;
+  });
+  fn.definePrototypeProperty(Boolean, "__minus__", function() {
+    return -this;
+  });
+
+  // binary operator methods
+  fn.definePrototypeProperty(Boolean, "__add__", function(b) {
+    return this + b;
+  });
+  fn.definePrototypeProperty(Boolean, "__sub__", function(b) {
+    var num = this - b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Boolean, "__mul__", function(b) {
+    var num = this * b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Boolean, "__div__", function(b) {
+    var num = this / b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Boolean, "__mod__", function(b) {
+    var num = this % b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.setupBinaryOp(Boolean, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.setupBinaryOp(Boolean, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  
+  module.exports = {};
+
+});
+define('cc/client/data', function(require, exports, module) {
+
+  var cc = require("./cc");
+  
+  cc.global.DATA = {
+    get: function(n) {
+      return cc.DATA[n] || "";
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/client/date', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  
+  // unary operator methods
+  fn.definePrototypeProperty(Date, "__plus__", function() {
+    return +this;
+  });
+  fn.definePrototypeProperty(Date, "__minus__", function() {
+    return -this;
+  });
+
+  // binary operator methods
+  fn.definePrototypeProperty(Date, "__add__", function(b) {
+    return this + b;
+  });
+  fn.definePrototypeProperty(Date, "__sub__", function(b) {
+    var num = this - b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Date, "__mul__", function(b) {
+    var num = this * b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Date, "__div__", function(b) {
+    var num = this / b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.definePrototypeProperty(Date, "__mod__", function(b) {
+    var num = this % b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  fn.setupBinaryOp(Date, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.setupBinaryOp(Date, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  
+  module.exports = {};
+
+});
+define('cc/client/function', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+
+  // unary operator methods
+  fn.definePrototypeProperty(Function, "__plus__", function() {
+    return 0; // avoid NaN
+  });
+  fn.definePrototypeProperty(Function, "__minus__", function() {
+    return 0; // avoid NaN
+  });
+
+  // binary operator methods
+  fn.definePrototypeProperty(Function, "__add__", function(b) {
+    return this.toString() + b;
+  });
+  fn.definePrototypeProperty(Function, "__sub__", function() {
+    return 0; // avoid NaN
   });
   fn.definePrototypeProperty(Function, "__mul__", function(b) {
     if (typeof b === "function") {
@@ -4648,95 +4773,19 @@ define('cc/client/object', function(require, exports, module) {
         return f.call(null, g.apply(null, arguments));
       };
     }
-    if (Array.isArray(b)) {
-      return b.map(function() {
-        return NaN;
-      });
-    }
-    return this * b;
+    return 0; // avoid NaN
   });
-
-  
-  setupBinaryOperator("__div__", function(a, b) {
-    return a / b;
-  }, "/");
-  fn.definePrototypeProperty(String, "__div__", function(b) {
-    if (typeof b === "number") {
-      return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
-        return items.join("");
-      });
-    } else if (Array.isArray(b)) {
-      return b.map(function(b) {
-        return this.__div__(b);
-      }, this);
-    }
-    return this / b;
+  fn.definePrototypeProperty(Function, "__div__", function() {
+    return 0; // avoid NaN
   });
-  
-  setupBinaryOperator("__mod__", function(a, b) {
-    return a % b;
-  }, "%");
-  fn.definePrototypeProperty(String, "__mod__", function(b) {
-    if (typeof b === "number") {
-      return utils.clump(this.split(""), b|0).map(function(items) {
-        return items.join("");
-      });
-    } else if (Array.isArray(b)) {
-      return b.map(function(b) {
-        return this.__mod__(b);
-      }, this);
-    }
-    return this % b;
+  fn.definePrototypeProperty(Function, "__mod__", function() {
+    return 0; // avoid NaN
   });
-  
-  
-  setup("__and__",function(b) {
+  fn.setupBinaryOp(Function, "__and__", function(b) {
     return cc.createTaskWaitLogic("and", [this].concat(b));
   });
-  fn.definePrototypeProperty(Array, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", this.concat(b));
-  });
-  
-  setup("__or__", function(b) {
+  fn.setupBinaryOp(Function, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
-  fn.definePrototypeProperty(Array, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", this.concat(b));
-  });
-  
-  
-  setup("to_i", function() {
-    return this|0;
-  });
-  fn.definePrototypeProperty(Array, "to_i", function() {
-    return this.map(function(x) {
-      return x.to_i();
-    });
-  });
-  
-  setup("to_f", function() {
-    return +this;
-  });
-  fn.definePrototypeProperty(Array, "to_f", function() {
-    return this.map(function(x) {
-      return x.to_f();
-    });
-  });
-  
-  setup("to_s", function() {
-    return this.toString();
-  });
-  fn.definePrototypeProperty(Array, "to_s", function() {
-    return this.map(function(x) {
-      return x.to_s();
-    });
-  });
-  
-  setup("to_a", function() {
-    return [this];
-  });
-  fn.definePrototypeProperty(Array, "to_a", function() {
-    return this;
   });
   
   module.exports = {};
@@ -4748,6 +4797,12 @@ define('cc/client/number', function(require, exports, module) {
   var fn = require("./fn");
   
   // unary operator methods
+  fn.definePrototypeProperty(Number, "__plus__", function() {
+    return +this;
+  });
+  fn.definePrototypeProperty(Number, "__minus__", function() {
+    return -this;
+  });
   fn.definePrototypeProperty(Number, "neg", function() {
     return -this;
   });
@@ -4888,50 +4943,64 @@ define('cc/client/number', function(require, exports, module) {
   });
 
   // binary operator methods
-  var setupBinaryOp = function(selector, func) {
-    fn.definePrototypeProperty(Number, selector, function(b) {
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this[selector](b);
-        }, this);
-      } else if (cc.instanceOfUGen(b)) {
-        return cc.createBinaryOpUGen(selector, this, b);
-      }
-      return func.call(this, b || 0);
-    });
-  };
-
-  setupBinaryOp("eq", function(b) {
+  fn.setupBinaryOp(Number, "__add__", function(b) {
+    return this + b;
+  });
+  fn.setupBinaryOp(Number, "__sub__", function(b) {
+    return this - b;
+  });
+  fn.setupBinaryOp(Number, "__mul__", function(b) {
+    return this * b;
+  });
+  fn.setupBinaryOp(Number, "__div__", function(b) {
+    if (this === 0 && b === 0) {
+      return 0; // avoid NaN
+    }
+    return this / b;
+  });
+  fn.setupBinaryOp(Number, "__mod__", function(b) {
+    if (b === 0) {
+      return 0; // avoid NaN
+    }
+    return this % b;
+  });
+  fn.setupBinaryOp(Number, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.setupBinaryOp(Number, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  fn.setupBinaryOp(Number, "eq", function(b) {
     return this === b ? 1 : 0;
   });
-  setupBinaryOp("ne", function(b) {
+  fn.setupBinaryOp(Number, "ne", function(b) {
     return this !== b ? 1 : 0;
   });
-  setupBinaryOp("lt", function(b) {
+  fn.setupBinaryOp(Number, "lt", function(b) {
     return this < b ? 1 : 0;
   });
-  setupBinaryOp("gt", function(b) {
+  fn.setupBinaryOp(Number, "gt", function(b) {
     return this > b ? 1 : 0;
   });
-  setupBinaryOp("le", function(b) {
+  fn.setupBinaryOp(Number, "le", function(b) {
     return this <= b ? 1 : 0;
   });
-  setupBinaryOp("ge", function(b) {
+  fn.setupBinaryOp(Number, "ge", function(b) {
     return this >= b ? 1 : 0;
   });
-  setupBinaryOp("bitAnd", function(b) {
+  fn.setupBinaryOp(Number, "bitAnd", function(b) {
     return this & b;
   });
-  setupBinaryOp("bitOr", function(b) {
+  fn.setupBinaryOp(Number, "bitOr", function(b) {
     return this | b;
   });
-  setupBinaryOp("bitXor", function(b) {
+  fn.setupBinaryOp(Number, "bitXor", function(b) {
     return this ^ b;
   });
-  setupBinaryOp("min", function(b) {
+  fn.setupBinaryOp(Number, "min", function(b) {
     return Math.min(this, b);
   });
-  setupBinaryOp("max", function(b) {
+  fn.setupBinaryOp(Number, "max", function(b) {
     return Math.max(this, b);
   });
   
@@ -4942,103 +5011,115 @@ define('cc/client/number', function(require, exports, module) {
     }
     return Math.abs(a);
   };
-  setupBinaryOp("lcm", function(b) {
+  fn.setupBinaryOp(Number, "lcm", function(b) {
     if (this === 0 && b === 0) {
-      return 0;
+      return 0; // avoid NaN
     }
     return Math.abs(this * b) / gcd(this, b);
   });
-  setupBinaryOp("gcd", function(b) {
+  fn.setupBinaryOp(Number, "gcd", function(b) {
     return gcd(this, b);
   });
-  setupBinaryOp("round", function(b) {
-    return b === 0 ? this : Math.round(this / b) * b;
+  fn.setupBinaryOp(Number, "round", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.round(this / b) * b;
   });
-  setupBinaryOp("roundUp", function(b) {
-    return b === 0 ? this : Math.ceil(this / b) * b;
+  fn.setupBinaryOp(Number, "roundUp", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.ceil(this / b) * b;
   });
-  setupBinaryOp("roundDown", function(b) {
-    return b === 0 ? this : Math.floor(this / b) * b;
+  fn.setupBinaryOp(Number, "roundDown", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.floor(this / b) * b;
   });
-  setupBinaryOp("trunc", function(b) {
-    return b === 0 ? this : Math.floor(this / b) * b;
+  fn.setupBinaryOp(Number, "trunc", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.floor(this / b) * b;
   });
-  setupBinaryOp("atan2", function(b) {
+  fn.setupBinaryOp(Number, "atan2", function(b) {
     return Math.atan2(this, b);
   });
-  setupBinaryOp("hypot", function(b) {
+  fn.setupBinaryOp(Number, "hypot", function(b) {
     return Math.sqrt((this * this) + (b * b));
   });
-  setupBinaryOp("hypotApx", function(b) {
+  fn.setupBinaryOp(Number, "hypotApx", function(b) {
     var x = Math.abs(this), y = Math.abs(b);
     var minxy = Math.min(x, y);
     return x + y - (Math.sqrt(2) - 1) * minxy;
   });
-  setupBinaryOp("pow", function(b) {
+  fn.setupBinaryOp(Number, "pow", function(b) {
     return Math.pow(Math.abs(this), b);
   });
-  setupBinaryOp("leftShift", function(b) {
+  fn.setupBinaryOp(Number, "leftShift", function(b) {
     if (b < 0) {
       return (this|0) >> (-b|0);
     }
     return (this|0) << (b|0);
   });
-  setupBinaryOp("rightShift", function(b) {
+  fn.setupBinaryOp(Number, "rightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  setupBinaryOp("unsignedRightShift", function(b) {
+  fn.setupBinaryOp(Number, "unsignedRightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  setupBinaryOp("ring1", function(b) {
+  fn.setupBinaryOp(Number, "ring1", function(b) {
     return this * b + this;
   });
-  setupBinaryOp("ring2", function(b) {
+  fn.setupBinaryOp(Number, "ring2", function(b) {
     return this * b + this + b;
   });
-  setupBinaryOp("ring3", function(b) {
+  fn.setupBinaryOp(Number, "ring3", function(b) {
     return this * this * b;
   });
-  setupBinaryOp("ring4", function(b) {
+  fn.setupBinaryOp(Number, "ring4", function(b) {
     return this * this * b - this * b * b;
   });
-  setupBinaryOp("difsqr", function(b) {
+  fn.setupBinaryOp(Number, "difsqr", function(b) {
     return this * this - b * b;
   });
-  setupBinaryOp("sumsqr", function(b) {
+  fn.setupBinaryOp(Number, "sumsqr", function(b) {
     return this * this + b * b;
   });
-  setupBinaryOp("sqrsum", function(b) {
+  fn.setupBinaryOp(Number, "sqrsum", function(b) {
     return (this + b) * (this + b);
   });
-  setupBinaryOp("sqrdif", function(b) {
+  fn.setupBinaryOp(Number, "sqrdif", function(b) {
     return (this - b) * (this - b);
   });
-  setupBinaryOp("absdif", function(b) {
+  fn.setupBinaryOp(Number, "absdif", function(b) {
     return Math.abs(this - b);
   });
-  setupBinaryOp("thresh", function(b) {
+  fn.setupBinaryOp(Number, "thresh", function(b) {
     return this < b ? 0 : this;
   });
-  setupBinaryOp("amclip", function(b) {
+  fn.setupBinaryOp(Number, "amclip", function(b) {
     return this * 0.5 * (b + Math.abs(b));
   });
-  setupBinaryOp("scaleneg", function(b) {
+  fn.setupBinaryOp(Number, "scaleneg", function(b) {
     b = 0.5 * b + 0.5;
     return (Math.abs(this) - this) * b + this;
   });
-  setupBinaryOp("clip2", function(b) {
+  fn.setupBinaryOp(Number, "clip2", function(b) {
     return Math.max(-b, Math.min(this, b));
   });
-  setupBinaryOp("excess", function(b) {
+  fn.setupBinaryOp(Number, "excess", function(b) {
     return this - Math.max(-b, Math.min(this, b));
   });
-  setupBinaryOp("fold2", function(b) {
+  fn.setupBinaryOp(Number, "fold2", function(b) {
     var _in = this, x, c, range, range2;
     x = _in + b;
     if (_in >= b) {
@@ -5065,7 +5146,7 @@ define('cc/client/number', function(require, exports, module) {
     }
     return c - b;
   });
-  setupBinaryOp("wrap2", function(b) {
+  fn.setupBinaryOp(Number, "wrap2", function(b) {
     var _in = this, range;
     if (_in >= b) {
       range = b + b;
@@ -5096,110 +5177,85 @@ define('cc/client/number', function(require, exports, module) {
   module.exports = {};
 
 });
-define('cc/client/array', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var fn = require("./fn");
-  var ops   = require("../common/ops");
-  var utils = require("./utils");
-  
-  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      fn.definePrototypeProperty(Array, selector, function() {
-        return this.map(function(x) { return x[selector](); });
-      });
-    }
-  });
-
-  var foldAt = function(list, index) {
-    var len = list.length;
-    index = index % (len * 2 - 2);
-    if (index >= len) {
-      index = 2 * (len - 1) - index;
-    }
-    return list[index];
-  };
-  var calc_with_adverb = function(selector, a, b, adverb) {
-    var sort = a.length - b.length;
-    switch (adverb) {
-    case 1:
-      if (sort > 0) {
-        a.splice(b.length);
-      } else if (sort < 0) {
-        b.splice(a.length);
-      }
-      break;
-    case 2:
-      if (sort > 0) {
-        return a.map(function(a, i) {
-          return a[selector](foldAt(b, i));
-        });
-      } else if (sort < 0) {
-        return b.map(function(b, i) {
-          return foldAt(a, i)[selector](b);
-        });
-      }
-      break;
-    case 3:
-    case 4:
-      var table = a.map(function(a) {
-        return b.map(function(b) {
-          return a[selector](b);
-        });
-      });
-      return (adverb === 4) ? utils.flatten(table) : table;
-    }
-    if (a.length === b.length) {
-      return a.map(function(a, index) {
-        return a[selector](b[index]);
-      });
-    } else if (a.length > b.length) {
-      return a.map(function(a, index) {
-        return a[selector](b[index % b.length]);
-      });
-    } else {
-      return b.map(function(b, index) {
-        return a[index % a.length][selector](b);
-      });
-    }
-  };
-  
-  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      fn.definePrototypeProperty(Array, selector, function(b, adverb) {
-        if (Array.isArray(b)) {
-          return calc_with_adverb(selector, this, b, adverb);
-        } else if (cc.instanceOfUGen(b)) {
-          return this.map(function(a) {
-            return cc.createBinaryOpUGen(selector, a, b);
-          });
-        }
-        return this.map(function(a) {
-          return a[selector](b);
-        });
-      });
-    }
-  });
-  
-  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return cc.createMulAdd(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").multiCall().build());
+define('cc/client/object', function(require, exports, module) {
   
   module.exports = {};
 
 });
-define('cc/client/data', function(require, exports, module) {
-
-  var cc = require("./cc");
+define('cc/client/string', function(require, exports, module) {
   
-  cc.global.DATA = {
-    get: function(n) {
-      return cc.DATA[n] || "";
+  var fn = require("./fn");
+  var utils = require("./utils");
+  
+  // unary operator methods
+  fn.definePrototypeProperty(String, "__plus__", function() {
+    var num = +this;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
     }
-  };
+    return num;
+  });
+  fn.definePrototypeProperty(String, "__minus__", function() {
+    var num = -this;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+  
+  // binary operator methods
+  fn.setupBinaryOp(String, "__add__", function(b) {
+    return this + b;
+  });
+  fn.setupBinaryOp(String, "__sub__", function(b) {
+    var num = this - b;
+    if (isNaN(num)) {
+      return 0; // avoid NaN
+    }
+    return num;
+  });
+
+  var repeat = (function() {
+    var _repeat = function(s, n) {
+      if (n < 1) {
+        return "";
+      }
+      if (n % 2) {
+        return _repeat(s, n - 1) + s;
+      }
+      var half = _repeat(s, n >> 1);
+      return half + half;
+    };
+    return function(s, b) {
+      if (b === Infinity) {
+        throw new RangeError();
+      }
+      return _repeat(s, b|0);
+    };
+  })();
+  
+  fn.setupBinaryOp(String, "__mul__", function(b) {
+    if (typeof b === "number") {
+      return repeat(this, b);
+    }
+    return 0; // avoid NaN
+  });
+  fn.setupBinaryOp(String, "__div__", function(b) {
+    if (typeof b === "number") {
+      return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
+        return items.join("");
+      });
+    }
+    return 0; // avoid NaN
+  });
+  fn.setupBinaryOp(String, "__mod__", function(b) {
+    if (typeof b === "number") {
+      return utils.clump(this.split(""), Math.floor(b)).map(function(items) {
+        return items.join("");
+      });
+    }
+    return 0; // avoid NaN
+  });
   
   module.exports = {};
 
@@ -5927,6 +5983,7 @@ define('cc/exports/compiler/compiler', function(require, exports, module) {
       if (lang === "coffee") {
         return cc.createCoffeeCompiler();
       }
+      throw new TypeError("Compiler: '" + lang + "' not supported");
     };
   };
   
@@ -5936,18 +5993,12 @@ define('cc/exports/compiler/compiler', function(require, exports, module) {
 
 });
 define('cc/exports/compiler/coffee', function(require, exports, module) {
+
+  var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
   
   var cc = require("../../cc");
-  
-  var CoffeeScript = (function() {
-    if (global.CoffeeScript) {
-      return global.CoffeeScript;
-    }
-    return global.require("coffee-script");
-  })();
-
   var timevalue = require("../../common/timevalue").calc;
-
+  
   // CoffeeScript tags
   // IDENTIFIER
   // NUMBER
@@ -5985,169 +6036,157 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   // OUTDENT
   // RETURN
   // TERMINATOR
+  // HERECOMMENT
 
   var TAG   = 0;
   var VALUE = 1;
   var _     = {}; // empty location
-  
-  var dumpTokens = function(tokens) {
-    var indent = 0;
-    console.log(tokens.map(function(t) {
-      switch (t[0]) {
-      case "OUTDENT": case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
-        indent -= 1;
-        break;
-      }
-      var x = tab(indent) + t[0] + "\t" + t[1];
-      switch (t[0]) {
-      case "(": case "[": case "{": case "PARAM_START": case "CALL_START": case "INDENT":
-        indent += 1;
-        break;
-      }
-      return x;
-    }).join("\n"));
-  };
-  
-  var tab = function(n) {
-    var t = "";
-    while (n--) {
-      t += "  ";
-    }
-    return t;
-  };
 
-  var findOperandHead = function(tokens, index) {
+  var sortPlusMinusOperator = function(tokens) {
+    if (tokens._sorted) {
+      return tokens;
+    }
+    var prevTag = "";
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var tag = tokens[i][TAG];
+      if (tag === "+" || tag === "-") {
+        switch (prevTag) {
+        case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
+        case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
+          tokens[i][TAG] = "MATH";
+          break;
+        default:
+          tokens[i][TAG] = "UNARY";
+        }
+      }
+      prevTag = tag;
+    }
+    tokens._sorted = true;
+    return tokens;
+  };
+  
+  var revertPlusMinusOperator = function(tokens) {
+    if (!tokens._sorted) {
+      for (var i = 0, imax = tokens.length; i < imax; ++i) {
+        var val = tokens[i][VALUE];
+        if (val === "+" || val === "-") {
+          tokens[i][TAG] = val;
+        }
+      }
+      return tokens;
+    }
+    delete tokens._sorted;
+    return tokens;
+  };
+  
+  var getPrevOperand = function(tokens, index) {
+    tokens = sortPlusMinusOperator(tokens);
+    
     var bracket = 0;
     var indent  = 0;
-    while (0 < index) {
-      var token = tokens[index - 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "PARAM_START":
-          return index;
-        case "CALL_START":
-          bracket -= 1;
-          break;
-        case "(": case "[": case "{":
-          bracket -= 1;
-          /* falls through */
-        case "IDENTIFIER":
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            token = tokens[index - 1];
-            if (token) {
-              if (token[TAG] === "UNARY") {
-                return index - 1;
-              }
-              if (token[VALUE] === "+" || token[VALUE] === "-") {
-                token = tokens[index - 2];
-                if (!token) {
-                  return index - 1;
-                }
-                switch (token[TAG]) {
-                case "INDENT": case "TERMINATOR": case "CALL_START":
-                case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-                case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-                case "[": case "(": case "{": case ",": case "?":
-                  return index - 1;
-                }
-              }
-            }
-            return index;
+    var end = indent;
+    while (1 < index) {
+      switch (tokens[index - 1][TAG]) {
+      case "PARAM_END": case "CALL_END":
+        bracket += 1;
+        /* falls through */
+      case ".": case "@":
+        index -= 1;
+        continue;
+      }
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{": case "PARAM_START":
+        bracket -= 1;
+        /* falls through */
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
+      case "->":
+        if (bracket === 0 && indent === 0) {
+          var prev;
+          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
+            index -= 1;
           }
-          break;
-        case "}": case "]": case ")": case "PARAM_END": case "CALL_END":
-          bracket += 1;
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          indent -= 1;
-          break;
+          return {tokens:tokens, begin:index, end:end};
         }
+        break;
+      case "CALL_START":
+        bracket -= 1;
+        break;
+      case "}": case "]": case ")":
+        bracket += 1;
+        break;
+      case "OUTDENT":
+        indent += 1;
+        break;
+      case "INDENT":
+        indent -= 1;
+        break;
       }
       index -= 1;
     }
-    return 0;
+    return {tokens:tokens, begin:0, end:end};
   };
+  
+  var getNextOperand = function(tokens, index) {
+    tokens = sortPlusMinusOperator(tokens);
+    var bracket = 0;
+    var indent  = 0;
+    var begin = index;
+    var imax = tokens.length - 2;
 
-  var findOperandTail = function(tokens, index) {
-    var bracket  = 0;
-    var indent   = 0;
-    var inParams = false;
-    while (index < tokens.length) {
-      var token = tokens[index];
-      if (inParams) {
-        inParams = token[TAG] !== "PARAM_END";
-        index += 1;
-        continue;
+    if (tokens[index] && tokens[index][TAG] === "@") {
+      if (tokens[index+1][TAG] !== "IDENTIFIER") {
+        return {tokens:tokens, begin:index, end:index};
       }
-      switch (token[TAG]) {
+    }
+    
+    while (index < imax) {
+      var tag = tokens[index][TAG];
+      
+      switch (tag) {
+      case "(": case "[": case "{": case "PARAM_START":
+        bracket += 1;
+        break;
       case "}": case "]": case ")": case "CALL_END":
         bracket -= 1;
         break;
-      case "OUTDENT":
-        indent -= 1;
-        break;
-      case "PARAM_START":
-        inParams = true;
+      }
+      
+      switch (tokens[index + 1][TAG]) {
+      case "CALL_START":
+        bracket += 1;
+        index += 1;
+        continue;
+      case ".": case "@":
         index += 1;
         continue;
       }
-      token = tokens[index + 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          if (indent === 0) {
-            return index - 1;
-          }
-          break;
-        case "IDENTIFIER":
-          token = tokens[index + 1];
-          if (token && token[TAG] === "CALL_START") {
-            bracket += 1;
-            break;
-          }
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "(": case "[": case "{":
-          bracket += 1;
-          break;
-        case "}": case "]": case ")": case "CALL_END":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
+      
+      switch (tag) {
+      case "}": case "]": case ")": case "CALL_END":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "OUTDENT":
+        if (tag === "OUTDENT") {
+          indent -= 1;
         }
+        if (bracket === 0 && indent === 0) {
+          return {tokens:tokens, begin:begin, end:index};
+        }
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
       }
       index += 1;
     }
-    return tokens.length - 1;
+    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
   };
-
-  var replaceTimeValue = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  
+  var replaceFixedTimeValue = function(tokens) {
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
       var token = tokens[i];
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
         var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
@@ -6156,292 +6195,227 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           token[VALUE] = time.toString();
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replacePrecedence = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  var replaceStrictlyPrecedence = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i > 0; i--) {
       var token = tokens[i];
-      if (token[TAG] === "MATH") {
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens.splice(b, 0, [")", ")" , _]);
-        tokens.splice(a, 0, ["(", "(" , _]);
+      if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+        tokens.splice(next.end + 1, 0, [")", ")" , _]);
+        tokens.splice(prev.begin  , 0, ["(", "(" , _]);
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
-
-  var replaceUnaryOpTable = {
+  
+  var unaryOperatorDict = {
     "+": "__plus__", "-": "__minus__"
   };
-
-  var replaceUnaryOp = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  var replaceUnaryOperator = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
-      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceUnaryOpTable[token[VALUE]];
-        token = tokens[i - 1] || { 0:"TERMINATOR" };
-        switch (token[TAG]) {
-        case "INDENT": case "TERMINATOR": case "CALL_START":
-        case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-        case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
-          var a = findOperandTail(tokens, i);
-          tokens.splice(a+1, 0, ["."         , "."     , _]);
-          tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
-          tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
-          tokens.splice(i, 1);
-        }
+      if (token[TAG] === "UNARY" && unaryOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = unaryOperatorDict[token[VALUE]];
+        var next = getNextOperand(tokens, i);
+        tokens.splice(next.end+1, 0, ["."         , "."     , _]);
+        tokens.splice(next.end+2, 0, ["IDENTIFIER", selector, _]);
+        tokens.splice(next.end+3, 0, ["CALL_START", "("     , _]);
+        tokens.splice(next.end+4, 0, ["CALL_END"  , ")"     , _]);
+        tokens.splice(i, 1);
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replaceBinaryOpTable = {
+  var binaryOperatorDict = {
     "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
   };
-  
-  var replaceBinaryOp = function(tokens) {
-    var i = 0;
-    var replaceable = false;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (replaceable) {
-        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceBinaryOpTable[token[VALUE]];
-          var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
-          replaceable = false;
-          continue;
-        }
-      }
-      switch (token[TAG]) {
-      case "INDENT": case "TERMINATOR": case "CALL_START":
-      case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-      case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-      case "[": case "(": case "{": case ",": case "?":
-        replaceable = false;
-        break;
-      default:
-        replaceable = true;
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
+  var binaryOperatorAdverbs = {
+    W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
+    WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
   };
-
-  var replaceLogicOpTable = {
-    "&&": "__and__", "||": "__or__"
-  };
-  
-  var replaceLogicOp = function(tokens) {
-    var i = 1;
-    var replaceable = false;
-    var bracket = 0;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (replaceable && bracket === 1) {
-        if (replaceLogicOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceLogicOpTable[token[VALUE]];
-          var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."          , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER" , selector, _]);
-          tokens.splice(i++, 0, ["!CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["!CALL_END"  , ")"     , _]);
-          continue;
-        }
+  var checkAdvarb = function(tokens, index) {
+    var t0 = tokens[index  ];
+    var t1 = tokens[index-1];
+    var t2 = tokens[index-2];
+    if (t0 && t1 && t2) {
+      if (t0[VALUE] === t2[VALUE] && binaryOperatorAdverbs.hasOwnProperty(t1[VALUE])) {
+        return binaryOperatorAdverbs[t1[VALUE]];
       }
-      switch (token[TAG]) {
-      case "IDENTIFIER":
-        if (tokens[i-1][TAG] === "@" && token[VALUE] === "wait") {
-          replaceable = true;
-          bracket = 0;
-        }
-        break;
-      case "INDENT": case "TERMINATOR":
-        if (replaceable && bracket === 0) {
-          replaceable = false;
-        }
-        break;
-      case "{": case "PARAM_START": case "CALL_START":
-        if (replaceable) {
-          bracket += 1;
-        }
-        break;
-      case "CALL_END": case "PARAM_END": case "}":
-        if (replaceable) {
-          bracket -= 1;
-        }
-        break;
-      }
-      i += 1;
     }
-    tokens.forEach(function(items) {
-      if (items[TAG].charAt(0) === "!") {
-        items[TAG] = items[TAG].substr(1);
+  };
+  var replaceBinaryOperator = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH" && binaryOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = binaryOperatorDict[token[VALUE]];
+        var adverb   = checkAdvarb(tokens, i);
+        var next = getNextOperand(tokens, i);
+        if (adverb) {
+          i -= 2;
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 1, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 1, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+1, 0, [","         , ","   , _]);
+          tokens.splice(next.end+2, 0, ["IDENTIFIER", adverb, _]);
+          tokens.splice(next.end+3, 0, ["CALL_END"  , ")"   , _]);
+        } else {
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+3, 0, ["CALL_END", ")", _]);
+        }
       }
-    });
-    // dumpTokens(tokens);
+    }
     return tokens;
   };
   
-  var replaceCompoundAssignTable = {
+  var compoundAssignOperatorDict = {
     "+=": "__add__",
     "-=": "__sub__",
     "*=": "__mul__",
     "/=": "__div__",
     "%=": "__mod__",
   };
-  
   var replaceCompoundAssign = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+    for (var i = tokens.length; --i > 0; ) {
       var token = tokens[i];
-      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceCompoundAssignTable[token[VALUE]];
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens[i] = ["=", "=", _];
+      if (compoundAssignOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = compoundAssignOperatorDict[token[VALUE]];
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+        tokens.splice(i  , 1, ["="         , "="     , _]);
         tokens.splice(i+1, 0, ["."         , "."     , _]);
         tokens.splice(i+2, 0, ["IDENTIFIER", selector, _]);
         tokens.splice(i+3, 0, ["CALL_START", "("     , _]);
-        tokens.splice(b+3, 0, ["CALL_END"  , ")"     , _]);
-        for (var j = a; j < i; j++) {
+        tokens.splice(next.end+4, 0, ["CALL_END", ")", _]);
+        for (var j = prev.begin; j < i; ++j) {
           tokens.splice(i+1, 0, tokens[j]);
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replaceSynthDef = (function() {
-    var getParams = function(tokens, index) {
-      var begin = -1, end = -1;
-      for (var i = index + 1; i < tokens.length; ++i) {
-        if (tokens[i][TAG] === "PARAM_START") {
-          begin = i;
-        } else if (tokens[i][TAG] === "PARAM_END") {
-          end = i;
-          break;
-        }
-      }
-      var replace = "";
-      if (begin !== -1) {
-        replace = tokens.slice(begin+1, end).map(function(t) {
-          return t[VALUE];
-        }).join("").replace(/"/g, "'");
-      }
-      replace = "\"" + replace + "\"";
-      return { begin:begin, end:end, replace:replace };
-    };
-    return function(tokens) {
-      var i = tokens.length - 1;
-      while (0 <= i) {
-        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
-          if (tokens[i - 1][TAG] === ".") {
-            var token = tokens[i];
-            if (token[VALUE] === "def") {
-              token = tokens[i + 1];
-              if (token[TAG] === "CALL_START") {
-                var a = findOperandTail(tokens, i + 2);
-                var params = getParams(tokens, i + 1);
-                tokens.splice(++a, 0, [","     , ","           , _]);
-                tokens.splice(++a, 0, ["STRING", params.replace, _]);
-              }
-            }
-          }
-        }
-        i -= 1;
-      }
-      // dumpTokens(tokens);
-      return tokens;
-    };
-  })();
-
-  var replaceGlobal = function(tokens) {
-    var i = tokens.length - 2;
-    while (i >= 0) {
+  var logicOperatorDict = {
+    "&&": "__and__", "||": "__or__"
+  };
+  var replaceLogicOperator = function(tokens) {
+    var replaceable = false;
+    for (var i = 1; i < tokens.length; ++i) {
       var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER") {
-        if ((i === 0 || tokens[i-1][TAG] !== ".") && cc.global.hasOwnProperty(token[VALUE])) {
-          if (token[VALUE] !== "CoffeeCollider" && token[VALUE] !== "SocketSynthServer") {
-            tokens.splice(i  , 1, ["IDENTIFIER", "cc"        , _]);
-            tokens.splice(i+1, 0, ["."         , "."         , _]);
-            tokens.splice(i+2, 0, ["IDENTIFIER", token[VALUE], _]);
-          }
-        }
-        if (token[VALUE].charAt(0) === "$") {
-          var name = token[VALUE];
-          if (!/\d/.test(name.charAt(1))) {
-            name = name.substr(1);
-          }
-          if (name !== "") {
-            token = tokens[i - 1];
-            if (!token || token[TAG] !== ".") {
-              tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
-              tokens.splice(i+1, 0, ["."         , "."     , _]);
-              tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
-            }
-          }
+      if (token[VALUE] === "wait" && tokens[i-1][TAG] === "@") {
+        replaceable = true;
+        continue;
+      }
+      if (token[TAG] === ",") {
+        replaceable = false;
+        continue;
+      }
+      if (replaceable) {
+        if (token[TAG] === "LOGIC" && logicOperatorDict.hasOwnProperty(token[VALUE])) {
+          var selector = logicOperatorDict[token[VALUE]];
+          var next = getNextOperand(tokens, i);
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+3, 0, ["CALL_END", ")", _]);
+          i = next.end+3; // skip
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var cleanupParenthesis = function(tokens) {
-    var i = 0;
-    var bracket = 0;
-    while (i < tokens.length) {
+  var formatArgument = function(op) {
+    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
+        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
+      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
+        return "\"" + token[VALUE] + "\"";
+      }
+      return token[VALUE];
+    }).join("");
+  };
+  var getSynthDefArguments = function(tokens, index) {
+    if (tokens[index++][TAG] !== "PARAM_START") {
+      return [];
+    }
+    var args = [];
+    while (index < tokens.length) {
+      if (tokens[index][TAG] === "PARAM_END") {
+        break;
+      }
+      if (tokens[index][TAG] === "IDENTIFIER") {
+        args.push(tokens[index][VALUE]);
+        if (tokens[index+1][TAG] !== "=") {
+          args.push(0);
+        } else {
+          var next = getNextOperand(tokens, index+2);
+          args.push(formatArgument(next));
+          tokens.splice(index+1, next.end-next.begin+2);
+        }
+      }
+      index += 1;
+    }
+    return args;
+  };
+  
+  var replaceSynthDefinition = function(tokens) {
+    for (var i = tokens.length - 1; --i >= 2; ) {
       var token = tokens[i];
-      if (token[TAG] === "(") {
-        token = tokens[i + 1];
-        if (token && token[TAG] === "(") {
-          bracket = 2;
-          for (var j = i + 2; j < tokens.length; j++) {
-            token = tokens[j][TAG];
-            if (token === "(") {
-              bracket += 1;
-            } if (token === ")") {
-              bracket -= 1;
-              if (bracket === 0) {
-                if (tokens[j - 1][TAG] === ")") {
-                  tokens.splice(j, 1);
-                  tokens.splice(i, 1);
-                  i -= 1;
-                }
-                break;
-              }
-            }
+      if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def" && tokens[i-1][TAG] === "." &&
+          tokens[i-2][TAG] === "IDENTIFIER" && tokens[i-2][VALUE] === "Synth" && tokens[i+1][TAG] === "CALL_START") {
+        var args = getSynthDefArguments(tokens, i+2);
+        var next = getNextOperand(tokens, i+2);
+        tokens.splice(next.end+1, 0, [",", ",", _]);
+        tokens.splice(next.end+2, 0, ["[", "[", _]);
+        tokens.splice(next.end+3, 0, ["]", "]", _]);
+        for (var j = args.length; j--; ) {
+          tokens.splice(next.end+3, 0, ["STRING", "'" + args[j] + "'", _]);
+          if (j) {
+            tokens.splice(next.end+3, 0, [",", ",", _]);
           }
         }
       }
-      i += 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
-
-  var insertReturn = function(tokens) {
+  
+  var replaceGlobalVariants = function(tokens) {
+    for (var i = tokens.length - 1; i--; ) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (cc.global.hasOwnProperty(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue; // { NotGlobal:"dict key is not global" }
+        }
+        if (i > 0) {
+          if (tokens[i-1][TAG] === "." || tokens[i-1][TAG] === "@") {
+            continue; // this.is.NotGlobal, @isNotGlobal
+          }
+        }
+        tokens.splice(i  , 0, ["IDENTIFIER", "cc", _]);
+        tokens.splice(i+1, 0, ["."         , "." , _]);
+      } else if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
+      }
+    }
+    return tokens;
+  };
+  
+  var finalize = function(tokens) {
     tokens.splice(0, 0, ["("          , "("        , _]);
     tokens.splice(1, 0, ["PARAM_START", "("        , _]);
     tokens.splice(2, 0, ["IDENTIFIER" , "global"   , _]);
@@ -6450,6 +6424,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     tokens.splice(5, 0, ["PARAM_END"  , ")"        , _]);
     tokens.splice(6, 0, ["->"         , "->"       , _]);
     tokens.splice(7, 0, ["INDENT"     , 2          , _]);
+    
     var i = tokens.length - 1;
     tokens.splice(i++, 0, ["OUTDENT"   , 2            , _]);
     tokens.splice(i++, 0, [")"         , ")"          , _]);
@@ -6466,14 +6441,13 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     tokens.splice(i++, 0, ["LOGIC"     , "||"         , _]);
     tokens.splice(i++, 0, ["IDENTIFIER", "global"     , _]);
     tokens.splice(i++, 0, ["CALL_END"  , ")"          , _]);
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var Compiler = (function() {
-    function Compiler() {
+  var CoffeeCompiler = (function() {
+    function CoffeeCompiler() {
     }
-    Compiler.prototype.tokens = function(code) {
+    CoffeeCompiler.prototype.tokens = function(code) {
       var data = [];
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
@@ -6482,39 +6456,42 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
             data.push(token[VALUE].trim());
           }
         });
-        tokens = replaceTimeValue(tokens);
-        tokens = replaceUnaryOp(tokens);
-        tokens = replacePrecedence(tokens);
-        tokens = replaceBinaryOp(tokens);
-        tokens = replaceLogicOp(tokens);
+        tokens = replaceFixedTimeValue(tokens);
+        tokens = replaceStrictlyPrecedence(tokens);
+        tokens = replaceUnaryOperator(tokens);
+        tokens = replaceBinaryOperator(tokens);
         tokens = replaceCompoundAssign(tokens);
-        tokens = replaceSynthDef(tokens);
-        tokens = replaceGlobal(tokens);
-        tokens = cleanupParenthesis(tokens);
-        tokens = insertReturn(tokens);
+        tokens = replaceLogicOperator(tokens);
+        tokens = replaceSynthDefinition(tokens);
+        tokens = replaceGlobalVariants(tokens);
+        tokens = finalize(tokens);
       }
       this.code = code;
       this.data = data;
       return tokens;
     };
-    Compiler.prototype.compile = function(code) {
+    CoffeeCompiler.prototype.compile = function(code) {
       var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
-    Compiler.prototype.toString = function(tokens) {
+    var tab = function(n) {
+      var t = ""; while (n--) { t += "  "; } return t;
+    };
+    CoffeeCompiler.prototype.toString = function(tokens) {
       var indent = 0;
       if (typeof tokens === "string") {
         tokens = this.tokens(tokens);
       }
+      tokens = sortPlusMinusOperator(tokens);
       return tokens.map(function(token) {
         switch (token[TAG]) {
         case "TERMINATOR":
           return "\n" + tab(indent);
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           return "\n" + tab(indent);
         case "OUTDENT":
-          indent -= token[VALUE]|0;
+          indent -= 1;
           return "\n" + tab(indent);
         case "RETURN":
           return "return ";
@@ -6525,41 +6502,43 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           return token[VALUE];
         case "{":
           return "{";
-        case ",": case "RELATION":
+        case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
           return token[VALUE] + " ";
-        case "=":
-          return " = ";
-        case "COMPOUND_ASSIGN": case "COMPARE": case "MATH": case "+": case "-":
+        case "=": case "COMPARE": case "MATH": case "LOGIC":
           return " " + token[VALUE] + " ";
+        case "HERECOMMENT":
+          return "/* " + token[VALUE] + " */";
         default:
           return token[VALUE];
         }
       }).join("").trim();
     };
-    return Compiler;
+    return CoffeeCompiler;
   })();
-
+  
   var use = function() {
     cc.createCoffeeCompiler = function() {
-      return new Compiler();
+      return new CoffeeCompiler();
     };
   };
   
   module.exports = {
-    Compiler  : Compiler,
-    dumpTokens: dumpTokens,
-    findOperandHead : findOperandHead,
-    findOperandTail : findOperandTail,
-    replaceTimeValue     : replaceTimeValue,
-    replacePrecedence    : replacePrecedence,
-    replaceUnaryOp       : replaceUnaryOp,
-    replaceBinaryOp      : replaceBinaryOp,
-    replaceLogicOp       : replaceLogicOp,
-    replaceCompoundAssign: replaceCompoundAssign,
-    replaceSynthDef      : replaceSynthDef,
-    replaceGlobal        : replaceGlobal,
-    cleanupParenthesis   : cleanupParenthesis,
-    insertReturn         : insertReturn,
+    CoffeeCompiler: CoffeeCompiler,
+    
+    sortPlusMinusOperator  : sortPlusMinusOperator,
+    revertPlusMinusOperator: revertPlusMinusOperator,
+    getPrevOperand         : getPrevOperand,
+    getNextOperand         : getNextOperand,
+    replaceFixedTimeValue    : replaceFixedTimeValue,
+    replaceStrictlyPrecedence: replaceStrictlyPrecedence,
+    replaceUnaryOperator     : replaceUnaryOperator,
+    replaceBinaryOperator    : replaceBinaryOperator,
+    replaceCompoundAssign    : replaceCompoundAssign,
+    replaceLogicOperator     : replaceLogicOperator,
+    replaceSynthDefinition   : replaceSynthDefinition,
+    replaceGlobalVariants    : replaceGlobalVariants,
+    finalize                 : finalize,
+    getSynthDefArguments: getSynthDefArguments,
     use:use,
   };
 
@@ -7790,7 +7769,7 @@ define('cc/server/node', function(require, exports, module) {
       var fixNumList = specs.consts.map(function(value) {
         return instance.getFixNum(value);
       });
-      var unitList = specs.defs.map(function(spec) {
+      var unitList = specs.defList.map(function(spec) {
         return new Unit(this, spec);
       }, this);
       this.params   = specs.params;

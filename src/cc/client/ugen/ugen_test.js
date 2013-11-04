@@ -3,34 +3,27 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  var cc = require("../cc");
-  var ugen  = require("./ugen");
-  var uop   = require("./uop");
-  var inout = require("./inout");
-
-  require("../object");
-  require("../number");
-  
-  cc.registerUGen("Test", {
-    ar: {
-      defaults: "val1=1,val2=2",
-      ctor: function(val1, val2) {
-        return this.init(C.AUDIO, val1, val2);
-      }
-    },
-    kr: {
-      defaults: "val1=1,val2=2",
-      ctor: function(val1, val2) {
-        return this.init(C.CONTROL, val1, val2);
-      }
-    },
-  });
+  var cc   = require("../cc");
+  var ugen = require("./ugen");
   
   describe("ugen.js", function() {
     before(function() {
       ugen.use();
-      inout.use();
-      uop.use();
+
+      cc.registerUGen("Test", {
+        ar: {
+          defaults: "val1=1,val2=2",
+          ctor: function(val1, val2) {
+            return this.init(C.AUDIO, val1, val2);
+          }
+        },
+        kr: {
+          defaults: "val1=1,val2=2",
+          ctor: function(val1, val2) {
+            return this.init(C.CONTROL, val1, val2);
+          }
+        },
+      });
     });
     describe("UGen", function() {
       it("create", function() {

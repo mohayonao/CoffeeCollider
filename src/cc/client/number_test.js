@@ -4,10 +4,22 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   
   var cc = require("./cc");
-  require("./number");
   
   describe("number.js", function() {
+    before(function() {
+      require("./number");
+    });
     describe("uop", function() {
+      it("__plus__", function() {
+        assert.equal(( 2.2).__plus__(), + 2.2);
+        assert.equal(( 0.0).__plus__(), + 0.0);
+        assert.equal((-2.2).__plus__(), +-2.2);
+      });
+      it("__minus__", function() {
+        assert.equal((+5.2).__minus__(), -5.2);
+        assert.equal(( 0.0).__minus__(),  0.0);
+        assert.equal((-5.2).__minus__(), +5.2);
+      });
       it("neg", function() {
         assert.equal((+5.2).neg(), -5.2);
         assert.equal(( 0.0).neg(),  0.0);
@@ -218,6 +230,70 @@ define(function(require, exports, module) {
         cc.instanceOfUGen = function() {
           return false;
         };
+        cc.createTaskWaitLogic = function(logic, list) {
+          return [logic].concat(list);
+        };
+      });
+      it("__add__", function() {
+        assert.equal((-2.5).__add__(-3.5), -2.5 + -3.5);
+        assert.equal((-2.5).__add__( 0.0), -2.5 +  0.0);
+        assert.equal((-2.5).__add__(+3.5), -2.5 + +3.5);
+        assert.equal(( 0.0).__add__(-3.5),  0.0 + -3.5);
+        assert.equal(( 0.0).__add__( 0.0),  0.0 +  0.0);
+        assert.equal(( 0.0).__add__(+3.5),  0.0 + +3.5);
+        assert.equal((+2.5).__add__(-3.5),  2.5 + -3.5);
+        assert.equal((+2.5).__add__( 0.0),  2.5 +  0.0);
+        assert.equal((+2.5).__add__(+3.5),  2.5 + +3.5);
+      });
+      it("__sub__", function() {
+        assert.equal((-2.5).__sub__(-3.5), -2.5 - -3.5);
+        assert.equal((-2.5).__sub__( 0.0), -2.5 -  0.0);
+        assert.equal((-2.5).__sub__(+3.5), -2.5 - +3.5);
+        assert.equal(( 0.0).__sub__(-3.5),  0.0 - -3.5);
+        assert.equal(( 0.0).__sub__( 0.0),  0.0 -  0.0);
+        assert.equal(( 0.0).__sub__(+3.5),  0.0 - +3.5);
+        assert.equal((+2.5).__sub__(-3.5),  2.5 - -3.5);
+        assert.equal((+2.5).__sub__( 0.0),  2.5 -  0.0);
+        assert.equal((+2.5).__sub__(+3.5),  2.5 - +3.5);
+      });
+      it("__mul__", function() {
+        assert.equal((-2.5).__mul__(-3.5), -2.5 * -3.5);
+        assert.equal((-2.5).__mul__( 0.0), -2.5 *  0.0);
+        assert.equal((-2.5).__mul__(+3.5), -2.5 * +3.5);
+        assert.equal(( 0.0).__mul__(-3.5),  0.0 * -3.5);
+        assert.equal(( 0.0).__mul__( 0.0),  0.0 *  0.0);
+        assert.equal(( 0.0).__mul__(+3.5),  0.0 * +3.5);
+        assert.equal((+2.5).__mul__(-3.5),  2.5 * -3.5);
+        assert.equal((+2.5).__mul__( 0.0),  2.5 *  0.0);
+        assert.equal((+2.5).__mul__(+3.5),  2.5 * +3.5);
+      });
+      it("__div__", function() {
+        assert.equal((-2.5).__div__(-3.5), -2.5 / -3.5);
+        assert.equal((-2.5).__div__( 0.0), -2.5 /  0.0);
+        assert.equal((-2.5).__div__(+3.5), -2.5 / +3.5);
+        assert.equal(( 0.0).__div__(-3.5),  0.0 / -3.5);
+        assert.equal(( 0.0).__div__( 0.0),  0.0); // avoid NaN
+        assert.equal(( 0.0).__div__(+3.5),  0.0 / +3.5);
+        assert.equal((+2.5).__div__(-3.5),  2.5 / -3.5);
+        assert.equal((+2.5).__div__( 0.0),  2.5 /  0.0);
+        assert.equal((+2.5).__div__(+3.5),  2.5 / +3.5);
+      });
+      it("__mod__", function() {
+        assert.equal((-2.5).__mod__(-3.5), -2.5 % -3.5);
+        assert.equal((-2.5).__mod__( 0.0),  0.0); // avoid NaN
+        assert.equal((-2.5).__mod__(+3.5), -2.5 % +3.5);
+        assert.equal(( 0.0).__mod__(-3.5),  0.0 % -3.5);
+        assert.equal(( 0.0).__mod__( 0.0),  0.0); // avoid NaN
+        assert.equal(( 0.0).__mod__(+3.5),  0.0 % +3.5);
+        assert.equal((+2.5).__mod__(-3.5),  2.5 % -3.5);
+        assert.equal((+2.5).__mod__( 0.0),  0.0); // avoid NaN
+        assert.equal((+2.5).__mod__(+3.5),  2.5 % +3.5);
+      });
+      it("__and__", function() {
+        assert.deepEqual((1).__and__(2), ["and", 1, 2]);
+      });
+      it("__or__", function() {
+        assert.deepEqual((1).__or__(2), ["or", 1, 2]);
       });
       it("eq", function() {
         assert.equal((-2.5).eq(-3.5), 0);
@@ -345,7 +421,7 @@ define(function(require, exports, module) {
         assert.equal((-42).lcm(  0),   0);
         assert.equal((-42).lcm(+24), 168);
         assert.equal((  0).lcm(-24),   0);
-        assert.equal((  0).lcm(  0),   0);
+        assert.equal((  0).lcm(  0),   0); // avoid NaN
         assert.equal((  0).lcm(+24),   0);
         assert.equal((+42).lcm(-24), 168);
         assert.equal((+42).lcm(  0),   0);
@@ -364,46 +440,46 @@ define(function(require, exports, module) {
       });
       it("round", function() {
         assert.closeTo((-31.4).round(-1.5), -31.5, 1e-6);
-        assert.closeTo((-31.4).round( 0.0), -31.4, 1e-6);
+        assert.closeTo((-31.4).round( 0.0), -31.4, 1e-6); // avoid NaN
         assert.closeTo((-31.4).round(+1.5), -31.5, 1e-6);
         assert.closeTo((  0.0).round(-1.5), - 0.0, 1e-6);
-        assert.closeTo((  0.0).round( 0.0),   0.0, 1e-6);
+        assert.closeTo((  0.0).round( 0.0),   0.0, 1e-6); // avoid NaN
         assert.closeTo((  0.0).round(+1.5),   0.0, 1e-6);
         assert.closeTo((+31.4).round(-1.5),  31.5, 1e-6);
-        assert.closeTo((+31.4).round( 0.0),  31.4, 1e-6);
+        assert.closeTo((+31.4).round( 0.0),  31.4, 1e-6); // avoid NaN
         assert.closeTo((+31.4).round(+1.5),  31.5, 1e-6);
       });
       it("roundUp", function() {
         assert.closeTo((-31.4).roundUp(-1.5), -31.5, 1e-6);
-        assert.closeTo((-31.4).roundUp( 0.0), -31.4, 1e-6);
+        assert.closeTo((-31.4).roundUp( 0.0), -31.4, 1e-6); // avoid NaN
         assert.closeTo((-31.4).roundUp(+1.5), -30.0, 1e-6);
         assert.closeTo((  0.0).roundUp(-1.5),   0.0, 1e-6);
-        assert.closeTo((  0.0).roundUp( 0.0),   0.0, 1e-6);
+        assert.closeTo((  0.0).roundUp( 0.0),   0.0, 1e-6); // avoid NaN
         assert.closeTo((  0.0).roundUp(+1.5),   0.0, 1e-6);
         assert.closeTo((+31.4).roundUp(-1.5),  30.0, 1e-6);
-        assert.closeTo((+31.4).roundUp( 0.0),  31.4, 1e-6);
+        assert.closeTo((+31.4).roundUp( 0.0),  31.4, 1e-6); // avoid NaN
         assert.closeTo((+31.4).roundUp(+1.5),  31.5, 1e-6);
       });
       it("roundDown", function() {
         assert.closeTo((-31.4).roundDown(-1.5), -30.0, 1e-6);
-        assert.closeTo((-31.4).roundDown( 0.0), -31.4, 1e-6);
+        assert.closeTo((-31.4).roundDown( 0.0), -31.4, 1e-6); // avoid NaN
         assert.closeTo((-31.4).roundDown(+1.5), -31.5, 1e-6);
         assert.closeTo((  0.0).roundDown(-1.5),   0.0, 1e-6);
-        assert.closeTo((  0.0).roundDown( 0.0),   0.0, 1e-6);
+        assert.closeTo((  0.0).roundDown( 0.0),   0.0, 1e-6); // avoid NaN
         assert.closeTo((  0.0).roundDown(+1.5),   0.0, 1e-6);
         assert.closeTo((+31.4).roundDown(-1.5),  31.5, 1e-6);
-        assert.closeTo((+31.4).roundDown( 0.0),  31.4, 1e-6);
+        assert.closeTo((+31.4).roundDown( 0.0),  31.4, 1e-6); // avoid NaN
         assert.closeTo((+31.4).roundDown(+1.5),  30.0, 1e-6);
       });
       it("trunc", function() {
         assert.closeTo((-31.4).trunc(-1.5), -30.0, 1e-6);
-        assert.closeTo((-31.4).trunc( 0.0), -31.4, 1e-6);
+        assert.closeTo((-31.4).trunc( 0.0), -31.4, 1e-6); // avoid NaN
         assert.closeTo((-31.4).trunc(+1.5), -31.5, 1e-6);
         assert.closeTo((  0.0).trunc(-1.5),   0.0, 1e-6);
-        assert.closeTo((  0.0).trunc( 0.0),   0.0, 1e-6);
+        assert.closeTo((  0.0).trunc( 0.0),   0.0, 1e-6); // avoid NaN
         assert.closeTo((  0.0).trunc(+1.5),   0.0, 1e-6);
         assert.closeTo((+31.4).trunc(-1.5),  31.5, 1e-6);
-        assert.closeTo((+31.4).trunc( 0.0),  31.4, 1e-6);
+        assert.closeTo((+31.4).trunc( 0.0),  31.4, 1e-6); // avoid NaN
         assert.closeTo((+31.4).trunc(+1.5),  30.0, 1e-6);
       });
       it("atan2", function() {
@@ -549,6 +625,17 @@ define(function(require, exports, module) {
         assert.closeTo((+31.4).sumsqr( 0.0), 985.96, 1e-6);
         assert.closeTo((+31.4).sumsqr(+1.5), 988.21, 1e-6);
       });
+      it("sqrsum", function() {
+        assert.closeTo((-31.4).sqrsum(-1.5), 1082.41, 1e-6);
+        assert.closeTo((-31.4).sqrsum( 0.0),  985.96, 1e-6);
+        assert.closeTo((-31.4).sqrsum(+1.5),  894.01, 1e-6);
+        assert.closeTo((  0.0).sqrsum(-1.5),    2.25, 1e-6);
+        assert.closeTo((  0.0).sqrsum( 0.0),    0.00, 1e-6);
+        assert.closeTo((  0.0).sqrsum(+1.5),    2.25, 1e-6);
+        assert.closeTo((+31.4).sqrsum(-1.5),  894.01, 1e-6);
+        assert.closeTo((+31.4).sqrsum( 0.0),  985.96, 1e-6);
+        assert.closeTo((+31.4).sqrsum(+1.5), 1082.41, 1e-6);
+      });
       it("sqrdif", function() {
         assert.closeTo((-31.4).sqrdif(-1.5),  894.01, 1e-6);
         assert.closeTo((-31.4).sqrdif( 0.0),  985.96, 1e-6);
@@ -636,6 +723,7 @@ define(function(require, exports, module) {
         assert.closeTo((+31.4).fold2(-1.5), -4.4, 1e-6);
         assert.closeTo((+31.4).fold2( 0.0), -0.0, 1e-6);
         assert.closeTo((+31.4).fold2(+1.5),  1.4, 1e-6);
+        assert.closeTo(( -2.0).fold2( 1.0),  0.0, 1e-6);
       });
       it("wrap2", function() {
         assert.closeTo((-31.4).wrap2(-1.5), -1.4, 1e-6);
@@ -647,6 +735,8 @@ define(function(require, exports, module) {
         assert.closeTo((+31.4).wrap2(-1.5),  1.4, 1e-6);
         assert.closeTo((+31.4).wrap2( 0.0), -0.0, 1e-6);
         assert.closeTo((+31.4).wrap2(+1.5),  1.4, 1e-6);
+        assert.closeTo((  2.0).wrap2( 1.0),  0.0, 1e-6);
+        assert.closeTo(( -2.0).wrap2( 1.0),  0.0, 1e-6);
       });
     });
     describe("others", function() {

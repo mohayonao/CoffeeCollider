@@ -3,10 +3,10 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
-  var extend  = require("../common/extend");
   var utils   = require("./utils");
+  var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
-
+  
   var nodes = {};
   
   var Node = (function() {
@@ -48,10 +48,9 @@ define(function(require, exports, module) {
     function Group(target, addAction) {
       Node.call(this);
       this.klassName = "Group";
-      if (target) {
+      if (target instanceof Node) {
         var that = this;
-        var timeline = cc.client.timeline;
-        timeline.push(function() {
+        cc.client.timeline.push(function() {
           cc.client.pushToTimeline([
             "/g_new", that.nodeId, addAction, target.nodeId
           ]);
@@ -67,47 +66,20 @@ define(function(require, exports, module) {
     function Synth(target, addAction, def, args) {
       Node.call(this);
       this.klassName = "Synth";
-      this.params = def.specs.params;
-      if (target) {
-        var that = this;
+      if (target instanceof Node && cc.instanceOfSynthDef(def)) {
+        this.params  = def.specs.params;
+        var nodeId   = this.nodeId;
         var timeline = cc.client.timeline;
         var controls = args2controls(args, this.params);
         timeline.push(function() {
           cc.client.pushToTimeline([
-            "/s_new", that.nodeId, addAction, target.nodeId, def._defId, controls
+            "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
           ]);
         });
       }
     }
     extend(Synth, Node);
-
-    var args2controls = function(args, params) {
-      var controls = [];
-      if (utils.isDict(args)) {
-        Object.keys(args).forEach(function(key) {
-          var value  = args[key];
-          var index  = params.names.indexOf(key);
-          if (index === -1) {
-            return;
-          }
-          index = params.indices[index];
-          var length = params.length[index];
-          if (Array.isArray(value)) {
-            value.forEach(function(value, i) {
-              if (i < length) {
-                if (typeof value === "number" && !isNaN(value)) {
-                  controls.push(index + i, value);
-                }
-              }
-            });
-          } else if (typeof value === "number" && !isNaN(value)) {
-            controls.push(index, value);
-          }
-        });
-      }
-      return controls;
-    };
-
+    
     Synth.prototype._set = function(args) {
       var controls = args2controls(args, this.params);
       if (controls.length) {
@@ -121,420 +93,108 @@ define(function(require, exports, module) {
     
     return Synth;
   })();
-
-  var SynthDef = (function() {
-    var defId = 0;
-    function SynthDef(func, args) {
-      this.klassName = "SynthDef";
-      this._defId = defId++;
-      var isVaridArgs = false;
-      if (args) {
-        if (/^[ a-zA-Z0-9_$,.=\-\[\]]+$/.test(args)) {
-          args = unpackArguments(args);
-          if (args) {
-            isVaridArgs = args.vals.every(function(item) {
-              if (typeof item === "number") {
-                return true;
-              } else if (Array.isArray(item)) {
-                return item.every(function(item) {
-                  return typeof item === "number";
-                });
-              }
-              if (item === undefined || item === null) {
-                return true;
-              }
-              return false;
-            });
-          }
-        }
-        if (!isVaridArgs) {
-          throw "UgenGraphFunc's arguments should be a constant number or an array that contains it.";
-        }
-      } else {
-        args = { keys:[], vals:[] };
-      }
-
-      var children = [];
-      cc.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      var params  = { names:[], indices:[], length:[], values:[] };
-      var flatten = [];
-      var i, imax, length;
-      for (i = 0, imax = args.vals.length; i < imax; ++i) {
-        length = Array.isArray(args.vals[i]) ? args.vals[i].length : 1;
-        params.names  .push(args.keys[i]);
-        params.indices.push(flatten.length);
-        params.length .push(length);
-        params.values = params.values.concat(args.vals[i]);
-        flatten = flatten.concat(args.vals[i]);
-      }
-      var reshaped = [];
-      var controls = cc.createControl(C.CONTROL).init(flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      var saved = controls.slice();
-      for (i = 0; i < imax; ++i) {
-        if (Array.isArray(args.vals[i])) {
-          reshaped.push(saved.splice(0, args.vals[i].length));
-        } else {
-          reshaped.push(saved.shift());
-        }
-      }
-      
-      try {
-        func.apply(null, reshaped);
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        cc.setSynthDef(null);
-      }
-      // console.log(children);
-      var consts = [];
-      children.forEach(function(x) {
-        if (x.inputs) {
-          x.inputs.forEach(function(_in) {
-            if (typeof _in === "number" && consts.indexOf(_in) === -1) {
-              consts.push(_in);
-            }
-          });
-        }
-      });
-      consts.sort();
-      var ugenlist = topoSort(children).filter(function(x) {
-        return !(typeof x === "number" || cc.instanceOfOutputProxy(x));
-      });
-      // console.log(ugenlist);
-      var defs = ugenlist.map(function(x) {
-        var inputs = [];
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            var index = ugenlist.indexOf((cc.instanceOfOutputProxy(x)) ? x.inputs[0] : x);
-            var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
-            inputs.push(index, subindex);
-          });
-        }
-        var outputs;
-        if (cc.instanceOfMultiOutUGen(x)) {
-          outputs = x.channels.map(function(x) {
-            return x.rate;
-          });
-        } else if (x.numOfOutputs === 1) {
-          outputs = [ x.rate ];
-        } else {
-          outputs = [];
-        }
-        return [ x.klassName, x.rate, x.specialIndex|0, inputs, outputs, x.tag ];
-      });
-      var specs = {
-        consts: consts,
-        defs  : defs,
-        params: params,
-      };
-      this.specs = specs;
-      // console.log(specs);
-      cc.client.pushToTimeline([
-        "/s_def", this._defId, JSON.stringify(specs)
-      ]);
-      return this;
-    }
-    
-    SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      if (arguments[i] instanceof Node) {
-        target = arguments[i++];
-      } else {
-        target = cc.client.rootNode;
-      }
-      if (utils.isDict(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      } else {
-        addAction = "addToHead";
-      }
-      if (args && arguments.length === 1) {
-        if (args.target instanceof Node) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
-      switch (addAction) {
-      case "addToHead":
-        return SynthInterface.head(target, this, args);
-      case "addToTail":
-        return SynthInterface.tail(target, this, args);
-      case "addBefore":
-        return SynthInterface.before(target, this, args);
-      case "addAfter":
-        return SynthInterface.after(target, this, args);
-      default:
-        return SynthInterface.head(target, this, args);
-      }
-    }).multiCall().build();
-
-    var topoSort = (function() {
-      var _topoSort = function(x, list, checked) {
-        checked.push(x);
-        var index = list.indexOf(x);
-        if (index !== -1) {
-          list.splice(index, 1);
-        }
-        list.unshift(x);
-        if (x.inputs) {
-          x.inputs.forEach(function(x) {
-            _topoSort(x, list, checked);
-          });
-        }
-      };
-      return function(list) {
-        var checked = [];
-        list.slice().forEach(function(x) {
-          if (cc.instanceOfOut(x)) {
-            checked.push(x);
-            x.inputs.forEach(function(x) {
-              _topoSort(x, list, checked);
-            });
-          }
-        });
-        list = list.filter(function(x) {
-          return checked.indexOf(x) !== -1;
-        });
-        return list;
-      };
-    })();
-    
-    var splitArguments = function(args) {
-      var result  = [];
-      var begin   = 0;
-      var bracket = 0;
-      var inStr   = null;
-      for (var i = 0, imax = args.length; i < imax; ++i) {
-        var c = args.charAt(i);
-        if (args.charAt(i-1) === "\\") {
-          if (args.charAt(i-2) !== "\\") {
-            continue;
-          }
-        }
-        if (c === "\"" || c === "'") {
-          if (inStr === null) {
-            inStr = c;
-          } else if (inStr === c) {
-            inStr = null;
-          }
-        }
-        if (inStr) {
-          continue;
-        }
-        switch (c) {
-        case ",":
-          if (bracket === 0) {
-            result.push(args.slice(begin, i).trim());
-            begin = i + 1;
-          }
-          break;
-        case "[":
-          bracket += 1;
-          break;
-        case "]":
-          bracket -= 1;
-          break;
-        }
-      }
-      if (begin !== i) {
-        result.push(args.slice(begin, i).trim());
-      }
-      return result;
-    };
-    
-    var unpackArguments = function(args) {
-      var keys = [];
-      var vals = [];
-      if (args) {
-        try {
-          splitArguments(args).forEach(function(items) {
-            var i = items.indexOf("=");
-            var k, v;
-            if (i === -1) {
-              k = items;
-              v = undefined;
-            } else {
-              k = items.substr(0, i).trim();
-              v = JSON.parse(items.substr(i + 1));
-            }
-            keys.push(k);
-            vals.push(v);
-          });
-        } catch (e) {
+  
+  
+  var args2controls = function(args, params) {
+    var controls = [];
+    if (utils.isDict(args) && params) {
+      Object.keys(args).forEach(function(key) {
+        var value  = args[key];
+        var index  = params.names.indexOf(key);
+        if (index === -1) {
           return;
         }
-      }
-      return { keys:keys, vals:vals };
-    };
-    
-    return SynthDef;
-  })();
-
-  var GroupInterface = function() {
+        index = params.indices[index];
+        var length = params.length[index];
+        if (Array.isArray(value)) {
+          value.forEach(function(value, i) {
+            if (i < length) {
+              if (typeof value === "number" && !isNaN(value)) {
+                controls.push(index + i, value);
+              }
+            }
+          });
+        } else if (typeof value === "number" && !isNaN(value)) {
+          controls.push(index, value);
+        }
+      });
+    }
+    return controls;
+  };
+  
+  var sortArgs = function(list) {
+    var node, def, args;
+    if (cc.instanceOfSynthDef(list[0])) {
+      node = cc.client.rootNode;
+      def  = list[0];
+      args = list[1] || {};
+    } else if (cc.instanceOfSynthDef(list[1])) {
+      node = list[0];
+      def  = list[1];
+      args = list[2] || {};
+    } else {
+      node = cc.client.rootNode;
+      def  = null;
+      args = {};
+    }
+    return [node, def, args];
+  };
+  
+  var GroupInterface = cc.global.Group = function() {
     return new Group();
   };
   GroupInterface.after = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.after: arguments[0] is not a Node.");
-    }
-    return new Group(node, C.ADD_AFTER);
+    return new Group(node || cc.client.rootNode, C.ADD_AFTER);
   };
   GroupInterface.before = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.before: arguments[0] is not a Node.");
-    }
-    return new Group(node, C.ADD_BEFORE);
+    return new Group(node || cc.client.rootNode, C.ADD_BEFORE);
   };
   GroupInterface.head = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.head: arguments[0] is not a Group.");
-    }
-    return new Group(node, C.ADD_TO_HEAD);
+    return new Group(node || cc.client.rootNode, C.ADD_TO_HEAD);
   };
   GroupInterface.tail = function(node) {
-    node = node || cc.client.rootNode;
-    if (!(node instanceof Group)) {
-      throw new TypeError("Group.tail: arguments[0] is not a Group.");
-    }
-    return new Group(node, C.ADD_TO_TAIL);
+    return new Group(node || cc.client.rootNode, C.ADD_TO_TAIL);
   };
   GroupInterface.replace = function(node) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Group.replace: arguments[0] is not a Node.");
-    }
     return new Group(node, C.REPLACE);
   };
   
-  var SynthInterface = function() {
+  var SynthInterface = cc.global.Synth = function() {
     return new Synth();
   };
   SynthInterface.def = function(func, args) {
-    if (typeof func !== "function") {
-      throw new TypeError("Synth.def: arguments[0] is not a Function.");
-    }
-    return new SynthDef(func, args);
+    return cc.createSynthDef(func, args);
   };
   SynthInterface.after = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.after: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.after: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, C.ADD_AFTER, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], C.ADD_AFTER, list[1], list[2]);
   };
   SynthInterface.before = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.before: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.before: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, C.ADD_BEFORE, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], C.ADD_BEFORE, list[1], list[2]);
   };
   SynthInterface.head = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.head: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.head: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, C.ADD_TO_HEAD, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], C.ADD_TO_HEAD, list[1], list[2]);
   };
   SynthInterface.tail = function() {
-    var node, def, args;
-    if (arguments[0] instanceof SynthDef) {
-      node = cc.client.rootNode;
-      def  = arguments[0];
-      args = arguments[1] || {};
-    } else if (arguments[1] instanceof SynthDef) {
-      node = arguments[0];
-      def  = arguments[1];
-      args = arguments[2] || {};
-    }
-    if (!(node instanceof Group)) {
-      throw new TypeError("Synth.tail: arguments[0] is not a Group.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.tail: arguments[1] is not a SynthDef.");
-    }
-    return new Synth(node, C.ADD_TO_TAIL, def, args);
+    var list = sortArgs(arguments);
+    return new Synth(list[0], C.ADD_TO_TAIL, list[1], list[2]);
   };
   SynthInterface.replace = function(node, def, args) {
-    if (!(node instanceof Node)) {
-      throw new TypeError("Synth.replace: arguments[0] is not a Node.");
-    }
-    if (!(def instanceof SynthDef)) {
-      throw new TypeError("Synth.replace: arguments[1] is not a SynthDef.");
-    }
     return new Synth(node, C.REPLACE, def, args);
   };
   
-  var reset = function() {
-    nodes = {};
-  };
-
-  var get = function(nodeId) {
-    return nodes[nodeId];
-  };
-  
-  cc.global.Group = GroupInterface;
-  cc.global.Synth = SynthInterface;
   
   module.exports = {
     Node : Node,
     Group: Group,
     Synth: Synth,
+
+    // private methods
+    args2controls : args2controls,
     
     use: function() {
-      require("./ugen/ugen").use();
-
       cc.createNode = function() {
         return new Node();
       };
@@ -553,8 +213,12 @@ define(function(require, exports, module) {
       cc.instanceOfSynth = function(obj) {
         return obj instanceof Synth;
       };
-      cc.getNode   = get;
-      cc.resetNode = reset;
+      cc.getNode   = function(nodeId) {
+        return nodes[nodeId];
+      };
+      cc.resetNode = function() {
+        nodes = {};
+      };
     }
   };
 

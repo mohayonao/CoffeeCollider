@@ -11,6 +11,7 @@ define(function(require, exports, module) {
     describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {
+        scale.use();
         et12 = cc.global.Tuning.et12;
         just = cc.global.Tuning.just;
       });

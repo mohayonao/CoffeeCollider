@@ -33,6 +33,28 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
+
+    UGen.prototype.__plus__ = function() {
+      return this;
+    };
+    UGen.prototype.__minus__ = function() {
+      return this.neg();
+    };
+    fn.setupBinaryOp(UGen, "__add__", function(b) {
+      return cc.createBinaryOpUGen("+", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__sub__", function(b) {
+      return cc.createBinaryOpUGen("-", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__mul__", function(b) {
+      return cc.createBinaryOpUGen("*", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__div__", function(b) {
+      return cc.createBinaryOpUGen("/", this, b);
+    });
+    fn.setupBinaryOp(UGen, "__mod__", function(b) {
+      return cc.createBinaryOpUGen("%", this, b);
+    });
     
     UGen.prototype.madd = fn(function(mul, add) {
       return cc.createMulAdd(this, mul, add);
@@ -68,9 +90,9 @@ define(function(require, exports, module) {
     
     ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        UGen.prototype[selector] = function(b) {
+        fn.setupBinaryOp(UGen, selector, function(b) {
           return cc.createBinaryOpUGen(selector, this, b);
-        };
+        });
       }
     });
     
@@ -191,13 +213,25 @@ define(function(require, exports, module) {
         addToSynthDef = func;
       };
       
+      require("./uop").use();
+      require("./bop").use();
+      require("./madd").use();
+      require("./inout").use();
+      
       // redefinition for tests
       cc.UGen = UGen;
       cc.MultiOutUGen = MultiOutUGen;
       cc.registerUGen = registerUGen;
     },
     install: function() {
-      require("./installer").install();
+      require("./bufio");
+      require("./delay");
+      require("./inout");
+      require("./line");
+      require("./osc");
+      require("./pan");
+      require("./ui");
+      
       Object.keys(specs).forEach(function(name) {
         registerUGen(name, specs[name]);
       });

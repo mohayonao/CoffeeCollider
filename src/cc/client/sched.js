@@ -41,12 +41,10 @@ define(function(require, exports, module) {
       this._stack[this._stack.length - 1].push(that, func, args);
     };
     Timeline.prototype.process = function() {
-      var counterIncr = this.counterIncr;
-      if (counterIncr) {
-        var _list = this._list;
-        for (var i = 0; i < _list.length; ++i) {
-          _list[i].process(counterIncr);
-        }
+      var counterIncr = this.counterIncr || 1;
+      var _list = this._list;
+      for (var i = 0; i < _list.length; ++i) {
+        _list[i].process(counterIncr);
       }
     };
     

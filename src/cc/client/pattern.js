@@ -42,7 +42,7 @@ define(function(require, exports, module) {
     };
 
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function() {
           return new PUnaryOp(this, selector);
         };
@@ -50,7 +50,7 @@ define(function(require, exports, module) {
     });
     
     ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function(b) {
           return new PBinaryOp(this, selector, b);
         };

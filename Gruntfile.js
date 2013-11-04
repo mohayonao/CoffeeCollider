@@ -165,7 +165,8 @@ module.exports = function(grunt) {
   });
 
   grunt.registerTask("dryice", function() {
-    if (isDebugging()) {
+    var arg0 = arguments[0];
+    if (arg0 !== "force" && isDebugging()) {
       grunt.fail.warn("NOT built with debug mode.");
       return;
     }
@@ -360,6 +361,8 @@ module.exports = function(grunt) {
   });
   
   grunt.registerTask("coverage", function() {
+    var arg0 = arguments[0];
+    
     var istanbul = require("istanbul");
     var Instrumenter = istanbul.Instrumenter;
     var Collector    = istanbul.Collector;
@@ -373,15 +376,25 @@ module.exports = function(grunt) {
     var transformer = instrumenter.instrumentSync.bind(instrumenter);
     
     var tstFiles = [];
-    var covFiles = [];
-    grunt.file.expand("src/cc/**/*.*").forEach(function(file) {
-      var filepath = path.resolve(file);
-      if (/_test\.js$/.test(filepath)) {
-        tstFiles.push(filepath);
-      } else {
-        covFiles[filepath] = true;
-      }
-    });
+    var covFiles = {};
+    
+    if (arg0) {
+      grunt.file.expand("src/cc/**/*_test.js").forEach(function(file) {
+        if (file.indexOf(arg0) !== -1) {
+          tstFiles.push(file);
+          covFiles[path.resolve(file.replace(/_test\.js$/, ".js"))] = true;
+        }
+      });
+    } else {
+      grunt.file.expand("src/cc/**/*.*").forEach(function(file) {
+        var filepath = path.resolve(file);
+        if (/_test\.js$/.test(filepath)) {
+          tstFiles.push(filepath);
+        } else {
+          covFiles[filepath] = true;
+        }
+      });
+    }
     var matchFn = function(filepath) {
       return covFiles[filepath];
     };
@@ -392,7 +405,7 @@ module.exports = function(grunt) {
     var done = this.async();
     doMochaTest("nyan", tstFiles, function() {
       var reports = [];
-      reports.push(Report.create("text-summary"));
+      reports.push(Report.create("text"));
       reports.push(Report.create("lcov", { dir:"coverage" }));
       
       var cov = global[coverageVar];
@@ -428,9 +441,10 @@ module.exports = function(grunt) {
     });
   };
   
-  grunt.registerTask("check"    , ["typo", "jshint", "test"]);
-  grunt.registerTask("build"    , ["typo", "jshint", "test", "dryice"]);
+  grunt.registerTask("check", ["typo", "jshint", "test"]);
+  grunt.registerTask("build", ["typo", "jshint", "test", "dryice"]);
   grunt.registerTask("build:all", ["build", "uglify", "compress"]);
+  grunt.registerTask("build:force", ["dryice:force"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 

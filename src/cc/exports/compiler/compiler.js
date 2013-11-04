@@ -10,6 +10,7 @@ define(function(require, exports, module) {
       if (lang === "coffee") {
         return cc.createCoffeeCompiler();
       }
+      throw new TypeError("Compiler: '" + lang + "' not supported");
     };
   };
   

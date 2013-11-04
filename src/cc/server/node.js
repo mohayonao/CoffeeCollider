@@ -346,7 +346,7 @@ define(function(require, exports, module) {
       var fixNumList = specs.consts.map(function(value) {
         return instance.getFixNum(value);
       });
-      var unitList = specs.defs.map(function(spec) {
+      var unitList = specs.defList.map(function(spec) {
         return new Unit(this, spec);
       }, this);
       this.params   = specs.params;

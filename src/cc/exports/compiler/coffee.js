@@ -1,17 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
+
+  var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
   
   var cc = require("../../cc");
-  
-  var CoffeeScript = (function() {
-    if (global.CoffeeScript) {
-      return global.CoffeeScript;
-    }
-    return global.require("coffee-script");
-  })();
-
   var timevalue = require("../../common/timevalue").calc;
-
+  
   // CoffeeScript tags
   // IDENTIFIER
   // NUMBER
@@ -49,169 +43,157 @@ define(function(require, exports, module) {
   // OUTDENT
   // RETURN
   // TERMINATOR
+  // HERECOMMENT
 
   var TAG   = 0;
   var VALUE = 1;
   var _     = {}; // empty location
-  
-  var dumpTokens = function(tokens) {
-    var indent = 0;
-    console.log(tokens.map(function(t) {
-      switch (t[0]) {
-      case "OUTDENT": case "CALL_END": case "PARAM_END": case "}": case "]": case ")":
-        indent -= 1;
-        break;
-      }
-      var x = tab(indent) + t[0] + "\t" + t[1];
-      switch (t[0]) {
-      case "(": case "[": case "{": case "PARAM_START": case "CALL_START": case "INDENT":
-        indent += 1;
-        break;
-      }
-      return x;
-    }).join("\n"));
-  };
-  
-  var tab = function(n) {
-    var t = "";
-    while (n--) {
-      t += "  ";
-    }
-    return t;
-  };
 
-  var findOperandHead = function(tokens, index) {
+  var sortPlusMinusOperator = function(tokens) {
+    if (tokens._sorted) {
+      return tokens;
+    }
+    var prevTag = "";
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var tag = tokens[i][TAG];
+      if (tag === "+" || tag === "-") {
+        switch (prevTag) {
+        case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
+        case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
+          tokens[i][TAG] = "MATH";
+          break;
+        default:
+          tokens[i][TAG] = "UNARY";
+        }
+      }
+      prevTag = tag;
+    }
+    tokens._sorted = true;
+    return tokens;
+  };
+  
+  var revertPlusMinusOperator = function(tokens) {
+    if (!tokens._sorted) {
+      for (var i = 0, imax = tokens.length; i < imax; ++i) {
+        var val = tokens[i][VALUE];
+        if (val === "+" || val === "-") {
+          tokens[i][TAG] = val;
+        }
+      }
+      return tokens;
+    }
+    delete tokens._sorted;
+    return tokens;
+  };
+  
+  var getPrevOperand = function(tokens, index) {
+    tokens = sortPlusMinusOperator(tokens);
+    
     var bracket = 0;
     var indent  = 0;
-    while (0 < index) {
-      var token = tokens[index - 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "PARAM_START":
-          return index;
-        case "CALL_START":
-          bracket -= 1;
-          break;
-        case "(": case "[": case "{":
-          bracket -= 1;
-          /* falls through */
-        case "IDENTIFIER":
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            token = tokens[index - 1];
-            if (token) {
-              if (token[TAG] === "UNARY") {
-                return index - 1;
-              }
-              if (token[VALUE] === "+" || token[VALUE] === "-") {
-                token = tokens[index - 2];
-                if (!token) {
-                  return index - 1;
-                }
-                switch (token[TAG]) {
-                case "INDENT": case "TERMINATOR": case "CALL_START":
-                case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-                case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-                case "[": case "(": case "{": case ",": case "?":
-                  return index - 1;
-                }
-              }
-            }
-            return index;
+    var end = indent;
+    while (1 < index) {
+      switch (tokens[index - 1][TAG]) {
+      case "PARAM_END": case "CALL_END":
+        bracket += 1;
+        /* falls through */
+      case ".": case "@":
+        index -= 1;
+        continue;
+      }
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{": case "PARAM_START":
+        bracket -= 1;
+        /* falls through */
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
+      case "->":
+        if (bracket === 0 && indent === 0) {
+          var prev;
+          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
+            index -= 1;
           }
-          break;
-        case "}": case "]": case ")": case "PARAM_END": case "CALL_END":
-          bracket += 1;
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          indent -= 1;
-          break;
+          return {tokens:tokens, begin:index, end:end};
         }
+        break;
+      case "CALL_START":
+        bracket -= 1;
+        break;
+      case "}": case "]": case ")":
+        bracket += 1;
+        break;
+      case "OUTDENT":
+        indent += 1;
+        break;
+      case "INDENT":
+        indent -= 1;
+        break;
       }
       index -= 1;
     }
-    return 0;
+    return {tokens:tokens, begin:0, end:end};
   };
+  
+  var getNextOperand = function(tokens, index) {
+    tokens = sortPlusMinusOperator(tokens);
+    var bracket = 0;
+    var indent  = 0;
+    var begin = index;
+    var imax = tokens.length - 2;
 
-  var findOperandTail = function(tokens, index) {
-    var bracket  = 0;
-    var indent   = 0;
-    var inParams = false;
-    while (index < tokens.length) {
-      var token = tokens[index];
-      if (inParams) {
-        inParams = token[TAG] !== "PARAM_END";
-        index += 1;
-        continue;
+    if (tokens[index] && tokens[index][TAG] === "@") {
+      if (tokens[index+1][TAG] !== "IDENTIFIER") {
+        return {tokens:tokens, begin:index, end:index};
       }
-      switch (token[TAG]) {
+    }
+    
+    while (index < imax) {
+      var tag = tokens[index][TAG];
+      
+      switch (tag) {
+      case "(": case "[": case "{": case "PARAM_START":
+        bracket += 1;
+        break;
       case "}": case "]": case ")": case "CALL_END":
         bracket -= 1;
         break;
-      case "OUTDENT":
-        indent -= 1;
-        break;
-      case "PARAM_START":
-        inParams = true;
+      }
+      
+      switch (tokens[index + 1][TAG]) {
+      case "CALL_START":
+        bracket += 1;
+        index += 1;
+        continue;
+      case ".": case "@":
         index += 1;
         continue;
       }
-      token = tokens[index + 1];
-      if (!token || token[TAG] !== ".") {
-        token = tokens[index];
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          if (indent === 0) {
-            return index - 1;
-          }
-          break;
-        case "IDENTIFIER":
-          token = tokens[index + 1];
-          if (token && token[TAG] === "CALL_START") {
-            bracket += 1;
-            break;
-          }
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "(": case "[": case "{":
-          bracket += 1;
-          break;
-        case "}": case "]": case ")": case "CALL_END":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
-        case "INDENT":
-          indent += 1;
-          break;
-        case "OUTDENT":
-          if (indent === 0 && bracket === 0) {
-            return index;
-          }
-          break;
+      
+      switch (tag) {
+      case "}": case "]": case ")": case "CALL_END":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "OUTDENT":
+        if (tag === "OUTDENT") {
+          indent -= 1;
         }
+        if (bracket === 0 && indent === 0) {
+          return {tokens:tokens, begin:begin, end:index};
+        }
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
       }
       index += 1;
     }
-    return tokens.length - 1;
+    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
   };
-
-  var replaceTimeValue = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  
+  var replaceFixedTimeValue = function(tokens) {
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
       var token = tokens[i];
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
         var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
@@ -220,292 +202,227 @@ define(function(require, exports, module) {
           token[VALUE] = time.toString();
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replacePrecedence = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  var replaceStrictlyPrecedence = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i > 0; i--) {
       var token = tokens[i];
-      if (token[TAG] === "MATH") {
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens.splice(b, 0, [")", ")" , _]);
-        tokens.splice(a, 0, ["(", "(" , _]);
+      if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+        tokens.splice(next.end + 1, 0, [")", ")" , _]);
+        tokens.splice(prev.begin  , 0, ["(", "(" , _]);
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
-
-  var replaceUnaryOpTable = {
+  
+  var unaryOperatorDict = {
     "+": "__plus__", "-": "__minus__"
   };
-
-  var replaceUnaryOp = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+  var replaceUnaryOperator = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
-      if (replaceUnaryOpTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceUnaryOpTable[token[VALUE]];
-        token = tokens[i - 1] || { 0:"TERMINATOR" };
-        switch (token[TAG]) {
-        case "INDENT": case "TERMINATOR": case "CALL_START":
-        case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-        case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-        case "[": case "(": case "{": case ",": case "?": case "+": case "-": case ":":
-          var a = findOperandTail(tokens, i);
-          tokens.splice(a+1, 0, ["."         , "."     , _]);
-          tokens.splice(a+2, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(a+3, 0, ["CALL_START", "("     , _]);
-          tokens.splice(a+4, 0, ["CALL_END"  , ")"     , _]);
-          tokens.splice(i, 1);
-        }
+      if (token[TAG] === "UNARY" && unaryOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = unaryOperatorDict[token[VALUE]];
+        var next = getNextOperand(tokens, i);
+        tokens.splice(next.end+1, 0, ["."         , "."     , _]);
+        tokens.splice(next.end+2, 0, ["IDENTIFIER", selector, _]);
+        tokens.splice(next.end+3, 0, ["CALL_START", "("     , _]);
+        tokens.splice(next.end+4, 0, ["CALL_END"  , ")"     , _]);
+        tokens.splice(i, 1);
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replaceBinaryOpTable = {
+  var binaryOperatorDict = {
     "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
   };
-  
-  var replaceBinaryOp = function(tokens) {
-    var i = 0;
-    var replaceable = false;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (replaceable) {
-        if (replaceBinaryOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceBinaryOpTable[token[VALUE]];
-          var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."         , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER", selector, _]);
-          tokens.splice(i  , 0, ["CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["CALL_END"  , ")"     , _]);
-          replaceable = false;
-          continue;
-        }
-      }
-      switch (token[TAG]) {
-      case "INDENT": case "TERMINATOR": case "CALL_START":
-      case "COMPOUND_ASSIGN": case "UNARY": case "LOGIC":
-      case "SHIFT": case "COMPARE": case "=": case "..": case "...":
-      case "[": case "(": case "{": case ",": case "?":
-        replaceable = false;
-        break;
-      default:
-        replaceable = true;
-      }
-      i += 1;
-    }
-    // dumpTokens(tokens);
-    return tokens;
+  var binaryOperatorAdverbs = {
+    W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
+    WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
   };
-
-  var replaceLogicOpTable = {
-    "&&": "__and__", "||": "__or__"
-  };
-  
-  var replaceLogicOp = function(tokens) {
-    var i = 1;
-    var replaceable = false;
-    var bracket = 0;
-    while (i < tokens.length) {
-      var token = tokens[i];
-      if (replaceable && bracket === 1) {
-        if (replaceLogicOpTable.hasOwnProperty(token[VALUE])) {
-          var selector = replaceLogicOpTable[token[VALUE]];
-          var b = findOperandTail(tokens, i) + 1;
-          tokens.splice(i++, 1, ["."          , "."     , _]);
-          tokens.splice(i++, 0, ["IDENTIFIER" , selector, _]);
-          tokens.splice(i++, 0, ["!CALL_START", "("     , _]);
-          tokens.splice(b+2, 0, ["!CALL_END"  , ")"     , _]);
-          continue;
-        }
+  var checkAdvarb = function(tokens, index) {
+    var t0 = tokens[index  ];
+    var t1 = tokens[index-1];
+    var t2 = tokens[index-2];
+    if (t0 && t1 && t2) {
+      if (t0[VALUE] === t2[VALUE] && binaryOperatorAdverbs.hasOwnProperty(t1[VALUE])) {
+        return binaryOperatorAdverbs[t1[VALUE]];
       }
-      switch (token[TAG]) {
-      case "IDENTIFIER":
-        if (tokens[i-1][TAG] === "@" && token[VALUE] === "wait") {
-          replaceable = true;
-          bracket = 0;
-        }
-        break;
-      case "INDENT": case "TERMINATOR":
-        if (replaceable && bracket === 0) {
-          replaceable = false;
-        }
-        break;
-      case "{": case "PARAM_START": case "CALL_START":
-        if (replaceable) {
-          bracket += 1;
-        }
-        break;
-      case "CALL_END": case "PARAM_END": case "}":
-        if (replaceable) {
-          bracket -= 1;
-        }
-        break;
-      }
-      i += 1;
     }
-    tokens.forEach(function(items) {
-      if (items[TAG].charAt(0) === "!") {
-        items[TAG] = items[TAG].substr(1);
+  };
+  var replaceBinaryOperator = function(tokens) {
+    tokens = sortPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH" && binaryOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = binaryOperatorDict[token[VALUE]];
+        var adverb   = checkAdvarb(tokens, i);
+        var next = getNextOperand(tokens, i);
+        if (adverb) {
+          i -= 2;
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 1, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 1, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+1, 0, [","         , ","   , _]);
+          tokens.splice(next.end+2, 0, ["IDENTIFIER", adverb, _]);
+          tokens.splice(next.end+3, 0, ["CALL_END"  , ")"   , _]);
+        } else {
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+3, 0, ["CALL_END", ")", _]);
+        }
       }
-    });
-    // dumpTokens(tokens);
+    }
     return tokens;
   };
   
-  var replaceCompoundAssignTable = {
+  var compoundAssignOperatorDict = {
     "+=": "__add__",
     "-=": "__sub__",
     "*=": "__mul__",
     "/=": "__div__",
     "%=": "__mod__",
   };
-  
   var replaceCompoundAssign = function(tokens) {
-    var i = tokens.length - 1;
-    while (0 <= i) {
+    for (var i = tokens.length; --i > 0; ) {
       var token = tokens[i];
-      if (replaceCompoundAssignTable.hasOwnProperty(token[VALUE])) {
-        var selector = replaceCompoundAssignTable[token[VALUE]];
-        var a = findOperandHead(tokens, i);
-        var b = findOperandTail(tokens, i) + 1;
-        tokens[i] = ["=", "=", _];
+      if (compoundAssignOperatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = compoundAssignOperatorDict[token[VALUE]];
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+        tokens.splice(i  , 1, ["="         , "="     , _]);
         tokens.splice(i+1, 0, ["."         , "."     , _]);
         tokens.splice(i+2, 0, ["IDENTIFIER", selector, _]);
         tokens.splice(i+3, 0, ["CALL_START", "("     , _]);
-        tokens.splice(b+3, 0, ["CALL_END"  , ")"     , _]);
-        for (var j = a; j < i; j++) {
+        tokens.splice(next.end+4, 0, ["CALL_END", ")", _]);
+        for (var j = prev.begin; j < i; ++j) {
           tokens.splice(i+1, 0, tokens[j]);
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var replaceSynthDef = (function() {
-    var getParams = function(tokens, index) {
-      var begin = -1, end = -1;
-      for (var i = index + 1; i < tokens.length; ++i) {
-        if (tokens[i][TAG] === "PARAM_START") {
-          begin = i;
-        } else if (tokens[i][TAG] === "PARAM_END") {
-          end = i;
-          break;
-        }
-      }
-      var replace = "";
-      if (begin !== -1) {
-        replace = tokens.slice(begin+1, end).map(function(t) {
-          return t[VALUE];
-        }).join("").replace(/"/g, "'");
-      }
-      replace = "\"" + replace + "\"";
-      return { begin:begin, end:end, replace:replace };
-    };
-    return function(tokens) {
-      var i = tokens.length - 1;
-      while (0 <= i) {
-        if (tokens[i - 2] && tokens[i - 2][VALUE] === "Synth") {
-          if (tokens[i - 1][TAG] === ".") {
-            var token = tokens[i];
-            if (token[VALUE] === "def") {
-              token = tokens[i + 1];
-              if (token[TAG] === "CALL_START") {
-                var a = findOperandTail(tokens, i + 2);
-                var params = getParams(tokens, i + 1);
-                tokens.splice(++a, 0, [","     , ","           , _]);
-                tokens.splice(++a, 0, ["STRING", params.replace, _]);
-              }
-            }
-          }
-        }
-        i -= 1;
-      }
-      // dumpTokens(tokens);
-      return tokens;
-    };
-  })();
-
-  var replaceGlobal = function(tokens) {
-    var i = tokens.length - 2;
-    while (i >= 0) {
+  var logicOperatorDict = {
+    "&&": "__and__", "||": "__or__"
+  };
+  var replaceLogicOperator = function(tokens) {
+    var replaceable = false;
+    for (var i = 1; i < tokens.length; ++i) {
       var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER") {
-        if ((i === 0 || tokens[i-1][TAG] !== ".") && cc.global.hasOwnProperty(token[VALUE])) {
-          if (token[VALUE] !== "CoffeeCollider" && token[VALUE] !== "SocketSynthServer") {
-            tokens.splice(i  , 1, ["IDENTIFIER", "cc"        , _]);
-            tokens.splice(i+1, 0, ["."         , "."         , _]);
-            tokens.splice(i+2, 0, ["IDENTIFIER", token[VALUE], _]);
-          }
-        }
-        if (token[VALUE].charAt(0) === "$") {
-          var name = token[VALUE];
-          if (!/\d/.test(name.charAt(1))) {
-            name = name.substr(1);
-          }
-          if (name !== "") {
-            token = tokens[i - 1];
-            if (!token || token[TAG] !== ".") {
-              tokens.splice(i  , 1, ["IDENTIFIER", "global", _]);
-              tokens.splice(i+1, 0, ["."         , "."     , _]);
-              tokens.splice(i+2, 0, ["IDENTIFIER", name    , _]);
-            }
-          }
+      if (token[VALUE] === "wait" && tokens[i-1][TAG] === "@") {
+        replaceable = true;
+        continue;
+      }
+      if (token[TAG] === ",") {
+        replaceable = false;
+        continue;
+      }
+      if (replaceable) {
+        if (token[TAG] === "LOGIC" && logicOperatorDict.hasOwnProperty(token[VALUE])) {
+          var selector = logicOperatorDict[token[VALUE]];
+          var next = getNextOperand(tokens, i);
+          tokens.splice(i  , 1, ["."         , "."     , _]);
+          tokens.splice(i+1, 0, ["IDENTIFIER", selector, _]);
+          tokens.splice(i+2, 0, ["CALL_START", "("     , _]);
+          tokens.splice(next.end+3, 0, ["CALL_END", ")", _]);
+          i = next.end+3; // skip
         }
       }
-      i -= 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var cleanupParenthesis = function(tokens) {
-    var i = 0;
-    var bracket = 0;
-    while (i < tokens.length) {
+  var formatArgument = function(op) {
+    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
+        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
+      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
+        return "\"" + token[VALUE] + "\"";
+      }
+      return token[VALUE];
+    }).join("");
+  };
+  var getSynthDefArguments = function(tokens, index) {
+    if (tokens[index++][TAG] !== "PARAM_START") {
+      return [];
+    }
+    var args = [];
+    while (index < tokens.length) {
+      if (tokens[index][TAG] === "PARAM_END") {
+        break;
+      }
+      if (tokens[index][TAG] === "IDENTIFIER") {
+        args.push(tokens[index][VALUE]);
+        if (tokens[index+1][TAG] !== "=") {
+          args.push(0);
+        } else {
+          var next = getNextOperand(tokens, index+2);
+          args.push(formatArgument(next));
+          tokens.splice(index+1, next.end-next.begin+2);
+        }
+      }
+      index += 1;
+    }
+    return args;
+  };
+  
+  var replaceSynthDefinition = function(tokens) {
+    for (var i = tokens.length - 1; --i >= 2; ) {
       var token = tokens[i];
-      if (token[TAG] === "(") {
-        token = tokens[i + 1];
-        if (token && token[TAG] === "(") {
-          bracket = 2;
-          for (var j = i + 2; j < tokens.length; j++) {
-            token = tokens[j][TAG];
-            if (token === "(") {
-              bracket += 1;
-            } if (token === ")") {
-              bracket -= 1;
-              if (bracket === 0) {
-                if (tokens[j - 1][TAG] === ")") {
-                  tokens.splice(j, 1);
-                  tokens.splice(i, 1);
-                  i -= 1;
-                }
-                break;
-              }
-            }
+      if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def" && tokens[i-1][TAG] === "." &&
+          tokens[i-2][TAG] === "IDENTIFIER" && tokens[i-2][VALUE] === "Synth" && tokens[i+1][TAG] === "CALL_START") {
+        var args = getSynthDefArguments(tokens, i+2);
+        var next = getNextOperand(tokens, i+2);
+        tokens.splice(next.end+1, 0, [",", ",", _]);
+        tokens.splice(next.end+2, 0, ["[", "[", _]);
+        tokens.splice(next.end+3, 0, ["]", "]", _]);
+        for (var j = args.length; j--; ) {
+          tokens.splice(next.end+3, 0, ["STRING", "'" + args[j] + "'", _]);
+          if (j) {
+            tokens.splice(next.end+3, 0, [",", ",", _]);
           }
         }
       }
-      i += 1;
     }
-    // dumpTokens(tokens);
     return tokens;
   };
-
-  var insertReturn = function(tokens) {
+  
+  var replaceGlobalVariants = function(tokens) {
+    for (var i = tokens.length - 1; i--; ) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (cc.global.hasOwnProperty(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue; // { NotGlobal:"dict key is not global" }
+        }
+        if (i > 0) {
+          if (tokens[i-1][TAG] === "." || tokens[i-1][TAG] === "@") {
+            continue; // this.is.NotGlobal, @isNotGlobal
+          }
+        }
+        tokens.splice(i  , 0, ["IDENTIFIER", "cc", _]);
+        tokens.splice(i+1, 0, ["."         , "." , _]);
+      } else if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
+      }
+    }
+    return tokens;
+  };
+  
+  var finalize = function(tokens) {
     tokens.splice(0, 0, ["("          , "("        , _]);
     tokens.splice(1, 0, ["PARAM_START", "("        , _]);
     tokens.splice(2, 0, ["IDENTIFIER" , "global"   , _]);
@@ -514,6 +431,7 @@ define(function(require, exports, module) {
     tokens.splice(5, 0, ["PARAM_END"  , ")"        , _]);
     tokens.splice(6, 0, ["->"         , "->"       , _]);
     tokens.splice(7, 0, ["INDENT"     , 2          , _]);
+    
     var i = tokens.length - 1;
     tokens.splice(i++, 0, ["OUTDENT"   , 2            , _]);
     tokens.splice(i++, 0, [")"         , ")"          , _]);
@@ -530,14 +448,13 @@ define(function(require, exports, module) {
     tokens.splice(i++, 0, ["LOGIC"     , "||"         , _]);
     tokens.splice(i++, 0, ["IDENTIFIER", "global"     , _]);
     tokens.splice(i++, 0, ["CALL_END"  , ")"          , _]);
-    // dumpTokens(tokens);
     return tokens;
   };
   
-  var Compiler = (function() {
-    function Compiler() {
+  var CoffeeCompiler = (function() {
+    function CoffeeCompiler() {
     }
-    Compiler.prototype.tokens = function(code) {
+    CoffeeCompiler.prototype.tokens = function(code) {
       var data = [];
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
@@ -546,39 +463,42 @@ define(function(require, exports, module) {
             data.push(token[VALUE].trim());
           }
         });
-        tokens = replaceTimeValue(tokens);
-        tokens = replaceUnaryOp(tokens);
-        tokens = replacePrecedence(tokens);
-        tokens = replaceBinaryOp(tokens);
-        tokens = replaceLogicOp(tokens);
+        tokens = replaceFixedTimeValue(tokens);
+        tokens = replaceStrictlyPrecedence(tokens);
+        tokens = replaceUnaryOperator(tokens);
+        tokens = replaceBinaryOperator(tokens);
         tokens = replaceCompoundAssign(tokens);
-        tokens = replaceSynthDef(tokens);
-        tokens = replaceGlobal(tokens);
-        tokens = cleanupParenthesis(tokens);
-        tokens = insertReturn(tokens);
+        tokens = replaceLogicOperator(tokens);
+        tokens = replaceSynthDefinition(tokens);
+        tokens = replaceGlobalVariants(tokens);
+        tokens = finalize(tokens);
       }
       this.code = code;
       this.data = data;
       return tokens;
     };
-    Compiler.prototype.compile = function(code) {
+    CoffeeCompiler.prototype.compile = function(code) {
       var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
-    Compiler.prototype.toString = function(tokens) {
+    var tab = function(n) {
+      var t = ""; while (n--) { t += "  "; } return t;
+    };
+    CoffeeCompiler.prototype.toString = function(tokens) {
       var indent = 0;
       if (typeof tokens === "string") {
         tokens = this.tokens(tokens);
       }
+      tokens = sortPlusMinusOperator(tokens);
       return tokens.map(function(token) {
         switch (token[TAG]) {
         case "TERMINATOR":
           return "\n" + tab(indent);
         case "INDENT":
-          indent += token[VALUE]|0;
+          indent += 1;
           return "\n" + tab(indent);
         case "OUTDENT":
-          indent -= token[VALUE]|0;
+          indent -= 1;
           return "\n" + tab(indent);
         case "RETURN":
           return "return ";
@@ -589,41 +509,43 @@ define(function(require, exports, module) {
           return token[VALUE];
         case "{":
           return "{";
-        case ",": case "RELATION":
+        case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
           return token[VALUE] + " ";
-        case "=":
-          return " = ";
-        case "COMPOUND_ASSIGN": case "COMPARE": case "MATH": case "+": case "-":
+        case "=": case "COMPARE": case "MATH": case "LOGIC":
           return " " + token[VALUE] + " ";
+        case "HERECOMMENT":
+          return "/* " + token[VALUE] + " */";
         default:
           return token[VALUE];
         }
       }).join("").trim();
     };
-    return Compiler;
+    return CoffeeCompiler;
   })();
-
+  
   var use = function() {
     cc.createCoffeeCompiler = function() {
-      return new Compiler();
+      return new CoffeeCompiler();
     };
   };
   
   module.exports = {
-    Compiler  : Compiler,
-    dumpTokens: dumpTokens,
-    findOperandHead : findOperandHead,
-    findOperandTail : findOperandTail,
-    replaceTimeValue     : replaceTimeValue,
-    replacePrecedence    : replacePrecedence,
-    replaceUnaryOp       : replaceUnaryOp,
-    replaceBinaryOp      : replaceBinaryOp,
-    replaceLogicOp       : replaceLogicOp,
-    replaceCompoundAssign: replaceCompoundAssign,
-    replaceSynthDef      : replaceSynthDef,
-    replaceGlobal        : replaceGlobal,
-    cleanupParenthesis   : cleanupParenthesis,
-    insertReturn         : insertReturn,
+    CoffeeCompiler: CoffeeCompiler,
+    
+    sortPlusMinusOperator  : sortPlusMinusOperator,
+    revertPlusMinusOperator: revertPlusMinusOperator,
+    getPrevOperand         : getPrevOperand,
+    getNextOperand         : getNextOperand,
+    replaceFixedTimeValue    : replaceFixedTimeValue,
+    replaceStrictlyPrecedence: replaceStrictlyPrecedence,
+    replaceUnaryOperator     : replaceUnaryOperator,
+    replaceBinaryOperator    : replaceBinaryOperator,
+    replaceCompoundAssign    : replaceCompoundAssign,
+    replaceLogicOperator     : replaceLogicOperator,
+    replaceSynthDefinition   : replaceSynthDefinition,
+    replaceGlobalVariants    : replaceGlobalVariants,
+    finalize                 : finalize,
+    getSynthDefArguments: getSynthDefArguments,
     use:use,
   };
 

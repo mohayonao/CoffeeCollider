@@ -8,9 +8,8 @@ define(function(require, exports, module) {
   
   describe("client.js", function() {
     var called;
-    beforeEach(function() {
+    before(function() {
       require("./client").use();
-      called = [];
       cc.exports = nop;
       cc.createTimeline = function() {
         return {
@@ -34,6 +33,9 @@ define(function(require, exports, module) {
       cc.resetNativeTimers = function() {
         called.push("resetNativeTimers");
       };
+    });
+    beforeEach(function() {
+      called = [];
     });
     describe("SynthClient", function() {
       describe("createSynthClient", function() {

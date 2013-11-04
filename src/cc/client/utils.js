@@ -21,7 +21,7 @@ define(function(require, exports, module) {
     }
     return result;
   };
-
+  
   var flatten = (function() {
     var _flatten = function(list, result) {
       for (var i = 0, imax = list.length; i < imax; ++i) {

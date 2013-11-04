@@ -3,12 +3,11 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   
-  var cc     = require("./cc");
-  var random = require("./random");
-
+  var cc = require("./cc");
+  
   describe("random.js", function() {
     before(function() {
-      random.use();
+      require("./random").use();
     });
     describe("Random", function() {
       it("create", function() {
@@ -24,8 +23,8 @@ define(function(require, exports, module) {
         assert.notEqual(r1, r2);
       });
       it("seed", function() {
-        var r1 = cc.createRandom(3093459400);
-        var r2 = cc.createRandom(3093459400);
+        var r1 = cc.createRandom(3093459420);
+        var r2 = cc.createRandom(3093459420);
         assert.equal(r1.next(), r2.next());
         assert.equal(r1.next(), r2.next());
       });

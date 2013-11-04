@@ -2,20 +2,14 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-  var cc = require("./cc");
-  var fn = require("./fn");
-  var ugen  = require("./ugen/ugen");
-  var sched = require("./sched");
   
-  require("./object");
+  var cc = require("./cc");
   
   describe("sched.js", function() {
     var timeline, procN, procT;
     before(function() {
-      ugen.use();
-      sched.use();
-    });
-    beforeEach(function() {
+      require("./sched").use();
+      
       timeline = cc.createTimeline({
         bufLength:64, sampleRate:44100
       });
@@ -31,6 +25,9 @@ define(function(require, exports, module) {
         }
       };
       timeline.play( (64 / 44100) * 1000 );
+    });
+    after(function() {
+      timeline.pause();
     });
     describe("TaskDo", function() {
       it("create", function() {
@@ -73,8 +70,10 @@ define(function(require, exports, module) {
         procN(1);
         assert.equal(actual, 1);
         t.pause();
+        t.pause();
         procT(100);
         assert.equal(actual, 1);
+        t.play();
         t.play();
         procT(100);
         assert.equal(actual, 2);

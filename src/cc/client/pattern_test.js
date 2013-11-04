@@ -3,16 +3,14 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   
   var cc = require("./cc");
-  require("./ugen/ugen");
-  require("./object");
-  require("./number");
-
-  var pattern = require("./pattern");
   
   describe("pattern.js", function() {
     var emitted;
+    before(function() {
+      require("./number");
+      require("./pattern").use();
+    });
     beforeEach(function() {
-      pattern.use();
       emitted = false;
     });
     describe("PSequence", function() {

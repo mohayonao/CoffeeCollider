@@ -5,6 +5,12 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   
   // unary operator methods
+  fn.definePrototypeProperty(Number, "__plus__", function() {
+    return +this;
+  });
+  fn.definePrototypeProperty(Number, "__minus__", function() {
+    return -this;
+  });
   fn.definePrototypeProperty(Number, "neg", function() {
     return -this;
   });
@@ -145,50 +151,64 @@ define(function(require, exports, module) {
   });
 
   // binary operator methods
-  var setupBinaryOp = function(selector, func) {
-    fn.definePrototypeProperty(Number, selector, function(b) {
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return this[selector](b);
-        }, this);
-      } else if (cc.instanceOfUGen(b)) {
-        return cc.createBinaryOpUGen(selector, this, b);
-      }
-      return func.call(this, b || 0);
-    });
-  };
-
-  setupBinaryOp("eq", function(b) {
+  fn.setupBinaryOp(Number, "__add__", function(b) {
+    return this + b;
+  });
+  fn.setupBinaryOp(Number, "__sub__", function(b) {
+    return this - b;
+  });
+  fn.setupBinaryOp(Number, "__mul__", function(b) {
+    return this * b;
+  });
+  fn.setupBinaryOp(Number, "__div__", function(b) {
+    if (this === 0 && b === 0) {
+      return 0; // avoid NaN
+    }
+    return this / b;
+  });
+  fn.setupBinaryOp(Number, "__mod__", function(b) {
+    if (b === 0) {
+      return 0; // avoid NaN
+    }
+    return this % b;
+  });
+  fn.setupBinaryOp(Number, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.setupBinaryOp(Number, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  fn.setupBinaryOp(Number, "eq", function(b) {
     return this === b ? 1 : 0;
   });
-  setupBinaryOp("ne", function(b) {
+  fn.setupBinaryOp(Number, "ne", function(b) {
     return this !== b ? 1 : 0;
   });
-  setupBinaryOp("lt", function(b) {
+  fn.setupBinaryOp(Number, "lt", function(b) {
     return this < b ? 1 : 0;
   });
-  setupBinaryOp("gt", function(b) {
+  fn.setupBinaryOp(Number, "gt", function(b) {
     return this > b ? 1 : 0;
   });
-  setupBinaryOp("le", function(b) {
+  fn.setupBinaryOp(Number, "le", function(b) {
     return this <= b ? 1 : 0;
   });
-  setupBinaryOp("ge", function(b) {
+  fn.setupBinaryOp(Number, "ge", function(b) {
     return this >= b ? 1 : 0;
   });
-  setupBinaryOp("bitAnd", function(b) {
+  fn.setupBinaryOp(Number, "bitAnd", function(b) {
     return this & b;
   });
-  setupBinaryOp("bitOr", function(b) {
+  fn.setupBinaryOp(Number, "bitOr", function(b) {
     return this | b;
   });
-  setupBinaryOp("bitXor", function(b) {
+  fn.setupBinaryOp(Number, "bitXor", function(b) {
     return this ^ b;
   });
-  setupBinaryOp("min", function(b) {
+  fn.setupBinaryOp(Number, "min", function(b) {
     return Math.min(this, b);
   });
-  setupBinaryOp("max", function(b) {
+  fn.setupBinaryOp(Number, "max", function(b) {
     return Math.max(this, b);
   });
   
@@ -199,103 +219,115 @@ define(function(require, exports, module) {
     }
     return Math.abs(a);
   };
-  setupBinaryOp("lcm", function(b) {
+  fn.setupBinaryOp(Number, "lcm", function(b) {
     if (this === 0 && b === 0) {
-      return 0;
+      return 0; // avoid NaN
     }
     return Math.abs(this * b) / gcd(this, b);
   });
-  setupBinaryOp("gcd", function(b) {
+  fn.setupBinaryOp(Number, "gcd", function(b) {
     return gcd(this, b);
   });
-  setupBinaryOp("round", function(b) {
-    return b === 0 ? this : Math.round(this / b) * b;
+  fn.setupBinaryOp(Number, "round", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.round(this / b) * b;
   });
-  setupBinaryOp("roundUp", function(b) {
-    return b === 0 ? this : Math.ceil(this / b) * b;
+  fn.setupBinaryOp(Number, "roundUp", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.ceil(this / b) * b;
   });
-  setupBinaryOp("roundDown", function(b) {
-    return b === 0 ? this : Math.floor(this / b) * b;
+  fn.setupBinaryOp(Number, "roundDown", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.floor(this / b) * b;
   });
-  setupBinaryOp("trunc", function(b) {
-    return b === 0 ? this : Math.floor(this / b) * b;
+  fn.setupBinaryOp(Number, "trunc", function(b) {
+    if (b === 0) {
+      return this; // avoid NaN
+    }
+    return Math.floor(this / b) * b;
   });
-  setupBinaryOp("atan2", function(b) {
+  fn.setupBinaryOp(Number, "atan2", function(b) {
     return Math.atan2(this, b);
   });
-  setupBinaryOp("hypot", function(b) {
+  fn.setupBinaryOp(Number, "hypot", function(b) {
     return Math.sqrt((this * this) + (b * b));
   });
-  setupBinaryOp("hypotApx", function(b) {
+  fn.setupBinaryOp(Number, "hypotApx", function(b) {
     var x = Math.abs(this), y = Math.abs(b);
     var minxy = Math.min(x, y);
     return x + y - (Math.sqrt(2) - 1) * minxy;
   });
-  setupBinaryOp("pow", function(b) {
+  fn.setupBinaryOp(Number, "pow", function(b) {
     return Math.pow(Math.abs(this), b);
   });
-  setupBinaryOp("leftShift", function(b) {
+  fn.setupBinaryOp(Number, "leftShift", function(b) {
     if (b < 0) {
       return (this|0) >> (-b|0);
     }
     return (this|0) << (b|0);
   });
-  setupBinaryOp("rightShift", function(b) {
+  fn.setupBinaryOp(Number, "rightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  setupBinaryOp("unsignedRightShift", function(b) {
+  fn.setupBinaryOp(Number, "unsignedRightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  setupBinaryOp("ring1", function(b) {
+  fn.setupBinaryOp(Number, "ring1", function(b) {
     return this * b + this;
   });
-  setupBinaryOp("ring2", function(b) {
+  fn.setupBinaryOp(Number, "ring2", function(b) {
     return this * b + this + b;
   });
-  setupBinaryOp("ring3", function(b) {
+  fn.setupBinaryOp(Number, "ring3", function(b) {
     return this * this * b;
   });
-  setupBinaryOp("ring4", function(b) {
+  fn.setupBinaryOp(Number, "ring4", function(b) {
     return this * this * b - this * b * b;
   });
-  setupBinaryOp("difsqr", function(b) {
+  fn.setupBinaryOp(Number, "difsqr", function(b) {
     return this * this - b * b;
   });
-  setupBinaryOp("sumsqr", function(b) {
+  fn.setupBinaryOp(Number, "sumsqr", function(b) {
     return this * this + b * b;
   });
-  setupBinaryOp("sqrsum", function(b) {
+  fn.setupBinaryOp(Number, "sqrsum", function(b) {
     return (this + b) * (this + b);
   });
-  setupBinaryOp("sqrdif", function(b) {
+  fn.setupBinaryOp(Number, "sqrdif", function(b) {
     return (this - b) * (this - b);
   });
-  setupBinaryOp("absdif", function(b) {
+  fn.setupBinaryOp(Number, "absdif", function(b) {
     return Math.abs(this - b);
   });
-  setupBinaryOp("thresh", function(b) {
+  fn.setupBinaryOp(Number, "thresh", function(b) {
     return this < b ? 0 : this;
   });
-  setupBinaryOp("amclip", function(b) {
+  fn.setupBinaryOp(Number, "amclip", function(b) {
     return this * 0.5 * (b + Math.abs(b));
   });
-  setupBinaryOp("scaleneg", function(b) {
+  fn.setupBinaryOp(Number, "scaleneg", function(b) {
     b = 0.5 * b + 0.5;
     return (Math.abs(this) - this) * b + this;
   });
-  setupBinaryOp("clip2", function(b) {
+  fn.setupBinaryOp(Number, "clip2", function(b) {
     return Math.max(-b, Math.min(this, b));
   });
-  setupBinaryOp("excess", function(b) {
+  fn.setupBinaryOp(Number, "excess", function(b) {
     return this - Math.max(-b, Math.min(this, b));
   });
-  setupBinaryOp("fold2", function(b) {
+  fn.setupBinaryOp(Number, "fold2", function(b) {
     var _in = this, x, c, range, range2;
     x = _in + b;
     if (_in >= b) {
@@ -322,7 +354,7 @@ define(function(require, exports, module) {
     }
     return c - b;
   });
-  setupBinaryOp("wrap2", function(b) {
+  fn.setupBinaryOp(Number, "wrap2", function(b) {
     var _in = this, range;
     if (_in >= b) {
       range = b + b;

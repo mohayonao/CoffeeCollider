@@ -5,15 +5,21 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var ops   = require("../common/ops");
   var utils = require("./utils");
-  
+
+  var setupUnaryOp = function(selector) {
+    fn.definePrototypeProperty(Array, selector, function() {
+      return this.map(function(x) { return x[selector](); });
+    });
+  };
+
+  setupUnaryOp("__plus__");
+  setupUnaryOp("__minus__");
   ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
     if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      fn.definePrototypeProperty(Array, selector, function() {
-        return this.map(function(x) { return x[selector](); });
-      });
+      setupUnaryOp(selector);
     }
   });
-
+  
   var foldAt = function(list, index) {
     var len = list.length;
     index = index % (len * 2 - 2);
@@ -66,21 +72,42 @@ define(function(require, exports, module) {
       });
     }
   };
-  
+
+  var setupBinaryOp = function(selector) {
+    var ugenSelector;
+    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    } else {
+      ugenSelector = selector;
+    }
+    fn.definePrototypeProperty(Array, selector, function(b, adverb) {
+      if (Array.isArray(b)) {
+        return calc_with_adverb(selector, this, b, adverb);
+      } else if (cc.instanceOfUGen(b)) {
+        return this.map(function(a) {
+          return cc.createBinaryOpUGen(ugenSelector, a, b);
+        });
+      }
+      return this.map(function(a) {
+        return a[selector](b);
+      });
+    });
+  };
+
+  setupBinaryOp("__add__");
+  setupBinaryOp("__sub__");
+  setupBinaryOp("__mul__");
+  setupBinaryOp("__div__");
+  setupBinaryOp("__mod__");
+  fn.definePrototypeProperty(Array, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", this.concat(b));
+  });
+  fn.definePrototypeProperty(Array, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", this.concat(b));
+  });
   ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
     if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      fn.definePrototypeProperty(Array, selector, function(b, adverb) {
-        if (Array.isArray(b)) {
-          return calc_with_adverb(selector, this, b, adverb);
-        } else if (cc.instanceOfUGen(b)) {
-          return this.map(function(a) {
-            return cc.createBinaryOpUGen(selector, a, b);
-          });
-        }
-        return this.map(function(a) {
-          return a[selector](b);
-        });
-      });
+      setupBinaryOp(selector);
     }
   });
   

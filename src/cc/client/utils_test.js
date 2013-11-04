@@ -25,6 +25,8 @@ define(function(require, exports, module) {
       ];
       var actual = utils.flop(list);
       assert.deepEqual(actual, expected);
+      
+      assert.deepEqual(utils.flop([]), []);
     });
     it("flatten", function() {
       var list = [ 1, [2, [3]], [4, [5, [6]]] ];
@@ -37,6 +39,7 @@ define(function(require, exports, module) {
       var expected = [ [ 1, 2, 3 ], [ 4, 5, 6 ], [ 7, 8 ] ];
       var actual = utils.clump(list, 3);
       assert.deepEqual(actual, expected);
+      assert.deepEqual(utils.clump([], 2), []);
     });
   });
 

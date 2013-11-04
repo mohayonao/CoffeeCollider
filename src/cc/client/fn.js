@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var utils = require("./utils");
+  var ops   = require("../common/ops");
   var slice = [].slice;
   
   var fn = (function() {
@@ -27,7 +28,11 @@ define(function(require, exports, module) {
         this.def.split(",").forEach(function(items) {
           items = items.trim().split("=");
           keys.push( items[0].trim());
-          vals.push(items.length > 1 ? +items[1].trim() : undefined);
+          if (items.length === 2) {
+            vals.push(JSON.parse(items[1]));
+          } else {
+            vals.push(undefined);
+          }
         });
       }
       var ret = func;
@@ -76,18 +81,20 @@ define(function(require, exports, module) {
       var args = vals.slice();
       if (utils.isDict(given[given.length - 1])) {
         dict = given.pop();
-        for (var key in dict) {
+        Object.keys(dict).forEach(function(key) {
           var index = keys.indexOf(key);
           if (index !== -1) {
             args[index] = dict[key];
           }
-        }
+        });
       }
       for (var i = 0, imax = Math.min(given.length, args.length); i < imax; ++i) {
         args[i] = given[i];
       }
-      if (dict && args.length < keys.length - 1) {
-        args.push(dict);
+      if (dict && keys.length <= args.length) {
+        if (utils.isDict(vals[vals.length - 1])) {
+          args.splice(args.length-1, 1, dict);
+        }
       }
       return args;
     };
@@ -109,6 +116,26 @@ define(function(require, exports, module) {
       enumerable  : false,
       writable    : true,
       value       : func
+    });
+  };
+  
+  fn.setupBinaryOp = function(Klass, selector, func) {
+    var ugenSelector;
+    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    } else {
+      ugenSelector = selector;
+    }
+    fn.definePrototypeProperty(Klass, selector, function(b) {
+      var a = this;
+      if (Array.isArray(b)) {
+        return b.map(function(b) {
+          return a[selector](b);
+        });
+      } else if (cc.instanceOfUGen(b)) {
+        return cc.createBinaryOpUGen(ugenSelector, a, b);
+      }
+      return func.call(a, b);
     });
   };
   
