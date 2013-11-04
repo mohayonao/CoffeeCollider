@@ -31,11 +31,6 @@ $(function() {
   var status = "pause";
   
   $play.on("click", function(e) {
-    if (e.shiftKey) {
-      console.log(cc.impl.compiler.toString($code.val().trim()));
-      return;
-    }
-    
     execute();
     if (status === "pause") {
       cc.play();
@@ -65,21 +60,36 @@ $(function() {
       isPlaying = false;
     }
   });
+
+  var isEdge = /extras\/edge/.test(location.href);
   
   $("#link").on("click", function() {
-    var code = $code.val().trim();
-    window.location = "#" + srcFragment + encodeURIComponent(code);
+    if (isEdge) {
+      console.log(cc.impl.compiler.toString($code.val().trim()));
+    } else {
+      var code = $code.val().trim();
+      window.location = "#" + srcFragment + encodeURIComponent(code);
+    }
   });
-
+  
   $("a", "#example-list").each(function(i, a) {
     var $a = $(a);
     $a.on("click", function() {
-      $.get("./examples/" + $(this).attr("data-path")).then(function(res) {
+      var path = "./extras/examples/";
+      if (isEdge) {
+        path = "../examples/";
+      }
+      $.get(path + $(this).attr("data-path")).then(function(res) {
         $code.val(res);
       });
       return false;
     });
   });
+  
+  $("#version").text(cc.version);
+  if (isEdge) {
+    $("#link").text("Compile");
+  }
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {

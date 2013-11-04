@@ -7,8 +7,7 @@
 .travis.yml
 test/
 coverage/
-documents/
-examples/
+extras/
 files/
 Gruntfile.js
 index.html

@@ -66,7 +66,7 @@ module.exports = function(grunt) {
             return "test:" + filepath;
           }
           grunt.config(["jshint", "files"], filepath);
-          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice" ];
+          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice:edge" ];
           return tasks;
         }
       },
@@ -166,14 +166,19 @@ module.exports = function(grunt) {
 
   grunt.registerTask("dryice", function() {
     var arg0 = arguments[0];
-    if (arg0 !== "force" && isDebugging()) {
+    if (arg0 !== "edge" && isDebugging()) {
       grunt.fail.warn("NOT built with debug mode.");
       return;
     }
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
-    var dest = "build/coffee-collider";
+    var dest;
+    if (arg0 === "edge") {
+      dest = "extras/edge/coffee-collider";
+    } else {
+      dest = "build/coffee-collider";
+    }
     
     var coffeeColliderProject = {
       roots: [srcroot]
@@ -217,9 +222,20 @@ module.exports = function(grunt) {
         return text;
       },
       function(text) {
+        var version = grunt.config.get("pkg.version");
+        if (arg0 === "edge") {
+          var now = new Date();
+          version += "+";
+          version += now.getYear() + 1900;
+          version += ("00"+(now.getMonth()+1)).substr(-2);
+          version += ("00"+(now.getDate()   )).substr(-2)
+          version += ("00"+(now.getHours()  )).substr(-2)
+          version += ("00"+(now.getMinutes())).substr(-2)
+          version += "00";
+        }
         text = text.replace(/^define\((['"].+?['"]), \[(.+?)\], function\(require, exports, module\) {$/gm, "define($1, function(require, exports, module) {");
         text = text.replace(/\s*['"]use strict['"];$/gm, "");
-        text = text.replace(/#{VERSION}/g, grunt.config.get("pkg.version"));
+        text = text.replace(/#{VERSION}/g, version);
         text += 'var exports = _require("cc/cc", "' + main + '");\n';
         text += 'if (typeof module !== "undefined") {\n  module.exports = exports;\n}\n';
         return text;
@@ -443,8 +459,9 @@ module.exports = function(grunt) {
   
   grunt.registerTask("check", ["typo", "jshint", "test"]);
   grunt.registerTask("build", ["typo", "jshint", "test", "dryice"]);
-  grunt.registerTask("build:all", ["build", "uglify", "compress"]);
-  grunt.registerTask("build:force", ["dryice:force"]);
+  grunt.registerTask("build:all"  , ["build", "uglify", "compress"]);
+  grunt.registerTask("build:edge" , ["typo", "jshint", "test", "dryice:edge"]);
+  grunt.registerTask("build:force", ["dryice:edge"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CoffeeCollider</title>
+    <link rel="stylesheet" href="../css/index.css">
+  </head>
+  <body>
+    <textarea id="code" spellcheck="false" placeholder="# write a code here"></textarea>
+    <button id="play" class="btn">Play</button>
+    <button id="pause" class="btn">Pause</button>
+    <button id="link" class="btn">Link</button>
+    <div id="panel">
+      <h1>CoffeeCollider</h1>
+      <h5 id="version">version</h5>
+      <canvas id="canvas"></canvas>
+      <div class="block">
+        <h3>Examples</h3>
+        <ul id="example-list">
+          <li><a href="#" data-path="sine.coffee">sine</a></li>
+          <li><a href="#" data-path="task.coffee">task</a></li>
+          <li><a href="#" data-path="audio.coffee">audio</a></li>
+          <li><a href="#" data-path="mouse.coffee">mouse</a></li>
+        </ul>
+      </div>
+    </div>
+    <script src="../vendor/jquery-2.0.0.min.js"></script>
+    <script src="../vendor/coffee-script.js"></script>
+    <script src="./coffee-collider.js"></script>
+    <script src="../js/waveviewer.js"></script>
+    <script src="../js/index.js"></script>
+  </body>
+</html>
