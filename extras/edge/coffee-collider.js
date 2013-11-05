@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131105000200",
+    version: "0.0.0+20131105101200",
     global : {},
     Object : function CCObject() {}
   };
@@ -6071,6 +6071,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         switch (prevTag) {
         case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
         case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
+        case "CALL_END": case "INDEX_END":
           tokens[i][TAG] = "MATH";
           break;
         default:
@@ -6102,10 +6103,10 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     
     var bracket = 0;
     var indent  = 0;
-    var end = indent;
+    var end = index;
     while (1 < index) {
       switch (tokens[index - 1][TAG]) {
-      case "PARAM_END": case "CALL_END":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket += 1;
         /* falls through */
       case ".": case "@":
@@ -6127,7 +6128,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           return {tokens:tokens, begin:index, end:end};
         }
         break;
-      case "CALL_START":
+      case "CALL_START": case "INDEX_START":
         bracket -= 1;
         break;
       case "}": case "]": case ")":
@@ -6165,13 +6166,13 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       case "(": case "[": case "{": case "PARAM_START":
         bracket += 1;
         break;
-      case "}": case "]": case ")": case "CALL_END":
+      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
         bracket -= 1;
         break;
       }
       
       switch (tokens[index + 1][TAG]) {
-      case "CALL_START":
+      case "CALL_START": case "INDEX_START":
         bracket += 1;
         index += 1;
         continue;
@@ -6181,7 +6182,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       }
       
       switch (tag) {
-      case "}": case "]": case ")": case "CALL_END":
+      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
       case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
       case "UNDEFINED": case "NULL": case "OUTDENT":
         if (tag === "OUTDENT") {

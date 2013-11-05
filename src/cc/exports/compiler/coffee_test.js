@@ -54,7 +54,7 @@ define(function(require, exports, module) {
   };
   
   describe("coffee.js", function() {
-    it("sortPlusMinusOperator", function() {
+    it.only("sortPlusMinusOperator", function() {
       var tokens;
       tokens = coffee.tokens("+10");
       tokens = compiler.sortPlusMinusOperator(tokens);
@@ -114,6 +114,20 @@ define(function(require, exports, module) {
       assert.deepEqual(
         tagList(tokens), ["(", "NUMBER", ")", "MATH", "NUMBER", "TERMINATOR"]
       );
+
+      tokens = coffee.tokens("a() - 0");
+      tokens = compiler.sortPlusMinusOperator(tokens);
+      assert.deepEqual(
+        tagList(tokens), ["IDENTIFIER", "CALL_START", "CALL_END", "MATH", "NUMBER", "TERMINATOR"]
+      );
+      tokens = coffee.tokens("a[0] - 0");
+      tokens = compiler.sortPlusMinusOperator(tokens);
+      assert.deepEqual(
+        tagList(tokens), ["IDENTIFIER", "INDEX_START", "NUMBER", "INDEX_END", "MATH", "NUMBER", "TERMINATOR"]
+      );
+      
+      tokens = coffee.tokens("(0) - 0");
+      tokens = compiler.sortPlusMinusOperator(tokens);
       tokens = compiler.sortPlusMinusOperator(tokens);
       tokens = compiler.revertPlusMinusOperator(tokens);
       tokens = compiler.revertPlusMinusOperator(tokens);
@@ -121,7 +135,6 @@ define(function(require, exports, module) {
         tagList(tokens), ["(", "NUMBER", ")", "-", "NUMBER", "TERMINATOR"]
       );
     });
-    
     it("getPrevOperand", function() {
       var tokens, op;
       tokens = coffee.tokens("");
@@ -203,6 +216,10 @@ define(function(require, exports, module) {
       tokens = coffee.tokens("a = Math.sin 1.57");
       op = compiler.getPrevOperand(tokens, tokens.length-1);
       assert.equal(tokens[op.begin][VALUE], "Math", "calling is headable");
+      
+      tokens = coffee.tokens("a[0..1]");
+      op = compiler.getPrevOperand(tokens, tokens.length-1);
+      assert.equal(tokens[op.begin][VALUE], "a", "index start is not headable");
     });
     it("getNextOperand", function() {
       var tokens, code, op;
@@ -289,6 +306,10 @@ define(function(require, exports, module) {
       tokens = coffee.tokens("1 + [2,3].pop() + 4");
       op = compiler.getNextOperand(tokens, 2);
       assert.equal(tokens[op.end][TAG], "CALL_END", ".");
+      
+      tokens = coffee.tokens("a = a[0..1] + 1");
+      op = compiler.getNextOperand(tokens, 2);
+      assert.equal(tokens[op.end][TAG], "INDEX_END", "index end is tailable");
       
       code = [
         "Synth.def ->",
