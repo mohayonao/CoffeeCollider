@@ -217,6 +217,7 @@ define(function(require, exports, module) {
       require("./bop").use();
       require("./madd").use();
       require("./inout").use();
+      require("./mix");
       
       // redefinition for tests
       cc.UGen = UGen;

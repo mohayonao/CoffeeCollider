@@ -40,7 +40,7 @@ define(function(require, exports, module) {
           if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
-        } else if (cc.instancrOfMulAdd(a)) {
+        } else if (cc.instanceOfMulAdd(a)) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
               return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
