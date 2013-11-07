@@ -41,20 +41,32 @@ button {
 #ctrl button {
     opacity: 1;
 }
-#play {
+#boot {
     position: absolute;
     top  : 5px;
     right: 225px;
 }
-#pause {
+#run {
     position: absolute;
     top  : 40px;
     right: 225px;
 }
-#link {
+#reset {
     position: absolute;
     top  : 75px;
     right: 225px;
+}
+#compile-coffee {
+    position: absolute;
+    top  : 110px;
+    right: 225px;
+    display: none;
+}
+#compile-js {
+    position: absolute;
+    top  : 145px;
+    right: 225px;
+    display: none;
 }
 #panel {
     position: absolute;

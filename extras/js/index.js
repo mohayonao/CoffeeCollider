@@ -1,9 +1,11 @@
 $(function() {
   "use strict";
   
+  var isEdge = /extras\/edge/.test(location.href);
+  
   var srcFragment = "try:";
   var $code = $("#code");
-  var $play = $("#play");
+  var $boot = $("#boot");
   
   var config = {};
   location.search.substr(1).split("&").forEach(function(kv) {
@@ -26,50 +28,47 @@ $(function() {
   var viewer = new WaveViewer(cc, document.getElementById("canvas"), {
     width:200, height:100, fillStyle:"#2c3e50", strokeStyle:"#f1c40f", lineWidth:2
   });
-  var isPlaying = false;
-  var prevCode  = null;
   var status = "pause";
   
-  $play.on("click", function(e) {
-    execute();
+  var changeFavicon;
+  if (isEdge) {
+    changeFavicon = function(mode) {
+      $("#favicon").attr({href:"../img/" + mode + ".gif"});
+    };
+  } else {
+    changeFavicon = function(mode) {
+      $("#favicon").attr({href:"./extras/img/" + mode + ".gif"});
+    };
+  }
+  
+  $boot.on("click", function(e) {
     if (status === "pause") {
       cc.play();
       viewer.start();
-      $play.addClass("btn-danger").text("Run");
+      $boot.addClass("btn-danger");
       status = "play";
-      isPlaying = true;
+      changeFavicon("play");
+    } else {
+      cc.pause();
+      viewer.stop();
+      $boot.removeClass("btn-danger");
+      status = "pause";
+      changeFavicon("pause");
     }
   });
   
-  var execute = function() {
+  $("#run").on("click", function() {
     var code = $code.val().trim();
     cc.execute(code, function(res) {
       if (res !== undefined) {
         console.log(res);
       }
     });
-    prevCode = code;
-  };
-
-  $("#pause").on("click", function() {
-    if (status === "play") {
-      cc.pause();
-      viewer.stop();
-      $play.removeClass("btn-danger").text("Play");
-      status = "pause";
-      isPlaying = false;
-    }
+    window.location = "#" + srcFragment + encodeURIComponent(code);
   });
 
-  var isEdge = /extras\/edge/.test(location.href);
-  
-  $("#link").on("click", function() {
-    if (isEdge) {
-      console.log(cc.impl.compiler.toString($code.val().trim()));
-    } else {
-      var code = $code.val().trim();
-      window.location = "#" + srcFragment + encodeURIComponent(code);
-    }
+  $("#reset").on("click", function() {
+    cc.reset();
   });
   
   $("a", "#example-list").each(function(i, a) {
@@ -88,7 +87,15 @@ $(function() {
   
   $("#version").text(cc.version);
   if (isEdge) {
-    $("#link").text("Compile");
+    $("#compile-coffee").on("click", function() {
+      var code = cc.impl.compiler.toString($code.val().trim());
+      console.log(code);
+    }).show();
+    $("#compile-js").on("click", function() {
+      var code = cc.impl.compiler.toString($code.val().trim());
+      code = CoffeeScript.compile(code, {bare:true});
+      console.log(code);
+    }).show();
   }
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
