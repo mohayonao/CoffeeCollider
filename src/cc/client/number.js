@@ -149,7 +149,10 @@ define(function(require, exports, module) {
   fn.definePrototypeProperty(Number, "pi", function() {
     return this * Math.PI;
   });
-
+  fn.definePrototypeProperty(Number, "to_i", function() {
+    return this|0;
+  });
+  
   // binary operator methods
   fn.setupBinaryOp(Number, "__add__", function(b) {
     return this + b;

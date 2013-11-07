@@ -195,6 +195,9 @@ define(function(require, exports, module) {
   calcFunc.pi = function(a) {
     return Math.PI * a;
   };
+  calcFunc.to_i = function(a) {
+    return a|0;
+  };
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
