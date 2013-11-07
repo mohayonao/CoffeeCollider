@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var fn = require("./fn");
   var utils   = require("./utils");
   var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
@@ -19,25 +18,25 @@ define(function(require, exports, module) {
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
-    Node.prototype.play = fn.sync(function() {
+    Node.prototype.play = function() {
       cc.client.pushToTimeline([
         "/n_run", this.nodeId, true
       ]);
       return this;
-    });
-    Node.prototype.pause = fn.sync(function() {
+    };
+    Node.prototype.pause = function() {
       cc.client.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
-    });
-    Node.prototype.stop = fn.sync(function() {
+    };
+    Node.prototype.stop = function() {
       cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
       this._blocking = false;
       return this;
-    });
+    };
     Node.prototype.performWait = function() {
       return this._blocking;
     };
@@ -49,12 +48,9 @@ define(function(require, exports, module) {
       Node.call(this);
       this.klassName = "Group";
       if (target instanceof Node) {
-        var that = this;
-        cc.client.timeline.push(function() {
-          cc.client.pushToTimeline([
-            "/g_new", that.nodeId, addAction, target.nodeId
-          ]);
-        });
+        cc.client.pushToTimeline([
+          "/g_new", this.nodeId, addAction, target.nodeId
+        ]);
       }
     }
     extend(Group, Node);
@@ -69,18 +65,15 @@ define(function(require, exports, module) {
       if (target instanceof Node && cc.instanceOfSynthDef(def)) {
         this.params  = def.specs.params;
         var nodeId   = this.nodeId;
-        var timeline = cc.client.timeline;
         var controls = args2controls(args, this.params);
-        timeline.push(function() {
-          cc.client.pushToTimeline([
-            "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
-          ]);
-        });
+        cc.client.pushToTimeline([
+          "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
+        ]);
       }
     }
     extend(Synth, Node);
     
-    Synth.prototype._set = function(args) {
+    Synth.prototype.set = function(args) {
       var controls = args2controls(args, this.params);
       if (controls.length) {
         cc.client.pushToTimeline([
@@ -88,8 +81,6 @@ define(function(require, exports, module) {
         ]);
       }
     };
-    
-    Synth.prototype.set = fn.sync(Synth.prototype._set);
     
     return Synth;
   })();

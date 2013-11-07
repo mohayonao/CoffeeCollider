@@ -49,8 +49,8 @@ define(function(require, exports, module) {
   var VALUE = 1;
   var _     = {}; // empty location
 
-  var sortPlusMinusOperator = function(tokens) {
-    if (tokens._sorted) {
+  var detectPlusMinusOperator = function(tokens) {
+    if (tokens.cc_plusminus) {
       return tokens;
     }
     var prevTag = "";
@@ -69,12 +69,12 @@ define(function(require, exports, module) {
       }
       prevTag = tag;
     }
-    tokens._sorted = true;
+    tokens.cc_plusminus = true;
     return tokens;
   };
   
   var revertPlusMinusOperator = function(tokens) {
-    if (!tokens._sorted) {
+    if (!tokens.cc_plusminus) {
       for (var i = 0, imax = tokens.length; i < imax; ++i) {
         var val = tokens[i][VALUE];
         if (val === "+" || val === "-") {
@@ -83,12 +83,12 @@ define(function(require, exports, module) {
       }
       return tokens;
     }
-    delete tokens._sorted;
+    delete tokens.cc_plusminus;
     return tokens;
   };
   
   var getPrevOperand = function(tokens, index) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     
     var bracket = 0;
     var indent  = 0;
@@ -136,7 +136,7 @@ define(function(require, exports, module) {
   };
   
   var getNextOperand = function(tokens, index) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     var bracket = 0;
     var indent  = 0;
     var begin = index;
@@ -155,8 +155,14 @@ define(function(require, exports, module) {
       case "(": case "[": case "{": case "PARAM_START":
         bracket += 1;
         break;
-      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
+      case "}": case "]": case ")": case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket -= 1;
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
         break;
       }
       
@@ -165,7 +171,7 @@ define(function(require, exports, module) {
         bracket += 1;
         index += 1;
         continue;
-      case ".": case "@":
+      case ".": case "@": case "ELSE":
         index += 1;
         continue;
       }
@@ -174,23 +180,156 @@ define(function(require, exports, module) {
       case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
       case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
       case "UNDEFINED": case "NULL": case "OUTDENT":
-        if (tag === "OUTDENT") {
-          indent -= 1;
-        }
         if (bracket === 0 && indent === 0) {
           return {tokens:tokens, begin:begin, end:index};
         }
-        break;
-      case "PARAM_END":
-        bracket -= 1;
-        break;
-      case "INDENT":
-        indent += 1;
         break;
       }
       index += 1;
     }
     return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
+  };
+
+  var isDot = function(token) {
+    return !!token && (token[TAG] === "." || token[TAG] === "@");
+  };
+  
+  var getVariables = function(op, list) {
+    var tokens = op.tokens;
+    list = list || [];
+    if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
+      for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
+        var _op = getNextOperand(tokens, i);
+        getVariables(_op, list);
+        i += _op.end - _op.begin + 1;
+        if (tokens[i][TAG] !== ",") {
+          i += 1;
+        }
+      }
+    } else {
+      if (!isDot(tokens[op.begin-1])) {
+        if (/^[a-z][a-zA-Z0-9_$]*$/.test(tokens[op.begin][VALUE])) {
+          list.push(tokens[op.begin][VALUE]);
+        }
+      }
+    }
+    return list;
+  };
+  var indexOfParamEnd = function(tokens, index) {
+    var bracket = 0;
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "PARAM_START":
+        bracket += 1;
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        if (bracket === 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  };
+  var getInfoOfArguments = function(tokens, index) {
+    var begin = index;
+    var end   = indexOfParamEnd(tokens, index);
+    var args  = [];
+    for (var i = begin+1; i < end; ++i) {
+      var op = getNextOperand(tokens, i);
+      getVariables(op, args);
+      i += op.end - op.begin + 1;
+      if (tokens[i][TAG] === "=") {
+        op = getNextOperand(tokens, i+1);
+        i += op.end - op.begin + 1;
+      }
+      if (tokens[i][TAG] !== ",") {
+        i += 1;
+      }
+    }
+    return {args:args, end:end};
+  };
+  
+  var detectFunctionParameters = function(tokens) {
+    if (tokens.cc_localVars) {
+      return tokens;
+    }
+    var stack = [
+      { declared:[], local:[], outer:[], args:[] }
+    ], peek;
+    var ignored = [
+      "cc", "global", "console",
+      "setInterval", "setTimeout", "clearInterval", "clearTimeout"
+    ];
+    var sortVariables = function(name) {
+      if (ignored.indexOf(name) !== -1) {
+        return;
+      }
+      if (peek.declared.indexOf(name) === -1) {
+        if (peek.args.indexOf(name) === -1 && peek.local.indexOf(name) === -1) {
+          peek.local.push(name);
+        }
+      } else {
+        if (name !== "global" && peek.outer.indexOf(name) === -1) {
+          peek.outer.push(name);
+          for (var i = stack.length - 2; i >= 0; i--) {
+            if (stack[i].local.indexOf(name) !== -1) {
+              return;
+            }
+            if (stack[i].outer.indexOf(name) === -1) {
+              stack[i].outer.push(name);
+            }
+          }
+        }
+      }
+    };
+    var indent = 0;
+    var args   = [];
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var op, token = tokens[i];
+      peek = stack[stack.length-1];
+      switch (token[TAG]) {
+      case "PARAM_START":
+        args = getInfoOfArguments(tokens, i);
+        i    = args.end ;
+        args = args.args;
+        break;
+      case "->": case "=>":
+        var scope = {
+          declared: peek.declared.concat(peek.local),
+          local:[], outer:[], args:args.splice(0), indent:indent
+        };
+        tokens[i].cc_localVars = scope.local;
+        tokens[i].cc_outerVars = scope.outer;
+        stack.push(scope);
+        break;
+      case "FOR":
+        do {
+          op = getNextOperand(tokens, i+1);
+          getVariables(op).forEach(sortVariables);
+          i = op.end + 1;
+        } while (i < imax && tokens[i][TAG] === ",");
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        if (peek.indent === indent) {
+          stack.pop();
+        }
+        break;
+      default:
+        op = getNextOperand(tokens, i);
+        if (tokens[op.begin][TAG] === "IDENTIFIER") {
+          if (tokens[op.end+1][TAG] !== ":") {
+            getVariables(op).forEach(sortVariables);
+          }
+        }
+      }
+    }
+    tokens.cc_localVars = stack[0].local;
+    return tokens;
   };
   
   var replaceFixedTimeValue = function(tokens) {
@@ -208,7 +347,7 @@ define(function(require, exports, module) {
   };
   
   var replaceStrictlyPrecedence = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i > 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
@@ -225,7 +364,7 @@ define(function(require, exports, module) {
     "+": "__plus__", "-": "__minus__"
   };
   var replaceUnaryOperator = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "UNARY" && unaryOperatorDict.hasOwnProperty(token[VALUE])) {
@@ -259,7 +398,7 @@ define(function(require, exports, module) {
     }
   };
   var replaceBinaryOperator = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "MATH" && binaryOperatorDict.hasOwnProperty(token[VALUE])) {
@@ -397,7 +536,270 @@ define(function(require, exports, module) {
     return tokens;
   };
   
-  var replaceGlobalVariants = function(tokens) {
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    return val;
+  };
+
+  var iterContextMethods = [
+    "yield"
+  ];
+  var replaceIteratorFunction = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "Iterator") {
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (tokens[j][TAG] === "->" ||
+              tokens[j][TAG] === "=>" ||
+              tokens[j][TAG] === "PARAM_START") {
+            makeSegmentedFunction(getNextOperand(tokens, j), iterContextMethods);
+            break;
+          }
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  var taskContextMethods = [
+    "wait", "break", "continue", "redo"
+  ];
+  var replaceTaskFunction = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "Task") {
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (tokens[j][TAG] === "->" ||
+              tokens[j][TAG] === "=>" ||
+              tokens[j][TAG] === "PARAM_START") {
+            makeSegmentedFunction(getNextOperand(tokens, j), taskContextMethods);
+            break;
+          }
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  var insertClosureFuction = function(tokens, index, t, body) {
+    var outerVars = t.cc_outerVars;
+    if (outerVars && outerVars.length) {
+      var offset = 0;
+      if (tokens[index-2][TAG] !== "PARAM_END") {
+        offset = 1;
+      } else {
+        var bracket = 0;
+        while ((t = tokens[index - offset]) !== undefined) {
+          if (t[TAG] === "PARAM_END") {
+            bracket += 1;
+          } else if (t[TAG] === "PARAM_START") {
+            bracket -=1;
+            if (bracket === 0) {
+              break;
+            }
+          }
+          offset += 1;
+        }
+      }
+      
+      index -= offset;
+      tokens.splice(index++, 0, ["UNARY"      , "do", _]);
+      tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
+      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", outerVars[i], _]);
+      }
+      tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
+      tokens.splice(index++, 0, ["->"         , "->", _]);
+      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+      index += offset;
+    }
+    
+    var indent = 0;
+    LOOP:
+    while ((t = body.shift()) !== undefined) {
+      tokens.splice(index++, 0, t);
+      switch (t[TAG]) {
+      case "INDENT":
+        indent += 1;
+        break;
+      case "->": case "=>":
+        index = insertClosureFuction(tokens, index, t, body);
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        break LOOP;
+      }
+    }
+    if (outerVars && outerVars.length) {
+      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    }
+    return index;
+  };
+  
+  var makeSegmentedFunction = function(op, controlMethods) {
+    var tokens = op.tokens;
+    var index  = op.begin;
+    var begin  = index;
+    var body = tokens.splice(op.begin, op.end-op.begin+1);
+    var t, bracket, indent;
+    var localVars, outerVars, controlMethodCalled, numOfSegments;
+    var i, imax;
+    
+    var params = [];
+    for (bracket = 0; (t = body.shift()) !== undefined; ) {
+      if (t[TAG] === "PARAM_START") {
+        bracket += 1;
+      } else if (t[TAG] === "PARAM_END") {
+        bracket -= 1;
+      } else if (t[TAG] === "->" || t[TAG] === "=>") {
+        if (bracket === 0) {
+          break;
+        }
+      }
+      params.push(t);
+    }
+    localVars = t.cc_localVars;
+    outerVars = t.cc_outerVars;
+    body.shift(); // remove INDENT
+    body.pop();   // remove OUTDENT
+    
+    // replace function
+    if (outerVars.length) {
+      tokens.splice(index++, 0, ["UNARY"      , "do", _]);
+      tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
+      for (i = 0, imax = outerVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", outerVars[i], _]);
+      }
+      tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
+      tokens.splice(index++, 0, ["->"         , "->", _]);
+      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    }
+    
+    tokens.splice(index++, 0, ["->"     , "->", _]);
+    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    
+    // declare local variables
+    if (localVars.length) {
+      for (i = 0, imax = localVars.length; i < imax; i++) {
+        tokens.splice(index++, 0, ["IDENTIFIER", localVars[i], _]);
+        tokens.splice(index++, 0, ["="         , "="         , _]);
+      }
+      tokens.splice(index++, 0, ["UNDEFINED" , "undefined", _]);
+      tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+    }
+    
+    // return an array of function segments
+    tokens.splice(index++, 0, ["["      , "[" , _]);
+    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    
+    numOfSegments = 0;
+    
+    NEXT_SEGMENTS:
+    while (body.length) {
+      if (numOfSegments) {
+        tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+      }
+      numOfSegments += 1;
+
+      // insert arguments
+      for (i = 0, imax = params.length; i < imax; ++i) {
+        tokens.splice(index++, 0, params[i]);
+      }
+      tokens.splice(index++, 0, ["->"    , "->", _]);
+      tokens.splice(index++, 0, ["INDENT", 2   , _]);
+      
+      controlMethodCalled = 0;
+      for (bracket = indent = 0; (t = body.shift()) !== undefined; ) {
+        tokens.splice(index++, 0, t);
+        if (t.cc_tasked) {
+          continue;
+        }
+        switch (t[TAG]) {
+        case "CALL_START":
+          bracket += 1;
+          continue;
+        case "CALL_END":
+          bracket -= 1;
+          continue;
+        case "INDENT":
+          indent += 1;
+          continue;
+        case "OUTDENT":
+          indent -= 1;
+          continue;
+        case "->": case "=>":
+          index = insertClosureFuction(tokens, index, t, body);
+          continue;
+        case "TERMINATOR":
+          if (bracket === 0 && indent === 0 && controlMethodCalled) {
+            tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+            continue NEXT_SEGMENTS;
+          }
+          break;
+        }
+        if (bracket === 0 && t[TAG] === "@" && body[0] &&
+            controlMethods.indexOf(getIdentifier(body[0])) !== -1) {
+          controlMethodCalled = 1;
+        }
+      }
+      tokens.splice(index++, 0, ["OUTDENT", 2, _]);
+    }
+    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    tokens.splice(index++, 0, ["]"      , "]", _]);
+    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    if (outerVars.length) {
+      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    }
+    
+    for (i = index - 1; i >= begin; --i) {
+      tokens[i].cc_tasked = true;
+    }
+  };
+  
+  var replaceGlobalVariables = function(tokens) {
+    for (var i = tokens.length - 1; i--; ) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue; // { NotGlobal:"dict key is not global" }
+        }
+        if (isDot(tokens[i-1])) {
+          continue; // this.is.NotGlobal, @isNotGlobal
+        }
+        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
+      }
+    }
+    return tokens;
+  };
+  
+  var replaceCCVariables = function(tokens) {
     for (var i = tokens.length - 1; i--; ) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
@@ -405,19 +807,13 @@ define(function(require, exports, module) {
       }
       if (cc.global.hasOwnProperty(token[VALUE])) {
         if (tokens[i+1][TAG] === ":") {
-          continue; // { NotGlobal:"dict key is not global" }
+          continue;
         }
-        if (i > 0) {
-          if (tokens[i-1][TAG] === "." || tokens[i-1][TAG] === "@") {
-            continue; // this.is.NotGlobal, @isNotGlobal
-          }
+        if (isDot(tokens[i-1])) {
+          continue;
         }
         tokens.splice(i  , 0, ["IDENTIFIER", "cc", _]);
         tokens.splice(i+1, 0, ["."         , "." , _]);
-      } else if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
-        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
-        tokens.splice(i+1, 0, ["."         , "."     , _]);
-        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
       }
     }
     return tokens;
@@ -451,6 +847,46 @@ define(function(require, exports, module) {
     tokens.splice(i++, 0, ["CALL_END"  , ")"          , _]);
     return tokens;
   };
+
+  var tab = function(n) {
+    var t = "";
+    for (var i = 0; i < n; ++i) {
+      t += "  ";
+    }
+    return t;
+  };
+  var prettyPrint = function(tokens) {
+    var indent = 0;
+    tokens = detectPlusMinusOperator(tokens);
+    return tokens.map(function(token) {
+      switch (token[TAG]) {
+      case "TERMINATOR":
+        return "\n" + tab(indent);
+      case "INDENT":
+        indent += 1;
+        return "\n" + tab(indent);
+      case "OUTDENT":
+        indent -= 1;
+        return "\n" + tab(indent);
+      case "RETURN":
+        return "return ";
+      case "UNARY":
+        return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
+      case "{":
+        return "{";
+      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
+        return token[VALUE] + " ";
+      case "=": case "COMPARE": case "MATH": case "LOGIC":
+        return " " + token[VALUE] + " ";
+      case "HERECOMMENT":
+        return "/* " + token[VALUE] + " */";
+      default:
+        return token[VALUE];
+      }
+    }).join("").split("\n").filter(function(line) {
+      return !(/^\s*$/.test(line));
+    }).join("\n").trim();
+  };
   
   var CoffeeCompiler = (function() {
     function CoffeeCompiler() {
@@ -464,6 +900,7 @@ define(function(require, exports, module) {
             data.push(token[VALUE].trim());
           }
         });
+        tokens = replaceGlobalVariables(tokens);
         tokens = replaceFixedTimeValue(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
@@ -471,7 +908,9 @@ define(function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceGlobalVariants(tokens);
+        tokens = replaceIteratorFunction(tokens);
+        tokens = replaceTaskFunction(tokens);
+        tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
       this.code = code;
@@ -482,44 +921,11 @@ define(function(require, exports, module) {
       var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
-    var tab = function(n) {
-      var t = ""; while (n--) { t += "  "; } return t;
-    };
     CoffeeCompiler.prototype.toString = function(tokens) {
-      var indent = 0;
       if (typeof tokens === "string") {
         tokens = this.tokens(tokens);
       }
-      tokens = sortPlusMinusOperator(tokens);
-      return tokens.map(function(token) {
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          return "\n" + tab(indent);
-        case "INDENT":
-          indent += 1;
-          return "\n" + tab(indent);
-        case "OUTDENT":
-          indent -= 1;
-          return "\n" + tab(indent);
-        case "RETURN":
-          return "return ";
-        case "UNARY":
-          if (token[VALUE].length > 1) {
-            return token[VALUE] + " ";
-          }
-          return token[VALUE];
-        case "{":
-          return "{";
-        case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
-          return token[VALUE] + " ";
-        case "=": case "COMPARE": case "MATH": case "LOGIC":
-          return " " + token[VALUE] + " ";
-        case "HERECOMMENT":
-          return "/* " + token[VALUE] + " */";
-        default:
-          return token[VALUE];
-        }
-      }).join("").trim();
+      return prettyPrint(tokens);
     };
     return CoffeeCompiler;
   })();
@@ -533,10 +939,12 @@ define(function(require, exports, module) {
   module.exports = {
     CoffeeCompiler: CoffeeCompiler,
     
-    sortPlusMinusOperator  : sortPlusMinusOperator,
-    revertPlusMinusOperator: revertPlusMinusOperator,
-    getPrevOperand         : getPrevOperand,
-    getNextOperand         : getNextOperand,
+    detectPlusMinusOperator : detectPlusMinusOperator,
+    revertPlusMinusOperator : revertPlusMinusOperator,
+    getPrevOperand          : getPrevOperand,
+    getNextOperand          : getNextOperand,
+    detectFunctionParameters: detectFunctionParameters,
+    
     replaceFixedTimeValue    : replaceFixedTimeValue,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
@@ -544,10 +952,15 @@ define(function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceGlobalVariants    : replaceGlobalVariants,
+    replaceIteratorFunction  : replaceIteratorFunction,
+    replaceTaskFunction      : replaceTaskFunction,
+    replaceGlobalVariables   : replaceGlobalVariables,
+    replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
+    prettyPrint              : prettyPrint,
+    
     getSynthDefArguments: getSynthDefArguments,
-    use:use,
+    use: use,
   };
 
 });

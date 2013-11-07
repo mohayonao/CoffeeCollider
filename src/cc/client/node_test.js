@@ -10,20 +10,20 @@ define(function(require, exports, module) {
     var tl, actual, expected;
     before(function() {
       node.use();
-      cc.timeline = {
-        push: function(that, func, args) {
-          if (typeof that === "function") {
-            that();
-          } else {
-            func.apply(that, args);
-          }
-        }
-      };
+      // cc.timeline = {
+      //   push: function(that, func, args) {
+      //     if (typeof that === "function") {
+      //       that();
+      //     } else {
+      //       func.apply(that, args);
+      //     }
+      //   }
+      // };
       cc.client = {
         pushToTimeline: function(cmd) {
           tl = cmd;
         },
-        timeline: cc.timeline,
+        // timeline: cc.timeline,
         rootNode: cc.createGroup(),
       };
       cc.instanceOfSynthDef = function() {

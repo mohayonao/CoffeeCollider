@@ -61,20 +61,6 @@ define(function(require, exports, module) {
         assert.deepEqual(calc(10, 1), 10);
       });
     });
-    it("sync", function() {
-      var result;
-      cc.timeline = {
-        push: function(that, func, args) {
-          result = func.call(that, args);
-        }
-      };
-      var synced = fn.sync(function(arg) {
-        return "synced-" + arg;
-      });
-      synced("func");
-      
-      assert.equal(result, "synced-func");
-    });
     it("definePrototypeProperty", function() {
       fn.definePrototypeProperty(Array, "fn_test", function() {
         return "fn_test";

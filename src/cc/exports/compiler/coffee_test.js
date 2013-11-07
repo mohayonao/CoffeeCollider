@@ -8,9 +8,13 @@ define(function(require, exports, module) {
   var compiler = require("./coffee");
   var TAG   = 0;
   var VALUE = 1;
-
+  
   var tab = function(n) {
-    var t = ""; while (n--) { t += "  "; } return t;
+    var t = "";
+    for (var i = 0; i < n; ++i) {
+      t += "  ";
+    }
+    return t;
   };
   var dumpTokens = function(tokens, linenum) {
     var indent = 0;
@@ -32,21 +36,6 @@ define(function(require, exports, module) {
       return x;
     }).join("\n"));
   };
-  var detokens = function(tokens) {
-    var indent = 0;
-    return tokens.map(function(token) {
-      switch (token[TAG]) {
-      case "INDENT":
-        indent += 1;
-        return "\n";
-      case "OUTDENT":
-        indent -= 1;
-        return "\n";
-      }
-      return tab(indent) + token[VALUE];
-    }).join("");
-  };
-  
   var tagList = function(tokens) {
     return tokens.map(function(token) {
       return token[TAG]
@@ -54,81 +43,92 @@ define(function(require, exports, module) {
   };
   
   describe("coffee.js", function() {
-    it.only("sortPlusMinusOperator", function() {
+    var testSuite;
+    before(function() {
+      testSuite = function(func, code, expected) {
+        var tokens = func(coffee.tokens(code));
+        var actual = compiler.prettyPrint(tokens);
+        assert.equal(actual, expected, code);
+        assert.doesNotThrow(function() {
+          coffee.nodes(tokens).compile();
+        }, code);
+      };
+    });
+    it("detectPlusMinusOperator", function() {
       var tokens;
       tokens = coffee.tokens("+10");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.equal(tokens[0][TAG], "UNARY");
 
       tokens = coffee.tokens("-10");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.equal(tokens[0][TAG], "UNARY");
       
       tokens = coffee.tokens("a + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["IDENTIFIER", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("1 + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["NUMBER", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("'a' + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["STRING", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("/a/ + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["REGEX", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("true + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["BOOL", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("null + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["NULL", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("undefined + 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["UNDEFINED", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("[] - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["[", "]", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("{} - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["{", "}", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("(0) - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["(", "NUMBER", ")", "MATH", "NUMBER", "TERMINATOR"]
       );
 
       tokens = coffee.tokens("a() - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["IDENTIFIER", "CALL_START", "CALL_END", "MATH", "NUMBER", "TERMINATOR"]
       );
       tokens = coffee.tokens("a[0] - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       assert.deepEqual(
         tagList(tokens), ["IDENTIFIER", "INDEX_START", "NUMBER", "INDEX_END", "MATH", "NUMBER", "TERMINATOR"]
       );
       
       tokens = coffee.tokens("(0) - 0");
-      tokens = compiler.sortPlusMinusOperator(tokens);
-      tokens = compiler.sortPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
+      tokens = compiler.detectPlusMinusOperator(tokens);
       tokens = compiler.revertPlusMinusOperator(tokens);
       tokens = compiler.revertPlusMinusOperator(tokens);
       assert.deepEqual(
@@ -318,7 +318,62 @@ define(function(require, exports, module) {
       ].join("\n");
       tokens = coffee.tokens(code);
       op = compiler.getNextOperand(tokens, 4); // from ->
-      assert.equal(tokens[op.end][TAG], "OUTDENT", "function");
+      assert.equal(tokens[op.end  ][TAG], "OUTDENT" , "function");
+      assert.equal(tokens[op.end+1][TAG], "CALL_END", "function");
+      
+      code = [
+        "a (a=0)->",
+        "  @f 1",
+        "  @g 2",
+        "b = 0"
+      ].join("\n");
+      tokens = coffee.tokens(code);
+      op = compiler.getNextOperand(tokens, 1); // from ->
+      assert.equal(tokens[op.end  ][TAG], "OUTDENT" , "function");
+      assert.equal(tokens[op.end+1][TAG], "CALL_END", "function");
+    });
+    it("detectFunctionParameters", function() {
+      var tokens, code, actual;
+      var crawlLocalVars = function(tokens) {
+        var list = [ tokens.cc_localVars ];
+        tokens.forEach(function(token) {
+          if (token.cc_localVars) {
+            list.push(token.cc_localVars.sort());
+          }
+        });
+        return list;
+      };
+      var crawlOuterVars = function(tokens) {
+        var list = [];
+        tokens.forEach(function(token) {
+          if (token.cc_outerVars) {
+            list.push(token.cc_outerVars.sort());
+          }
+        });
+        return list;
+      };
+      code = [
+        "a = b = c = d = e = f = 10",
+        "g = (h, i, j)->",
+        "  k = a + b",
+        "  for l, [m, n] in j",
+        "    o += i * m",
+        "  global = p = ->",
+        "    q = {g:d.c}",
+        "    [r, [s, t]] = [e, f]",
+        "  q = 10",
+        "k = t = 10"
+      ].join("\n");
+      tokens = coffee.tokens(code);
+      tokens = compiler.detectFunctionParameters(tokens);
+      actual = crawlLocalVars(tokens);
+      assert.deepEqual(actual, [
+        ["a","b","c","d","e","f","g","k","t"], ["k","l","m","n","o","p","q"], ["q","r","s","t"]
+      ]);
+      actual = crawlOuterVars(tokens);
+      assert.deepEqual(actual, [
+        ["a","b","d","e","f"], ["d","e","f"]
+      ]);
     });
     it("replaceFixedTimeValue", function() {
       var tokens;
@@ -337,62 +392,53 @@ define(function(require, exports, module) {
       assert.equal(tokens[0][VALUE], "'10min'", "not replace when use single quotation");
     });
     it("replaceStrictlyPrecedence", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("0*(10+20*30-40/50)");
-      tokens = compiler.replaceStrictlyPrecedence(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "(0*(10+(20*30)-(40/50)))");
+      var code, expected;
+      code     = "0 * (10 + 20 * 30 - 40 / 50)";
+      expected = "(0 * (10 + (20 * 30) - (40 / 50)))";
+      testSuite(compiler.replaceStrictlyPrecedence, code, expected);
     });
     it("replaceUnaryOperator", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("+10 + -[20]");
-      tokens = compiler.replaceUnaryOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "10.__plus__()+[20].__minus__()");
+      var code, expected;
+      code     = "+10 + -[20]";
+      expected = "10.__plus__() + [20].__minus__()";
+      testSuite(compiler.replaceUnaryOperator, code, expected);
     });
     it("replaceBinaryOperator", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("+10 + -[20]");
-      tokens = compiler.replaceBinaryOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "+10.__add__(-[20])");
-
-      tokens = coffee.tokens("+10 +F+ -[20]");
-      tokens = compiler.replaceBinaryOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "+10.__add__(-[20],FOLD)");
-
-      tokens = coffee.tokens("FOLD + -[20]");
-      tokens = compiler.replaceBinaryOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "FOLD.__add__(-[20])");
+      var code, expected;
+      code     = "+10 + -[20]";
+      expected = "+10.__add__(-[20])";
+      testSuite(compiler.replaceBinaryOperator, code, expected);
+      
+      code     = "+10 +F+ -[20]";
+      expected = "+10.__add__(-[20], FOLD)";
+      testSuite(compiler.replaceBinaryOperator, code, expected);
+      
+      code     = "FOLD + -[20]";
+      expected = "FOLD.__add__(-[20])";
+      testSuite(compiler.replaceBinaryOperator, code, expected);
     });
     it("replaceCompoundAssign", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("a.a += 10");
-      tokens = compiler.replaceCompoundAssign(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "a.a=a.a.__add__(10)");
+      var code, expected;
+      code     = "a.a += 10";
+      expected = "a.a = a.a.__add__(10)";
+      testSuite(compiler.replaceCompoundAssign, code, expected);
     });
     it("replaceLogicOperator", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("10 && 20 || 30");
-      tokens = compiler.replaceLogicOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "10&&20||30");
+      var code, expected;
+      code     = "10 && 20 || 30";
+      expected = "10 && 20 || 30";
+      testSuite(compiler.replaceLogicOperator, code, expected);
 
-      tokens = coffee.tokens("@wait 10 && 20 || 30");
-      tokens = compiler.replaceLogicOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "@wait(10.__and__(20).__or__(30))");
+      code     = "@wait 10 && 20 || 30";
+      expected = "@wait(10.__and__(20).__or__(30))";
+      testSuite(compiler.replaceLogicOperator, code, expected);
 
-      tokens = coffee.tokens("@wait 10 && (20||30), 40 || 50");
-      tokens = compiler.replaceLogicOperator(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "@wait(10.__and__((20||30)),40||50)");
+      code     = "@wait 10 && (20||30), 40 || 50";
+      expected = "@wait(10.__and__((20 || 30)), 40 || 50)";
+      testSuite(compiler.replaceLogicOperator, code, expected);
     });
     it("replaceSynthDefinition", function() {
-      var tokens, code, actual, expected;
+      var code, expected;
       code = [
         "Synth.def ->",
         "  1000",
@@ -401,77 +447,275 @@ define(function(require, exports, module) {
       expected = [
         "Synth.def(->",
         "  1000",
-        ",[]).play()"
+        ", []).play()"
       ].join("\n");
-      tokens = coffee.tokens(code);
-      tokens = compiler.replaceSynthDefinition(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, expected);
+      testSuite(compiler.replaceSynthDefinition, code, expected);
       
       code = [
-        "Synth.def (out,freq=440,amp=[1,2])->",
+        "Synth.def (out, freq=440, amp=[1,2])->",
         "  1000",
         ".play()"
       ].join("\n");
       expected = [
-        "Synth.def((out,freq,amp)->",
+        "Synth.def((out, freq, amp)->",
         "  1000",
-        ",['out','0','freq','440','amp','[1,2]']).play()"
+        ", ['out', '0', 'freq', '440', 'amp', '[1,2]']).play()"
       ].join("\n");
-      tokens = coffee.tokens(code);
-      tokens = compiler.replaceSynthDefinition(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, expected);
-
+      testSuite(compiler.replaceSynthDefinition, code, expected);
+      
       code = [
-        "Synth.def((a={},b='')->",
+        "Synth.def((a={}, b='')->",
         "  1000",
         ", 1000).play()"
       ].join("\n");
       expected = [
-        "Synth.def((a,b)->",
+        "Synth.def((a, b)->",
         "  1000",
-        ",['a','{}','b','\"\"'],1000).play()"
+        ", ['a', '{}', 'b', '\"\"'], 1000).play()"
       ].join("\n");
-      tokens = coffee.tokens(code);
-      tokens = compiler.replaceSynthDefinition(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, expected);
+      testSuite(compiler.replaceSynthDefinition, code, expected);
     });
-    it("replaceGlobalVariants", function() {
+    it("replaceIteratorFunction", function() {
+      var code, expected;
+      code = [
+        "i = Iterator ->",
+        "  @yield 100",
+        "  if true",
+        "    @yield 200",
+        "  else 0",
+        "  a = => @yield 300",
+        "  @yield 400",
+      ].join("\n");
+      expected = [
+        "i = Iterator(->",
+        "  a = undefined",
+        "  [",
+        "    ->",
+        "      @yield(100)",
+        "    ->",
+        "      if true",
+        "        @yield(200)",
+        "      else",
+        "        0",
+        "    ->",
+        "      a = =>",
+        "        @yield(300)",
+        "      @yield(400)",
+        "  ]",
+        ")"
+      ].join("\n");
+      testSuite(compiler.replaceIteratorFunction, code, expected);
+
+      code = [
+        "func = Iterator func",
+        "func = (i)->",
+        "  100",
+      ].join("\n");
+      expected = [
+        "func = Iterator(func)",
+        "func = (i)->",
+        "  100",
+      ].join("\n");
+      testSuite(compiler.replaceIteratorFunction, code, expected);
+
+      code = [
+        "func = Iterator(func).on 'end', ->",
+        "  100"
+      ].join("\n");
+      expected = [
+        "func = Iterator(func).on('end', ->",
+        "  100",
+        ")"
+      ].join("\n");
+      testSuite(compiler.replaceIteratorFunction, code, expected);
+    });
+    it("replaceTaskFunction", function() {
+      var code, actual, expected;
+      code = [
+        "t = Task (i)->",
+        "  @func()",
+        "  @wait 100",
+        "  @break()",
+        "  @continue()",
+        "  @redo()",
+        "  @func()",
+        "  @func()",
+      ].join("\n");
+      expected = [
+        "t = Task(->",
+        "  [",
+        "    (i)->",
+        "      @func()",
+        "      @wait(100)",
+        "    (i)->",
+        "      @break()",
+        "    (i)->",
+        "      @continue()",
+        "    (i)->",
+        "      @redo()",
+        "    (i)->",
+        "      @func()",
+        "      @func()",
+        "  ]",
+        ")"
+      ].join("\n");
+      testSuite(compiler.replaceTaskFunction, code, expected);
+      
+      code = [
+        "Task.do (i)->",
+        "  a = 100",
+        "  @wait 100",
+        "  [b, c] = [200, 300]",
+        "  @break()",
+        ".play()"
+      ].join("\n");
+      expected = [
+        "Task.do(->",
+        "  a = b = c = undefined",
+        "  [",
+        "    (i)->",
+        "      a = 100",
+        "      @wait(100)",
+        "    (i)->",
+        "      [b, c] = [200, 300]",
+        "      @break()",
+        "  ]",
+        ").play()"
+      ].join("\n");
+      testSuite(compiler.replaceTaskFunction, code, expected);
+      
+      code = [
+        "func = Task func",
+        "func = (i)->",
+        "  100",
+      ].join("\n");
+      expected = [
+        "func = Task(func)",
+        "func = (i)->",
+        "  100",
+      ].join("\n");
+      testSuite(compiler.replaceTaskFunction, code, expected);
+      
+      code = [
+        "func = Task.do(func).on 'end', ->",
+        "  100"
+      ].join("\n");
+      expected = [
+        "func = Task.do(func).on('end', ->",
+        "  100",
+        ")"
+      ].join("\n");
+      testSuite(compiler.replaceTaskFunction, code, expected);
+      
+      code = [
+        "def = make()",
+        "Task.do (i)->", // outer:[def], local:[s, t]
+        "  s = def.play()",
+        "  @wait Task.each [500, 250, 500], (n, i)->", // outer:[s, def], local:[t, x]
+        "    s.set()",
+        "    x = n",
+        "    t = Task.interval 100, (i)->", // outer:[x, def], local:[y]
+        "      x = i",
+        "      y = i * 2",
+        "      def.play(x, y).on 'end', (i)->", // outer:[y], local:[z]
+        "        y = 10",
+        "        z = 20",
+        "    .play()",
+        "    @wait x",
+        "    t.stop()",
+        "  .play()",
+        "  @wait Task.do ->", // outer:[], local:[]
+        "    @wait 50",
+        "  .play()",
+        "  t = 1000",
+        "  @wait t",
+        ".play()"
+      ].join("\n");
+      
+      expected = [
+        "def = make()",
+        "Task.do(do (def)->", // outer:[def], local:[s, t]
+        "  ->",
+        "    s = t = undefined",
+        "    [",
+        "      (i)->",
+        "        s = def.play()",
+        "        @wait(Task.each([500, 250, 500], do (s, def)->", // outer:[s, def], local:[t, x]
+        "          ->",
+        "            x = t = undefined",
+        "            [",
+        "              (n, i)->",
+        "                s.set()",
+        "                x = n",
+        "                t = Task.interval(100, do (x, def)->", // outer:[x, def], local:[y]
+        "                  ->",
+        "                    y = undefined",
+        "                    [",
+        "                      (i)->",
+        "                        x = i",
+        "                        y = i * 2", // outer:[y], local:[z]
+        "                        def.play(x, y).on('end', do (y)->",
+        "                          (i)->",
+        "                            y = 10",
+        "                            z = 20",
+        "                        )",
+        "                    ]",
+        "                ).play()",
+        "                @wait(x)",
+        "              (n, i)->",
+        "                t.stop()",
+        "            ]",
+        "        ).play())",
+        "      (i)->",
+        "        @wait(Task.do(->", // outer:[], local:[]
+        "          [",
+        "            ->",
+        "              @wait(50)",
+        "          ]",
+        "        ).play())",
+        "      (i)->",
+        "        t = 1000",
+        "        @wait(t)",
+        "    ]",
+        ").play()"
+      ].join("\n");
+      testSuite(compiler.replaceTaskFunction, code, expected);
+    });
+    it("replaceGlobalVariables", function() {
+      var code, actual, expected;
+      code     = "[$, $123, $__, $isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
+      expected = "[$, $123, $__, global.isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
+      testSuite(compiler.replaceGlobalVariables, code, expected);
+      
+      code     = "{$key:$val}";
+      expected = "{$key:global.val}";
+      testSuite(compiler.replaceGlobalVariables, code, expected);
+    });
+    it("replaceCCVariables", function() {
+      var code, actual, expected;
       cc.global.Global = true;
-      var tokens, actual;
-      tokens = coffee.tokens("Global, NotGlobal");
-      tokens = compiler.replaceGlobalVariants(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "cc.Global,NotGlobal");
+      
+      code     = "[Global, NotGlobal]";
+      expected = "[cc.Global, NotGlobal]";
+      testSuite(compiler.replaceCCVariables, code, expected);
 
-      tokens = coffee.tokens("a.Global, @Global");
-      tokens = compiler.replaceGlobalVariants(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "a.Global,@Global");
-
-      tokens = coffee.tokens("{Global:Global}");
-      tokens = compiler.replaceGlobalVariants(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "{Global:cc.Global}");
-
-      tokens = coffee.tokens("$,$123,$isGlobal");
-      tokens = compiler.replaceGlobalVariants(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(actual, "$,$123,global.isGlobal");
+      code     = "[a.Global, @Global]";
+      expected = "[a.Global, @Global]";
+      testSuite(compiler.replaceCCVariables, code, expected);
+      
+      code     = "{Global:Global}";
+      expected = "{Global:cc.Global}";
+      testSuite(compiler.replaceCCVariables, code, expected);
     });
     it("finalize", function() {
-      var tokens, actual;
-      tokens = coffee.tokens("100");
-      tokens = compiler.finalize(tokens);
-      actual = detokens(tokens).trim();
-      assert.equal(
-        actual, "" +
-          "((global,undefined)->\n" +
-          "  100\n" +
-          ").call(cc.__context__,this.self||global)"
-      );
+      var code, actual, expected;
+      code     = "100";
+      expected = [
+        "((global, undefined)->",
+        "  100",
+        ").call(cc.__context__, this.self || global)",
+      ].join("\n");
+      testSuite(compiler.finalize, code, expected);
     });
     it("getSynthDefArguments", function() {
       var tokens, code, actual, expected;

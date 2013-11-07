@@ -103,13 +103,6 @@ define(function(require, exports, module) {
     };
   })();
   
-  fn.sync = function(func) {
-    return function() {
-      cc.timeline.push(this, func, slice.call(arguments));
-      return this;
-    };
-  };
-
   fn.definePrototypeProperty = function(Klass, key, func) {
     Object.defineProperty(Klass.prototype, key, {
       configurable: true,
