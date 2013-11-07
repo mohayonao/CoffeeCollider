@@ -249,7 +249,7 @@ define('cc/client/client', function(require, exports, module) {
       this.server.onmessage = function(e) {
         that.recvFromServer(e.data);
       };
-      require("../common/console").bindConsoleApply(commands);
+      require("../common/console").bind(commands);
     }
     extend(IFrameSynthClient, SynthClient);
     
@@ -379,8 +379,14 @@ define('cc/client/client', function(require, exports, module) {
   commands["/play"] = function(msg) {
     this.play(msg);
   };
+  commands["/played"] = function(msg) {
+    this.sendToIF(msg);
+  };
   commands["/pause"] = function(msg) {
     this.pause(msg);
+  };
+  commands["/paused"] = function(msg) {
+    this.sendToIF(msg);
   };
   commands["/reset"] = function(msg) {
     this.reset(msg);
@@ -468,6 +474,7 @@ define('cc/client/client', function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./buffer").use();
       require("./node").use();
       require("./pattern").use();
@@ -703,10 +710,11 @@ define('cc/common/browser', function(require, exports, module) {
 
 });
 define('cc/common/console', function(require, exports, module) {
-  
+
+  var cc = require("../cc");
   var unpack = require("./pack").unpack;
   
-  var bindConsoleApply = function(commands) {
+  var bind = function(commands) {
     commands["/console/log"] = function(msg) {
       console.log.apply(console, unpack(msg[1]));
     };
@@ -725,7 +733,23 @@ define('cc/common/console', function(require, exports, module) {
   };
   
   module.exports = {
-    bindConsoleApply: bindConsoleApply
+    bind: bind,
+    use : function() {
+      cc.console = {
+        log: function() {
+          global.console.log.apply(global.console, arguments);
+        },
+        info: function() {
+          global.console.info.apply(global.console, arguments);
+        },
+        warn: function() {
+          global.console.warn.apply(global.console, arguments);
+        },
+        error: function() {
+          global.console.error.apply(global.console, arguments);
+        }
+      };
+    }
   };
 
 });
@@ -1090,13 +1114,6 @@ define('cc/client/fn', function(require, exports, module) {
     };
   })();
   
-  fn.sync = function(func) {
-    return function() {
-      cc.timeline.push(this, func, slice.call(arguments));
-      return this;
-    };
-  };
-
   fn.definePrototypeProperty = function(Klass, key, func) {
     Object.defineProperty(Klass.prototype, key, {
       configurable: true,
@@ -1194,8 +1211,8 @@ define('cc/client/utils', function(require, exports, module) {
 });
 define('cc/common/ops', function(require, exports, module) {
 
-  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
-  var BINARY_OP_UGEN_MAP = "+ - * / / % == != < > <= >= min max & | ^ lcm gcd round roundUp trunc atan2 hypot hypotApx pow << >> >>> fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors".split(" ");
+  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi to_i".split(" ");
+  var BINARY_OP_UGEN_MAP = "+ - * / / % eq ne lt gt le ge min max bitAnd bitOr bitXor lcm gcd round roundUp trunc atan2 hypot hypotApx pow leftShift rightShift unsignedRightShift fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors roundDown".split(" ");
 
   var UGEN_OP_ALIASES = {
     __plus__ : "num",
@@ -1298,7 +1315,6 @@ define('cc/common/emitter', function(require, exports, module) {
 define('cc/client/node', function(require, exports, module) {
 
   var cc = require("./cc");
-  var fn = require("./fn");
   var utils   = require("./utils");
   var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
@@ -1315,25 +1331,25 @@ define('cc/client/node', function(require, exports, module) {
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
-    Node.prototype.play = fn.sync(function() {
+    Node.prototype.play = function() {
       cc.client.pushToTimeline([
         "/n_run", this.nodeId, true
       ]);
       return this;
-    });
-    Node.prototype.pause = fn.sync(function() {
+    };
+    Node.prototype.pause = function() {
       cc.client.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
-    });
-    Node.prototype.stop = fn.sync(function() {
+    };
+    Node.prototype.stop = function() {
       cc.client.pushToTimeline([
         "/n_free", this.nodeId
       ]);
       this._blocking = false;
       return this;
-    });
+    };
     Node.prototype.performWait = function() {
       return this._blocking;
     };
@@ -1345,12 +1361,9 @@ define('cc/client/node', function(require, exports, module) {
       Node.call(this);
       this.klassName = "Group";
       if (target instanceof Node) {
-        var that = this;
-        cc.client.timeline.push(function() {
-          cc.client.pushToTimeline([
-            "/g_new", that.nodeId, addAction, target.nodeId
-          ]);
-        });
+        cc.client.pushToTimeline([
+          "/g_new", this.nodeId, addAction, target.nodeId
+        ]);
       }
     }
     extend(Group, Node);
@@ -1365,18 +1378,15 @@ define('cc/client/node', function(require, exports, module) {
       if (target instanceof Node && cc.instanceOfSynthDef(def)) {
         this.params  = def.specs.params;
         var nodeId   = this.nodeId;
-        var timeline = cc.client.timeline;
         var controls = args2controls(args, this.params);
-        timeline.push(function() {
-          cc.client.pushToTimeline([
-            "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
-          ]);
-        });
+        cc.client.pushToTimeline([
+          "/s_new", nodeId, addAction, target.nodeId, def._defId, controls
+        ]);
       }
     }
     extend(Synth, Node);
     
-    Synth.prototype._set = function(args) {
+    Synth.prototype.set = function(args) {
       var controls = args2controls(args, this.params);
       if (controls.length) {
         cc.client.pushToTimeline([
@@ -1384,8 +1394,6 @@ define('cc/client/node', function(require, exports, module) {
         ]);
       }
     };
-    
-    Synth.prototype.set = fn.sync(Synth.prototype._set);
     
     return Synth;
   })();
@@ -1457,9 +1465,6 @@ define('cc/client/node', function(require, exports, module) {
   
   var SynthInterface = cc.global.Synth = function() {
     return new Synth();
-  };
-  SynthInterface.def = function(func, args) {
-    return cc.createSynthDef(func, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
@@ -2653,58 +2658,80 @@ define('cc/client/scale', function(require, exports, module) {
 define('cc/client/sched', function(require, exports, module) {
 
   var cc = require("./cc");
-  var fn = require("./fn");
-  var extend = require("../common/extend");
+  var extend  = require("../common/extend");
   var emitter = require("../common/emitter");
-  
+  var slice = [].slice;
+
   var Timeline = (function() {
     function Timeline() {
       this.klassName = "Timeline";
-      this.reset();
+      this.tasks = [];
+      this.counterIncr = 0;
     }
     extend(Timeline, cc.Object);
     
     Timeline.prototype.play = function(counterIncr) {
-      this.counterIncr = counterIncr;
+      this.counterIncr = Math.max(1, counterIncr);
     };
     Timeline.prototype.pause = function() {
       this.counterIncr = 0;
     };
     Timeline.prototype.reset = function() {
-      var taskGlobal = cc.createTaskGlobal(this);
-      this._list   = [ taskGlobal ];
-      this._stack  = [ taskGlobal ];
-      this.context = taskGlobal.context;
+      this.tasks = [];
     };
-    Timeline.prototype.append = function(sched) {
-      var index = this._list.indexOf(sched);
+    Timeline.prototype.append = function(task) {
+      var index = this.tasks.indexOf(task);
       if (index === -1) {
-        this._list.push(sched);
+        this.tasks.push(task);
       }
     };
-    Timeline.prototype.remove = function(sched) {
-      var index = this._list.indexOf(sched);
+    Timeline.prototype.remove = function(task) {
+      var index = this.tasks.indexOf(task);
       if (index !== -1) {
-        this._list.splice(index, 1);
+        this.tasks.splice(index, 1);
       }
-    };
-    Timeline.prototype.push = function(that, func, args) {
-      this._stack[this._stack.length - 1].push(that, func, args);
     };
     Timeline.prototype.process = function() {
-      var counterIncr = this.counterIncr || 1;
-      var _list = this._list;
-      for (var i = 0; i < _list.length; ++i) {
-        _list[i].process(counterIncr);
+      var counterIncr = this.counterIncr;
+      var tasks = this.tasks;
+      for (var i = 0; i < tasks.length; ++i) {
+        tasks[i].process(counterIncr);
       }
     };
     
     return Timeline;
   })();
   
+  var TaskFunction = (function() {
+    function TaskFunction(init) {
+      emitter.mixin(this);
+      this.klassName = "TaskFunction";
+      if (typeof init !== "function") {
+        throw new TypeError("TaskFunction: first argument should be a Function.");
+      }
+      var segments = init();
+      if (!Array.isArray(segments)) {
+        throw new TypeError("TaskFunction: invalid initialize function");
+      }
+      this.segments = segments;
+      this.index    = 0;
+    }
+    extend(TaskFunction, cc.Object);
+    
+    TaskFunction.prototype.perform = function(context) {
+      var func = this.segments[this.index++];
+      if (func) {
+        func.apply(context, slice.call(arguments, 1));
+        return true;
+      }
+      return false;
+    };
+    
+    return TaskFunction;
+  })();
+
   var TaskWaitToken = (function() {
     function TaskWaitToken(item) {
-      emitter.mixin(this);
       this.klassName = "TaskWaitToken";
       this.item = item;
       this._blocking = true;
@@ -2712,12 +2739,6 @@ define('cc/client/sched', function(require, exports, module) {
     extend(TaskWaitToken, cc.Object);
     
     TaskWaitToken.prototype.performWait = function() {
-      if (this._blocking) {
-        this._blocking = !!this.item;
-        if (!this._blocking) {
-          this.emit("end");
-        }
-      }
       return this._blocking;
     };
     
@@ -2736,7 +2757,6 @@ define('cc/client/sched', function(require, exports, module) {
         this.item -= counterIncr;
         if (this.item <= 0) {
           this._blocking = false;
-          this.emit("end");
         }
       }
       return this._blocking;
@@ -2755,507 +2775,366 @@ define('cc/client/sched', function(require, exports, module) {
     TaskWaitTokenFunction.prototype.performWait = function() {
       if (this._blocking) {
         this._blocking = !!this.item();
-        if (!this._blocking) {
-          this.emit("end");
-        }
       }
       return this._blocking;
     };
     
     return TaskWaitTokenFunction;
   })();
-
+  
   var TaskWaitTokenBoolean = (function() {
     function TaskWaitTokenBoolean(item) {
       TaskWaitToken.call(this, item);
       this.klassName = "TaskWaitTokenBoolean";
+      this._blocking = item;
     }
     extend(TaskWaitTokenBoolean, TaskWaitToken);
     
-    TaskWaitTokenBoolean.prototype.performWait = function() {
-      if (this._blocking) {
-        this._blocking = this.item;
-        if (!this._blocking) {
-          this.emit("end");
-        }
-      }
-      return this._blocking;
-    };
-    
     return TaskWaitTokenBoolean;
   })();
-  
-  var TaskWaitTokenBlock = (function() {
-    function TaskWaitTokenBlock(item) {
+
+  var TaskWaitTokenBlockable = (function() {
+    function TaskWaitTokenBlockable(item) {
       TaskWaitToken.call(this, item);
-      this.klassName = "TaskWaitTokenBlock";
+      this.klassName = "TaskWaitTokenBlockable";
     }
-    extend(TaskWaitTokenBlock, TaskWaitToken);
+    extend(TaskWaitTokenBlockable, TaskWaitToken);
     
-    TaskWaitTokenBlock.prototype.performWait = function(counterIncr) {
+    TaskWaitTokenBlockable.prototype.performWait = function(counterIncr) {
       if (this._blocking) {
         this._blocking = this.item.performWait(counterIncr);
-        if (!this._blocking) {
-          this.emit("end");
-        }
       }
       return this._blocking;
     };
     
-    return TaskWaitTokenBlock;
+    return TaskWaitTokenBlockable;
   })();
 
-  var TaskWaitAND = (function() {
-    function TaskWaitAND(list) {
-      emitter.mixin(this);
-      this.klassName = "TaskWaitAND";
-      var items = [];
-      list.forEach(function(x) {
-        if (x instanceof TaskWaitAND) {
-          items = items.concat(x.list);
+  var TaskWaitTokenLogicAND = (function() {
+    function TaskWaitTokenLogicAND(list) {
+      TaskWaitToken.call(this, []);
+      this.klassName = "TaskWaitTokenLogicAND";
+      var item = [];
+      list.forEach(function(token) {
+        if (token instanceof TaskWaitTokenLogicAND) {
+          item = item.concat(token.item);
         } else {
-          items.push(x);
+          item.push(token);
         }
       });
-      this.items = items;
-      this._blocking = true;
+      this.item = item;
     }
-    extend(TaskWaitAND, TaskWaitToken);
+    extend(TaskWaitTokenLogicAND, TaskWaitToken);
     
-    TaskWaitAND.prototype.performWait = function(counterIncr) {
+    TaskWaitTokenLogicAND.prototype.performWait = function(counterIncr) {
       if (this._blocking) {
-        this._blocking = this.items.reduce(function(_blocking, item) {
-          return item.performWait(counterIncr) || _blocking;
-        }, false);
-      }
-      if (!this._blocking) {
-        this.emit("end");
+        this.item = this.item.filter(function(token) {
+          return token.performWait(counterIncr);
+        });
+        this._blocking = this.item.length > 0;
       }
       return this._blocking;
     };
     
-    return TaskWaitAND;
+    return TaskWaitTokenLogicAND;
   })();
 
-  var TaskWaitOR = (function() {
-    function TaskWaitOR(list) {
-      emitter.mixin(this);
-      this.klassName = "TaskWaitOR";
-      var items = [];
-      list.forEach(function(x) {
-        if (x instanceof TaskWaitOR) {
-          items = items.concat(x.list);
+  var TaskWaitTokenLogicOR = (function() {
+    function TaskWaitTokenLogicOR(list) {
+      TaskWaitToken.call(this, []);
+      var item = [];
+      list.forEach(function(token) {
+        if (token instanceof TaskWaitTokenLogicOR) {
+          item = item.concat(token.item);
         } else {
-          items.push(x);
+          item.push(token);
         }
       });
-      this.items = items;
-      this._blocking = true;
+      this.item = item;
     }
-    extend(TaskWaitOR, TaskWaitToken);
+    extend(TaskWaitTokenLogicOR, TaskWaitToken);
     
-    TaskWaitOR.prototype.performWait = function(counterIncr) {
+    TaskWaitTokenLogicOR.prototype.performWait = function(counterIncr) {
+      var blocking = true;
+      this.item = this.item.filter(function(token) {
+        var _blocking = token.performWait(counterIncr);
+        blocking = _blocking && blocking;
+        return _blocking;
+      });
       if (this._blocking) {
-        this._blocking = this.items.reduce(function(_blocking, item) {
-          return item.performWait(counterIncr) && _blocking;
-        }, true);
-        if (!this._blocking) {
-          this.emit("end");
-        }
+        this._blocking = blocking;
       }
       return this._blocking;
     };
     
-    return TaskWaitOR;
+    return TaskWaitTokenLogicOR;
   })();
   
-  var TaskContext = (function() {
-    function TaskContext(task) {
-      this.klassName = "TaskContext";
-      this.wait = function(item) {
-        var token = cc.createTaskWaitToken(item);
-        task._queue.push(token);
-        return token;
-      };
-      this.pause = function() {
-        task.pause();
-      };
-      this.stop = function() {
-        task.stop();
-      };
-    }
-    return TaskContext;
-  })();
-  
-  var Task = (function() {
-    function Task() {
+  var TaskProcessor = (function() {
+    function TaskProcessor(func) {
+      var that = this;
+      
       emitter.mixin(this);
-      this.klassName = "Task";
-      this._blocking  = true;
+      this.klassName = "TaskProcessor";
       this.timeline  = cc.timeline;
-      this.context   = cc.createTaskContext(this);
-      this._queue = [];
-      this._bang  = false;
-      this._index = 0;
-      this._prev  = null;
-      this._next  = null;
+      this._blocking = true;
+      this._func  = func;
+      this._count = 0;
+      this._prev = null;
+      this._next = null;
+      this._wait = null;
+      this._context = {
+        wait: function(token) {
+          that._wait = cc.createTaskWaitToken(token||0);
+        },
+        continue: function(token) {
+          that._wait = cc.createTaskWaitToken(token||0);
+          that._func.index = 0;
+          that._done();
+        },
+        redo: function(token) {
+          that._wait = cc.createTaskWaitToken(token||0);
+          that._func.index = 0;
+        },
+        break: function() {
+          that._func.index = that._func.segments.length;
+          that.stop();
+        }
+      };
     }
-    extend(Task, cc.Object);
+    extend(TaskProcessor, cc.Object);
     
-    Task.prototype.play = fn.sync(function() {
+    TaskProcessor.prototype.play = function() {
       var that = this;
       // rewind to the head task of a chain
       while (that._prev !== null) {
         that = that._prev;
       }
       if (that.timeline) {
-        that.timeline.append(that);
+        cc.timeline.append(that);
       }
-      if (that._queue.length === 0) {
-        that._bang = true;
-      }
-    });
-    Task.prototype.pause = fn.sync(function() {
+      this._blocking = true;
+      return this;
+    };
+    TaskProcessor.prototype.pause = function() {
       if (this.timeline) {
         this.timeline.remove(this);
       }
-      this._bang = false;
-    });
-    Task.prototype.stop = fn.sync(function() {
-      if (this.timeline) {
-        this.timeline.remove(this);
-      }
-      this._bang = false;
-      this.timeline = null;
       this._blocking = false;
-      this.emit("end");
-      if (this._next) {
-        this._next._prev = null;
-        this._next.play();
-        this._next = null;
+      return this;
+    };
+    TaskProcessor.prototype.stop = function() {
+      if (this.timeline) {
+        this.timeline.remove(this);
+        this.emit("end");
+        if (this._next) {
+          this._next._prev = null;
+          this._next.play();
+          this._next = null;
+        }
       }
-    });
-    Task.prototype.performWait = function() {
+      this._count    = 0;
+      this._blocking = false;
+      this.timeline  = null;
+      return this;
+    };
+    TaskProcessor.prototype.process = function(counterIncr) {
+      var blocking;
+      while (this._blocking) {
+        if (this._wait) {
+          blocking = this._wait.performWait(counterIncr);
+          if (blocking) {
+            return;
+          }
+          this._wait = null;
+        }
+        blocking = this._execute(this._count);
+        if (!blocking) {
+          this._done();
+        }
+        counterIncr  = 0;
+      }
+    };
+    TaskProcessor.prototype._execute = function() {
+      return this._func.perform(this._context, this._count);
+    };
+    TaskProcessor.prototype.performWait = function() {
       return this._blocking;
     };
-
+    
     // task chain methods
-    Task.prototype["do"] = function(func) {
-      var next = cc.createTaskDo(func);
+    TaskProcessor.prototype["do"] = function(func) {
+      var next = new TaskProcessorDo(cc.createTaskFunction(func));
       next._prev = this;
       this._next = next;
       return next;
     };
-    Task.prototype.loop = function(func) {
-      var next = cc.createTasLoop(func);
+    TaskProcessor.prototype.loop = function(func) {
+      var next = new TaskProcessorLoop(cc.createTaskFunction(func));
       next._prev = this;
       this._next = next;
       return next;
     };
-    Task.prototype.each = function(list, func) {
-      var next = cc.createTaskEach(list, func);
+    TaskProcessor.prototype.each = function(list, func) {
+      var next = new TaskProcessorEach(list, cc.createTaskFunction(func));
       next._prev = this;
       this._next = next;
       return next;
     };
-    Task.prototype.timeout = function(delay, func) {
-      var next = cc.createTaskTimeout(delay, func);
+    TaskProcessor.prototype.timeout = function(delay, func) {
+      var next = new TaskProcessorTimeout(delay, cc.createTaskFunction(func));
       next._prev = this;
       this._next = next;
       return next;
     };
-    Task.prototype.interval = function(delay, func) {
-      var next = cc.createTaskInterval(delay, func);
+    TaskProcessor.prototype.interval = function(delay, func) {
+      var next = new TaskProcessorInterval(delay, cc.createTaskFunction(func));
       next._prev = this;
       this._next = next;
       return next;
     };
-
     
-    Task.prototype.push = function(that, func, args) {
-      if (typeof that === "function") {
-        this._queue.push([that, null, args]);
-      } else {
-        this._queue.push([func, that, args]);
-      }
-    };
-    Task.prototype.done = function() {
-      // should be overridden
-    };
-    Task.prototype.process = function(counterIncr) {
-      var timeline = this.timeline;
-      var _queue   = this._queue;
-      var continuance = false;
-      do {
-        if (this._bang) {
-          timeline._stack.push(this);
-          this._execute();
-          this._index += 1;
-          timeline._stack.pop();
-          this._bang = false;
-        }
-        var i = 0;
-        LOOP:
-        while (i < _queue.length) {
-          var e = _queue[i];
-          if (Array.isArray(e)) {
-            e[0].apply(e[1], e[2]);
-          } else {
-            if (e.performWait) {
-              if (e.performWait(counterIncr)) {
-                break LOOP;
-              }
-            }
-          }
-          i += 1;
-        }
-        continuance = false;
-        if (i) {
-          _queue.splice(0, i);
-          if (_queue.length === 0) {
-            continuance = this.done();
-          }
-        }
-      } while (continuance);
-    };
-    return Task;
+    return TaskProcessor;
   })();
   
-  var TaskGlobal = (function() {
-    function TaskGlobal(timeline) {
-      Task.call(this, timeline);
-      this.klassName = "TaskGlobal";
+  var TaskProcessorDo = (function() {
+    function TaskProcessorDo(func) {
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorDo";
     }
-    extend(TaskGlobal, Task);
+    extend(TaskProcessorDo, TaskProcessor);
     
-    TaskGlobal.prototype.play  = function() {};
-    TaskGlobal.prototype.pause = function() {};
-    TaskGlobal.prototype.stop  = function() {};
-    
-    return TaskGlobal;
-  })();
-  
-  var TaskDo = (function() {
-    function TaskDo(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.do: First argument must be a Function.");
-      }
-      Task.call(this);
-      this.klassName = "TaskDo";
-      this.func = func;
-    }
-    extend(TaskDo, Task);
-
-    TaskDo.prototype._execute = function() {
-      this.func.call(this.context, this._index);
-    };
-    TaskDo.prototype.done = function() {
+    TaskProcessorDo.prototype._done = function() {
       this.stop();
     };
     
-    return TaskDo;
+    return TaskProcessorDo;
   })();
-  
-  var TaskLoop = (function() {
-    function TaskLoop(func) {
-      if (typeof func !== "function") {
-        throw new TypeError("Task.loop: First argument must be a Function.");
-      }
-      TaskDo.call(this, func);
-      this.klassName = "TaskLoop";
-    }
-    extend(TaskLoop, TaskDo);
 
-    TaskLoop.prototype.done = function() {
-      this._bang = true;
+  var TaskProcessorLoop = (function() {
+    function TaskProcessorLoop(func) {
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorLoop";
+    }
+    extend(TaskProcessorLoop, TaskProcessor);
+    
+    TaskProcessorLoop.prototype._done = function() {
+      this._func.index = 0;
+      this._count += 1;
     };
     
-    return TaskLoop;
+    return TaskProcessorLoop;
   })();
 
-  var TaskEach = (function() {
-    function TaskEach(list, func) {
+  var TaskProcessorEach = (function() {
+    function TaskProcessorEach(list, func) {
       if (!(Array.isArray(list))) {
         throw new TypeError("Task.each: First argument must be an Array.");
       }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.each: Second argument must be a Function.");
-      }
-      Task.call(this);
-      this.klassName = "TaskEach";
-      this.list = list;
-      this.func = func;
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorEach";
+      this._list = list;
     }
-    extend(TaskEach, Task);
-
-    TaskEach.prototype._execute = function() {
-      if (this._index < this.list.length) {
-        this.func.call(this.context, this.list[this._index], this._index);
-      }
+    extend(TaskProcessorEach, TaskProcessor);
+    
+    TaskProcessorEach.prototype._execute = function() {
+      return this._func.perform(this._context, this._list[this._count], this._count);
     };
-    TaskEach.prototype.done = function() {
-      if (this._index < this.list.length) {
-        this._bang = true;
+    TaskProcessorEach.prototype._done = function() {
+      this._count += 1;
+      if (this._count < this._list.length) {
+        this._func.index = 0;
       } else {
         this.stop();
       }
     };
     
-    return TaskEach;
+    return TaskProcessorEach;
   })();
 
-  var TaskTimeout = (function() {
-    function TaskTimeout(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.timeout: First argument must be a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.timeout: Second argument must be a Function.");
-      }
-      Task.call(this);
-      this.klassName = "TaskTimeout";
-      delay = Math.max(0, delay);
-      if (isNaN(delay)) {
-        delay = 0;
-      }
-      this.func = func;
-      this._queue.push(cc.createTaskWaitToken(delay));
+  var TaskProcessorTimeout = (function() {
+    function TaskProcessorTimeout(delay, func) {
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorTimeout";
+      this._delay = Math.max(1, +delay) || 0;
+      this._wait  = cc.createTaskWaitToken(this._delay);
     }
-    extend(TaskTimeout, Task);
+    extend(TaskProcessorTimeout, TaskProcessor);
     
-    TaskTimeout.prototype._execute = function() {
-      this.func.call(this.context, this._index);
-    };
-    TaskTimeout.prototype.done = function() {
-      if (this._index === 0) {
-        this._bang = true;
-        return true;
-      }
+    TaskProcessorTimeout.prototype._done = function() {
       this.stop();
     };
     
-    return TaskTimeout;
+    return TaskProcessorTimeout;
   })();
   
-  var TaskInterval = (function() {
-    function TaskInterval(delay, func) {
-      if (typeof delay !== "number") {
-        throw new TypeError("Task.interval: First argument must be a Number.");
-      }
-      if (typeof func !== "function") {
-        throw new TypeError("Task.interval: Second argument must be a Function.");
-      }
-      TaskTimeout.call(this, delay, func);
-      this.klassName = "TaskInterval";
+  var TaskProcessorInterval = (function() {
+    function TaskProcessorInterval(delay, func) {
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorInterval";
+      this._delay = Math.max(1, +delay) || 0;
+      this._wait  = cc.createTaskWaitToken(this._delay);
     }
-    extend(TaskInterval, TaskTimeout);
-
-    TaskInterval.prototype.done = function() {
-      this._bang = true;
-      return true;
+    extend(TaskProcessorInterval, TaskProcessor);
+    
+    TaskProcessorInterval.prototype._done = function() {
+      this._func.index = 0;
+      this._count += 1;
+      this._wait = cc.createTaskWaitToken(this._delay);
     };
     
-    return TaskInterval;
+    return TaskProcessorInterval;
   })();
   
-  var TaskBlock = (function() {
-    function TaskBlock(count) {
-      this.klassName = "TaskBlock";
-      if (typeof count !== "number") {
-        count = 1;
-      }
-      this._count = count;
-      this._blocking = true;
-    }
-    TaskBlock.prototype.lock = fn.sync(function(count) {
-      if (typeof count !== "number") {
-        count = 1;
-      }
-      this._count += count;
-    });
-    TaskBlock.prototype.free = fn.sync(function(count) {
-      if (typeof count !== "number") {
-        count = 1;
-      }
-      this._count -= count;
-      if (this._count <= 0) {
-        this._blocking = false;
-      }
-    });
-    TaskBlock.prototype.performWait = function() {
-      return this._blocking;
-    };
-    return TaskBlock;
-  })();
-  
-  cc.global.Task = {
-    "do": function(func) {
-      return cc.createTaskDo(func);
-    },
-    loop: function(func) {
-      return cc.createTaskLoop(func);
-    },
-    each: function(list, func) {
-      return cc.createTaskEach(list, func);
-    },
-    timeout: function(delay, func) {
-      return cc.createTaskTimeout(delay, func);
-    },
-    interval: function(delay, func) {
-      return cc.createTaskInterval(delay, func);
-    },
-    block: function() {
-      return cc.createTaskBlock();
-    }
+  cc.global.Task = function(func) {
+    return cc.createTaskFunction(func);
+  };
+  cc.global.Task["do"] = function(func) {
+    return new TaskProcessorDo(cc.createTaskFunction(func));
+  };
+  cc.global.Task.loop = function(func) {
+    return new TaskProcessorLoop(cc.createTaskFunction(func));
+  };
+  cc.global.Task.each = function(list, func) {
+    return new TaskProcessorEach(list, cc.createTaskFunction(func));
+  };
+  cc.global.Task.timeout = function(delay, func) {
+    return new TaskProcessorTimeout(delay, cc.createTaskFunction(func));
+  };
+  cc.global.Task.interval = function(delay, func) {
+    return new TaskProcessorInterval(delay, cc.createTaskFunction(func));
   };
   
   module.exports = {
-    Timeline: Timeline,
-    TaskWaitToken        : TaskWaitToken,
-    TaskWaitTokenNumber  : TaskWaitTokenNumber,
-    TaskWaitTokenFunction: TaskWaitTokenFunction,
-    TaskWaitTokenBoolean : TaskWaitTokenBoolean,
-    TaskWaitTokenBlock   : TaskWaitTokenBlock,
-    TaskWaitAND : TaskWaitAND,
-    TaskWaitOR  : TaskWaitOR,
-    TaskContext : TaskContext,
-    Task        : Task,
-    TaskGlobal  : TaskGlobal,
-    TaskDo      : TaskDo,
-    TaskLoop    : TaskLoop,
-    TaskEach    : TaskEach,
-    TaskTimeout : TaskTimeout,
-    TaskInterval: TaskInterval,
-    TaskBlock   : TaskBlock,
+    Timeline     : Timeline,
+    TaskFunction : TaskFunction,
+    TaskWaitToken         : TaskWaitToken,
+    TaskWaitTokenNumber   : TaskWaitTokenNumber,
+    TaskWaitTokenFunction : TaskWaitTokenFunction,
+    TaskWaitTokenBoolean  : TaskWaitTokenBoolean,
+    TaskWaitTokenBlockable: TaskWaitTokenBlockable,
+    TaskWaitTokenLogicAND : TaskWaitTokenLogicAND,
+    TaskWaitTokenLogicOR  : TaskWaitTokenLogicOR,
+    TaskProcessor        : TaskProcessor,
+    TaskProcessorDo      : TaskProcessorDo,
+    TaskProcessorLoop    : TaskProcessorLoop,
+    TaskProcessorEach    : TaskProcessorEach,
+    TaskProcessorTimeout : TaskProcessorTimeout,
+    TaskProcessorInterval: TaskProcessorInterval,
     
     use: function() {
       cc.createTimeline = function() {
         cc.timeline = new Timeline();
         return cc.timeline;
       };
-      cc.createTaskGlobal = function(timeline) {
-        return new TaskGlobal(timeline);
+      cc.instanceOfTimeline = function(obj) {
+        return obj instanceof Timeline;
       };
-      cc.createTaskDo = function(func) {
-        return new TaskDo(func);
+      cc.createTaskFunction = function(init) {
+        return new TaskFunction(init);
       };
-      cc.createTaskLoop = function(func) {
-        return new TaskLoop(func);
-      };
-      cc.createTaskEach = function(list, func) {
-        return new TaskEach(list, func);
-      };
-      cc.createTaskTimeout = function(delay, func) {
-        return new TaskTimeout(delay, func);
-      };
-      cc.createTaskInterval = function(delay, func) {
-        return new TaskInterval(delay, func);
-      };
-      cc.createTaskBlock = function() {
-        return new TaskBlock();
-      };
-      cc.createTaskContext = function(task) {
-        return new TaskContext(task);
+      cc.instanceOfTaskFunction = function(obj) {
+        return obj instanceof TaskFunction;
       };
       cc.createTaskWaitToken = function(item) {
         if (item instanceof TaskWaitToken) {
@@ -3269,24 +3148,25 @@ define('cc/client/sched', function(require, exports, module) {
         case "boolean":
           return new TaskWaitTokenBoolean(item);
         default:
-          if (item) {
-            if (Array.isArray(item)) {
-              return cc.createTaskWaitLogic("and", item);
-            } else if (typeof item.performWait === "function") {
-              return new TaskWaitTokenBlock(item);
-            }
+          if (Array.isArray(item)) {
+            return cc.createTaskWaitLogic("and", item);
+          } else if (item && typeof item.performWait === "function") {
+            return new TaskWaitTokenBlockable(item);
           }
         }
         throw new TypeError("TaskWaitToken: Invalid type");
       };
-      cc.createTaskWaitLogic = function(logic, list) {
-        list = list.map(function(x) {
-          return cc.createTaskWaitToken(x);
-        });
-        return (logic === "and") ? new TaskWaitAND(list) : new TaskWaitOR(list);
-      };
-      cc.instanceOfWaitToken = function(obj) {
+      cc.instanceOfTaskWaitToken = function(obj) {
         return obj instanceof TaskWaitToken;
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        list = list.map(function(token) {
+          return cc.createTaskWaitToken(token);
+        });
+        if (logic === "and") {
+          return new TaskWaitTokenLogicAND(list);
+        }
+        return new TaskWaitTokenLogicOR(list);
       };
     }
   };
@@ -3298,14 +3178,69 @@ define('cc/client/synthdef', function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var extend = require("../common/extend");
+  var slice = [].slice;
   
   var defId = 0;
+
+  var SynthDefTemplate = (function() {
+    function SynthDefTemplate(func, args) {
+      this.klassName = "SynthDefTemplate";
+      this.func   = func;
+      this.args   = args2keyValues(args);
+      this.params = args2params(this.args);
+    }
+    extend(SynthDefTemplate, cc.Object);
+
+    SynthDefTemplate.prototype.build = function(opts) {
+      return new SynthDef(this, opts||{});
+    };
+    
+    SynthDefTemplate.prototype.play = fn(function() {
+      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var target = list[0];
+      var args   = list[1];
+      var addAction = list[2];
+      return new SynthDef(this).play(target, args, addAction);
+    }).multiCall().build();
+    
+    return SynthDefTemplate;
+  })();
+  
+  var getSynthDefPlayArguments = function() {
+    var target, args, addAction;
+    var i = 0;
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.client.rootNode;
+    }
+    if (utils.isDict(arguments[i])) {
+      args = arguments[i++];
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = arguments[i];
+    } else {
+      addAction = "addToHead";
+    }
+    if (args && arguments.length === 1) {
+      if (cc.instanceOfNode(args.target)) {
+        target = args.target;
+        delete args.target;
+      }
+      if (typeof args.addAction === "string") {
+        addAction = args.addAction;
+        delete args.addAction;
+      }
+    }
+    return [target, args, addAction];
+  };
   
   var SynthDef = (function() {
-    function SynthDef(func, _args) {
+    function SynthDef(template, _opts) {
       this.klassName = "SynthDef";
       this._defId = defId++;
-      if (!(func && _args)) {
+
+      if (!(template instanceof SynthDefTemplate)) {
         this.specs = {
           consts:[], defs:[], params:{ names:[], indices:[], length:[], values:[] }
         };
@@ -3317,15 +3252,27 @@ define('cc/client/synthdef', function(require, exports, module) {
         children.push(ugen);
       });
       
-      var args     = args2keyValues(_args);
-      var params   = args2params(args);
+      var args     = template.args;
+      var params   = template.params;
       var controls = cc.createControl(1).init(params.flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
       
+      var opts = {};
+      if (params.opts) {
+        Object.keys(params.opts).forEach(function(key) {
+          opts[key] = params.opts[key];
+        });
+      }
+      if (_opts) {
+        Object.keys(_opts).forEach(function(key) {
+          opts[key] = _opts[key];
+        });
+      }
+      
       try {
-        func.apply(null, reshapeArgs(args.vals, controls).concat(params.opts));
+        template.func.apply(null, reshapeArgs(args.vals, controls).concat(opts));
       } catch (e) {
         throw e.toString();
       } finally {
@@ -3349,31 +3296,10 @@ define('cc/client/synthdef', function(require, exports, module) {
     extend(SynthDef, cc.Object);
     
     SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      if (cc.instanceOfNode(arguments[i])) {
-        target = arguments[i++];
-      } else {
-        target = cc.client.rootNode;
-      }
-      if (utils.isDict(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      } else {
-        addAction = "addToHead";
-      }
-      if (args && arguments.length === 1) {
-        if (cc.instanceOdNode(args.target)) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
+      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var target = list[0];
+      var args   = list[1];
+      var addAction = list[2];
       switch (addAction) {
       case "addToHead":
         return cc.createSynth(target, 0, this, args);
@@ -3477,7 +3403,7 @@ define('cc/client/synthdef', function(require, exports, module) {
   var topoSort = (function() {
     var _topoSort = function(x, list, checked, stack) {
       if (stack.indexOf(x) !== stack.length-1) {
-        console.warn("UGen graph contains recursion.");
+        cc.console.warn("UGen graph contains recursion.");
         return;
       }
       checked.push(x);
@@ -3554,10 +3480,17 @@ define('cc/client/synthdef', function(require, exports, module) {
     }
     return result;
   };
+
+  var SynthDefInterface = global.SynthDef = function(func, args) {
+    return cc.createSynthDefTemplate(func, args);
+  };
+  SynthDefInterface.read = function() {
+  };
   
   module.exports = {
+    SynthDefTemplate: SynthDefTemplate,
     SynthDef: SynthDef,
-
+    
     args2keyValues: args2keyValues,
     args2params   : args2params,
     isValidDefArg : isValidDefArg,
@@ -3567,8 +3500,14 @@ define('cc/client/synthdef', function(require, exports, module) {
     makeDefList   : makeDefList,
     
     use: function() {
-      cc.createSynthDef = function(func, args) {
-        return new SynthDef(func, args);
+      cc.createSynthDefTemplate = function(func, args) {
+        return new SynthDefTemplate(func, args);
+      };
+      cc.instanceOfSynthDefTemplate = function(obj) {
+        return obj instanceof SynthDefTemplate;
+      };
+      cc.createSynthDef = function(func, args, opts) {
+        return new SynthDef(func, args, opts);
       };
       cc.instanceOfSynthDef = function(obj) {
         return obj instanceof SynthDef;
@@ -3795,6 +3734,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
       require("./bop").use();
       require("./madd").use();
       require("./inout").use();
+      require("./mix");
       
       // redefinition for tests
       cc.UGen = UGen;
@@ -3804,6 +3744,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     install: function() {
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./osc");
@@ -3900,7 +3841,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
           if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
-        } else if (cc.instancrOfMulAdd(a)) {
+        } else if (cc.instanceOfMulAdd(a)) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
               return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
@@ -4314,6 +4255,50 @@ define('cc/client/ugen/inout', function(require, exports, module) {
   };
 
 });
+define('cc/client/ugen/mix', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var utils = require("../utils");
+  
+  var mix = function(array) {
+    if (!Array.isArray(array)) {
+      array = [array];
+    }
+    var reduceArray = utils.clump(array, 4);
+    var a = reduceArray.map(function(a) {
+      switch (a.length) {
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
+      case 1: return a[0];
+      }
+    });
+    switch (a.length) {
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
+      case 1: return a[0];
+      default: return mix(a);
+    }
+  };
+  
+  cc.global.Mix = function(array) {
+    return mix(array) || [];
+  };
+  cc.global.Mix.fill = function(n, func) {
+    n = n|0;
+    var array = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      array[i] = func(i);
+    }
+    return mix(array);
+  };
+  cc.global.Mix.ar = function() {
+  };
+  
+  module.exports = {};
+
+});
 define('cc/client/ugen/bufio', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -4377,6 +4362,30 @@ define('cc/client/ugen/delay', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/client/ugen/filter', function(require, exports, module) {
+
+  var ugen = require("./ugen");
+  
+  ugen.specs.RLPF = {
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(2, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(1, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  ugen.specs.RHPF = ugen.specs.RLPF;
+  
+  module.exports = {};
+
+});
 define('cc/client/ugen/line', function(require, exports, module) {
   
   var ugen = require("./ugen");
@@ -4418,6 +4427,21 @@ define('cc/client/ugen/osc', function(require, exports, module) {
     }
   };
 
+  ugen.specs.SinOscFB = {
+    ar: {
+      defaults: "freq=440,feedback=0,mul=1,add=0",
+      ctor: function(freq, feedback, mul, add) {
+        return this.init(2, freq, feedback).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,feedback=0,mul=1,add=0",
+      ctor: function(freq, feedback, mul, add) {
+        return this.init(1, freq, feedback).madd(mul, add);
+      }
+    }
+  };
+  
   ugen.specs.LFSaw = {
     ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
@@ -4429,6 +4453,25 @@ define('cc/client/ugen/osc', function(require, exports, module) {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(1, freq, iphase).madd(mul, add);
+      }
+    }
+  };
+
+  ugen.specs.LFPar = ugen.specs.LFSaw;
+  ugen.specs.LFCub = ugen.specs.LFSaw;
+  ugen.specs.LFTri = ugen.specs.LFSaw;
+
+  ugen.specs.LFPulse = {
+    ar: {
+      defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
+      ctor: function(freq, iphase, width, mul, add) {
+        return this.init(2, freq, iphase, width).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
+      ctor: function(freq, iphase, width, mul, add) {
+        return this.init(1, freq, iphase, width).madd(mul, add);
       }
     }
   };
@@ -4941,7 +4984,10 @@ define('cc/client/number', function(require, exports, module) {
   fn.definePrototypeProperty(Number, "pi", function() {
     return this * Math.PI;
   });
-
+  fn.definePrototypeProperty(Number, "to_i", function() {
+    return this|0;
+  });
+  
   // binary operator methods
   fn.setupBinaryOp(Number, "__add__", function(b) {
     return this + b;
@@ -5178,6 +5224,16 @@ define('cc/client/number', function(require, exports, module) {
 
 });
 define('cc/client/object', function(require, exports, module) {
+
+  var cc = require("./cc");
+
+  cc.Object.prototype.__and__ = function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  };
+  
+  cc.Object.prototype.__or__ = function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  };
   
   module.exports = {};
 
@@ -5335,7 +5391,6 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
 
   var CoffeeColliderImpl = (function() {
     function CoffeeColliderImpl(exports, opts) {
-      var that = this;
       this.exports  = exports;
       this.compiler = cc.createCompiler("coffee");
       
@@ -5350,58 +5405,62 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.channels   = this.api.channels;
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
+      this.strmList = new Array(16);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
+      this.syncCount = 0;
       this.speaker = opts.speaker !== false;
       this.api.init();
-
-      var syncItems = new Uint8Array(12);
+      
+      var syncItems = new Uint8Array(20);
       if (typeof window !== "undefined" && opts.mouse !== false) {
         var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
-          f32_syncItems[1] = e.pageX / window.innerWidth;
-          f32_syncItems[2] = e.pageY / window.innerHeight;
-          that.syncItemsChanged = true;
+          f32_syncItems[2] = e.pageX / window.innerWidth;
+          f32_syncItems[3] = e.pageY / window.innerHeight;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[3] = 1;
-          that.syncItemsChanged = true;
+          f32_syncItems[4] = 1;
         }, false);
         window.addEventListener("mouseup", function() {
-          syncItems[3] = 0;
-          that.syncItemsChanged = true;
+          f32_syncItems[4] = 0;
         }, false);
       }
       this.syncItems = syncItems;
+      this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        if (this.api) {
-          var strm = this.strm;
-          for (var i = 0, imax = strm.length; i < imax; ++i) {
-            strm[i] = 0;
-          }
-          this.strmList.splice(0);
-          this.strmListReadIndex  = 0;
-          this.strmListWriteIndex = 0;
-          this.api.play();
-        }
         this.sendToClient(["/play"]);
-        this.exports.emit("play");
       }
+    };
+    CoffeeColliderImpl.prototype._played = function(syncCount) {
+      if (this.api) {
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList.splice(0);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        this.syncCount = syncCount;
+        this.api.play();
+      }
+      this.exports.emit("play");
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        if (this.api) {
-          this.api.pause();
-        }
         this.sendToClient(["/pause"]);
-        this.exports.emit("pause");
       }
+    };
+    CoffeeColliderImpl.prototype._paused = function() {
+      if (this.api) {
+        this.api.pause();
+      }
+      this.exports.emit("pause");
     };
     CoffeeColliderImpl.prototype.reset = function() {
       this.execId = 0;
@@ -5417,15 +5476,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.exports.emit("reset");
     };
     CoffeeColliderImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
+      var strm = this.strmList[this.strmListReadIndex & 15];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strmListReadIndex += 1;
         this.strm.set(strm);
       }
-      if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItems);
-        this.syncItemsChanged = false;
-      }
+      this.syncCount += 1;
+      this.syncItemsUInt32[1] = this.syncCount;
+      this.sendToClient(this.syncItems);
     };
     CoffeeColliderImpl.prototype.execute = function(code) {
       var append, callback;
@@ -5475,8 +5533,8 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
       if (msg instanceof Int16Array) {
-        this.strmList[this.strmListWriteIndex] = msg;
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmList[this.strmListWriteIndex & 15] = msg;
+        this.strmListWriteIndex += 1;
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -5618,6 +5676,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     ]);
     this.exports.emit("connected");
   };
+  commands["/played"] = function(msg) {
+    var syncCount = msg[1];
+    this._played(syncCount);
+  };
+  commands["/paused"] = function(msg) {
+    var syncCount = msg[1];
+    this._paused(syncCount);
+  };
   commands["/executed"] = function(msg) {
     var execId = msg[1];
     var result = msg[2];
@@ -5642,7 +5708,7 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
   commands["/socket/sendToIF"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
-  require("../common/console").bindConsoleApply(commands);
+  require("../common/console").bind(commands);
   
   var use = function() {
     require("../common/browser").use();
@@ -5805,7 +5871,7 @@ define('cc/common/audioapi', function(require, exports, module) {
           var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
-            if (written - 60 > Date.now() - start) {
+            if (written - 20 > Date.now() - start) {
               return;
             }
             var i = interleaved.length;
@@ -6042,8 +6108,8 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   var VALUE = 1;
   var _     = {}; // empty location
 
-  var sortPlusMinusOperator = function(tokens) {
-    if (tokens._sorted) {
+  var detectPlusMinusOperator = function(tokens) {
+    if (tokens.cc_plusminus) {
       return tokens;
     }
     var prevTag = "";
@@ -6053,6 +6119,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         switch (prevTag) {
         case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
         case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
+        case "CALL_END": case "INDEX_END":
           tokens[i][TAG] = "MATH";
           break;
         default:
@@ -6061,12 +6128,12 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       }
       prevTag = tag;
     }
-    tokens._sorted = true;
+    tokens.cc_plusminus = true;
     return tokens;
   };
   
   var revertPlusMinusOperator = function(tokens) {
-    if (!tokens._sorted) {
+    if (!tokens.cc_plusminus) {
       for (var i = 0, imax = tokens.length; i < imax; ++i) {
         var val = tokens[i][VALUE];
         if (val === "+" || val === "-") {
@@ -6075,19 +6142,19 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       }
       return tokens;
     }
-    delete tokens._sorted;
+    delete tokens.cc_plusminus;
     return tokens;
   };
   
   var getPrevOperand = function(tokens, index) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     
     var bracket = 0;
     var indent  = 0;
-    var end = indent;
+    var end = index;
     while (1 < index) {
       switch (tokens[index - 1][TAG]) {
-      case "PARAM_END": case "CALL_END":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket += 1;
         /* falls through */
       case ".": case "@":
@@ -6109,7 +6176,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           return {tokens:tokens, begin:index, end:end};
         }
         break;
-      case "CALL_START":
+      case "CALL_START": case "INDEX_START":
         bracket -= 1;
         break;
       case "}": case "]": case ")":
@@ -6128,7 +6195,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   };
   
   var getNextOperand = function(tokens, index) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     var bracket = 0;
     var indent  = 0;
     var begin = index;
@@ -6147,42 +6214,181 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       case "(": case "[": case "{": case "PARAM_START":
         bracket += 1;
         break;
-      case "}": case "]": case ")": case "CALL_END":
-        bracket -= 1;
-        break;
-      }
-      
-      switch (tokens[index + 1][TAG]) {
-      case "CALL_START":
-        bracket += 1;
-        index += 1;
-        continue;
-      case ".": case "@":
-        index += 1;
-        continue;
-      }
-      
-      switch (tag) {
-      case "}": case "]": case ")": case "CALL_END":
-      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
-      case "UNDEFINED": case "NULL": case "OUTDENT":
-        if (tag === "OUTDENT") {
-          indent -= 1;
-        }
-        if (bracket === 0 && indent === 0) {
-          return {tokens:tokens, begin:begin, end:index};
-        }
-        break;
-      case "PARAM_END":
+      case "}": case "]": case ")": case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket -= 1;
         break;
       case "INDENT":
         indent += 1;
         break;
+      case "OUTDENT":
+        indent -= 1;
+        break;
+      }
+      
+      switch (tokens[index + 1][TAG]) {
+      case "CALL_START": case "INDEX_START":
+        bracket += 1;
+        index += 1;
+        continue;
+      case ".": case "@": case "ELSE":
+        index += 1;
+        continue;
+      }
+      
+      switch (tag) {
+      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "OUTDENT":
+        if (bracket === 0 && indent === 0) {
+          return {tokens:tokens, begin:begin, end:index};
+        }
+        break;
       }
       index += 1;
     }
     return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
+  };
+
+  var isDot = function(token) {
+    return !!token && (token[TAG] === "." || token[TAG] === "@");
+  };
+  
+  var getVariables = function(op, list) {
+    var tokens = op.tokens;
+    list = list || [];
+    if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
+      for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
+        var _op = getNextOperand(tokens, i);
+        getVariables(_op, list);
+        i += _op.end - _op.begin + 1;
+        if (tokens[i][TAG] !== ",") {
+          i += 1;
+        }
+      }
+    } else {
+      if (!isDot(tokens[op.begin-1])) {
+        if (/^[a-z][a-zA-Z0-9_$]*$/.test(tokens[op.begin][VALUE])) {
+          list.push(tokens[op.begin][VALUE]);
+        }
+      }
+    }
+    return list;
+  };
+  var indexOfParamEnd = function(tokens, index) {
+    var bracket = 0;
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "PARAM_START":
+        bracket += 1;
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        if (bracket === 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  };
+  var getInfoOfArguments = function(tokens, index) {
+    var begin = index;
+    var end   = indexOfParamEnd(tokens, index);
+    var args  = [];
+    for (var i = begin+1; i < end; ++i) {
+      var op = getNextOperand(tokens, i);
+      getVariables(op, args);
+      i += op.end - op.begin + 1;
+      if (tokens[i][TAG] === "=") {
+        op = getNextOperand(tokens, i+1);
+        i += op.end - op.begin + 1;
+      }
+      if (tokens[i][TAG] !== ",") {
+        i += 1;
+      }
+    }
+    return {args:args, end:end};
+  };
+  
+  var detectFunctionParameters = function(tokens) {
+    if (tokens.cc_localVars) {
+      return tokens;
+    }
+    var stack = [
+      { declared:[], local:[], outer:[], args:[] }
+    ], peek;
+    var ignored = [
+      "cc", "global", "console",
+      "setInterval", "setTimeout", "clearInterval", "clearTimeout"
+    ];
+    var sortVariables = function(name) {
+      if (ignored.indexOf(name) !== -1) {
+        return;
+      }
+      if (peek.declared.indexOf(name) === -1) {
+        if (peek.args.indexOf(name) === -1 && peek.local.indexOf(name) === -1) {
+          peek.local.push(name);
+        }
+      } else {
+        if (name !== "global" && peek.outer.indexOf(name) === -1) {
+          peek.outer.push(name);
+          for (var i = stack.length - 2; i >= 0; i--) {
+            if (stack[i].local.indexOf(name) !== -1) {
+              return;
+            }
+            if (stack[i].outer.indexOf(name) === -1) {
+              stack[i].outer.push(name);
+            }
+          }
+        }
+      }
+    };
+    var indent = 0;
+    var args   = [];
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var op, token = tokens[i];
+      peek = stack[stack.length-1];
+      switch (token[TAG]) {
+      case "PARAM_START":
+        args = getInfoOfArguments(tokens, i);
+        i    = args.end ;
+        args = args.args;
+        break;
+      case "->": case "=>":
+        var scope = {
+          declared: peek.declared.concat(peek.local),
+          local:[], outer:[], args:args.splice(0), indent:indent
+        };
+        tokens[i].cc_localVars = scope.local;
+        tokens[i].cc_outerVars = scope.outer;
+        stack.push(scope);
+        break;
+      case "FOR":
+        do {
+          op = getNextOperand(tokens, i+1);
+          getVariables(op).forEach(sortVariables);
+          i = op.end + 1;
+        } while (i < imax && tokens[i][TAG] === ",");
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        if (peek.indent === indent) {
+          stack.pop();
+        }
+        break;
+      default:
+        op = getNextOperand(tokens, i);
+        if (tokens[op.begin][TAG] === "IDENTIFIER") {
+          if (tokens[op.end+1][TAG] !== ":") {
+            getVariables(op).forEach(sortVariables);
+          }
+        }
+      }
+    }
+    tokens.cc_localVars = stack[0].local;
+    return tokens;
   };
   
   var replaceFixedTimeValue = function(tokens) {
@@ -6200,7 +6406,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   };
   
   var replaceStrictlyPrecedence = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i > 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
@@ -6217,7 +6423,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     "+": "__plus__", "-": "__minus__"
   };
   var replaceUnaryOperator = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "UNARY" && unaryOperatorDict.hasOwnProperty(token[VALUE])) {
@@ -6251,7 +6457,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     }
   };
   var replaceBinaryOperator = function(tokens) {
-    tokens = sortPlusMinusOperator(tokens);
+    tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "MATH" && binaryOperatorDict.hasOwnProperty(token[VALUE])) {
@@ -6367,21 +6573,41 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     }
     return args;
   };
+
+  var isFunctionHeader = function(token) {
+    return (token[TAG] === "->" ||
+            token[TAG] === "=>" ||
+            token[TAG] === "PARAM_START");
+  };
   
   var replaceSynthDefinition = function(tokens) {
-    for (var i = tokens.length - 1; --i >= 2; ) {
-      var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def" && tokens[i-1][TAG] === "." &&
-          tokens[i-2][TAG] === "IDENTIFIER" && tokens[i-2][VALUE] === "Synth" && tokens[i+1][TAG] === "CALL_START") {
-        var args = getSynthDefArguments(tokens, i+2);
-        var next = getNextOperand(tokens, i+2);
-        tokens.splice(next.end+1, 0, [",", ",", _]);
-        tokens.splice(next.end+2, 0, ["[", "[", _]);
-        tokens.splice(next.end+3, 0, ["]", "]", _]);
-        for (var j = args.length; j--; ) {
-          tokens.splice(next.end+3, 0, ["STRING", "'" + args[j] + "'", _]);
-          if (j) {
-            tokens.splice(next.end+3, 0, [",", ",", _]);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "SynthDef") {
+        var index = -1;
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (isFunctionHeader(tokens[j])) {
+            index = j;
+            break;
+          }
+        }
+        
+        if (index !== -1) {
+          var args = getSynthDefArguments(tokens, index);
+          var next = getNextOperand(tokens, index);
+          tokens.splice(next.end+1, 0, [",", ",", _]);
+          tokens.splice(next.end+2, 0, ["[", "[", _]);
+          tokens.splice(next.end+3, 0, ["]", "]", _]);
+          for (var k = args.length; k--; ) {
+            tokens.splice(next.end+3, 0, ["STRING", "'" + args[k] + "'", _]);
+            if (k) {
+              tokens.splice(next.end+3, 0, [",", ",", _]);
+            }
           }
         }
       }
@@ -6389,7 +6615,266 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     return tokens;
   };
   
-  var replaceGlobalVariants = function(tokens) {
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    return val;
+  };
+
+  var iterContextMethods = [
+    "yield"
+  ];
+  var replaceIteratorFunction = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "Iterator") {
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (isFunctionHeader(tokens[j])) {
+            makeSegmentedFunction(getNextOperand(tokens, j), iterContextMethods);
+            break;
+          }
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  var taskContextMethods = [
+    "wait", "break", "continue", "redo"
+  ];
+  var replaceTaskFunction = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "Task") {
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (isFunctionHeader(tokens[j])) {
+            makeSegmentedFunction(getNextOperand(tokens, j), taskContextMethods);
+            break;
+          }
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  var insertClosureFuction = function(tokens, index, t, body) {
+    var outerVars = t.cc_outerVars;
+    if (outerVars && outerVars.length) {
+      var offset = 0;
+      if (tokens[index-2][TAG] !== "PARAM_END") {
+        offset = 1;
+      } else {
+        var bracket = 0;
+        while ((t = tokens[index - offset]) !== undefined) {
+          if (t[TAG] === "PARAM_END") {
+            bracket += 1;
+          } else if (t[TAG] === "PARAM_START") {
+            bracket -=1;
+            if (bracket === 0) {
+              break;
+            }
+          }
+          offset += 1;
+        }
+      }
+      
+      index -= offset;
+      tokens.splice(index++, 0, ["UNARY"      , "do", _]);
+      tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
+      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", outerVars[i], _]);
+      }
+      tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
+      tokens.splice(index++, 0, ["->"         , "->", _]);
+      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+      index += offset;
+    }
+    
+    var indent = 0;
+    LOOP:
+    while ((t = body.shift()) !== undefined) {
+      tokens.splice(index++, 0, t);
+      switch (t[TAG]) {
+      case "INDENT":
+        indent += 1;
+        break;
+      case "->": case "=>":
+        index = insertClosureFuction(tokens, index, t, body);
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        break LOOP;
+      }
+    }
+    if (outerVars && outerVars.length) {
+      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    }
+    return index;
+  };
+  
+  var makeSegmentedFunction = function(op, controlMethods) {
+    var tokens = op.tokens;
+    var index  = op.begin;
+    var begin  = index;
+    var body = tokens.splice(op.begin, op.end-op.begin+1);
+    var t, bracket, indent;
+    var localVars, outerVars, controlMethodCalled, numOfSegments;
+    var i, imax;
+    
+    var params = [];
+    for (bracket = 0; (t = body.shift()) !== undefined; ) {
+      if (t[TAG] === "PARAM_START") {
+        bracket += 1;
+      } else if (t[TAG] === "PARAM_END") {
+        bracket -= 1;
+      } else if (t[TAG] === "->" || t[TAG] === "=>") {
+        if (bracket === 0) {
+          break;
+        }
+      }
+      params.push(t);
+    }
+    localVars = t.cc_localVars;
+    outerVars = t.cc_outerVars;
+    body.shift(); // remove INDENT
+    body.pop();   // remove OUTDENT
+    
+    // replace function
+    if (outerVars.length) {
+      tokens.splice(index++, 0, ["UNARY"      , "do", _]);
+      tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
+      for (i = 0, imax = outerVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", outerVars[i], _]);
+      }
+      tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
+      tokens.splice(index++, 0, ["->"         , "->", _]);
+      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    }
+    
+    tokens.splice(index++, 0, ["->"     , "->", _]);
+    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    
+    // declare local variables
+    if (localVars.length) {
+      for (i = 0, imax = localVars.length; i < imax; i++) {
+        tokens.splice(index++, 0, ["IDENTIFIER", localVars[i], _]);
+        tokens.splice(index++, 0, ["="         , "="         , _]);
+      }
+      tokens.splice(index++, 0, ["UNDEFINED" , "undefined", _]);
+      tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+    }
+    
+    // return an array of function segments
+    tokens.splice(index++, 0, ["["      , "[" , _]);
+    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
+    
+    numOfSegments = 0;
+    
+    NEXT_SEGMENTS:
+    while (body.length) {
+      if (numOfSegments) {
+        tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+      }
+      numOfSegments += 1;
+
+      // insert arguments
+      for (i = 0, imax = params.length; i < imax; ++i) {
+        tokens.splice(index++, 0, params[i]);
+      }
+      tokens.splice(index++, 0, ["->"    , "->", _]);
+      tokens.splice(index++, 0, ["INDENT", 2   , _]);
+      
+      controlMethodCalled = 0;
+      for (bracket = indent = 0; (t = body.shift()) !== undefined; ) {
+        tokens.splice(index++, 0, t);
+        if (t.cc_tasked) {
+          continue;
+        }
+        switch (t[TAG]) {
+        case "CALL_START":
+          bracket += 1;
+          continue;
+        case "CALL_END":
+          bracket -= 1;
+          continue;
+        case "INDENT":
+          indent += 1;
+          continue;
+        case "OUTDENT":
+          indent -= 1;
+          continue;
+        case "->": case "=>":
+          index = insertClosureFuction(tokens, index, t, body);
+          continue;
+        case "TERMINATOR":
+          if (bracket === 0 && indent === 0 && controlMethodCalled) {
+            tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+            continue NEXT_SEGMENTS;
+          }
+          break;
+        }
+        if (bracket === 0 && t[TAG] === "@" && body[0] &&
+            controlMethods.indexOf(getIdentifier(body[0])) !== -1) {
+          controlMethodCalled = 1;
+        }
+      }
+      tokens.splice(index++, 0, ["OUTDENT", 2, _]);
+    }
+    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    tokens.splice(index++, 0, ["]"      , "]", _]);
+    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    if (outerVars.length) {
+      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    }
+    
+    for (i = index - 1; i >= begin; --i) {
+      tokens[i].cc_tasked = true;
+    }
+  };
+  
+  var replaceGlobalVariables = function(tokens) {
+    for (var i = tokens.length - 1; i--; ) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue; // { NotGlobal:"dict key is not global" }
+        }
+        if (isDot(tokens[i-1])) {
+          continue; // this.is.NotGlobal, @isNotGlobal
+        }
+        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
+        tokens.splice(i+1, 0, ["."         , "."     , _]);
+        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
+      }
+    }
+    return tokens;
+  };
+  
+  var replaceCCVariables = function(tokens) {
     for (var i = tokens.length - 1; i--; ) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
@@ -6397,19 +6882,13 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       }
       if (cc.global.hasOwnProperty(token[VALUE])) {
         if (tokens[i+1][TAG] === ":") {
-          continue; // { NotGlobal:"dict key is not global" }
+          continue;
         }
-        if (i > 0) {
-          if (tokens[i-1][TAG] === "." || tokens[i-1][TAG] === "@") {
-            continue; // this.is.NotGlobal, @isNotGlobal
-          }
+        if (isDot(tokens[i-1])) {
+          continue;
         }
         tokens.splice(i  , 0, ["IDENTIFIER", "cc", _]);
         tokens.splice(i+1, 0, ["."         , "." , _]);
-      } else if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
-        tokens.splice(i  , 0, ["IDENTIFIER", "global", _]);
-        tokens.splice(i+1, 0, ["."         , "."     , _]);
-        tokens.splice(i+2, 1, ["IDENTIFIER", token[VALUE].substr(1), _]);
       }
     }
     return tokens;
@@ -6419,11 +6898,9 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     tokens.splice(0, 0, ["("          , "("        , _]);
     tokens.splice(1, 0, ["PARAM_START", "("        , _]);
     tokens.splice(2, 0, ["IDENTIFIER" , "global"   , _]);
-    tokens.splice(3, 0, [","          , ","        , _]);
-    tokens.splice(4, 0, ["IDENTIFIER" , "undefined", _]);
-    tokens.splice(5, 0, ["PARAM_END"  , ")"        , _]);
-    tokens.splice(6, 0, ["->"         , "->"       , _]);
-    tokens.splice(7, 0, ["INDENT"     , 2          , _]);
+    tokens.splice(3, 0, ["PARAM_END"  , ")"        , _]);
+    tokens.splice(4, 0, ["->"         , "->"       , _]);
+    tokens.splice(5, 0, ["INDENT"     , 2          , _]);
     
     var i = tokens.length - 1;
     tokens.splice(i++, 0, ["OUTDENT"   , 2            , _]);
@@ -6443,6 +6920,46 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     tokens.splice(i++, 0, ["CALL_END"  , ")"          , _]);
     return tokens;
   };
+
+  var tab = function(n) {
+    var t = "";
+    for (var i = 0; i < n; ++i) {
+      t += "  ";
+    }
+    return t;
+  };
+  var prettyPrint = function(tokens) {
+    var indent = 0;
+    tokens = detectPlusMinusOperator(tokens);
+    return tokens.map(function(token) {
+      switch (token[TAG]) {
+      case "TERMINATOR":
+        return "\n" + tab(indent);
+      case "INDENT":
+        indent += 1;
+        return "\n" + tab(indent);
+      case "OUTDENT":
+        indent -= 1;
+        return "\n" + tab(indent);
+      case "RETURN":
+        return "return ";
+      case "UNARY":
+        return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
+      case "{":
+        return "{";
+      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
+        return token[VALUE] + " ";
+      case "=": case "COMPARE": case "MATH": case "LOGIC":
+        return " " + token[VALUE] + " ";
+      case "HERECOMMENT":
+        return "/* " + token[VALUE] + " */";
+      default:
+        return token[VALUE];
+      }
+    }).join("").split("\n").filter(function(line) {
+      return !(/^\s*$/.test(line));
+    }).join("\n").trim();
+  };
   
   var CoffeeCompiler = (function() {
     function CoffeeCompiler() {
@@ -6456,6 +6973,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
             data.push(token[VALUE].trim());
           }
         });
+        tokens = replaceGlobalVariables(tokens);
         tokens = replaceFixedTimeValue(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
@@ -6463,7 +6981,8 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceGlobalVariants(tokens);
+        tokens = replaceTaskFunction(tokens);
+        tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
       this.code = code;
@@ -6474,44 +6993,11 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       var tokens = this.tokens(code);
       return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
     };
-    var tab = function(n) {
-      var t = ""; while (n--) { t += "  "; } return t;
-    };
     CoffeeCompiler.prototype.toString = function(tokens) {
-      var indent = 0;
       if (typeof tokens === "string") {
         tokens = this.tokens(tokens);
       }
-      tokens = sortPlusMinusOperator(tokens);
-      return tokens.map(function(token) {
-        switch (token[TAG]) {
-        case "TERMINATOR":
-          return "\n" + tab(indent);
-        case "INDENT":
-          indent += 1;
-          return "\n" + tab(indent);
-        case "OUTDENT":
-          indent -= 1;
-          return "\n" + tab(indent);
-        case "RETURN":
-          return "return ";
-        case "UNARY":
-          if (token[VALUE].length > 1) {
-            return token[VALUE] + " ";
-          }
-          return token[VALUE];
-        case "{":
-          return "{";
-        case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
-          return token[VALUE] + " ";
-        case "=": case "COMPARE": case "MATH": case "LOGIC":
-          return " " + token[VALUE] + " ";
-        case "HERECOMMENT":
-          return "/* " + token[VALUE] + " */";
-        default:
-          return token[VALUE];
-        }
-      }).join("").trim();
+      return prettyPrint(tokens);
     };
     return CoffeeCompiler;
   })();
@@ -6525,10 +7011,12 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
   module.exports = {
     CoffeeCompiler: CoffeeCompiler,
     
-    sortPlusMinusOperator  : sortPlusMinusOperator,
-    revertPlusMinusOperator: revertPlusMinusOperator,
-    getPrevOperand         : getPrevOperand,
-    getNextOperand         : getNextOperand,
+    detectPlusMinusOperator : detectPlusMinusOperator,
+    revertPlusMinusOperator : revertPlusMinusOperator,
+    getPrevOperand          : getPrevOperand,
+    getNextOperand          : getNextOperand,
+    detectFunctionParameters: detectFunctionParameters,
+    
     replaceFixedTimeValue    : replaceFixedTimeValue,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
@@ -6536,10 +7024,15 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceGlobalVariants    : replaceGlobalVariants,
+    replaceIteratorFunction  : replaceIteratorFunction,
+    replaceTaskFunction      : replaceTaskFunction,
+    replaceGlobalVariables   : replaceGlobalVariables,
+    replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
+    prettyPrint              : prettyPrint,
+    
     getSynthDefArguments: getSynthDefArguments,
-    use:use,
+    use: use,
   };
 
 });
@@ -6701,10 +7194,9 @@ define('cc/server/server', function(require, exports, module) {
       this.instanceManager = cc.createInstanceManager();
       this.strm = null;
       this.timer = cc.createTimer();
-      this.processed = 0;
-      this.processStart    = 0;
-      this.processInterval = 0;
       this.initialized = false;
+      this.syncCount    = new Uint32Array(1);
+      this.sysSyncCount = 0;
     }
     
     SynthServer.prototype.sendToClient = function() {
@@ -6742,11 +7234,11 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
+      this.sendToClient([
+        "/played", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
@@ -6756,6 +7248,9 @@ define('cc/server/server', function(require, exports, module) {
           this.timer.stop();
         }
       }
+      this.sendToClient([
+        "/paused", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
@@ -6794,7 +7289,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -6816,7 +7311,7 @@ define('cc/server/server', function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
+      this.syncCount[0] += 1;
     };
     
     return WorkerSynthServer;
@@ -6842,7 +7337,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     IFrameSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -6863,7 +7358,7 @@ define('cc/server/server', function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
+      this.syncCount += 1;
     };
     
     return IFrameSynthServer;
@@ -6905,9 +7400,6 @@ define('cc/server/server', function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
     };
@@ -6928,7 +7420,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -6950,8 +7442,7 @@ define('cc/server/server', function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
-      
+      this.syncCount[0] += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
@@ -6963,6 +7454,7 @@ define('cc/server/server', function(require, exports, module) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this._strm.set(strm);
       }
+      this.sysSyncCount += 1;
     };
     
     return NodeJSSynthServer;
@@ -7056,7 +7548,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -7077,8 +7569,8 @@ define('cc/server/server', function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
-
+      this.syncCount[0] += 1;
+      
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
@@ -7092,7 +7584,7 @@ define('cc/server/server', function(require, exports, module) {
     var instance = null;
     function SocketSynthServerExports(server, opts) {
       if (instance) {
-        console.warn("CoffeeColliderSocketServer has been created already.");
+        cc.console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
       emitter.mixin(this);
@@ -7139,6 +7631,7 @@ define('cc/server/server', function(require, exports, module) {
   module.exports = {
     use: function() {
       require("../common/timer").use();
+      require("../common/console").use();
       require("./instance").use();
       require("./rate").use();
       require("./unit/unit").use();
@@ -7354,7 +7847,7 @@ define('cc/server/instance', function(require, exports, module) {
       this.defs    = {};
       this.buffers = {};
       this.bufSrc  = {};
-      this.syncItems     = new Uint8Array(12);
+      this.syncItems     = new Uint8Array(20);
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
@@ -7866,9 +8359,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
-        console.warn(this.name + "'s ctor is not found.");
+        cc.console.warn(this.name + "'s ctor is not found.");
       }
-      this.tag = tag;
+      this.tag = tag || "";
       return this;
     };
     Unit.prototype.doneAction = function(action) {
@@ -7876,16 +8369,37 @@ define('cc/server/unit/unit', function(require, exports, module) {
         this.done = true;
         this.parent.doneAction(action, this.tag);
       }
+      action = 0;
     };
     return Unit;
   })();
+
+  var zapgremlins = function(a) {
+    if (isNaN(a) || (-1e-6 < a && a < 0) || (0 <= a && a < +1e-6)) {
+      return 0;
+    }
+    return a;
+  };
   
+  var avoidzero = function(a) {
+    if (a < 0) {
+      if (-1e-6 < a) {
+        a = -1e-6;
+      }
+    } else if (a < +1e-6) {
+      a = 1e-6;
+    }
+    return a;
+  };
   
   module.exports = {
     Unit : Unit,
     specs: specs,
+
+    zapgremlins: zapgremlins,
+    avoidzero  : avoidzero,
     
-    use  : function() {
+    use: function() {
       cc.createUnit = function(parent, specs) {
         return new Unit(parent, specs);
       };
@@ -7972,8 +8486,13 @@ define('cc/server/commands', function(require, exports, module) {
     }
   };
   
-  commands[0] = function(binay) {
-    this.syncItems.set(binay);
+  commands[0] = function(binary) {
+    this.syncItems.set(binary);
+    var server    = this.manager.server;
+    var syncCount = new Uint32Array(binary.buffer)[1];
+    if (server.sysSyncCount < syncCount) {
+      server.sysSyncCount = syncCount;
+    }
   };
   commands[1] = function(binary) {
     var bufSrcId = (binary[3] << 8) + binary[2];
@@ -8118,6 +8637,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
       require("./bop");
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./madd");
@@ -8131,36 +8651,40 @@ define('cc/server/unit/installer', function(require, exports, module) {
 });
 define('cc/server/unit/bop', function(require, exports, module) {
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
 
   var calcFunc = {};
   
   unit.specs.BinaryOpUGen = (function() {
-    var AA = 2   * 10 + 2;
-    var AK = 2   * 10 + 1;
-    var AI = 2   * 10 + 0;
-    var KA = 1 * 10 + 2;
-    var KK = 1 * 10 + 1;
-    var KI = 1 * 10 + 0;
-    var IA = 0  * 10 + 2;
-    var IK = 0  * 10 + 1;
-    var II = 0  * 10 + 0;
     
     var ctor = function() {
       var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];
       var process;
       if (func) {
-        switch (this.inRates[0] * 10 + this.inRates[1]) {
-        case AA: process = func.aa; break;
-        case AK: process = func.ak; break;
-        case AI: process = func.ai; break;
-        case KA: process = func.ka; break;
-        case KK: process = func.kk; break;
-        case KI: process = func.ki; break;
-        case IA: process = func.ia; break;
-        case IK: process = func.ik; break;
-        case II: process = func.ii; break;
+        switch (this.inRates[0]) {
+        case 2:
+          switch (this.inRates[1]) {
+          case 2:   process = func.aa; break;
+          case 1: process = func.ak; break;
+          case 0:  process = func.ai; break;
+          }
+          break;
+        case 1:
+          switch (this.inRates[1]) {
+          case 2:   process = func.ka; break;
+          case 1: process = func.kk; break;
+          case 0:  process = func.kk; break;
+          }
+          break;
+        case 0:
+          switch (this.inRates[1]) {
+          case 2:   process = func.ia; break;
+          case 1: process = func.kk; break;
+          case 0:  process = null   ; break;
+          }
+          break;
         }
         this.process = process;
         this._a = this.inputs[0][0];
@@ -8171,7 +8695,7 @@ define('cc/server/unit/bop', function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        console.log("BinaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -8712,17 +9236,37 @@ define('cc/server/unit/bop', function(require, exports, module) {
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.aa) { func.aa = binary_aa(func); }
-    if (!func.ak) { func.ak = binary_ak(func); }
-    if (!func.ai) { func.ai = binary_ai(func); }
-    if (!func.ka) { func.ka = binary_ka(func); }
-    if (!func.kk) { func.kk = binary_kk(func); }
-    if (!func.ki) { func.ki = func.kk; }
-    if (!func.ia) { func.ia = binary_ia(func); }
-    if (!func.ik) { func.ik = func.kk; }
+    if (!func.aa) {
+      func.aa = binary_aa(func);
+    }
+    if (!func.ak) {
+      func.ak = binary_ak(func);
+    }
+    if (!func.ai) {
+      func.ai = binary_ai(func);
+    }
+    if (!func.ka) {
+      func.ka = binary_ka(func);
+    }
+    if (!func.kk) {
+      func.kk = binary_kk(func);
+    }
+    if (!func.ia) {
+      func.ia = binary_ia(func);
+    }
+    func.ki = func.kk;
+    func.ik = func.kk;
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc : calcFunc,
+    binary_aa: binary_aa,
+    binary_ak: binary_ak,
+    binary_ai: binary_ai,
+    binary_ka: binary_ka,
+    binary_kk: binary_kk,
+    binary_ia: binary_ia,
+  };
 
 });
 define('cc/server/unit/bufio', function(require, exports, module) {
@@ -9123,6 +9667,250 @@ define('cc/server/unit/delay', function(require, exports, module) {
       this._iwrphase = iwrphase;
     };
 
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
+define('cc/server/unit/filter', function(require, exports, module) {
+
+  var unit = require("./unit");
+  var zapgremlins = unit.zapgremlins;
+  
+  unit.specs.RLPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        var next_b1 = (1.0 + C) * cosf;
+        var next_b2 = -C;
+        var next_a0 = (1.0 + C - next_b1) * 0.25;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 + 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 + 2.0 * y2 + y0;
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 + 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 + 2.0 * y2 + y0;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        b1 = (1.0 + C) * cosf;
+        b2 = -C;
+        a0 = (1.0 + C - b1) * 0.25;
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 + 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 + 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+
+  unit.specs.RHPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        var next_b1 = (1.0 + C) * cosf;
+        var next_b2 = -C;
+        var next_a0 = (1.0 + C + next_b1) * 0.25;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 - 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 - 2.0 * y2 + y0;
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 - 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 - 2.0 * y2 + y0;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        b1 = (1.0 + C) * cosf;
+        b2 = -C;
+        a0 = (1.0 + C + b1) * 0.25;
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 - 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 - 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
     return ctor;
   })();
   
@@ -10107,6 +10895,60 @@ define('cc/server/unit/osc', function(require, exports, module) {
     return ctor;
   })();
 
+  unit.specs.SinOscFB = (function() {
+    var ctor = function() {
+      this.process = next_aa;
+      this._radtoinc = kSineSize / twopi;
+      this._cpstoinc = kSineSize * this.rate.sampleDur;
+      this._mask  = kSineMask;
+      this._table = gSineWavetable;
+      this._freq     = this.inputs[0][0];
+      this._feedback = this.inputs[1][0] * this._radtoinc;
+      this._y = 0;
+      this._x = 0;
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var nextFreq     = this.inputs[0][0];
+      var nextFeedback = this.inputs[1][0];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var freq = this._freq;
+      var feedback = this._feedback;
+      var y = this._y;
+      var x = this._x, pphase, index, i;
+      if (nextFreq === freq && nextFeedback === feedback) {
+        freq     *= cpstoinc;
+        feedback *= radtoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq;
+        }
+      } else {
+        var freq_slope     = (nextFreq     - freq    ) * this.rate.slopeFactor;
+        var feedback_slope = (nextFeedback - feedback) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq * cpstoinc;
+          freq     += freq_slope;
+          feedback += feedback_slope;
+        }
+        this._freq     = nextFreq;
+        this._feedback = nextFeedback;
+      }
+      this._y = y;
+      this._x = x;
+    };
+    return ctor;
+  })();
+
   unit.specs.LFSaw = (function() {
     var ctor = function() {
       if (this.inRates[0] === 2) {
@@ -10159,6 +11001,213 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._phase = phase;
     };
     
+    return ctor;
+  })();
+
+  unit.specs.LFPar = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFCub = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 2 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0] + 0.5;
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFTri = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freqIn[i] * cpstoinc;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freq;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFPulse = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this._duty    = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freq;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
     return ctor;
   })();
   
@@ -10336,7 +11385,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.f32_syncItems[1] : 0;
+      var y0 = instance ? instance.f32_syncItems[2] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -10368,7 +11417,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.f32_syncItems[2] : 0;
+      var y0 = instance ? instance.f32_syncItems[3] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -10399,7 +11448,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? (instance.syncItems[3] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.f32_syncItems[4] ? maxval : minval) : minval;
       this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };
@@ -10411,6 +11460,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
 });
 define('cc/server/unit/uop', function(require, exports, module) {
 
+  var cc   = require("../cc");
   var unit = require("./unit");
   var ops  = require("../../common/ops");
   
@@ -10423,8 +11473,12 @@ define('cc/server/unit/uop', function(require, exports, module) {
       var process;
       if (func) {
         switch (this.inRates[0]) {
-        case 2  : process = func.a; break;
-        case 1: process = func.k; break;
+        case 2:
+          process = func.a;
+          break;
+        case 1:
+          process = func.k;
+          break;
         }
         this.process = process;
         if (this.process) {
@@ -10433,7 +11487,7 @@ define('cc/server/unit/uop', function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
-        console.log("UnaryOpUGen[" + this.specialIndex + "] is not defined.");
+        cc.console.warn("UnaryOpUGen[" + ops.UNARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     
@@ -10458,15 +11512,7 @@ define('cc/server/unit/uop', function(require, exports, module) {
     };
   };
   
-  var avoidzero = function(a) {
-    if (-1e-6 < a && a < 0) {
-      a = -1e-6;
-    }
-    if (0 <= a && a < +1e-6) {
-      a = +1e-6;
-    }
-    return a;
-  };
+  var avoidzero = unit.avoidzero;
   
   calcFunc.neg = function(a) {
     return -a;
@@ -10540,10 +11586,10 @@ define('cc/server/unit/uop', function(require, exports, module) {
     return Math.log(Math.abs(avoidzero(a)));
   };
   calcFunc.log2 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG2E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG2E;
   };
   calcFunc.log10 = function(a) {
-    return Math.log2(Math.abs(avoidzero(a))) * Math.LOG10E;
+    return Math.log(Math.abs(avoidzero(a))) * Math.LOG10E;
   };
   calcFunc.sin = function(a) {
     return Math.sin(a);
@@ -10605,20 +11651,24 @@ define('cc/server/unit/uop', function(require, exports, module) {
   calcFunc.tilde = function(a) {
     return ~a;
   };
-  calcFunc.num = function(a) {
-    return a;
-  };
   calcFunc.pi = function(a) {
     return Math.PI * a;
+  };
+  calcFunc.to_i = function(a) {
+    return a|0;
   };
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];
-    if (!func.a) { func.a = unary_a(func); }
-    if (!func.k) { func.k = unary_k(func); }
+    func.a = unary_a(func);
+    func.k = unary_k(func);
   });
   
-  module.exports = {};
+  module.exports = {
+    calcFunc: calcFunc,
+    unary_k : unary_k,
+    unary_a : unary_a
+  };
 
 });
 var exports = _require("cc/cc", "cc/loader");
