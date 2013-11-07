@@ -81,7 +81,7 @@ define(function(require, exports, module) {
       var func = function(out, freq, opts) {
         assert.equal(out .klassName, "OutputProxy");
         assert.equal(freq.klassName, "OutputProxy");
-        assert.deepEqual(opts, {phase:0}, "opts is {phase:0}");
+        assert.deepEqual(opts, {phase:0, amp:0.5}, "opts is {phase:0, amp:0.5}");
         var a = {
           klassName: "SinOsc",
           rate     : C.AUDIO,
@@ -98,8 +98,9 @@ define(function(require, exports, module) {
         addToSynth(a);
         addToSynth(b);
       };
-      var args = [ "out", "0", "freq", "440", "opts", '{"phase":0}' ];
-      var def = cc.createSynthDef(func, args);
+      var args = [ "out", "0", "freq", "440", "opts", '{"phase":1, "amp":0.5}' ];
+      var tmpl = cc.createSynthDefTemplate(func, args);
+      var def  = tmpl.build({phase:0});
       assert.deepEqual(def.specs, {
         consts : [ 0 ],
         defList: [
@@ -118,17 +119,6 @@ define(function(require, exports, module) {
         "/s_def", def._defId, JSON.stringify(def.specs)
       ]);
     });
-    it("makeSynthDef: error", function() {
-      var func = function() {
-        throw "makeSynthDef: error";
-      };
-      var args = [];
-      assert.throw(function() {
-        cc.createSynthDef(func, args);
-        assert.isNull(tl);
-      }, "makeSynthDef: error");
-    });
-    
     describe("private methods", function() {
       it("args2keyValues", function() {
         actual = synthdef.args2keyValues([]);

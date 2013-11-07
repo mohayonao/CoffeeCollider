@@ -154,7 +154,7 @@ define(function(require, exports, module) {
     return new Synth();
   };
   SynthInterface.def = function(func, args) {
-    return cc.createSynthDef(func, args);
+    return cc.createSynthDefTemplate(func, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);

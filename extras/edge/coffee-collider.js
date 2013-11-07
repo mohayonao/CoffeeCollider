@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131107142000",
+    version: "0.0.0+20131107155400",
     global : {},
     Object : function CCObject() {}
   };
@@ -1467,7 +1467,7 @@ define('cc/client/node', function(require, exports, module) {
     return new Synth();
   };
   SynthInterface.def = function(func, args) {
-    return cc.createSynthDef(func, args);
+    return cc.createSynthDefTemplate(func, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
@@ -3181,14 +3181,69 @@ define('cc/client/synthdef', function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var extend = require("../common/extend");
+  var slice = [].slice;
   
   var defId = 0;
+
+  var SynthDefTemplate = (function() {
+    function SynthDefTemplate(func, args) {
+      this.klassName = "SynthDefTemplate";
+      this.func   = func;
+      this.args   = args2keyValues(args);
+      this.params = args2params(this.args);
+    }
+    extend(SynthDefTemplate, cc.Object);
+
+    SynthDefTemplate.prototype.build = function(opts) {
+      return new SynthDef(this, opts||{});
+    };
+    
+    SynthDefTemplate.prototype.play = fn(function() {
+      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var target = list[0];
+      var args   = list[1];
+      var addAction = list[2];
+      return new SynthDef(this).play(target, args, addAction);
+    }).multiCall().build();
+    
+    return SynthDefTemplate;
+  })();
+  
+  var getSynthDefPlayArguments = function() {
+    var target, args, addAction;
+    var i = 0;
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.client.rootNode;
+    }
+    if (utils.isDict(arguments[i])) {
+      args = arguments[i++];
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = arguments[i];
+    } else {
+      addAction = "addToHead";
+    }
+    if (args && arguments.length === 1) {
+      if (cc.instanceOfNode(args.target)) {
+        target = args.target;
+        delete args.target;
+      }
+      if (typeof args.addAction === "string") {
+        addAction = args.addAction;
+        delete args.addAction;
+      }
+    }
+    return [target, args, addAction];
+  };
   
   var SynthDef = (function() {
-    function SynthDef(func, _args) {
+    function SynthDef(template, _opts) {
       this.klassName = "SynthDef";
       this._defId = defId++;
-      if (!(func && _args)) {
+
+      if (!(template instanceof SynthDefTemplate)) {
         this.specs = {
           consts:[], defs:[], params:{ names:[], indices:[], length:[], values:[] }
         };
@@ -3200,15 +3255,27 @@ define('cc/client/synthdef', function(require, exports, module) {
         children.push(ugen);
       });
       
-      var args     = args2keyValues(_args);
-      var params   = args2params(args);
+      var args     = template.args;
+      var params   = template.params;
       var controls = cc.createControl(1).init(params.flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
       
+      var opts = {};
+      if (params.opts) {
+        Object.keys(params.opts).forEach(function(key) {
+          opts[key] = params.opts[key];
+        });
+      }
+      if (_opts) {
+        Object.keys(_opts).forEach(function(key) {
+          opts[key] = _opts[key];
+        });
+      }
+      
       try {
-        func.apply(null, reshapeArgs(args.vals, controls).concat(params.opts));
+        template.func.apply(null, reshapeArgs(args.vals, controls).concat(opts));
       } catch (e) {
         throw e.toString();
       } finally {
@@ -3232,31 +3299,10 @@ define('cc/client/synthdef', function(require, exports, module) {
     extend(SynthDef, cc.Object);
     
     SynthDef.prototype.play = fn(function() {
-      var target, args, addAction;
-      var i = 0;
-      if (cc.instanceOfNode(arguments[i])) {
-        target = arguments[i++];
-      } else {
-        target = cc.client.rootNode;
-      }
-      if (utils.isDict(arguments[i])) {
-        args = arguments[i++];
-      }
-      if (typeof arguments[i] === "string") {
-        addAction = arguments[i];
-      } else {
-        addAction = "addToHead";
-      }
-      if (args && arguments.length === 1) {
-        if (cc.instanceOdNode(args.target)) {
-          target = args.target;
-          delete args.target;
-        }
-        if (typeof args.addAction === "string") {
-          addAction = args.addAction;
-          delete args.addAction;
-        }
-      }
+      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var target = list[0];
+      var args   = list[1];
+      var addAction = list[2];
       switch (addAction) {
       case "addToHead":
         return cc.createSynth(target, 0, this, args);
@@ -3439,8 +3485,9 @@ define('cc/client/synthdef', function(require, exports, module) {
   };
   
   module.exports = {
+    SynthDefTemplate: SynthDefTemplate,
     SynthDef: SynthDef,
-
+    
     args2keyValues: args2keyValues,
     args2params   : args2params,
     isValidDefArg : isValidDefArg,
@@ -3450,8 +3497,14 @@ define('cc/client/synthdef', function(require, exports, module) {
     makeDefList   : makeDefList,
     
     use: function() {
-      cc.createSynthDef = function(func, args) {
-        return new SynthDef(func, args);
+      cc.createSynthDefTemplate = function(func, args) {
+        return new SynthDefTemplate(func, args);
+      };
+      cc.instanceOfSynthDefTemplate = function(obj) {
+        return obj instanceof SynthDefTemplate;
+      };
+      cc.createSynthDef = function(func, args, opts) {
+        return new SynthDef(func, args, opts);
       };
       cc.instanceOfSynthDef = function(obj) {
         return obj instanceof SynthDef;

@@ -1,18 +1,23 @@
 def = Synth.def (freq=440, amp=1)->
   amp *= Line.kr(0.5, 0, 2.5)
   Out.ar(2, SinOsc.ar([freq, freq * 1.25]) * amp)
+.build()  
 
 Synth.def ->
   Out.ar(0, CombL.ar(In.ar([2, 3], decaytime:5)))
 .play()
  
 Task.loop ->
-  freq = Math.random() * 880 + 220
-  s = def.play().on "done", ->
-    s.stop()
-  t = Task.each [1,4,3,2,8,4,3,2], (x, i)->
-    s.set freq:freq * x, amp:1-(i/8)
+  root  = 880.rand() + 220
+  synth = def.play().on "done", ->
+    @stop()
+  task  = Task.each [1,4,3,2,8,4,3,2], (x, i)->
+    freq = root * x
+    amp  = 1 - (i / 8)
+    synth.set freq:freq, amp:amp
+    @wait 125
+    synth.set freq:freq * 1.midiratio()
     @wait 125
   .play()
-  @wait t
+  @wait task
 .play()
