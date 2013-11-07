@@ -153,9 +153,6 @@ define(function(require, exports, module) {
   var SynthInterface = cc.global.Synth = function() {
     return new Synth();
   };
-  SynthInterface.def = function(func, args) {
-    return cc.createSynthDefTemplate(func, args);
-  };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_AFTER, list[1], list[2]);

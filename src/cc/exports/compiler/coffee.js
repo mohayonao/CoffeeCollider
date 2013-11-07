@@ -514,21 +514,41 @@ define(function(require, exports, module) {
     }
     return args;
   };
+
+  var isFunctionHeader = function(token) {
+    return (token[TAG] === "->" ||
+            token[TAG] === "=>" ||
+            token[TAG] === "PARAM_START");
+  };
   
   var replaceSynthDefinition = function(tokens) {
-    for (var i = tokens.length - 1; --i >= 2; ) {
-      var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def" && tokens[i-1][TAG] === "." &&
-          tokens[i-2][TAG] === "IDENTIFIER" && tokens[i-2][VALUE] === "Synth" && tokens[i+1][TAG] === "CALL_START") {
-        var args = getSynthDefArguments(tokens, i+2);
-        var next = getNextOperand(tokens, i+2);
-        tokens.splice(next.end+1, 0, [",", ",", _]);
-        tokens.splice(next.end+2, 0, ["[", "[", _]);
-        tokens.splice(next.end+3, 0, ["]", "]", _]);
-        for (var j = args.length; j--; ) {
-          tokens.splice(next.end+3, 0, ["STRING", "'" + args[j] + "'", _]);
-          if (j) {
-            tokens.splice(next.end+3, 0, [",", ",", _]);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "SynthDef") {
+        var index = -1;
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (isFunctionHeader(tokens[j])) {
+            index = j;
+            break;
+          }
+        }
+        
+        if (index !== -1) {
+          var args = getSynthDefArguments(tokens, index);
+          var next = getNextOperand(tokens, index);
+          tokens.splice(next.end+1, 0, [",", ",", _]);
+          tokens.splice(next.end+2, 0, ["[", "[", _]);
+          tokens.splice(next.end+3, 0, ["]", "]", _]);
+          for (var k = args.length; k--; ) {
+            tokens.splice(next.end+3, 0, ["STRING", "'" + args[k] + "'", _]);
+            if (k) {
+              tokens.splice(next.end+3, 0, [",", ",", _]);
+            }
           }
         }
       }
@@ -559,9 +579,7 @@ define(function(require, exports, module) {
           if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
             break;
           }
-          if (tokens[j][TAG] === "->" ||
-              tokens[j][TAG] === "=>" ||
-              tokens[j][TAG] === "PARAM_START") {
+          if (isFunctionHeader(tokens[j])) {
             makeSegmentedFunction(getNextOperand(tokens, j), iterContextMethods);
             break;
           }
@@ -585,9 +603,7 @@ define(function(require, exports, module) {
           if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
             break;
           }
-          if (tokens[j][TAG] === "->" ||
-              tokens[j][TAG] === "=>" ||
-              tokens[j][TAG] === "PARAM_START") {
+          if (isFunctionHeader(tokens[j])) {
             makeSegmentedFunction(getNextOperand(tokens, j), taskContextMethods);
             break;
           }
@@ -906,7 +922,6 @@ define(function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceIteratorFunction(tokens);
         tokens = replaceTaskFunction(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);

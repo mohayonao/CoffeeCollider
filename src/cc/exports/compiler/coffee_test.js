@@ -440,36 +440,48 @@ define(function(require, exports, module) {
     it("replaceSynthDefinition", function() {
       var code, expected;
       code = [
-        "Synth.def ->",
+        "SynthDef ->",
         "  1000",
         ".play()"
       ].join("\n");
       expected = [
-        "Synth.def(->",
+        "SynthDef(->",
         "  1000",
         ", []).play()"
       ].join("\n");
       testSuite(compiler.replaceSynthDefinition, code, expected);
       
       code = [
-        "Synth.def (out, freq=440, amp=[1,2])->",
+        "SynthDef (out, freq=440, amp=[1,2])->",
         "  1000",
         ".play()"
       ].join("\n");
       expected = [
-        "Synth.def((out, freq, amp)->",
+        "SynthDef((out, freq, amp)->",
         "  1000",
         ", ['out', '0', 'freq', '440', 'amp', '[1,2]']).play()"
       ].join("\n");
       testSuite(compiler.replaceSynthDefinition, code, expected);
       
       code = [
-        "Synth.def((a={}, b='')->",
+        "SynthDef((a={}, b='')->",
         "  1000",
         ", 1000).play()"
       ].join("\n");
       expected = [
-        "Synth.def((a, b)->",
+        "SynthDef((a, b)->",
+        "  1000",
+        ", ['a', '{}', 'b', '\"\"'], 1000).play()"
+      ].join("\n");
+      testSuite(compiler.replaceSynthDefinition, code, expected);
+
+      code = [
+        "SynthDef('test', (a={}, b='')->",
+        "  1000",
+        ", 1000).play()"
+      ].join("\n");
+      expected = [
+        "SynthDef('test', (a, b)->",
         "  1000",
         ", ['a', '{}', 'b', '\"\"'], 1000).play()"
       ].join("\n");

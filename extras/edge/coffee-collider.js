@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131107155400",
+    version: "0.0.0+20131107174700",
     global : {},
     Object : function CCObject() {}
   };
@@ -1465,9 +1465,6 @@ define('cc/client/node', function(require, exports, module) {
   
   var SynthInterface = cc.global.Synth = function() {
     return new Synth();
-  };
-  SynthInterface.def = function(func, args) {
-    return cc.createSynthDefTemplate(func, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
@@ -3483,6 +3480,12 @@ define('cc/client/synthdef', function(require, exports, module) {
     }
     return result;
   };
+
+  var SynthDefInterface = global.SynthDef = function(func, args) {
+    return cc.createSynthDefTemplate(func, args);
+  };
+  SynthDefInterface.read = function() {
+  };
   
   module.exports = {
     SynthDefTemplate: SynthDefTemplate,
@@ -3731,6 +3734,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
       require("./bop").use();
       require("./madd").use();
       require("./inout").use();
+      require("./mix");
       
       // redefinition for tests
       cc.UGen = UGen;
@@ -3836,7 +3840,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
           if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
-        } else if (cc.instancrOfMulAdd(a)) {
+        } else if (cc.instanceOfMulAdd(a)) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
               return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
@@ -4248,6 +4252,50 @@ define('cc/client/ugen/inout', function(require, exports, module) {
       };
     }
   };
+
+});
+define('cc/client/ugen/mix', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var utils = require("../utils");
+  
+  var mix = function(array) {
+    if (!Array.isArray(array)) {
+      array = [array];
+    }
+    var reduceArray = utils.clump(array, 4);
+    var a = reduceArray.map(function(a) {
+      switch (a.length) {
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
+      case 1: return a[0];
+      }
+    });
+    switch (a.length) {
+      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
+      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
+      case 1: return a[0];
+      default: return mix(a);
+    }
+  };
+  
+  cc.global.Mix = function(array) {
+    return mix(array) || [];
+  };
+  cc.global.Mix.fill = function(n, func) {
+    n = n|0;
+    var array = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      array[i] = func(i);
+    }
+    return mix(array);
+  };
+  cc.global.Mix.ar = function() {
+  };
+  
+  module.exports = {};
 
 });
 define('cc/client/ugen/bufio', function(require, exports, module) {
@@ -6463,21 +6511,41 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     }
     return args;
   };
+
+  var isFunctionHeader = function(token) {
+    return (token[TAG] === "->" ||
+            token[TAG] === "=>" ||
+            token[TAG] === "PARAM_START");
+  };
   
   var replaceSynthDefinition = function(tokens) {
-    for (var i = tokens.length - 1; --i >= 2; ) {
-      var token = tokens[i];
-      if (token[TAG] === "IDENTIFIER" && token[VALUE] === "def" && tokens[i-1][TAG] === "." &&
-          tokens[i-2][TAG] === "IDENTIFIER" && tokens[i-2][VALUE] === "Synth" && tokens[i+1][TAG] === "CALL_START") {
-        var args = getSynthDefArguments(tokens, i+2);
-        var next = getNextOperand(tokens, i+2);
-        tokens.splice(next.end+1, 0, [",", ",", _]);
-        tokens.splice(next.end+2, 0, ["[", "[", _]);
-        tokens.splice(next.end+3, 0, ["]", "]", _]);
-        for (var j = args.length; j--; ) {
-          tokens.splice(next.end+3, 0, ["STRING", "'" + args[j] + "'", _]);
-          if (j) {
-            tokens.splice(next.end+3, 0, [",", ",", _]);
+    for (var i = tokens.length - 3; i--; ) {
+      if (i && tokens[i-1][TAG] === ".") {
+        continue;
+      }
+      if (tokens[i][VALUE] === "SynthDef") {
+        var index = -1;
+        for (var j = i+2, jmax = tokens.length; j < jmax; ++j) {
+          if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
+            break;
+          }
+          if (isFunctionHeader(tokens[j])) {
+            index = j;
+            break;
+          }
+        }
+        
+        if (index !== -1) {
+          var args = getSynthDefArguments(tokens, index);
+          var next = getNextOperand(tokens, index);
+          tokens.splice(next.end+1, 0, [",", ",", _]);
+          tokens.splice(next.end+2, 0, ["[", "[", _]);
+          tokens.splice(next.end+3, 0, ["]", "]", _]);
+          for (var k = args.length; k--; ) {
+            tokens.splice(next.end+3, 0, ["STRING", "'" + args[k] + "'", _]);
+            if (k) {
+              tokens.splice(next.end+3, 0, [",", ",", _]);
+            }
           }
         }
       }
@@ -6508,9 +6576,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
             break;
           }
-          if (tokens[j][TAG] === "->" ||
-              tokens[j][TAG] === "=>" ||
-              tokens[j][TAG] === "PARAM_START") {
+          if (isFunctionHeader(tokens[j])) {
             makeSegmentedFunction(getNextOperand(tokens, j), iterContextMethods);
             break;
           }
@@ -6534,9 +6600,7 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
           if (tokens[j][TAG] === "TERMINATOR" || tokens[j][TAG] === ".") {
             break;
           }
-          if (tokens[j][TAG] === "->" ||
-              tokens[j][TAG] === "=>" ||
-              tokens[j][TAG] === "PARAM_START") {
+          if (isFunctionHeader(tokens[j])) {
             makeSegmentedFunction(getNextOperand(tokens, j), taskContextMethods);
             break;
           }
@@ -6855,7 +6919,6 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceIteratorFunction(tokens);
         tokens = replaceTaskFunction(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);

@@ -1,9 +1,9 @@
-def = Synth.def (freq=440, amp=1)->
+def = SynthDef (freq=440, amp=1)->
   amp *= Line.kr(0.5, 0, 2.5)
   Out.ar(2, SinOsc.ar([freq, freq * 1.25]) * amp)
 .build()  
 
-Synth.def ->
+SynthDef ->
   Out.ar(0, CombL.ar(In.ar([2, 3], decaytime:5)))
 .play()
  

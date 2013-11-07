@@ -307,6 +307,12 @@ define(function(require, exports, module) {
     }
     return result;
   };
+
+  var SynthDefInterface = global.SynthDef = function(func, args) {
+    return cc.createSynthDefTemplate(func, args);
+  };
+  SynthDefInterface.read = function() {
+  };
   
   module.exports = {
     SynthDefTemplate: SynthDefTemplate,

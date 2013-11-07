@@ -1,4 +1,4 @@
-tmp = Synth.def (freq=440, amp=1, opts={})->
+tmp = SynthDef (freq=440, amp=1, opts={})->
   osc = opts.create(freq)
   Out.ar(0, osc * amp)
 

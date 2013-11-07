@@ -1,4 +1,4 @@
-Synth.def ->
+SynthDef ->
   freq = MouseY.kr(1760, 220, "exponential")
   mod  = SinOsc.ar(freq * MouseButton.kr(1, 2, lag:1))
   mod *= MouseX.kr(0, 20, "exponential")
