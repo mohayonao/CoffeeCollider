@@ -711,7 +711,7 @@ define(function(require, exports, module) {
       var code, actual, expected;
       code     = "100";
       expected = [
-        "((global, undefined)->",
+        "((global)->",
         "  100",
         ").call(cc.__context__, this.self || global)",
       ].join("\n");

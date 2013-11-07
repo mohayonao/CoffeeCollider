@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131107111900",
+    version: "0.0.0+20131107112900",
     global : {},
     Object : function CCObject() {}
   };
@@ -6703,11 +6703,9 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     tokens.splice(0, 0, ["("          , "("        , _]);
     tokens.splice(1, 0, ["PARAM_START", "("        , _]);
     tokens.splice(2, 0, ["IDENTIFIER" , "global"   , _]);
-    tokens.splice(3, 0, [","          , ","        , _]);
-    tokens.splice(4, 0, ["IDENTIFIER" , "undefined", _]);
-    tokens.splice(5, 0, ["PARAM_END"  , ")"        , _]);
-    tokens.splice(6, 0, ["->"         , "->"       , _]);
-    tokens.splice(7, 0, ["INDENT"     , 2          , _]);
+    tokens.splice(3, 0, ["PARAM_END"  , ")"        , _]);
+    tokens.splice(4, 0, ["->"         , "->"       , _]);
+    tokens.splice(5, 0, ["INDENT"     , 2          , _]);
     
     var i = tokens.length - 1;
     tokens.splice(i++, 0, ["OUTDENT"   , 2            , _]);
