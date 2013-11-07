@@ -87,7 +87,7 @@ define(function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? (instance.syncItems[C.BUTTON] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.f32_syncItems[C.BUTTON] ? maxval : minval) : minval;
       this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };

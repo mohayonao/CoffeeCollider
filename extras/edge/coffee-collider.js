@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131107112900",
+    version: "0.0.0+20131107142000",
     global : {},
     Object : function CCObject() {}
   };
@@ -379,8 +379,14 @@ define('cc/client/client', function(require, exports, module) {
   commands["/play"] = function(msg) {
     this.play(msg);
   };
+  commands["/played"] = function(msg) {
+    this.sendToIF(msg);
+  };
   commands["/pause"] = function(msg) {
     this.pause(msg);
+  };
+  commands["/paused"] = function(msg) {
+    this.sendToIF(msg);
   };
   commands["/reset"] = function(msg) {
     this.reset(msg);
@@ -5222,7 +5228,6 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
 
   var CoffeeColliderImpl = (function() {
     function CoffeeColliderImpl(exports, opts) {
-      var that = this;
       this.exports  = exports;
       this.compiler = cc.createCompiler("coffee");
       
@@ -5237,58 +5242,62 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.channels   = this.api.channels;
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
+      this.strmList = new Array(16);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
+      this.syncCount = 0;
       this.speaker = opts.speaker !== false;
       this.api.init();
-
-      var syncItems = new Uint8Array(12);
+      
+      var syncItems = new Uint8Array(20);
       if (typeof window !== "undefined" && opts.mouse !== false) {
         var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
-          f32_syncItems[1] = e.pageX / window.innerWidth;
-          f32_syncItems[2] = e.pageY / window.innerHeight;
-          that.syncItemsChanged = true;
+          f32_syncItems[2] = e.pageX / window.innerWidth;
+          f32_syncItems[3] = e.pageY / window.innerHeight;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[3] = 1;
-          that.syncItemsChanged = true;
+          f32_syncItems[4] = 1;
         }, false);
         window.addEventListener("mouseup", function() {
-          syncItems[3] = 0;
-          that.syncItemsChanged = true;
+          f32_syncItems[4] = 0;
         }, false);
       }
       this.syncItems = syncItems;
+      this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        if (this.api) {
-          var strm = this.strm;
-          for (var i = 0, imax = strm.length; i < imax; ++i) {
-            strm[i] = 0;
-          }
-          this.strmList.splice(0);
-          this.strmListReadIndex  = 0;
-          this.strmListWriteIndex = 0;
-          this.api.play();
-        }
         this.sendToClient(["/play"]);
-        this.exports.emit("play");
       }
+    };
+    CoffeeColliderImpl.prototype._played = function(syncCount) {
+      if (this.api) {
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList.splice(0);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        this.syncCount = syncCount;
+        this.api.play();
+      }
+      this.exports.emit("play");
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        if (this.api) {
-          this.api.pause();
-        }
         this.sendToClient(["/pause"]);
-        this.exports.emit("pause");
       }
+    };
+    CoffeeColliderImpl.prototype._paused = function() {
+      if (this.api) {
+        this.api.pause();
+      }
+      this.exports.emit("pause");
     };
     CoffeeColliderImpl.prototype.reset = function() {
       this.execId = 0;
@@ -5304,15 +5313,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       this.exports.emit("reset");
     };
     CoffeeColliderImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
+      var strm = this.strmList[this.strmListReadIndex & 15];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strmListReadIndex += 1;
         this.strm.set(strm);
       }
-      if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItems);
-        this.syncItemsChanged = false;
-      }
+      this.syncCount += 1;
+      this.syncItemsUInt32[1] = this.syncCount;
+      this.sendToClient(this.syncItems);
     };
     CoffeeColliderImpl.prototype.execute = function(code) {
       var append, callback;
@@ -5362,8 +5370,8 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
       if (msg instanceof Int16Array) {
-        this.strmList[this.strmListWriteIndex] = msg;
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmList[this.strmListWriteIndex & 15] = msg;
+        this.strmListWriteIndex += 1;
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -5504,6 +5512,14 @@ define('cc/exports/coffeecollider', function(require, exports, module) {
       "/init", this.sampleRate, this.channels
     ]);
     this.exports.emit("connected");
+  };
+  commands["/played"] = function(msg) {
+    var syncCount = msg[1];
+    this._played(syncCount);
+  };
+  commands["/paused"] = function(msg) {
+    var syncCount = msg[1];
+    this._paused(syncCount);
   };
   commands["/executed"] = function(msg) {
     var execId = msg[1];
@@ -5692,7 +5708,7 @@ define('cc/common/audioapi', function(require, exports, module) {
           var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
-            if (written - 60 > Date.now() - start) {
+            if (written - 20 > Date.now() - start) {
               return;
             }
             var i = interleaved.length;
@@ -7000,10 +7016,9 @@ define('cc/server/server', function(require, exports, module) {
       this.instanceManager = cc.createInstanceManager();
       this.strm = null;
       this.timer = cc.createTimer();
-      this.processed = 0;
-      this.processStart    = 0;
-      this.processInterval = 0;
       this.initialized = false;
+      this.syncCount    = new Uint32Array(1);
+      this.sysSyncCount = 0;
     }
     
     SynthServer.prototype.sendToClient = function() {
@@ -7041,11 +7056,11 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
+      this.sendToClient([
+        "/played", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
@@ -7055,6 +7070,9 @@ define('cc/server/server', function(require, exports, module) {
           this.timer.stop();
         }
       }
+      this.sendToClient([
+        "/paused", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
@@ -7093,7 +7111,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -7115,7 +7133,7 @@ define('cc/server/server', function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
+      this.syncCount[0] += 1;
     };
     
     return WorkerSynthServer;
@@ -7141,7 +7159,7 @@ define('cc/server/server', function(require, exports, module) {
       ]);
     };
     IFrameSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -7162,7 +7180,7 @@ define('cc/server/server', function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
+      this.syncCount += 1;
     };
     
     return IFrameSynthServer;
@@ -7204,9 +7222,6 @@ define('cc/server/server', function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
     };
@@ -7227,7 +7242,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -7249,8 +7264,7 @@ define('cc/server/server', function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
-      
+      this.syncCount[0] += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
@@ -7262,6 +7276,7 @@ define('cc/server/server', function(require, exports, module) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this._strm.set(strm);
       }
+      this.sysSyncCount += 1;
     };
     
     return NodeJSSynthServer;
@@ -7355,7 +7370,7 @@ define('cc/server/server', function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.processDone - 60 > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -7376,8 +7391,8 @@ define('cc/server/server', function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
-
+      this.syncCount[0] += 1;
+      
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
@@ -7654,7 +7669,7 @@ define('cc/server/instance', function(require, exports, module) {
       this.defs    = {};
       this.buffers = {};
       this.bufSrc  = {};
-      this.syncItems     = new Uint8Array(12);
+      this.syncItems     = new Uint8Array(20);
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
@@ -8284,8 +8299,13 @@ define('cc/server/commands', function(require, exports, module) {
     }
   };
   
-  commands[0] = function(binay) {
-    this.syncItems.set(binay);
+  commands[0] = function(binary) {
+    this.syncItems.set(binary);
+    var server    = this.manager.server;
+    var syncCount = new Uint32Array(binary.buffer)[1];
+    if (server.sysSyncCount < syncCount) {
+      server.sysSyncCount = syncCount;
+    }
   };
   commands[1] = function(binary) {
     var bufSrcId = (binary[3] << 8) + binary[2];
@@ -10672,7 +10692,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.f32_syncItems[1] : 0;
+      var y0 = instance ? instance.f32_syncItems[2] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -10704,7 +10724,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? instance.f32_syncItems[2] : 0;
+      var y0 = instance ? instance.f32_syncItems[3] : 0;
       if (warp === 0) {
         y0 = (maxval - minval) * y0 + minval;
       } else {
@@ -10735,7 +10755,7 @@ define('cc/server/unit/ui', function(require, exports, module) {
         this._b1  = lag === 0 ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         this._lag = lag;
       }
-      var y0 = instance ? (instance.syncItems[3] ? maxval : minval) : minval;
+      var y0 = instance ? (instance.f32_syncItems[4] ? maxval : minval) : minval;
       this.outputs[0][0] = y1 = y0 + b1 * (y1 - y0);
       this._y1 = y1;
     };

@@ -16,10 +16,9 @@ define(function(require, exports, module) {
       this.instanceManager = cc.createInstanceManager();
       this.strm = null;
       this.timer = cc.createTimer();
-      this.processed = 0;
-      this.processStart    = 0;
-      this.processInterval = 0;
       this.initialized = false;
+      this.syncCount    = new Uint32Array(1);
+      this.sysSyncCount = 0;
     }
     
     SynthServer.prototype.sendToClient = function() {
@@ -57,11 +56,11 @@ define(function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
+      this.sendToClient([
+        "/played", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
@@ -71,6 +70,9 @@ define(function(require, exports, module) {
           this.timer.stop();
         }
       }
+      this.sendToClient([
+        "/paused", this.syncCount[0]
+      ]);
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
@@ -109,7 +111,7 @@ define(function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -131,7 +133,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
+      this.syncCount[0] += 1;
     };
     
     return WorkerSynthServer;
@@ -157,7 +159,7 @@ define(function(require, exports, module) {
       ]);
     };
     IFrameSynthServer.prototype.process = function() {
-      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -178,7 +180,7 @@ define(function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
+      this.syncCount += 1;
     };
     
     return IFrameSynthServer;
@@ -220,9 +222,6 @@ define(function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.processStart = Date.now();
-        this.processDone  = 0;
-        this.processInterval = (this.strmLength / this.sampleRate) * 1000;
         this.timer.start(this.process.bind(this), 10);
       }
     };
@@ -243,7 +242,7 @@ define(function(require, exports, module) {
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -265,8 +264,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToClient(strm);
-      this.processDone += this.processInterval;
-      
+      this.syncCount[0] += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
@@ -278,6 +276,7 @@ define(function(require, exports, module) {
         this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
         this._strm.set(strm);
       }
+      this.sysSyncCount += 1;
     };
     
     return NodeJSSynthServer;
@@ -371,7 +370,7 @@ define(function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.processDone - C.PROCESS_MARGIN > Date.now() - this.processStart) {
+      if (this.sysSyncCount < this.syncCount[0] - 4) {
         return;
       }
       var strm = this.strm;
@@ -392,8 +391,8 @@ define(function(require, exports, module) {
       }
       this.sendToClient(strm);
       this.sendToClient(["/process"]);
-      this.processDone += this.processInterval;
-
+      this.syncCount[0] += 1;
+      
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;

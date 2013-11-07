@@ -74,7 +74,6 @@ define(function(require, exports, module) {
 
   var CoffeeColliderImpl = (function() {
     function CoffeeColliderImpl(exports, opts) {
-      var that = this;
       this.exports  = exports;
       this.compiler = cc.createCompiler("coffee");
       
@@ -89,58 +88,62 @@ define(function(require, exports, module) {
       this.channels   = this.api.channels;
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
-      this.strmList = new Array(8);
+      this.strmList = new Array(C.STRM_LIST_LENGTH);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
+      this.syncCount = 0;
       this.speaker = opts.speaker !== false;
       this.api.init();
-
+      
       var syncItems = new Uint8Array(C.SYNC_ITEM_LEN);
       if (typeof window !== "undefined" && opts.mouse !== false) {
         var f32_syncItems = new Float32Array(syncItems.buffer);
         window.addEventListener("mousemove", function(e) {
           f32_syncItems[C.POS_X] = e.pageX / window.innerWidth;
           f32_syncItems[C.POS_Y] = e.pageY / window.innerHeight;
-          that.syncItemsChanged = true;
         }, false);
         window.addEventListener("mousedown", function() {
-          syncItems[C.BUTTON] = 1;
-          that.syncItemsChanged = true;
+          f32_syncItems[C.BUTTON] = 1;
         }, false);
         window.addEventListener("mouseup", function() {
-          syncItems[C.BUTTON] = 0;
-          that.syncItemsChanged = true;
+          f32_syncItems[C.BUTTON] = 0;
         }, false);
       }
       this.syncItems = syncItems;
+      this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
     }
     
     CoffeeColliderImpl.prototype.play = function() {
       if (!this.isPlaying) {
         this.isPlaying = true;
-        if (this.api) {
-          var strm = this.strm;
-          for (var i = 0, imax = strm.length; i < imax; ++i) {
-            strm[i] = 0;
-          }
-          this.strmList.splice(0);
-          this.strmListReadIndex  = 0;
-          this.strmListWriteIndex = 0;
-          this.api.play();
-        }
         this.sendToClient(["/play"]);
-        this.exports.emit("play");
       }
+    };
+    CoffeeColliderImpl.prototype._played = function(syncCount) {
+      if (this.api) {
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList.splice(0);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        this.syncCount = syncCount;
+        this.api.play();
+      }
+      this.exports.emit("play");
     };
     CoffeeColliderImpl.prototype.pause = function() {
       if (this.isPlaying) {
         this.isPlaying = false;
-        if (this.api) {
-          this.api.pause();
-        }
         this.sendToClient(["/pause"]);
-        this.exports.emit("pause");
       }
+    };
+    CoffeeColliderImpl.prototype._paused = function() {
+      if (this.api) {
+        this.api.pause();
+      }
+      this.exports.emit("pause");
     };
     CoffeeColliderImpl.prototype.reset = function() {
       this.execId = 0;
@@ -156,15 +159,14 @@ define(function(require, exports, module) {
       this.exports.emit("reset");
     };
     CoffeeColliderImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
+      var strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strmListReadIndex += 1;
         this.strm.set(strm);
       }
-      if (this.syncItemsChanged) {
-        this.sendToClient(this.syncItems);
-        this.syncItemsChanged = false;
-      }
+      this.syncCount += 1;
+      this.syncItemsUInt32[C.SYNC_COUNT] = this.syncCount;
+      this.sendToClient(this.syncItems);
     };
     CoffeeColliderImpl.prototype.execute = function(code) {
       var append, callback;
@@ -214,8 +216,8 @@ define(function(require, exports, module) {
     };
     CoffeeColliderImpl.prototype.recvFromClient = function(msg) {
       if (msg instanceof Int16Array) {
-        this.strmList[this.strmListWriteIndex] = msg;
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = msg;
+        this.strmListWriteIndex += 1;
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -356,6 +358,14 @@ define(function(require, exports, module) {
       "/init", this.sampleRate, this.channels
     ]);
     this.exports.emit("connected");
+  };
+  commands["/played"] = function(msg) {
+    var syncCount = msg[1];
+    this._played(syncCount);
+  };
+  commands["/paused"] = function(msg) {
+    var syncCount = msg[1];
+    this._paused(syncCount);
   };
   commands["/executed"] = function(msg) {
     var execId = msg[1];

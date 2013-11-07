@@ -246,8 +246,14 @@ define(function(require, exports, module) {
   commands["/play"] = function(msg) {
     this.play(msg);
   };
+  commands["/played"] = function(msg) {
+    this.sendToIF(msg);
+  };
   commands["/pause"] = function(msg) {
     this.pause(msg);
+  };
+  commands["/paused"] = function(msg) {
+    this.sendToIF(msg);
   };
   commands["/reset"] = function(msg) {
     this.reset(msg);

@@ -1,4 +1,7 @@
 {
+  "STRM_LIST_LENGTH"  : 16,
+  "STRM_LIST_MASK"    : 15,
+  
   "WORKER_SAMPLERATE" : 44100,
   "WORKER_CHANNELS"   :     2,
   "WORKER_STRM_LENGTH":  1024,
@@ -19,7 +22,7 @@
   "NODEJS_STRM_LENGTH":  4096,
   "NODEJS_BUF_LENGTH" :    64,
   
-  "PROCESS_MARGIN": 60,
+  "PROCESS_MARGIN": 20,
 
   "DO_NOTHING": 0,
 
@@ -42,10 +45,11 @@
   "AUDIO_BUS_LEN"  : 16,
   "CONTROL_BUS_LEN": 128,
   
-  "SYNC_ITEM_LEN": 12,
-  "BUTTON" : 3,
-  "POS_X"  : 1,
-  "POS_Y"  : 2,
+  "SYNC_ITEM_LEN": 20,
+  "SYNC_COUNT": 1,
+  "POS_X"  : 2,
+  "POS_Y"  : 3,
+  "BUTTON" : 4,
   
   "FREE"       : 2,
   "ADD_TO_HEAD": 0,

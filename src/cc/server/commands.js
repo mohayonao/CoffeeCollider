@@ -78,8 +78,13 @@ define(function(require, exports, module) {
     }
   };
   
-  commands[C.BINARY_CMD_SET_SYNC] = function(binay) {
-    this.syncItems.set(binay);
+  commands[C.BINARY_CMD_SET_SYNC] = function(binary) {
+    this.syncItems.set(binary);
+    var server    = this.manager.server;
+    var syncCount = new Uint32Array(binary.buffer)[C.SYNC_COUNT];
+    if (server.sysSyncCount < syncCount) {
+      server.sysSyncCount = syncCount;
+    }
   };
   commands[C.BINARY_CMD_SET_BUFSRC] = function(binary) {
     var bufSrcId = (binary[3] << 8) + binary[2];

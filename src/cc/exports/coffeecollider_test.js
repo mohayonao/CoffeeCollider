@@ -141,28 +141,23 @@ define(function(require, exports, module) {
       describe("instance methods", function() {
         it("#play", function() {
           instance.play();
-          assert.equal(event, "play");
           assert.deepEqual(posted, ["/play"]);
           
           event = posted = "";
           instance.play();
-          assert.equal(event, "");
           assert.equal(posted, "");
         });
         it("#pause", function() {
           instance.pause();
-          assert.equal(event, "");
           assert.equal(posted, "");
 
           event = posted = "";
           instance.play();
           instance.pause();
-          assert.equal(event, "pause");
           assert.deepEqual(posted, ["/pause"]);
           
           event = posted = "";
           instance.pause();
-          assert.equal(event, "");
           assert.equal(posted, "");
         });
         it("#reset", function() {
