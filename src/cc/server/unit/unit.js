@@ -52,13 +52,21 @@ define(function(require, exports, module) {
     };
     return Unit;
   })();
+
+  var zapgremlins = function(a) {
+    if (isNaN(a) || (-1e-6 < a && a < 0) || (0 <= a && a < +1e-6)) {
+      return 0;
+    }
+    return a;
+  };
   
   var avoidzero = function(a) {
-    if (-1e-6 < a && a < 0) {
-      a = -1e-6;
-    }
-    if (0 <= a && a < +1e-6) {
-      a = +1e-6;
+    if (a < 0) {
+      if (-1e-6 < a) {
+        a = -1e-6;
+      }
+    } else if (a < +1e-6) {
+      a = 1e-6;
     }
     return a;
   };
@@ -66,8 +74,9 @@ define(function(require, exports, module) {
   module.exports = {
     Unit : Unit,
     specs: specs,
-    
-    avoidzero: avoidzero,
+
+    zapgremlins: zapgremlins,
+    avoidzero  : avoidzero,
     
     use: function() {
       cc.createUnit = function(parent, specs) {

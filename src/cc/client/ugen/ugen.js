@@ -227,6 +227,7 @@ define(function(require, exports, module) {
     install: function() {
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./osc");

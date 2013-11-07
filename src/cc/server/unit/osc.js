@@ -172,6 +172,60 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  unit.specs.SinOscFB = (function() {
+    var ctor = function() {
+      this.process = next_aa;
+      this._radtoinc = kSineSize / twopi;
+      this._cpstoinc = kSineSize * this.rate.sampleDur;
+      this._mask  = kSineMask;
+      this._table = gSineWavetable;
+      this._freq     = this.inputs[0][0];
+      this._feedback = this.inputs[1][0] * this._radtoinc;
+      this._y = 0;
+      this._x = 0;
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var nextFreq     = this.inputs[0][0];
+      var nextFeedback = this.inputs[1][0];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var freq = this._freq;
+      var feedback = this._feedback;
+      var y = this._y;
+      var x = this._x, pphase, index, i;
+      if (nextFreq === freq && nextFeedback === feedback) {
+        freq     *= cpstoinc;
+        feedback *= radtoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq;
+        }
+      } else {
+        var freq_slope     = (nextFreq     - freq    ) * this.rate.slopeFactor;
+        var feedback_slope = (nextFeedback - feedback) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq * cpstoinc;
+          freq     += freq_slope;
+          feedback += feedback_slope;
+        }
+        this._freq     = nextFreq;
+        this._feedback = nextFeedback;
+      }
+      this._y = y;
+      this._x = x;
+    };
+    return ctor;
+  })();
+
   unit.specs.LFSaw = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
@@ -224,6 +278,213 @@ define(function(require, exports, module) {
       this._phase = phase;
     };
     
+    return ctor;
+  })();
+
+  unit.specs.LFPar = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFCub = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 2 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0] + 0.5;
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFTri = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freqIn[i] * cpstoinc;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freq;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFPulse = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this._duty    = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freq;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
     return ctor;
   })();
   

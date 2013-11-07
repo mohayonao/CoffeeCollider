@@ -7,6 +7,7 @@ define(function(require, exports, module) {
       require("./bop");
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./madd");

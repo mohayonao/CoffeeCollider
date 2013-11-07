@@ -126,7 +126,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131107174700",
+    version: "0.0.0+20131108072000",
     global : {},
     Object : function CCObject() {}
   };
@@ -1211,7 +1211,7 @@ define('cc/client/utils', function(require, exports, module) {
 });
 define('cc/common/ops', function(require, exports, module) {
 
-  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi".split(" ");
+  var UNARY_OP_UGEN_MAP = "neg not isNil notNil bitNot abs asFloat asInt ceil floor frac sign squared cubed sqrt exp reciprocal midicps cpsmidi midiratio ratiomidi dbamp ampdb octcps cpsoct log log2 log10 sin cos tan asin acos atan sinh cosh tanh rand rand2 linrand bilinrand sum3rand distort softclip coin digitvalue silence thru rectWindow hanWindow welWindow triWindow ramp scurve numunaryselectors num tilde pi to_i".split(" ");
   var BINARY_OP_UGEN_MAP = "+ - * / / % eq ne lt gt le ge min max bitAnd bitOr bitXor lcm gcd round roundUp trunc atan2 hypot hypotApx pow leftShift rightShift unsignedRightShift fill ring1 ring2 ring3 ring4 difsqr sumsqr sqrsum sqrdif absdif thresh amclip scaleneg clip2 excess fold2 wrap2 firstarg randrange exprandrange numbinaryselectors roundDown".split(" ");
 
   var UGEN_OP_ALIASES = {
@@ -3744,6 +3744,7 @@ define('cc/client/ugen/ugen', function(require, exports, module) {
     install: function() {
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./osc");
@@ -4361,6 +4362,30 @@ define('cc/client/ugen/delay', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/client/ugen/filter', function(require, exports, module) {
+
+  var ugen = require("./ugen");
+  
+  ugen.specs.RLPF = {
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(2, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(1, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  ugen.specs.RHPF = ugen.specs.RLPF;
+  
+  module.exports = {};
+
+});
 define('cc/client/ugen/line', function(require, exports, module) {
   
   var ugen = require("./ugen");
@@ -4402,6 +4427,21 @@ define('cc/client/ugen/osc', function(require, exports, module) {
     }
   };
 
+  ugen.specs.SinOscFB = {
+    ar: {
+      defaults: "freq=440,feedback=0,mul=1,add=0",
+      ctor: function(freq, feedback, mul, add) {
+        return this.init(2, freq, feedback).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,feedback=0,mul=1,add=0",
+      ctor: function(freq, feedback, mul, add) {
+        return this.init(1, freq, feedback).madd(mul, add);
+      }
+    }
+  };
+  
   ugen.specs.LFSaw = {
     ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
@@ -4413,6 +4453,25 @@ define('cc/client/ugen/osc', function(require, exports, module) {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(1, freq, iphase).madd(mul, add);
+      }
+    }
+  };
+
+  ugen.specs.LFPar = ugen.specs.LFSaw;
+  ugen.specs.LFCub = ugen.specs.LFSaw;
+  ugen.specs.LFTri = ugen.specs.LFSaw;
+
+  ugen.specs.LFPulse = {
+    ar: {
+      defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
+      ctor: function(freq, iphase, width, mul, add) {
+        return this.init(2, freq, iphase, width).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
+      ctor: function(freq, iphase, width, mul, add) {
+        return this.init(1, freq, iphase, width).madd(mul, add);
       }
     }
   };
@@ -4925,7 +4984,10 @@ define('cc/client/number', function(require, exports, module) {
   fn.definePrototypeProperty(Number, "pi", function() {
     return this * Math.PI;
   });
-
+  fn.definePrototypeProperty(Number, "to_i", function() {
+    return this|0;
+  });
+  
   // binary operator methods
   fn.setupBinaryOp(Number, "__add__", function(b) {
     return this + b;
@@ -8311,13 +8373,21 @@ define('cc/server/unit/unit', function(require, exports, module) {
     };
     return Unit;
   })();
+
+  var zapgremlins = function(a) {
+    if (isNaN(a) || (-1e-6 < a && a < 0) || (0 <= a && a < +1e-6)) {
+      return 0;
+    }
+    return a;
+  };
   
   var avoidzero = function(a) {
-    if (-1e-6 < a && a < 0) {
-      a = -1e-6;
-    }
-    if (0 <= a && a < +1e-6) {
-      a = +1e-6;
+    if (a < 0) {
+      if (-1e-6 < a) {
+        a = -1e-6;
+      }
+    } else if (a < +1e-6) {
+      a = 1e-6;
     }
     return a;
   };
@@ -8325,8 +8395,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
   module.exports = {
     Unit : Unit,
     specs: specs,
-    
-    avoidzero: avoidzero,
+
+    zapgremlins: zapgremlins,
+    avoidzero  : avoidzero,
     
     use: function() {
       cc.createUnit = function(parent, specs) {
@@ -8566,6 +8637,7 @@ define('cc/server/unit/installer', function(require, exports, module) {
       require("./bop");
       require("./bufio");
       require("./delay");
+      require("./filter");
       require("./inout");
       require("./line");
       require("./madd");
@@ -9601,6 +9673,250 @@ define('cc/server/unit/delay', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/server/unit/filter', function(require, exports, module) {
+
+  var unit = require("./unit");
+  var zapgremlins = unit.zapgremlins;
+  
+  unit.specs.RLPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        var next_b1 = (1.0 + C) * cosf;
+        var next_b2 = -C;
+        var next_a0 = (1.0 + C - next_b1) * 0.25;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 + 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 + 2.0 * y2 + y0;
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 + 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 + 2.0 * y2 + y0;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 + 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        b1 = (1.0 + C) * cosf;
+        b2 = -C;
+        a0 = (1.0 + C - b1) * 0.25;
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 + 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 + 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+
+  unit.specs.RHPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        var next_b1 = (1.0 + C) * cosf;
+        var next_b2 = -C;
+        var next_a0 = (1.0 + C + next_b1) * 0.25;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 - 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 - 2.0 * y2 + y0;
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = a0 * inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2 - 2.0 * y0 + y1;
+          y1 = a0 * inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1 - 2.0 * y2 + y0;
+        }
+        for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+          y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0 - 2.0 * y1 + y2;
+          y2 = y1; y1 = y0;
+        }
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq || reson !== this._reson) {
+        var qres = Math.max(0.001, reson);
+        var pfreq = freq * this.rate.radiansPerSample;
+        var D = Math.tan(pfreq * qres * 0.5);
+        var C = ((1.0-D)/(1.0+D));
+        var cosf = Math.cos(pfreq);
+        b1 = (1.0 + C) * cosf;
+        b2 = -C;
+        a0 = (1.0 + C + b1) * 0.25;
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 - 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+        this._freq = freq;
+        this._reson = reson;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = a0 * inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = y0 - 2.0 * y1 + y2;
+        y2 = y1; y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
 define('cc/server/unit/inout', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -10579,6 +10895,60 @@ define('cc/server/unit/osc', function(require, exports, module) {
     return ctor;
   })();
 
+  unit.specs.SinOscFB = (function() {
+    var ctor = function() {
+      this.process = next_aa;
+      this._radtoinc = kSineSize / twopi;
+      this._cpstoinc = kSineSize * this.rate.sampleDur;
+      this._mask  = kSineMask;
+      this._table = gSineWavetable;
+      this._freq     = this.inputs[0][0];
+      this._feedback = this.inputs[1][0] * this._radtoinc;
+      this._y = 0;
+      this._x = 0;
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var nextFreq     = this.inputs[0][0];
+      var nextFeedback = this.inputs[1][0];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var freq = this._freq;
+      var feedback = this._feedback;
+      var y = this._y;
+      var x = this._x, pphase, index, i;
+      if (nextFreq === freq && nextFeedback === feedback) {
+        freq     *= cpstoinc;
+        feedback *= radtoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq;
+        }
+      } else {
+        var freq_slope     = (nextFreq     - freq    ) * this.rate.slopeFactor;
+        var feedback_slope = (nextFeedback - feedback) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * feedback * y;
+          index  = (pphase & mask) << 1;
+          out[i] = y = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq * cpstoinc;
+          freq     += freq_slope;
+          feedback += feedback_slope;
+        }
+        this._freq     = nextFreq;
+        this._feedback = nextFeedback;
+      }
+      this._y = y;
+      this._x = x;
+    };
+    return ctor;
+  })();
+
   unit.specs.LFSaw = (function() {
     var ctor = function() {
       if (this.inRates[0] === 2) {
@@ -10631,6 +11001,213 @@ define('cc/server/unit/osc', function(require, exports, module) {
       this._phase = phase;
     };
     
+    return ctor;
+  })();
+
+  unit.specs.LFPar = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z, y;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+          y = 1 - z * z;
+        } else if (phase < 3) {
+          z = phase - 2;
+          y = z * z - 1;
+        } else {
+          phase -= 4;
+          z = phase;
+          y = 1 - z * z;
+        }
+        out[i] = y;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFCub = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 2 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0] + 0.5;
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase < 1) {
+          z = phase;
+        } else if (phase < 2) {
+          z = 2 - phase;
+        } else {
+          phase -= 2;
+          z = phase;
+        }
+        out[i] = z * z * (6 - 4 * z) - 1;
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFTri = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = 4 * this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freqIn[i] * cpstoinc;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = phase > 1 ? 2 - phase : phase;
+        phase += freq;
+        if (phase >= 3) { phase -= 4; }
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
+
+  unit.specs.LFPulse = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._cpstoinc = this.rate.sampleDur;
+      this._phase   = this.inputs[1][0];
+      this._duty    = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn   = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var nextDuty = this.inputs[2][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase > 1) {
+          phase -= 1;
+          duty = nextDuty;
+          z = duty < 0.5 ? 1 : 0;
+        } else {
+          z = phase < duty ? 1 : 0;
+        }
+        out[i] = z;
+        phase += freq;
+      }
+      this._duty  = duty;
+      this._phase = phase;
+    };
     return ctor;
   })();
   
@@ -11076,6 +11653,9 @@ define('cc/server/unit/uop', function(require, exports, module) {
   };
   calcFunc.pi = function(a) {
     return Math.PI * a;
+  };
+  calcFunc.to_i = function(a) {
+    return a|0;
   };
   
   Object.keys(calcFunc).forEach(function(key) {

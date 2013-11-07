@@ -48,7 +48,7 @@
     }
   };
   WaveViewer.prototype._calcY = function(val) {
-    return val * 0.95 * this.canvas.height + (this.canvas.height * 0.5);
+    return -val * 0.45 * this.canvas.height + (this.canvas.height * 0.5);
   };
   
   window.WaveViewer = WaveViewer;
