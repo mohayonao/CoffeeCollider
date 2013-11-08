@@ -86,7 +86,7 @@ $(function() {
   });
   
   $("#version").text(cc.version);
-  if (isEdge) {
+  var devMode = function() {
     $("#compile-coffee").on("click", function() {
       var code = cc.impl.compiler.toString($code.val().trim());
       console.log(code);
@@ -96,11 +96,17 @@ $(function() {
       code = CoffeeScript.compile(code, {bare:true});
       console.log(code);
     }).show();
+  };
+  
+  if (isEdge) {
+    devMode();
   }
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {
     $code.val(hash.substr(srcFragment.length));
   }
+
+  cc.dev = devMode;
 
 });
