@@ -1054,7 +1054,7 @@ define('cc/client/fn', function(require, exports, module) {
             args = resolve_args(keys, vals, slice.call(arguments));
             if (containsArray(args)) {
               return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
+                return ret.apply(this, items);
               }, this);
             }
             return func.apply(this, args);
@@ -1064,7 +1064,7 @@ define('cc/client/fn', function(require, exports, module) {
             var args = slice.call(arguments);
             if (containsArray(args)) {
               return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
+                return ret.apply(this, items);
               }, this);
             }
             return func.apply(this, args);
@@ -1087,6 +1087,18 @@ define('cc/client/fn', function(require, exports, module) {
       }
       return false;
     };
+    // var containsArray2 = function(list) {
+    //   for (var i = 0, imax = list.length; i < imax; ++i) {
+    //     if (Array.isArray(list[i])) {
+    //       for (var j = 0, jmax = list[i].length; j < jmax; ++j) {
+    //         if (Array.isArray(list[i][j])) {
+    //           return true;
+    //         }
+    //       }
+    //     }
+    //   }
+    //   return false;
+    // };
     var resolve_args = function(keys, vals, given) {
       var dict;
       var args = vals.slice();
@@ -3805,6 +3817,7 @@ define('cc/client/ugen/bop', function(require, exports, module) {
   var cc = require("../cc");
   var extend = require("../../common/extend");
   var ops    = require("../../common/ops");
+  var fn     = require("../fn");
   var utils  = require("../utils");
   
   var BinaryOpUGen = (function() {
@@ -3981,9 +3994,9 @@ define('cc/client/ugen/bop', function(require, exports, module) {
   
   module.exports = {
     use: function() {
-      cc.createBinaryOpUGen = function(selector, a, b) {
+      cc.createBinaryOpUGen = fn(function(selector, a, b) {
         return new BinaryOpUGen().init(selector, a, b);
-      };
+      }).multiCall().build();
       cc.instanceOfBinaryOpUGen = function(obj) {
         return obj instanceof BinaryOpUGen;
       };
@@ -3995,6 +4008,7 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   
   var cc = require("../cc");
   var extend = require("../../common/extend");
+  var fn     = require("../fn");
   
   var asRate = function(obj) {
     if (Array.isArray(obj)) {
@@ -4125,15 +4139,15 @@ define('cc/client/ugen/madd', function(require, exports, module) {
   
   module.exports = {
     use: function() {
-      cc.createMulAdd = function(_in, mul, add) {
+      cc.createMulAdd = fn(function(_in, mul, add) {
         return new MulAdd().init(_in, mul, add);
-      };
-      cc.createSum3 = function(in0, in1, in2) {
+      }).multiCall().build();
+      cc.createSum3 = fn(function(in0, in1, in2) {
         return new Sum3().init(in0, in1, in2);
-      };
-      cc.createSum4 = function(in0, in1, in2, in3) {
+      }).multiCall().build();
+      cc.createSum4 = fn(function(in0, in1, in2, in3) {
         return new Sum4().init(in0, in1, in2, in3);
-      };
+      }).multiCall().build();
       cc.instanceOfMulAdd = function(obj) {
         return obj instanceof MulAdd;
       };
@@ -4267,18 +4281,27 @@ define('cc/client/ugen/mix', function(require, exports, module) {
     var reduceArray = utils.clump(array, 4);
     var a = reduceArray.map(function(a) {
       switch (a.length) {
-      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-      case 3: return cc.createSum3(a[0], a[1], a[2]);
-      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
-      case 1: return a[0];
+      case 4:
+        return cc.createSum4(a[0], a[1], a[2], a[3]);
+      case 3:
+        return cc.createSum3(a[0], a[1], a[2]);
+      case 2:
+        return cc.createBinaryOpUGen("+", a[0], a[1]);
+      case 1:
+        return a[0];
       }
     });
     switch (a.length) {
-      case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-      case 3: return cc.createSum3(a[0], a[1], a[2]);
-      case 2: return cc.createBinaryOpUGen("+", a[0], a[1]);
-      case 1: return a[0];
-      default: return mix(a);
+    case 4:
+      return cc.createSum4(a[0], a[1], a[2], a[3]);
+    case 3:
+      return cc.createSum3(a[0], a[1], a[2]);
+    case 2:
+      return cc.createBinaryOpUGen("+", a[0], a[1]);
+    case 1:
+      return a[0];
+    default:
+      return mix(a);
     }
   };
   
@@ -6153,33 +6176,13 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
     var indent  = 0;
     var end = index;
     while (1 < index) {
-      switch (tokens[index - 1][TAG]) {
-      case "PARAM_END": case "CALL_END": case "INDEX_END":
-        bracket += 1;
-        /* falls through */
-      case ".": case "@":
-        index -= 1;
-        continue;
-      }
       switch (tokens[index][TAG]) {
-      case "(": case "[": case "{": case "PARAM_START":
-        bracket -= 1;
-        /* falls through */
-      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
-      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
-      case "->":
-        if (bracket === 0 && indent === 0) {
-          var prev;
-          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
-            index -= 1;
-          }
-          return {tokens:tokens, begin:index, end:end};
-        }
-        break;
-      case "CALL_START": case "INDEX_START":
+      case "(": case "[": case "{":
+      case "PARAM_START": case "CALL_START": case "INDEX_START":
         bracket -= 1;
         break;
       case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket += 1;
         break;
       case "OUTDENT":
@@ -6187,6 +6190,26 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
         break;
       case "INDENT":
         indent -= 1;
+        break;
+      }
+      switch (tokens[index - 1][TAG]) {
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
+      case ".": case "@":
+        index -= 1;
+        continue;
+      }
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{": case "PARAM_START":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
+      case "->": case "=>":
+        if (bracket === 0 && indent === 0) {
+          var prev;
+          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
+            index -= 1;
+          }
+          return {tokens:tokens, begin:index, end:end};
+        }
         break;
       }
       index -= 1;
@@ -6211,10 +6234,12 @@ define('cc/exports/compiler/coffee', function(require, exports, module) {
       var tag = tokens[index][TAG];
       
       switch (tag) {
-      case "(": case "[": case "{": case "PARAM_START":
+      case "(": case "[": case "{":
+      case "PARAM_START":
         bracket += 1;
         break;
-      case "}": case "]": case ")": case "PARAM_END": case "CALL_END": case "INDEX_END":
+      case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket -= 1;
         break;
       case "INDENT":
