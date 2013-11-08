@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131109065600",
+    version: "0.0.0+20131109074400",
     global : {},
     Object : function CCObject() {}
   };
@@ -2773,14 +2773,14 @@ define('cc/lang/task', function(require, exports, module) {
     };
     
     // task chain methods
-    TaskProcessor.prototype["do"] = function(func) {
-      var next = new TaskProcessorDo(cc.createTaskFunction(func));
+    TaskProcessor.prototype["do"] = function(num, func) {
+      var next = new TaskProcessorDo(num, func);
       next._prev = this;
       this._next = next;
       return next;
     };
     TaskProcessor.prototype.loop = function(func) {
-      var next = new TaskProcessorLoop(cc.createTaskFunction(func));
+      var next = new TaskProcessorDo(Infinity, func);
       next._prev = this;
       this._next = next;
       return next;
@@ -2796,32 +2796,42 @@ define('cc/lang/task', function(require, exports, module) {
   })();
   
   var TaskProcessorDo = (function() {
-    function TaskProcessorDo(func) {
+    function TaskProcessorDo() {
+      var num, func;
+      var i = 0;
+      if (typeof arguments[i] === "number") {
+        num = arguments[i++];
+      }
+      if (typeof arguments[i] === "function") {
+        func = cc.createTaskFunction(arguments[i++]);
+      } else if (func instanceof TaskFunction) {
+        func = arguments[i++];
+      }
       TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorDo";
+      
+      if (num !== Infinity) {
+        num = num|0;
+      }
+      this._num = num;
+      
+      if (num === Infinity) {
+        this.klassName = "TaskProcessorLoop";
+      } else {
+        this.klassName = "TaskProcessorDo";
+      }
     }
     extend(TaskProcessorDo, TaskProcessor);
     
     TaskProcessorDo.prototype._done = function() {
-      this.stop();
+      this._count += 1;
+      if (this._count < this._num) {
+        this._func.index = 0;
+      } else {
+        this.stop();
+      }
     };
     
     return TaskProcessorDo;
-  })();
-
-  var TaskProcessorLoop = (function() {
-    function TaskProcessorLoop(func) {
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorLoop";
-    }
-    extend(TaskProcessorLoop, TaskProcessor);
-    
-    TaskProcessorLoop.prototype._done = function() {
-      this._func.index = 0;
-      this._count += 1;
-    };
-    
-    return TaskProcessorLoop;
   })();
 
   var TaskProcessorEach = (function() {
@@ -2853,11 +2863,11 @@ define('cc/lang/task', function(require, exports, module) {
   cc.global.Task = function(func) {
     return cc.createTaskFunction(func);
   };
-  cc.global.Task["do"] = function(func) {
-    return new TaskProcessorDo(cc.createTaskFunction(func));
+  cc.global.Task["do"] = function(num, func) {
+    return new TaskProcessorDo(num, func);
   };
   cc.global.Task.loop = function(func) {
-    return new TaskProcessorLoop(cc.createTaskFunction(func));
+    return new TaskProcessorDo(Infinity, func);
   };
   cc.global.Task.each = function(list, func) {
     return new TaskProcessorEach(list, cc.createTaskFunction(func));
@@ -2875,7 +2885,6 @@ define('cc/lang/task', function(require, exports, module) {
     TaskWaitTokenLogicOR  : TaskWaitTokenLogicOR,
     TaskProcessor        : TaskProcessor,
     TaskProcessorDo      : TaskProcessorDo,
-    TaskProcessorLoop    : TaskProcessorLoop,
     TaskProcessorEach    : TaskProcessorEach,
     
     use: function() {

@@ -357,7 +357,7 @@ define(function(require, exports, module) {
         var t = cc.global.Task.loop(func).on("end", function() {
           passed = true;
         });
-        assert.instanceOf(t, task.TaskProcessorLoop);
+        assert.instanceOf(t, task.TaskProcessorDo);
         
         t.process(0);
         assert.isFalse(passed);
