@@ -1,13 +1,12 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc   = require("../cc");
-  var unit = require("./unit");
-  var ops  = require("../../common/ops");
+  var cc  = require("../cc");
+  var ops = require("../../common/ops");
 
   var calcFunc = {};
   
-  unit.specs.BinaryOpUGen = (function() {
+  cc.unit.specs.BinaryOpUGen = (function() {
     
     var ctor = function() {
       var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];

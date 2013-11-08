@@ -25,8 +25,8 @@ define(function(require, exports, module) {
           cc.console.warn.result = str;
         }
       };
-      unit.specs.TestUnit = function() {
-        unit.specs.TestUnit.called = true;
+      cc.unit.specs.TestUnit = function() {
+        cc.unit.specs.TestUnit.called = true;
       };
     });
     it("create", function() {
@@ -51,9 +51,9 @@ define(function(require, exports, module) {
       var specs = [
         "TestUnit", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
       ];
-      unit.specs.TestUnit.called = false;
+      cc.unit.specs.TestUnit.called = false;
       var u = cc.createUnit(parent, specs).init("tag");
-      assert.isTrue(unit.specs.TestUnit.called);
+      assert.isTrue(cc.unit.specs.TestUnit.called);
       assert.equal(u.tag, "tag");
     });
     it("init(not exist)", function() {
@@ -76,15 +76,6 @@ define(function(require, exports, module) {
       parent.doneAction.result = null;
       u.doneAction(2);
       assert.isNull(parent.doneAction.result);
-    });
-    describe("utility methods", function() {
-      it("avoidzero", function() {
-        assert.equal(unit.avoidzero(-1e-2), -1e-2);
-        assert.equal(unit.avoidzero(-1e-8), -1e-6);
-        assert.equal(unit.avoidzero(0), 1e-6);
-        assert.equal(unit.avoidzero(+1e-8), +1e-6);
-        assert.equal(unit.avoidzero(+1e-2), +1e-2);
-      });
     });
   });
 

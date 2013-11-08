@@ -1,11 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   var table = require("./table");
   var gSine = table.gSine;
 
-  unit.specs.Pan2 = (function() {
+  cc.unit.specs.Pan2 = (function() {
     var ctor = function() {
       if (this.inRates[1] === C.AUDIO) {
         this.process = next_aa;

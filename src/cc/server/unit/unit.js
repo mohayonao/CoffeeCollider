@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   var specs = {};
+  cc.unit = { specs:specs };
   
   var Unit = (function() {
     function Unit(parent, specs) {
@@ -52,31 +53,9 @@ define(function(require, exports, module) {
     };
     return Unit;
   })();
-
-  var zapgremlins = function(a) {
-    if (isNaN(a) || (-1e-6 < a && a < 0) || (0 <= a && a < +1e-6)) {
-      return 0;
-    }
-    return a;
-  };
-  
-  var avoidzero = function(a) {
-    if (a < 0) {
-      if (-1e-6 < a) {
-        a = -1e-6;
-      }
-    } else if (a < +1e-6) {
-      a = 1e-6;
-    }
-    return a;
-  };
   
   module.exports = {
     Unit : Unit,
-    specs: specs,
-
-    zapgremlins: zapgremlins,
-    avoidzero  : avoidzero,
     
     use: function() {
       cc.createUnit = function(parent, specs) {
@@ -84,5 +63,19 @@ define(function(require, exports, module) {
       };
     }
   };
+
+  require("./bop");
+  require("./bufio");
+  require("./delay");
+  require("./filter");
+  require("./inout");
+  require("./line");
+  require("./madd");
+  require("./osc");
+  require("./pan");
+  require("./ui");
+  require("./uop");
+  
+  module.exports.use();
 
 });

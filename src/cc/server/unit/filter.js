@@ -1,10 +1,10 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
-  var zapgremlins = unit.zapgremlins;
+  var cc = require("../cc");
+  var zapgremlins = require("./utils").zapgremlins;
   
-  unit.specs.RLPF = (function() {
+  cc.unit.specs.RLPF = (function() {
     var ctor = function() {
       if (this.bufLength === 1) {
         this.process = next_1;
@@ -122,7 +122,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.RHPF = (function() {
+  cc.unit.specs.RHPF = (function() {
     var ctor = function() {
       if (this.bufLength === 1) {
         this.process = next_1;

@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   var table = require("./table");
   
   var twopi = 2 * Math.PI;
@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var kSineMask = table.kSineMask;
   var gSineWavetable = table.gSineWavetable;
   
-  unit.specs.SinOsc = (function() {
+  cc.unit.specs.SinOsc = (function() {
     var ctor = function() {
       this._freq  = this.inputs[0][0];
       this._phase = this.inputs[1][0];
@@ -172,7 +172,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.SinOscFB = (function() {
+  cc.unit.specs.SinOscFB = (function() {
     var ctor = function() {
       this.process = next_aa;
       this._radtoinc = kSineSize / twopi;
@@ -226,7 +226,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.LFSaw = (function() {
+  cc.unit.specs.LFSaw = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
         this.process = next_a;
@@ -281,7 +281,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.LFPar = (function() {
+  cc.unit.specs.LFPar = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
         this.process = next_a;
@@ -340,7 +340,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.LFCub = (function() {
+  cc.unit.specs.LFCub = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
         this.process = next_a;
@@ -393,7 +393,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.LFTri = (function() {
+  cc.unit.specs.LFTri = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
         this.process = next_a;
@@ -430,7 +430,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.LFPulse = (function() {
+  cc.unit.specs.LFPulse = (function() {
     var ctor = function() {
       if (this.inRates[0] === C.AUDIO) {
         this.process = next_a;

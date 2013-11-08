@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   
-  unit.specs.Line = (function() {
+  cc.unit.specs.Line = (function() {
     var ctor = function() {
       this.process = next_kkk;
       var start = this.inputs[0][0];

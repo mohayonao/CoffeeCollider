@@ -72,7 +72,7 @@ define(function(require, exports, module) {
       }
       this._worker.onmessage = null;
     };
-    NativeTimer.prototype.isRunning = function() {
+    WorkerTimer.prototype.isRunning = function() {
       return !!this._worker.onmessage;
     };
     return WorkerTimer;
@@ -134,5 +134,7 @@ define(function(require, exports, module) {
       cc.resetNativeTimers = resetNativeTimers;
     }
   };
+
+  module.exports.use();
 
 });

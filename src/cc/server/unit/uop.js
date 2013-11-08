@@ -1,13 +1,13 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc   = require("../cc");
-  var unit = require("./unit");
-  var ops  = require("../../common/ops");
+  var cc  = require("../cc");
+  var ops = require("../../common/ops");
+  var avoidzero = require("./utils").avoidzero;
   
   var calcFunc = {};
   
-  unit.specs.UnaryOpUGen = (function() {
+  cc.unit.specs.UnaryOpUGen = (function() {
     
     var ctor = function() {
       var func = calcFunc[ops.UNARY_OP_UGEN_MAP[this.specialIndex]];
@@ -52,8 +52,6 @@ define(function(require, exports, module) {
       }
     };
   };
-  
-  var avoidzero = unit.avoidzero;
   
   calcFunc.neg = function(a) {
     return -a;

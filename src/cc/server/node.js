@@ -232,7 +232,7 @@ define(function(require, exports, module) {
       if (this.instance) {
         userId = this.instance.userId;
       }
-      cc.server.sendToClient([
+      cc.server.sendToLang([
         "/emit/n_end", this.nodeId
       ], userId);
     }
@@ -294,7 +294,7 @@ define(function(require, exports, module) {
         if (this.instance) {
           userId = this.instance.userId;
         }
-        cc.server.sendToClient([
+        cc.server.sendToLang([
           "/emit/n_done", this.nodeId, tag
         ], userId);
       }

@@ -12,7 +12,7 @@ define(function(require, exports, module) {
       require("./server").use();
       
       called = [];
-      cc.client = { process: nop };
+      cc.lang = { process: nop };
       cc.createTimer = function() {
         return {
           isRunning: function() {
@@ -69,31 +69,31 @@ define(function(require, exports, module) {
         });
       });
       describe("messaging", function() {
-        var instance, sendToClient;
+        var instance, sendToLang;
         beforeEach(function() {
-          sendToClient = [""];
+          sendToLang = [""];
           cc.opmode = "worker";
           instance = cc.createSynthServer();
-          instance.sendToClient = function(msg) {
-            sendToClient = msg;
+          instance.sendToLang = function(msg) {
+            sendToLang = msg;
           };
         });
         it("/init", function() {
-          instance.recvFromClient(["/init", 8000, 1]);
+          instance.recvFromLang(["/init", 8000, 1]);
           assert.equal(instance.sampleRate, 8000);
           assert.equal(instance.channels  ,    1);
         });
         it("/play", function() {
-          instance.recvFromClient(["/play"]);
+          instance.recvFromLang(["/play"]);
         });
         it("/pause", function() {
-          instance.recvFromClient(["/pause"]);
+          instance.recvFromLang(["/pause"]);
         });
         it("/reset", function() {
-          instance.recvFromClient(["/reset"]);
+          instance.recvFromLang(["/reset"]);
         });
         it("/processed", function() {
-          instance.recvFromClient(["/processed", 0]);
+          instance.recvFromLang(["/processed", 0]);
           assert.deepEqual(called, ["im.pushToTimeline"]);
         });
       });

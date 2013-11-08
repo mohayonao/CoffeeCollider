@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   
-  unit.specs.MulAdd = (function() {
+  cc.unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -349,7 +349,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.Sum3 = (function() {
+  cc.unit.specs.Sum3 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]];
@@ -468,7 +468,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  unit.specs.Sum4 = (function() {
+  cc.unit.specs.Sum4 = (function() {
     var ctor = function() {
       var rates = this.inRates;
       var process = next[rates[0]][rates[1]][rates[2]][rates[3]];

@@ -16,8 +16,13 @@ var _require = function(parentId, moduleName) {
     var req = function(module) {
       return _require(moduleName, module);
     };
-    var ret = module(req, exports, mod);
-    exports = ret || mod.exports;
+    var ret = null;
+    if (module) {
+      module(req, exports, mod);
+      exports = ret || mod.exports;
+    } else {
+      exports = -1;
+    }
     _define.modules[moduleName] = exports;
     delete _define.payloads[moduleName];
   }

@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   var log001 = Math.log(0.001);
 
   var calcDelay = function(unit, delaytime, minDelay) {
@@ -41,7 +41,7 @@ define(function(require, exports, module) {
     this._feedbk    = calcFeedback(this._delaytime, this._decaytime);
   };
 
-  unit.specs.CombN = (function() {
+  cc.unit.specs.CombN = (function() {
     var ctor = function() {
       this.process = next_akk;
       feedbackdelay_ctor.call(this);
@@ -109,7 +109,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.CombL = (function() {
+  cc.unit.specs.CombL = (function() {
     var ctor = function() {
       this.process = next_akk;
       feedbackdelay_ctor.call(this);
@@ -184,7 +184,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  unit.specs.CombC = (function() {
+  cc.unit.specs.CombC = (function() {
     var ctor = function() {
       this.process = next_akk;
       feedbackdelay_ctor.call(this);

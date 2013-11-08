@@ -1,7 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
-  
-  var unit = require("./unit");
+
+  var cc = require("../cc");
   
   var sc_loop = function(unit, index, hi, loop) {
     if (index >= hi) {
@@ -36,7 +36,7 @@ define(function(require, exports, module) {
     return ((c3 * x + c2) * x + c1) * x + c0;
   };
   
-  unit.specs.PlayBuf = (function() {
+  cc.unit.specs.PlayBuf = (function() {
     var ctor = function() {
       this._buffer = null;
       this._phase  = this.inputs[3][0];

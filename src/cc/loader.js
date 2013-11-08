@@ -18,63 +18,63 @@ define(function(require, exports, module) {
     }
     if (cc.coffeeColliderHash === "#iframe") {
       cc.opmode  = "iframe";
-      cc.context = "client";
-      require("./client/client").use();
-      cc.client = cc.createSynthClient();
+      cc.context = "lang";
+      require("./lang/lang");
+      cc.lang = cc.createSynthLang();
     } else if (cc.coffeeColliderHash === "#socket") {
       cc.opmode  = "socket";
-      cc.context = "client";
-      require("./client/client").use();
-      cc.client = cc.createSynthClient();
+      cc.context = "lang";
+      require("./lang/lang");
+      cc.lang = cc.createSynthLang();
     } else {
-      cc.opmode  = "exports";
-      cc.context = "exports";
-      require("./exports/coffeecollider").use();
+      cc.opmode  = "client";
+      cc.context = "client";
+      require("./client/client");
       global.CoffeeCollider = function(opts) {
-        return cc.createCoffeeCollider(opts);
+        return cc.createSynthClient(opts);
       };
     }
   } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#iframe") {
       cc.opmode  = "iframe";
       cc.context = "server";
-      require("./server/server").use();
+      require("./server/server");
       cc.server = cc.createSynthServer();
       cc.server.connect();
     } else {
       cc.opmode  = "worker";
-      cc.context = "client/server";
-      require("./client/client").use();
-      require("./server/server").use();
-      cc.client = cc.createSynthClient();
+      cc.context = "lang/server";
+      require("./lang/lang");
+      require("./server/server");
+      cc.lang = cc.createSynthLang();
       cc.server = cc.createSynthServer();
-      cc.client.sendToServer = cc.server.recvFromClient.bind(cc.server);
-      cc.server.sendToClient = cc.client.recvFromServer.bind(cc.client);
+      cc.lang.sendToServer = cc.server.recvFromLang.bind(cc.server);
+      cc.server.sendToLang = cc.lang.recvFromServer.bind(cc.lang);
       cc.server.connect();
     }
   } else if (typeof global.GLOBAL !== "undefined") {
     cc.global.CoffeeCollider = function() {
       cc.opmode  = "nodejs";
-      cc.context = "exports/client/server";
-      require("./exports/coffeecollider").use();
-      require("./client/client").use();
-      require("./server/server").use();
-      cc.exports = cc.createCoffeeCollider({nodejs:true});
-      cc.client  = cc.createSynthClient();
-      cc.server  = cc.createSynthServer();
-      cc.exports.impl.sendToClient = cc.client.recvFromIF.bind(cc.client);
-      cc.client.sendToServer  = cc.server.recvFromClient.bind(cc.server);
-      cc.server.sendToClient  = cc.client.recvFromServer.bind(cc.client);
-      cc.client.sendToIF      = cc.exports.impl.recvFromClient.bind(cc.exports.impl);
+      cc.context = "client/lang/server";
+      require("./client/client");
+      require("./lang/lang");
+      require("./server/server");
+      cc.client = cc.createSynthClient({nodejs:true});
+      cc.lang   = cc.createSynthLang();
+      cc.server = cc.createSynthServer();
+      cc.client.impl.sendToLang = cc.lang.recvFromClient.bind(cc.lang);
+      cc.lang.sendToServer = cc.server.recvFromLang.bind(cc.server);
+      cc.server.sendToLang = cc.lang.recvFromServer.bind(cc.lang);
+      cc.lang.sendToClient = cc.client.impl.recvFromLang.bind(cc.client.impl);
       cc.server.connect();
-      return cc.exports;
+      return cc.client;
     };
     cc.global.SocketSynthServer = function(opts) {
       cc.opmode  = "socket";
       cc.context = "server";
-      require("./server/server").use();
+      require("./server/server");
       cc.server = cc.createSynthServer();
-      return cc.server.exports.createServer(opts);
+      return cc.server.client.createServer(opts);
     };
     module.exports = cc.global;
   }

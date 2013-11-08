@@ -11,7 +11,7 @@ define(function(require, exports, module) {
     timeline: {
       push: function(func) { func(); }
     },
-    sendToClient: function() {}
+    sendToLang: function() {}
   };
   
   var walk = (function() {

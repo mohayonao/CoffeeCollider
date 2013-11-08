@@ -2,9 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var unit = require("./unit");
   
-  unit.specs.Control = (function() {
+  cc.unit.specs.Control = (function() {
     var ctor = function() {
       if (this.numOfOutputs === 1) {
         this.process = next_1;
@@ -27,7 +26,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  unit.specs.In = (function() {
+  cc.unit.specs.In = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
@@ -57,7 +56,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  unit.specs.Out = (function() {
+  cc.unit.specs.Out = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {

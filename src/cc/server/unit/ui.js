@@ -1,11 +1,11 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var unit = require("./unit");
+  var cc = require("../cc");
   
   var log001 = Math.log(0.001);
 
-  unit.specs.MouseX = (function() {
+  cc.unit.specs.MouseX = (function() {
     var ctor = function() {
       this.process = next_kkkk;
       this._y1  = 0;
@@ -37,7 +37,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.MouseY = (function() {
+  cc.unit.specs.MouseY = (function() {
     var ctor = function() {
       this.process = next_kkkk;
       this._y1  = 0;
@@ -69,7 +69,7 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  unit.specs.MouseButton = (function() {
+  cc.unit.specs.MouseButton = (function() {
     var ctor = function() {
       this.process = next_kkk;
       this._y1  = 0;
