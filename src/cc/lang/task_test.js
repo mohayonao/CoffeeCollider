@@ -136,10 +136,10 @@ define(function(require, exports, module) {
         assert.instanceOf(t, task.TaskWaitTokenNumber);
         assert.isTrue(cc.instanceOfTaskWaitToken(t));
         
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isTrue(b);
 
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isFalse(b);
         
         b = t.performWait(0);
@@ -154,14 +154,14 @@ define(function(require, exports, module) {
         assert.isTrue(cc.instanceOfTaskWaitToken(t));
 
         flag = true;
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isTrue(b);
 
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isTrue(b);
 
         flag = false;
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isFalse(b);
 
         flag = true;
@@ -175,17 +175,17 @@ define(function(require, exports, module) {
         assert.instanceOf(t, task.TaskWaitTokenBoolean);
         assert.isTrue(cc.instanceOfTaskWaitToken(t));
 
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isTrue(b);
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isTrue(b);
 
         t = cc.createTaskWaitToken(false);
         assert.isTrue(cc.instanceOfTaskWaitToken(t));
         
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isFalse(b);
-        b = t.performWait(1);
+        b = t.performWait(1000);
         assert.isFalse(b);
       });
       it("array", function() {
@@ -195,11 +195,11 @@ define(function(require, exports, module) {
         assert.instanceOf(t, task.TaskWaitTokenLogicAND);
         assert.isTrue(cc.instanceOfTaskWaitToken(t));
 
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isTrue(b);
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isTrue(b);
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isFalse(b);
       });
       it("blockable", function() {
@@ -252,19 +252,19 @@ define(function(require, exports, module) {
         assert.isTrue(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
 
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isTrue(b);
         assert.isTrue(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
 
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isTrue(b);
         assert.isFalse(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
 
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isFalse(b);
         assert.isFalse(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
@@ -288,19 +288,19 @@ define(function(require, exports, module) {
         assert.isTrue(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
         
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isFalse(b);
         assert.isTrue(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
         
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isFalse(b);
         assert.isFalse(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
         assert.isTrue(t2.performWait(0));
         
-        b = t.performWait(10);
+        b = t.performWait(10000);
         assert.isFalse(b);
         assert.isFalse(t0.performWait(0));
         assert.isFalse(t1.performWait(0));
@@ -312,6 +312,7 @@ define(function(require, exports, module) {
     });
     describe("Processor", function() {
       beforeEach(function() {
+        cc.createTaskManager();
         cmd = [
           function(n, i) {
             actual.push([n, i, 1]);
@@ -338,17 +339,17 @@ define(function(require, exports, module) {
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1]]);
 
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2]]);
 
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-        
-        t.process(16);
-        assert.isTrue(passed);
 
+        t.process(16000);
+        assert.isTrue(passed);
+        
         t.stop();
       });
       it("Task.loop", function() {
@@ -362,15 +363,15 @@ define(function(require, exports, module) {
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1]]);
 
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2]]);
 
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
         
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3], [1, nil, 1]]);
       });
@@ -385,23 +386,23 @@ define(function(require, exports, module) {
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1]]);
 
-        t.process(16);
-        t.process(16);
+        t.process(16000);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3]]);
         
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
                                   [20, 1, 1]]);
-        t.process(16);
-        t.process(16);
+        t.process(16000);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
                                   [20, 1, 1], [20, 1, 2], [20, 1, 3]]);          
-        t.process(16);
-        t.process(16);
-        t.process(16);
+        t.process(16000);
+        t.process(16000);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
                                   [20, 1, 1], [20, 1, 2], [20, 1, 3],
@@ -409,7 +410,7 @@ define(function(require, exports, module) {
         t.process(0);
         assert.isFalse(passed);
         
-        t.process(16);
+        t.process(16000);
         assert.isTrue(passed);
         
         assert.throws(function() {
@@ -428,12 +429,12 @@ define(function(require, exports, module) {
         };
         
         t.process(0);
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
         
-        t.process(16);
-        t.process(16);
+        t.process(16000);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2],
                                   [20, 1, 1], [20, 1, 2]]);
@@ -450,12 +451,12 @@ define(function(require, exports, module) {
         };
         
         t.process(0);
-        t.process(16);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
         
-        t.process(16);
-        t.process(16);
+        t.process(16000);
+        t.process(16000);
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2],
                                   [10, 0, 1], [10, 0, 2]]);
@@ -475,7 +476,7 @@ define(function(require, exports, module) {
         assert.isFalse(passed);
         assert.deepEqual(actual, [[10, 0, 1]]);
         
-        t.process(16);
+        t.process(16000);
         assert.isTrue(passed);
         assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
       });
@@ -495,7 +496,7 @@ define(function(require, exports, module) {
           passed.push("end");
         });
 
-        tm.play(16);
+        tm.play(16000);
         t3.play();
         
         cmd[1] = function() {
@@ -553,7 +554,7 @@ define(function(require, exports, module) {
         assert.isTrue(cc.instanceOfTaskWaitToken(wt));
         assert.isTrue(wt.performWait(0));
         
-        tm.play(16);
+        tm.play(16000);
         tm.process();
         assert.deepEqual(actual, [[0, nil, 1]]);
         tm.process();

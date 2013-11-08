@@ -15,9 +15,9 @@ Task.loop ->
     freq = root * x
     amp  = 1 - (i / 8)
     synth.set freq:freq, amp:amp
-    @wait 125
+    @wait "bpm140 l16"
     synth.set freq:freq * 1.midiratio()
-    @wait 125
+    @wait "bpm140 l16"
   .play()
   @wait task
 .play()

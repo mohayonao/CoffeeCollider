@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131108213100",
+    version: "0.0.0+20131108215100",
     global : {},
     Object : function CCObject() {}
   };
@@ -2558,6 +2558,7 @@ define('cc/lang/task', function(require, exports, module) {
     function TaskWaitTokenNumber(item) {
       TaskWaitToken.call(this, item);
       this.klassName = "TaskWaitTokenNumber";
+      this.item *= 1000;
     }
     extend(TaskWaitTokenNumber, TaskWaitToken);
     

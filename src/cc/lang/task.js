@@ -93,6 +93,7 @@ define(function(require, exports, module) {
     function TaskWaitTokenNumber(item) {
       TaskWaitToken.call(this, item);
       this.klassName = "TaskWaitTokenNumber";
+      this.item *= 1000;
     }
     extend(TaskWaitTokenNumber, TaskWaitToken);
     
