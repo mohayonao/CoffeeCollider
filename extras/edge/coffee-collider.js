@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131108173700",
+    version: "0.0.0+20131108174500",
     global : {},
     Object : function CCObject() {}
   };
@@ -4801,6 +4801,11 @@ define('cc/lang/array', function(require, exports, module) {
       return cc.createMulAdd(_in, mul, add);
     });
   }).defaults("mul=1,add=0").multiCall().build());
+  
+  cc.global.SHORT = 1;
+  cc.global.FOLD  = 2;
+  cc.global.TABLE = 3;
+  cc.global.FLAT  = 4;
   
   module.exports = {};
 

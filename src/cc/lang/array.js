@@ -118,6 +118,11 @@ define(function(require, exports, module) {
     });
   }).defaults("mul=1,add=0").multiCall().build());
   
+  cc.global.SHORT = C.SHORT;
+  cc.global.FOLD  = C.FOLD;
+  cc.global.TABLE = C.TABLE;
+  cc.global.FLAT  = C.FLAT;
+  
   module.exports = {};
 
 });
