@@ -325,18 +325,6 @@ define(function(require, exports, module) {
       this._next = next;
       return next;
     };
-    TaskProcessor.prototype.timeout = function(delay, func) {
-      var next = new TaskProcessorTimeout(delay, cc.createTaskFunction(func));
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    TaskProcessor.prototype.interval = function(delay, func) {
-      var next = new TaskProcessorInterval(delay, cc.createTaskFunction(func));
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
     
     return TaskProcessor;
   })();
@@ -395,40 +383,6 @@ define(function(require, exports, module) {
     
     return TaskProcessorEach;
   })();
-
-  var TaskProcessorTimeout = (function() {
-    function TaskProcessorTimeout(delay, func) {
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorTimeout";
-      this._delay = Math.max(1, +delay) || 0;
-      this._wait  = cc.createTaskWaitToken(this._delay);
-    }
-    extend(TaskProcessorTimeout, TaskProcessor);
-    
-    TaskProcessorTimeout.prototype._done = function() {
-      this.stop();
-    };
-    
-    return TaskProcessorTimeout;
-  })();
-  
-  var TaskProcessorInterval = (function() {
-    function TaskProcessorInterval(delay, func) {
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorInterval";
-      this._delay = Math.max(1, +delay) || 0;
-      this._wait  = cc.createTaskWaitToken(this._delay);
-    }
-    extend(TaskProcessorInterval, TaskProcessor);
-    
-    TaskProcessorInterval.prototype._done = function() {
-      this._func.index = 0;
-      this._count += 1;
-      this._wait = cc.createTaskWaitToken(this._delay);
-    };
-    
-    return TaskProcessorInterval;
-  })();
   
   cc.global.Task = function(func) {
     return cc.createTaskFunction(func);
@@ -441,12 +395,6 @@ define(function(require, exports, module) {
   };
   cc.global.Task.each = function(list, func) {
     return new TaskProcessorEach(list, cc.createTaskFunction(func));
-  };
-  cc.global.Task.timeout = function(delay, func) {
-    return new TaskProcessorTimeout(delay, cc.createTaskFunction(func));
-  };
-  cc.global.Task.interval = function(delay, func) {
-    return new TaskProcessorInterval(delay, cc.createTaskFunction(func));
   };
   
   module.exports = {
@@ -463,8 +411,6 @@ define(function(require, exports, module) {
     TaskProcessorDo      : TaskProcessorDo,
     TaskProcessorLoop    : TaskProcessorLoop,
     TaskProcessorEach    : TaskProcessorEach,
-    TaskProcessorTimeout : TaskProcessorTimeout,
-    TaskProcessorInterval: TaskProcessorInterval,
     
     use: function() {
       cc.createTaskManager = function() {

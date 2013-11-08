@@ -416,66 +416,6 @@ define(function(require, exports, module) {
           cc.global.Task.each("invalid", func);
         }, TypeError);
       });
-      it("Task.timeout", function() {
-        var passed = false;
-        var t = cc.global.Task.timeout(32, func).on("end", function() {
-          passed = true;
-        });
-        assert.instanceOf(t, task.TaskProcessorTimeout);
-        
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, []);
-
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, []);
-
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1]]);
-        
-        t.process(16);
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-        
-        t.process(16);
-        assert.isTrue(passed);
-        
-        t.stop();
-      });
-      it("Task.interval", function() {
-        var passed = false;
-        var t = cc.global.Task.interval(32, func).on("end", function() {
-          passed = true;
-        });
-        assert.instanceOf(t, task.TaskProcessorInterval);
-        
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, []);
-        
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, []);
-
-        t.process(16);
-        t.process(16);
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-        t.process(16);
-        
-        // delay
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-        
-        t.process(16);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3], [1, nil, 1]]);
-      });
       it("continue", function() {
         var passed = false;
         var t = cc.global.Task.each([10,20,30], func).on("end", function() {
@@ -542,130 +482,66 @@ define(function(require, exports, module) {
       it("chain", function() {
         var passed = [];
         var tm = cc.createTaskManager();
-        var t0 = cc.global.Task.timeout(16, func).on("end", function() {
-          passed.push("timeout");
-        });
-        var t1 = t0.do(func).on("end", function() {
+        var t0 = cc.global.Task.do(func).on("end", function() {
           passed.push("do");
         });
-        var t2 = t1.each([10, 20], func).on("end", function() {
+        var t1 = t0.each([10, 20], func).on("end", function() {
           passed.push("each");
         });
-        var t3 = t2.interval(16, func).on("end", function() {
-          passed.push("interval");
-        });
-        var t4 = t3.loop(func).on("end", function() {
+        var t2 = t1.loop(func).on("end", function() {
           passed.push("loop");
         });
-        var t5 = t4.timeout(16, func).on("end", function() {
+        var t3 = t2.do(func).on("end", function() {
           passed.push("end");
         });
 
-        tm.play(8);
-        t5.play();
+        tm.play(16);
+        t3.play();
         
         cmd[1] = function() {
           this.break();
         };
         
         tm.process();
-        assert.deepEqual(actual, []);
-
-        tm.process();
         assert.deepEqual(actual, [[0, nil, 1]]);
         assert.deepEqual(passed, []);
-
-        // timeout
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout"]);
-
+        
         // do
         tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout"]);
+        assert.deepEqual(actual, [[0, nil, 1]]);
+        assert.deepEqual(passed, ["do"]);
         
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do"]);
-
         // each
         tm.process();
         assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
                                   [10,   0, 1]]);
-        assert.deepEqual(passed, ["timeout", "do"]);
-        tm.process();
+        assert.deepEqual(passed, ["do"]);
         tm.process();
         assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
                                   [10,   0, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each"]);
+        assert.deepEqual(passed, ["do", "each"]);
 
-        // interval
-        tm.process(); // delay
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [10,   0, 1]]);
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each"]);
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each", "interval"]);
-        
         // loop
         tm.process();
         assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
                                   [10,   0, 1],
-                                  [ 0, nil, 1],
                                   [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each", "interval"]);
-        tm.process();
+        assert.deepEqual(passed, ["do", "each"]);
         tm.process();
         assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
                                   [10,   0, 1],
-                                  [ 0, nil, 1],
                                   [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each", "interval", "loop"]);
+        assert.deepEqual(passed, ["do", "each", "loop"]);
         
-        // timeout
-        tm.process(); // delay
+        tm.process();
         assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
                                   [10,   0, 1],
                                   [ 0, nil, 1],
                                   [ 0, nil, 1]]);
+        assert.deepEqual(passed, ["do", "each", "loop"]);
+        
         tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each", "interval", "loop"]);
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1],
-                                  [ 0, nil, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["timeout", "do", "each", "interval", "loop", "end"]);
+        assert.deepEqual(passed, ["do", "each", "loop", "end"]);
       });
       it("play/pause/stop", function() {
         var passed = false;
