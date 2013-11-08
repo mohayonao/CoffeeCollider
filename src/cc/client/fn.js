@@ -43,7 +43,7 @@ define(function(require, exports, module) {
             args = resolve_args(keys, vals, slice.call(arguments));
             if (containsArray(args)) {
               return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
+                return ret.apply(this, items);
               }, this);
             }
             return func.apply(this, args);
@@ -53,7 +53,7 @@ define(function(require, exports, module) {
             var args = slice.call(arguments);
             if (containsArray(args)) {
               return utils.flop(args).map(function(items) {
-                return func.apply(this, items);
+                return ret.apply(this, items);
               }, this);
             }
             return func.apply(this, args);
@@ -76,6 +76,18 @@ define(function(require, exports, module) {
       }
       return false;
     };
+    // var containsArray2 = function(list) {
+    //   for (var i = 0, imax = list.length; i < imax; ++i) {
+    //     if (Array.isArray(list[i])) {
+    //       for (var j = 0, jmax = list[i].length; j < jmax; ++j) {
+    //         if (Array.isArray(list[i][j])) {
+    //           return true;
+    //         }
+    //       }
+    //     }
+    //   }
+    //   return false;
+    // };
     var resolve_args = function(keys, vals, given) {
       var dict;
       var args = vals.slice();

@@ -36,11 +36,21 @@ define(function(require, exports, module) {
         }).defaults("val=0,mul=1,add=0").build();
         assert.equal(calc(10, {add:20, sub:5}), 20);
       });
-      it("multiCall", function() {
-        var calc = fn(function(val, mul, add) {
-          return val * mul + add;
-        }).multiCall().build();
-        assert.deepEqual(calc(10, [1, 2], 0), [10, 20]);
+      describe("multiCall", function() {
+        var calc;
+        before(function() {
+          calc = fn(function(val, mul, add) {
+            return val * mul + add;
+          }).multiCall().build();
+        });
+        it("basis", function() {
+          assert.deepEqual(calc(10, [1, 2], 0), [10, 20]);
+        });
+        it("issue-31", function() {
+          var actual = calc(10, [1, 2], [[100,[1000]]]);
+          assert.deepEqual(actual,
+                           [ [ 110, [ 1010 ] ], [ 120, [ 1020 ] ] ]);
+        });
       });
       it("multiCall without an array", function() {
         var calc = fn(function(val, mul, add) {

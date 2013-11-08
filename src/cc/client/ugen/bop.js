@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var extend = require("../../common/extend");
   var ops    = require("../../common/ops");
+  var fn     = require("../fn");
   var utils  = require("../utils");
   
   var BinaryOpUGen = (function() {
@@ -180,9 +181,9 @@ define(function(require, exports, module) {
   
   module.exports = {
     use: function() {
-      cc.createBinaryOpUGen = function(selector, a, b) {
+      cc.createBinaryOpUGen = fn(function(selector, a, b) {
         return new BinaryOpUGen().init(selector, a, b);
-      };
+      }).multiCall().build();
       cc.instanceOfBinaryOpUGen = function(obj) {
         return obj instanceof BinaryOpUGen;
       };
