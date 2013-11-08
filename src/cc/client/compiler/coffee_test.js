@@ -45,9 +45,13 @@ define(function(require, exports, module) {
   describe("coffee.js", function() {
     var testSuite;
     before(function() {
-      testSuite = function(func, code, expected) {
+      testSuite = function(func, code, expected, show) {
         var tokens = func(coffee.tokens(code));
         var actual = compiler.prettyPrint(tokens);
+        if (show) {
+          console.log(actual);
+          console.log("-----");
+        }
         assert.equal(actual, expected, code);
         assert.doesNotThrow(function() {
           coffee.nodes(tokens).compile();
@@ -478,7 +482,7 @@ define(function(require, exports, module) {
         code     = "0 * (10 + 20 * 30 - 40 / 50)";
         expected = "(0 * (10 + (20 * 30) - (40 / 50)))";
         testSuite(compiler.replaceStrictlyPrecedence, code, expected);
-      });      
+      });
     });
     it("replaceUnaryOperator", function() {
       var code, expected;
@@ -486,19 +490,45 @@ define(function(require, exports, module) {
       expected = "10.__plus__() + [20].__minus__()";
       testSuite(compiler.replaceUnaryOperator, code, expected);
     });
-    it("replaceBinaryOperator", function() {
+    it("replaceTextBinaryAdverb (issue-33)", function() {
+      var code, actual, expected;
+      code     = "1 +S+ 2";
+      expected = '1 + "#!S" + 2';
+      actual = compiler.replaceTextBinaryAdverb(code);
+      assert.equal(actual, expected);
+
+      code     = "1 *CLIP* 2";
+      expected = '1 * "#!C" * 2';
+      actual = compiler.replaceTextBinaryAdverb(code);
+      assert.equal(actual, expected);
+
+      code     = "1 *CLI* 2";
+      expected = "1 *CLI* 2";
+      actual = compiler.replaceTextBinaryAdverb(code);
+      assert.equal(actual, expected);
+
+      code     = "1 *S+ 2";
+      expected = "1 *S+ 2";
+      actual = compiler.replaceTextBinaryAdverb(code);
+      assert.equal(actual, expected);
+    });
+    describe("replaceBinaryOperator", function() {
       var code, expected;
-      code     = "+10 + -[20]";
-      expected = "+10.__add__(-[20])";
-      testSuite(compiler.replaceBinaryOperator, code, expected);
-      
-      code     = "+10 +F+ -[20]";
-      expected = "+10.__add__(-[20], FOLD)";
-      testSuite(compiler.replaceBinaryOperator, code, expected);
-      
-      code     = "FOLD + -[20]";
-      expected = "FOLD.__add__(-[20])";
-      testSuite(compiler.replaceBinaryOperator, code, expected);
+      it("basis", function() {
+        code     = "+10 + -[20]";
+        expected = "+10.__add__(-[20])";
+        testSuite(compiler.replaceBinaryOperator, code, expected);
+      });
+      it("issue-33", function() {
+        code     = "+10 +F+ -[20]";
+        code     = compiler.replaceTextBinaryAdverb(code);
+        expected = "+10.__add__(-[20], FOLD)";
+        testSuite(compiler.replaceBinaryOperator, code, expected);
+        
+        code     = '+10 +"#!F"+ -[20]';
+        expected = "+10.__add__(-[20], FOLD)";
+        testSuite(compiler.replaceBinaryOperator, code, expected);
+      });
     });
     it("replaceCompoundAssign", function() {
       var code, expected;

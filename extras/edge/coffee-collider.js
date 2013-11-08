@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131108215100",
+    version: "0.0.0+20131109065600",
     global : {},
     Object : function CCObject() {}
   };
@@ -6695,13 +6695,24 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
     WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
   };
+  var replaceTextBinaryAdverb = function(code) {
+    Object.keys(binaryOperatorAdverbs).forEach(function(key) {
+      var a = new RegExp("([+\\-*/%])(" + key + ")\\1", "g");
+      var b = "$1 " + "\"#!" + key.charAt(0) + "\"" + " $1";
+      code = code.replace(a, b);
+    });
+    return code;
+  };
   var checkAdvarb = function(tokens, index) {
     var t0 = tokens[index  ];
     var t1 = tokens[index-1];
     var t2 = tokens[index-2];
     if (t0 && t1 && t2) {
-      if (t0[VALUE] === t2[VALUE] && binaryOperatorAdverbs.hasOwnProperty(t1[VALUE])) {
-        return binaryOperatorAdverbs[t1[VALUE]];
+      if (/^"#![WSCFTX]"$/.test(t1[VALUE])) {
+        var key = t1[VALUE].charAt(3);
+        if (t0[VALUE] === t2[VALUE] && binaryOperatorAdverbs.hasOwnProperty(key)) {
+          return binaryOperatorAdverbs[key];
+        }
       }
     }
   };
@@ -7215,6 +7226,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     }
     CoffeeCompiler.prototype.tokens = function(code) {
       var data = [];
+      code = replaceTextBinaryAdverb(code);
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
         tokens.forEach(function(token) {
@@ -7265,7 +7277,8 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     getPrevOperand          : getPrevOperand,
     getNextOperand          : getNextOperand,
     detectFunctionParameters: detectFunctionParameters,
-    
+
+    replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
     replaceFixedTimeValue    : replaceFixedTimeValue,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
