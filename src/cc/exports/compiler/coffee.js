@@ -94,33 +94,13 @@ define(function(require, exports, module) {
     var indent  = 0;
     var end = index;
     while (1 < index) {
-      switch (tokens[index - 1][TAG]) {
-      case "PARAM_END": case "CALL_END": case "INDEX_END":
-        bracket += 1;
-        /* falls through */
-      case ".": case "@":
-        index -= 1;
-        continue;
-      }
       switch (tokens[index][TAG]) {
-      case "(": case "[": case "{": case "PARAM_START":
-        bracket -= 1;
-        /* falls through */
-      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
-      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
-      case "->":
-        if (bracket === 0 && indent === 0) {
-          var prev;
-          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
-            index -= 1;
-          }
-          return {tokens:tokens, begin:index, end:end};
-        }
-        break;
-      case "CALL_START": case "INDEX_START":
+      case "(": case "[": case "{":
+      case "PARAM_START": case "CALL_START": case "INDEX_START":
         bracket -= 1;
         break;
       case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket += 1;
         break;
       case "OUTDENT":
@@ -128,6 +108,26 @@ define(function(require, exports, module) {
         break;
       case "INDENT":
         indent -= 1;
+        break;
+      }
+      switch (tokens[index - 1][TAG]) {
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
+      case ".": case "@":
+        index -= 1;
+        continue;
+      }
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{": case "PARAM_START":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
+      case "->": case "=>":
+        if (bracket === 0 && indent === 0) {
+          var prev;
+          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
+            index -= 1;
+          }
+          return {tokens:tokens, begin:index, end:end};
+        }
         break;
       }
       index -= 1;
@@ -152,10 +152,12 @@ define(function(require, exports, module) {
       var tag = tokens[index][TAG];
       
       switch (tag) {
-      case "(": case "[": case "{": case "PARAM_START":
+      case "(": case "[": case "{":
+      case "PARAM_START":
         bracket += 1;
         break;
-      case "}": case "]": case ")": case "PARAM_END": case "CALL_END": case "INDEX_END":
+      case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
         bracket -= 1;
         break;
       case "INDENT":
