@@ -5,10 +5,8 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var extend = require("../common/extend");
-  var slice = [].slice;
   
   var defId = 0;
-  
   
   var SynthDef = (function() {
     function SynthDef(func, args) {
@@ -23,10 +21,12 @@ define(function(require, exports, module) {
     extend(SynthDef, cc.Object);
     
     SynthDef.prototype.build = function() {
-      build.call(this);
-      cc.lang.pushToTimeline([
-        "/s_def", this._defId, JSON.stringify(this.specs)
-      ]);
+      if (!this.specs) {
+        build.call(this);
+        cc.lang.pushToTimeline([
+          "/s_def", this._defId, JSON.stringify(this.specs)
+        ]);
+      }
       return this;
     };
     
@@ -35,7 +35,7 @@ define(function(require, exports, module) {
         this.build();
       }
       
-      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var list = getSynthDefPlayArguments.apply(null, arguments);
       var target = list[0];
       var args   = list[1];
       var addAction = list[2];
@@ -52,7 +52,6 @@ define(function(require, exports, module) {
         return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
       }
     }).multiCall().build();
-
     
     var build = function() {
       var args   = this.args;
@@ -282,11 +281,9 @@ define(function(require, exports, module) {
     }
     return result;
   };
-
-  var SynthDefInterface = global.SynthDef = function(func, args) {
+  
+  cc.global.SynthDef = function(func, args) {
     return cc.createSynthDef(func, args);
-  };
-  SynthDefInterface.read = function() {
   };
   
   module.exports = {
