@@ -78,10 +78,9 @@ define(function(require, exports, module) {
       assert.isFalse(cc.instanceOfSynthDef([]));
     });
     it("makeSynthDef", function() {
-      var func = function(out, freq, opts) {
+      var func = function(out, freq) {
         assert.equal(out .klassName, "OutputProxy");
         assert.equal(freq.klassName, "OutputProxy");
-        assert.deepEqual(opts, {phase:0, amp:0.5}, "opts is {phase:0, amp:0.5}");
         var a = {
           klassName: "SinOsc",
           rate     : C.AUDIO,
@@ -98,9 +97,8 @@ define(function(require, exports, module) {
         addToSynth(a);
         addToSynth(b);
       };
-      var args = [ "out", "0", "freq", "440", "opts", '{"phase":1, "amp":0.5}' ];
-      var tmpl = cc.createSynthDefTemplate(func, args);
-      var def  = tmpl.build({phase:0});
+      var args = [ "out", "0", "freq", "440" ];
+      var def  = cc.createSynthDef(func, args).build();
       assert.deepEqual(def.specs, {
         consts : [ 0 ],
         defList: [

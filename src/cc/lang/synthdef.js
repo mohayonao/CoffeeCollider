@@ -8,30 +8,7 @@ define(function(require, exports, module) {
   var slice = [].slice;
   
   var defId = 0;
-
-  var SynthDefTemplate = (function() {
-    function SynthDefTemplate(func, args) {
-      this.klassName = "SynthDefTemplate";
-      this.func   = func;
-      this.args   = args2keyValues(args);
-      this.params = args2params(this.args);
-    }
-    extend(SynthDefTemplate, cc.Object);
-
-    SynthDefTemplate.prototype.build = function(opts) {
-      return new SynthDef(this, opts||{});
-    };
-    
-    SynthDefTemplate.prototype.play = fn(function() {
-      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
-      var target = list[0];
-      var args   = list[1];
-      var addAction = list[2];
-      return new SynthDef(this).play(target, args, addAction);
-    }).multiCall().build();
-    
-    return SynthDefTemplate;
-  })();
+  
   
   var getSynthDefPlayArguments = function() {
     var target, args, addAction;
@@ -63,43 +40,24 @@ define(function(require, exports, module) {
   };
   
   var SynthDef = (function() {
-    function SynthDef(template, _opts) {
+    function SynthDef(func, _args) {
       this.klassName = "SynthDef";
       this._defId = defId++;
-
-      if (!(template instanceof SynthDefTemplate)) {
-        this.specs = {
-          consts:[], defs:[], params:{ names:[], indices:[], length:[], values:[] }
-        };
-        return;
-      }
       
       var children = [];
       cc.setSynthDef(function(ugen) {
         children.push(ugen);
       });
       
-      var args     = template.args;
-      var params   = template.params;
+      var args     = args2keyValues(_args);
+      var params   = args2params(args);
       var controls = cc.createControl(C.CONTROL).init(params.flatten);
       if (!Array.isArray(controls)) {
         controls = [ controls ];
       }
       
-      var opts = {};
-      if (params.opts) {
-        Object.keys(params.opts).forEach(function(key) {
-          opts[key] = params.opts[key];
-        });
-      }
-      if (_opts) {
-        Object.keys(_opts).forEach(function(key) {
-          opts[key] = _opts[key];
-        });
-      }
-      
       try {
-        template.func.apply(null, reshapeArgs(args.vals, controls).concat(opts));
+        func.apply(null, reshapeArgs(args.vals, controls));
       } catch (e) {
         throw e.toString();
       } finally {
@@ -121,6 +79,10 @@ define(function(require, exports, module) {
       ]);
     }
     extend(SynthDef, cc.Object);
+
+    SynthDef.prototype.build = function() {
+      return this;
+    };
     
     SynthDef.prototype.play = fn(function() {
       var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
@@ -309,13 +271,12 @@ define(function(require, exports, module) {
   };
 
   var SynthDefInterface = global.SynthDef = function(func, args) {
-    return cc.createSynthDefTemplate(func, args);
+    return cc.createSynthDef(func, args);
   };
   SynthDefInterface.read = function() {
   };
   
   module.exports = {
-    SynthDefTemplate: SynthDefTemplate,
     SynthDef: SynthDef,
     
     args2keyValues: args2keyValues,
@@ -327,14 +288,8 @@ define(function(require, exports, module) {
     makeDefList   : makeDefList,
     
     use: function() {
-      cc.createSynthDefTemplate = function(func, args) {
-        return new SynthDefTemplate(func, args);
-      };
-      cc.instanceOfSynthDefTemplate = function(obj) {
-        return obj instanceof SynthDefTemplate;
-      };
-      cc.createSynthDef = function(func, args, opts) {
-        return new SynthDef(func, args, opts);
+      cc.createSynthDef = function(func, args) {
+        return new SynthDef(func, args);
       };
       cc.instanceOfSynthDef = function(obj) {
         return obj instanceof SynthDef;
