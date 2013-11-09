@@ -620,24 +620,6 @@ define(function(require, exports, module) {
         ].join("\n");
         testSuite(compiler.replaceSynthDefinition, code, expected);
       });
-      it("SynthDefTemplate", function() {
-        code = [
-          "SynthDefTemplate (out=0, osc)->",
-          "  (a=1, b=2)->", // should be skipped
-          "    0",
-          "  (freq=440, amp=0.5)->",
-          "    Out.ar(0, SinOsc.ar(freq) * amp)",
-        ].join("\n");
-        expected = [
-          "SynthDefTemplate((out = 0, osc)->",
-          "  (a = 1, b = 2)->",
-          "    0",
-          "  (freq, amp)->",
-          "    Out.ar(0, SinOsc.ar(freq) * amp)",
-          ", ['freq', '440', 'amp', '0.5'])",
-        ].join("\n");
-        testSuite(compiler.replaceSynthDefinition, code, expected);
-      });
     });
     describe("replaceTaskFunction", function() {
       var code, actual, expected;

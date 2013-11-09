@@ -546,99 +546,90 @@ define(function(require, exports, module) {
     }
     return -1;
   };
-  var indexOfFunctionBody = function(tokens, index) {
-    var bracket = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "PARAM_START":
-        bracket += 1;
-        break;
-      case "PARAM_END":
-        bracket -= 1;
-        break;
-      case "->": case "=>":
-        if (bracket === 0) {
-          return i + 2;
-        }
-      }
-    }
-    return -1;
-  };
-  var getLine = function(tokens, index) {
-    var depth = 0;
-    var result = { tokens:tokens, begin:index, end:-1, isLastLine:false };
-    LOOP:
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][VALUE]) {
-      case "(": case "{": case "[":
-        depth += 1;
-        break;
-      case "]": case "}": case ")":
-        depth -= 1;
-        break;
-      }
-      switch (tokens[i][TAG]) {
-      case "TERMINATOR":
-        if (depth === 0) {
-          result.end = i;
-        }
-        break;
-      case "INDENT":
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        if (depth === -1) {
-          result.end = i - 1;
-          result.isLastLine = true;
-        }
-        break;
-      }
-      if (result.end !== -1) {
-        break;
-      }
-    }
-    return result;
-  };
-  var getLastLine = function(tokens, index) {
-    while (index < tokens.length) {
-      var op = getLine(tokens, index);
-      if (op.isLastLine) {
-        return op;
-      }
-      index = op.end + 1;
-    }
-    return {begin:tokens.length};
-  };
+  // var indexOfFunctionBody = function(tokens, index) {
+  //   var bracket = 0;
+  //   for (var i = index, imax = tokens.length; i < imax; ++i) {
+  //     switch (tokens[i][TAG]) {
+  //     case "PARAM_START":
+  //       bracket += 1;
+  //       break;
+  //     case "PARAM_END":
+  //       bracket -= 1;
+  //       break;
+  //     case "->": case "=>":
+  //       if (bracket === 0) {
+  //         return i + 2;
+  //       }
+  //     }
+  //   }
+  //   return -1;
+  // };
+  // var getLine = function(tokens, index) {
+  //   var depth = 0;
+  //   var result = { tokens:tokens, begin:index, end:-1, isLastLine:false };
+  //   LOOP:
+  //   for (var i = index, imax = tokens.length; i < imax; ++i) {
+  //     switch (tokens[i][VALUE]) {
+  //     case "(": case "{": case "[":
+  //       depth += 1;
+  //       break;
+  //     case "]": case "}": case ")":
+  //       depth -= 1;
+  //       break;
+  //     }
+  //     switch (tokens[i][TAG]) {
+  //     case "TERMINATOR":
+  //       if (depth === 0) {
+  //         result.end = i;
+  //       }
+  //       break;
+  //     case "INDENT":
+  //       depth += 1;
+  //       break;
+  //     case "OUTDENT":
+  //       depth -= 1;
+  //       if (depth === -1) {
+  //         result.end = i - 1;
+  //         result.isLastLine = true;
+  //       }
+  //       break;
+  //     }
+  //     if (result.end !== -1) {
+  //       break;
+  //     }
+  //   }
+  //   return result;
+  // };
+  // var getLastLine = function(tokens, index) {
+  //   while (index < tokens.length) {
+  //     var op = getLine(tokens, index);
+  //     if (op.isLastLine) {
+  //       return op;
+  //     }
+  //     index = op.end + 1;
+  //   }
+  //   return {begin:tokens.length};
+  // };
   
   var replaceSynthDefinition = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     for (var i = tokens.length - 4; i--; ) {
-      if (i && tokens[i-1][TAG] === ".") {
+      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
         continue;
       }
-      var index, outer_index, inner_index = -1;
-      if (tokens[i][VALUE] === "SynthDef") {
-        outer_index = indexOfFunctionStart(tokens, i + 2);
-        inner_index = outer_index;
-      } else if (tokens[i][VALUE] === "SynthDefTemplate") {
-        outer_index = indexOfFunctionStart(tokens, i + 2);
-        if (outer_index !== -1 && (index = indexOfFunctionBody(tokens, outer_index)) !== -1) {
-          inner_index = indexOfFunctionStart(tokens, getLastLine(tokens, index).begin);
-        }
-      }
-      if (inner_index === -1) {
+      var index = indexOfFunctionStart(tokens, i + 2);
+      if (index === -1) {
         continue;
       }
       var args;
-      if (tokens[inner_index].cc_funcRef) {
-        args = tokens[inner_index].cc_funcRef.cc_funcParams.args;
+      if (tokens[index].cc_funcRef) {
+        args = tokens[index].cc_funcRef.cc_funcParams.args;
       } else {
         args = [];
       }
-      replaceSynthDefDefaultArguments(tokens, inner_index, args);
+      replaceSynthDefDefaultArguments(tokens, index, args);
       
-      index = getNextOperand(tokens, outer_index).end + 1;
+      index = getNextOperand(tokens, index).end + 1;
       insertSynthDefArgumentsToAfterFunction(tokens, index, args);
     }
     return tokens;
@@ -685,7 +676,7 @@ define(function(require, exports, module) {
   ];
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 3; i--; ) {
+    for (var i = tokens.length - 4; i--; ) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
         continue;
       }
