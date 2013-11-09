@@ -55,6 +55,103 @@ define(function(require, exports, module) {
   var VALUE = 1;
   var _     = {}; // empty location
 
+  // utility functions
+  var isDot = function(token) {
+    return !!token && (token[TAG] === "." || token[TAG] === "@");
+  };
+  
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    return val;
+  };
+  
+  var getLine = function(tokens, index) {
+    var depth = 0;
+    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
+    LOOP:
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "(": case "{": case "[":
+      case "CALL_START": case "PARAM_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case "]": case "}": case ")":
+      case "CALL_END": case "PARAM_END": case "INDEX_END":
+        depth -= 1;
+        break;
+      case "TERMINATOR":
+        if (depth === 0) {
+          result.end = i;
+        }
+        break;
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        depth -= 1;
+        if (depth === -1) {
+          result.end = i - 1;
+          result.isLastLine = true;
+        }
+        break;
+      }
+      if (result.end !== -1) {
+        break;
+      }
+    }
+    if (result.end === -1) {
+      result.end = tokens.length - 1;
+    }
+    result.len = result.end - result.begin + 1;
+    return result;
+  };
+  var indexOfParamEnd = function(tokens, index) {
+    var bracket = 0;
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "PARAM_START":
+        bracket += 1;
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        if (bracket === 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  };
+  var indexOfFunctionStart = function(tokens, index) {
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      if (tokens[i][TAG] === "TERMINATOR" || tokens[i][TAG] === ".") {
+        break;
+      }
+      if (tokens[i][TAG] === "->" ||
+          tokens[i][TAG] === "=>" ||
+          tokens[i][TAG] === "PARAM_START") {
+        return i;
+      }
+    }
+    return -1;
+  };
+  var formatArgument = function(op) {
+    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
+        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
+      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
+        return "\"" + token[VALUE] + "\"";
+      }
+      return token[VALUE];
+    }).join("");
+  };
+  
+  
+  
+  
   var detectPlusMinusOperator = function(tokens) {
     if (tokens.cc_plusminus) {
       return tokens;
@@ -198,63 +295,72 @@ define(function(require, exports, module) {
     return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
   };
   
-  var getIdentifier = function(token) {
-    var val = token[VALUE];
-    if (val.reserved) {
-      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
-        (val[5]||"") + (val[6]||"") + (val[7]||"");
+  var func = {};
+  var detectFunctionParameters = function(tokens) {
+    if (tokens.cc_funcParams) {
+      return tokens;
     }
-    return val;
-  };
-  
-  var getLine = function(tokens, index) {
-    var depth = 0;
-    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
-    LOOP:
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "(": case "{": case "[":
-      case "CALL_START": case "PARAM_START": case "INDEX_START":
-        depth += 1;
+    var stack = [
+      { declared:[], args:[], local:[], outer:[] }
+    ];
+    stack.setVariables = func.setVariables(stack);
+    
+    var indent = 0;
+    var args = [];
+    var vars = [];
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var op, token = tokens[i];
+      stack.peek = stack[stack.length-1];
+      switch (token[TAG]) {
+      case "PARAM_START":
+        args = func.getInfoOfArguments(tokens, i);
+        i    = args.end + 1;
+        vars = args.vars;
+        args = args.args;
+        /* falls through */
+      case "->": case "=>":
+        var scope = {
+          declared: stack.peek.declared.concat(stack.peek.local),
+          args:vars.splice(0), local:[], outer:[], indent:indent
+        };
+        tokens[i].cc_funcParams = {
+          args:args.splice(0), local:scope.local, outer:scope.outer
+        };
+        token.cc_funcRef = tokens[i];
+        stack.push(scope);
         break;
-      case "]": case "}": case ")":
-      case "CALL_END": case "PARAM_END": case "INDEX_END":
-        depth -= 1;
-        break;
-      case "TERMINATOR":
-        if (depth === 0) {
-          result.end = i;
-        }
+      case "FOR":
+        do {
+          op = getNextOperand(tokens, i+1);
+          func.getVariables(op).forEach(stack.setVariables);
+          i = op.end + 1;
+        } while (i < imax && tokens[i][TAG] === ",");
         break;
       case "INDENT":
-        depth += 1;
+        indent += 1;
         break;
       case "OUTDENT":
-        depth -= 1;
-        if (depth === -1) {
-          result.end = i - 1;
-          result.isLastLine = true;
+        indent -= 1;
+        if (stack.peek.indent === indent) {
+          stack.pop();
         }
         break;
-      }
-      if (result.end !== -1) {
-        break;
+      default:
+        op = getNextOperand(tokens, i);
+        if (tokens[op.begin][TAG] === "IDENTIFIER") {
+          if (tokens[op.end+1][TAG] !== ":") {
+            func.getVariables(op).forEach(stack.setVariables);
+          }
+        }
       }
     }
-    if (result.end === -1) {
-      result.end = tokens.length - 1;
-    }
-    result.len = result.end - result.begin + 1;
-    return result;
-  };
-  
-  // ----- ----- ----- ----- -----
-  
-  var isDot = function(token) {
-    return !!token && (token[TAG] === "." || token[TAG] === "@");
+    tokens.cc_funcParams = {
+      local: stack[0].local
+    };
+    return tokens;
   };
 
-  var setVariables = function(stack) {
+  func.setVariables = function(stack) {
     var ignored = [
       "cc", "global", "console",
       "setInterval", "setTimeout", "clearInterval", "clearTimeout"
@@ -290,71 +396,7 @@ define(function(require, exports, module) {
     };
   };
   
-  var detectFunctionParameters = function(tokens) {
-    if (tokens.cc_funcParams) {
-      return tokens;
-    }
-    var stack = [
-      { declared:[], args:[], local:[], outer:[] }
-    ];
-    stack.setVariables = setVariables(stack);
-    
-    var indent = 0;
-    var args = [];
-    var vars = [];
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      var op, token = tokens[i];
-      stack.peek = stack[stack.length-1];
-      switch (token[TAG]) {
-      case "PARAM_START":
-        args = getInfoOfArguments(tokens, i);
-        i    = args.end + 1;
-        vars = args.vars;
-        args = args.args;
-        /* falls through */
-      case "->": case "=>":
-        var scope = {
-          declared: stack.peek.declared.concat(stack.peek.local),
-          args:vars.splice(0), local:[], outer:[], indent:indent
-        };
-        tokens[i].cc_funcParams = {
-          args:args.splice(0), local:scope.local, outer:scope.outer
-        };
-        token.cc_funcRef = tokens[i];
-        stack.push(scope);
-        break;
-      case "FOR":
-        do {
-          op = getNextOperand(tokens, i+1);
-          getVariables(op).forEach(stack.setVariables);
-          i = op.end + 1;
-        } while (i < imax && tokens[i][TAG] === ",");
-        break;
-      case "INDENT":
-        indent += 1;
-        break;
-      case "OUTDENT":
-        indent -= 1;
-        if (stack.peek.indent === indent) {
-          stack.pop();
-        }
-        break;
-      default:
-        op = getNextOperand(tokens, i);
-        if (tokens[op.begin][TAG] === "IDENTIFIER") {
-          if (tokens[op.end+1][TAG] !== ":") {
-            getVariables(op).forEach(stack.setVariables);
-          }
-        }
-      }
-    }
-    tokens.cc_funcParams = {
-      local: stack[0].local
-    };
-    return tokens;
-  };
-  
-  var getInfoOfArguments = function(tokens, index) {
+  func.getInfoOfArguments = function(tokens, index) {
     var begin = index;
     var end  = indexOfParamEnd(tokens, index);
     var vars = [];
@@ -362,7 +404,7 @@ define(function(require, exports, module) {
     for (var i = begin+1; i < end; ++i) {
       var op = getNextOperand(tokens, i);
       args.push(formatArgument(op));
-      vars = getVariables(op, vars);
+      vars = func.getVariables(op, vars);
       i += op.end - op.begin + 1;
       if (tokens[i][TAG] === "=") {
         op = getNextOperand(tokens, i+1);
@@ -377,13 +419,13 @@ define(function(require, exports, module) {
     }
     return {vars:vars, args:args, end:end};
   };
-  var getVariables = function(op, list) {
+  func.getVariables = function(op, list) {
     var tokens = op.tokens;
     list = list || [];
     if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
       for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
         var _op = getNextOperand(tokens, i);
-        list = getVariables(_op, list);
+        list = func.getVariables(_op, list);
         i += _op.end - _op.begin + 1;
         if (tokens[i][TAG] !== ",") {
           i += 1;
@@ -398,32 +440,7 @@ define(function(require, exports, module) {
     }
     return list;
   };
-  var indexOfParamEnd = function(tokens, index) {
-    var bracket = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "PARAM_START":
-        bracket += 1;
-        break;
-      case "PARAM_END":
-        bracket -= 1;
-        if (bracket === 0) {
-          return i;
-        }
-      }
-    }
-    return -1;
-  };
-  var formatArgument = function(op) {
-    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
-      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
-        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
-      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
-        return "\"" + token[VALUE] + "\"";
-      }
-      return token[VALUE];
-    }).join("");
-  };
+  
   
   var replaceFixedTimeValue = function(tokens) {
     for (var i = 0, imax = tokens.length; i < imax; ++i) {
@@ -585,20 +602,8 @@ define(function(require, exports, module) {
     return tokens;
   };
   
-  var indexOfFunctionStart = function(tokens, index) {
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      if (tokens[i][TAG] === "TERMINATOR" || tokens[i][TAG] === ".") {
-        break;
-      }
-      if (tokens[i][TAG] === "->" ||
-          tokens[i][TAG] === "=>" ||
-          tokens[i][TAG] === "PARAM_START") {
-        return i;
-      }
-    }
-    return -1;
-  };
   
+  var synthdef = {};
   var replaceSynthDefinition = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     for (var i = tokens.length - 4; i--; ) {
@@ -615,14 +620,14 @@ define(function(require, exports, module) {
       } else {
         args = [];
       }
-      replaceSynthDefDefaultArguments(tokens, index, args);
+      synthdef.replaceSynthDefDefaultArguments(tokens, index, args);
       
       index = getNextOperand(tokens, index).end + 1;
-      insertSynthDefArgumentsToAfterFunction(tokens, index, args);
+      synthdef.insertSynthDefArgumentsToAfterFunction(tokens, index, args);
     }
     return tokens;
   };
-  var replaceSynthDefDefaultArguments = function(tokens, index, args) {
+  synthdef.replaceSynthDefDefaultArguments = function(tokens, index, args) {
     if (args.length) {
       // remove
       tokens.splice(index, indexOfParamEnd(tokens, index) - index + 1);
@@ -638,7 +643,7 @@ define(function(require, exports, module) {
       tokens.splice(index++, 0, ["PARAM_END"  , ")", _]);
     }
   };
-  var insertSynthDefArgumentsToAfterFunction = function(tokens, index, args) {
+  synthdef.insertSynthDefArgumentsToAfterFunction = function(tokens, index, args) {
     tokens.splice(index++, 0, [",", ",", _]);
     tokens.splice(index++, 0, ["[", "[", _]);
     for (var j = 0, jmax = args.length; j < jmax; ++j) {
@@ -650,11 +655,11 @@ define(function(require, exports, module) {
     tokens.splice(index++, 0, ["]", "]", _]);
   };
   
+
+  var task = {};
   var taskContextMethods = [
     "wait", "break", "continue", "redo"
   ];
-  var task = {};
-  
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     for (var i = tokens.length - 4; i--; ) {
