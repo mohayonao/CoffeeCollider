@@ -10,6 +10,87 @@ define(function(require, exports, module) {
   var defId = 0;
   
   
+  var SynthDef = (function() {
+    function SynthDef(func, args) {
+      this.klassName = "SynthDef";
+      this._defId = defId++;
+      
+      this.func   = func;
+      this.args   = args2keyValues(args);
+      this.params = args2params(this.args);
+      this.specs  = null;
+    }
+    extend(SynthDef, cc.Object);
+    
+    SynthDef.prototype.build = function() {
+      build.call(this);
+      cc.lang.pushToTimeline([
+        "/s_def", this._defId, JSON.stringify(this.specs)
+      ]);
+      return this;
+    };
+    
+    SynthDef.prototype.play = fn(function() {
+      if (this.specs === null) {
+        this.build();
+      }
+      
+      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
+      var target = list[0];
+      var args   = list[1];
+      var addAction = list[2];
+      switch (addAction) {
+      case "addToHead":
+        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
+      case "addToTail":
+        return cc.createSynth(target, C.ADD_TO_TAIL, this, args);
+      case "addBefore":
+        return cc.createSynth(target, C.ADD_BEFORE, this, args);
+      case "addAfter":
+        return cc.createSynth(target, C.ADD_AFTER, this, args);
+      default:
+        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
+      }
+    }).multiCall().build();
+
+    
+    var build = function() {
+      var args   = this.args;
+      var params = this.params;
+      
+      var children = [];
+      cc.setSynthDef(function(ugen) {
+        children.push(ugen);
+      });
+      
+      var controls = cc.createControl(C.CONTROL).init(params.flatten);
+      if (!Array.isArray(controls)) {
+        controls = [ controls ];
+      }
+      
+      try {
+        this.func.apply(null, reshapeArgs(args.vals, controls));
+      } catch (e) {
+        throw e.toString();
+      } finally {
+        cc.setSynthDef(null);
+      }
+      var consts  = getConstValues(children);
+      var defList = makeDefList(topoSort(children), consts);
+      
+      var specs = {
+        consts : consts,
+        defList: defList,
+        params : params.params
+      };
+      this.specs = specs;
+      // console.log(specs);
+    };
+    
+    return SynthDef;
+  })();
+  
+  // private methods
   var getSynthDefPlayArguments = function() {
     var target, args, addAction;
     var i = 0;
@@ -39,74 +120,6 @@ define(function(require, exports, module) {
     return [target, args, addAction];
   };
   
-  var SynthDef = (function() {
-    function SynthDef(func, _args) {
-      this.klassName = "SynthDef";
-      this._defId = defId++;
-      
-      var children = [];
-      cc.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      var args     = args2keyValues(_args);
-      var params   = args2params(args);
-      var controls = cc.createControl(C.CONTROL).init(params.flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      
-      try {
-        func.apply(null, reshapeArgs(args.vals, controls));
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        cc.setSynthDef(null);
-      }
-      var consts  = getConstValues(children);
-      var defList = makeDefList(topoSort(children), consts);
-      
-      var specs = {
-        consts : consts,
-        defList: defList,
-        params : params.params
-      };
-      this.specs = specs;
-      // console.log(specs);
-      
-      cc.lang.pushToTimeline([
-        "/s_def", this._defId, JSON.stringify(specs)
-      ]);
-    }
-    extend(SynthDef, cc.Object);
-
-    SynthDef.prototype.build = function() {
-      return this;
-    };
-    
-    SynthDef.prototype.play = fn(function() {
-      var list = getSynthDefPlayArguments.apply(null, slice.call(arguments));
-      var target = list[0];
-      var args   = list[1];
-      var addAction = list[2];
-      switch (addAction) {
-      case "addToHead":
-        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
-      case "addToTail":
-        return cc.createSynth(target, C.ADD_TO_TAIL, this, args);
-      case "addBefore":
-        return cc.createSynth(target, C.ADD_BEFORE, this, args);
-      case "addAfter":
-        return cc.createSynth(target, C.ADD_AFTER, this, args);
-      default:
-        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
-      }
-    }).multiCall().build();
-    
-    return SynthDef;
-  })();
-  
-  // private methods
   var args2keyValues = function(args) {
     var keys = [], vals = [];
     if (args && args.length) {
