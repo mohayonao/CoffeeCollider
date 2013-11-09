@@ -197,7 +197,59 @@ define(function(require, exports, module) {
     }
     return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
   };
-
+  
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    return val;
+  };
+  
+  var getLine = function(tokens, index) {
+    var depth = 0;
+    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
+    LOOP:
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "(": case "{": case "[":
+      case "CALL_START": case "PARAM_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case "]": case "}": case ")":
+      case "CALL_END": case "PARAM_END": case "INDEX_END":
+        depth -= 1;
+        break;
+      case "TERMINATOR":
+        if (depth === 0) {
+          result.end = i;
+        }
+        break;
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        depth -= 1;
+        if (depth === -1) {
+          result.end = i - 1;
+          result.isLastLine = true;
+        }
+        break;
+      }
+      if (result.end !== -1) {
+        break;
+      }
+    }
+    if (result.end === -1) {
+      result.end = tokens.length - 1;
+    }
+    result.len = result.end - result.begin + 1;
+    return result;
+  };
+  
+  // ----- ----- ----- ----- -----
+  
   var isDot = function(token) {
     return !!token && (token[TAG] === "." || token[TAG] === "@");
   };
@@ -546,70 +598,6 @@ define(function(require, exports, module) {
     }
     return -1;
   };
-  // var indexOfFunctionBody = function(tokens, index) {
-  //   var bracket = 0;
-  //   for (var i = index, imax = tokens.length; i < imax; ++i) {
-  //     switch (tokens[i][TAG]) {
-  //     case "PARAM_START":
-  //       bracket += 1;
-  //       break;
-  //     case "PARAM_END":
-  //       bracket -= 1;
-  //       break;
-  //     case "->": case "=>":
-  //       if (bracket === 0) {
-  //         return i + 2;
-  //       }
-  //     }
-  //   }
-  //   return -1;
-  // };
-  // var getLine = function(tokens, index) {
-  //   var depth = 0;
-  //   var result = { tokens:tokens, begin:index, end:-1, isLastLine:false };
-  //   LOOP:
-  //   for (var i = index, imax = tokens.length; i < imax; ++i) {
-  //     switch (tokens[i][VALUE]) {
-  //     case "(": case "{": case "[":
-  //       depth += 1;
-  //       break;
-  //     case "]": case "}": case ")":
-  //       depth -= 1;
-  //       break;
-  //     }
-  //     switch (tokens[i][TAG]) {
-  //     case "TERMINATOR":
-  //       if (depth === 0) {
-  //         result.end = i;
-  //       }
-  //       break;
-  //     case "INDENT":
-  //       depth += 1;
-  //       break;
-  //     case "OUTDENT":
-  //       depth -= 1;
-  //       if (depth === -1) {
-  //         result.end = i - 1;
-  //         result.isLastLine = true;
-  //       }
-  //       break;
-  //     }
-  //     if (result.end !== -1) {
-  //       break;
-  //     }
-  //   }
-  //   return result;
-  // };
-  // var getLastLine = function(tokens, index) {
-  //   while (index < tokens.length) {
-  //     var op = getLine(tokens, index);
-  //     if (op.isLastLine) {
-  //       return op;
-  //     }
-  //     index = op.end + 1;
-  //   }
-  //   return {begin:tokens.length};
-  // };
   
   var replaceSynthDefinition = function(tokens) {
     tokens = detectFunctionParameters(tokens);
@@ -662,18 +650,11 @@ define(function(require, exports, module) {
     tokens.splice(index++, 0, ["]", "]", _]);
   };
   
-  var getIdentifier = function(token) {
-    var val = token[VALUE];
-    if (val.reserved) {
-      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
-        (val[5]||"") + (val[6]||"") + (val[7]||"");
-    }
-    return val;
-  };
-  
   var taskContextMethods = [
     "wait", "break", "continue", "redo"
   ];
+  var task = {};
+  
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     for (var i = tokens.length - 4; i--; ) {
@@ -684,33 +665,65 @@ define(function(require, exports, module) {
       if (index === -1) {
         continue;
       }
-      makeSegmentedFunction(getNextOperand(tokens, index), taskContextMethods);
+      task.makeSegmentedFunction(getNextOperand(tokens, index), taskContextMethods);
     }
     return tokens;
   };
   
-  var insertClosureFuction = function(tokens, index, t, body) {
-    var outerVars = t.cc_funcParams.outer;
-    if (outerVars && outerVars.length) {
-      var offset = 0;
-      if (tokens[index-2][TAG] !== "PARAM_END") {
-        offset = 1;
-      } else {
-        var bracket = 0;
-        while ((t = tokens[index - offset]) !== undefined) {
-          if (t[TAG] === "PARAM_END") {
-            bracket += 1;
-          } else if (t[TAG] === "PARAM_START") {
-            bracket -=1;
-            if (bracket === 0) {
-              break;
-            }
-          }
-          offset += 1;
-        }
-      }
+  task.makeSegmentedFunction = function(op, controlMethods) {
+    var tokens = op.tokens;
+    var index  = op.begin;
+    var begin  = index;
+    var body   = tokens.splice(op.begin, op.end-op.begin+1);
+    var localVars, outerVars, args;
+
+    var ref = body[0].cc_funcRef;
+    
+    if (ref) {
+      localVars = ref.cc_funcParams.local;
+      outerVars = ref.cc_funcParams.outer;
+      args = ref.cc_funcParams.args.filter(function(name, i) {
+        return !(i & 1);
+      });
+    } else {
+      localVars = outerVars = args = [];
+    }
+    
+    if (args.length) {
+      // remove default args
+      body.splice(0, indexOfParamEnd(body, 0) + 1);
+    }
+    body.splice(0, 2); // remove ->, INDENT
+    body.pop();        // remove OUTDENT
+    
+    index = task.beginOfSegmentedFunction(tokens, index, outerVars);
+    {
+      index = task.insertLocalVariables(tokens, index, localVars);
+      tokens.splice(index++, 0, ["["      , "[" , _]);
+      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
       
-      index -= offset;
+      var numOfSegments = 0;
+      while (body.length) {
+        if (numOfSegments) {
+          tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+        }
+        numOfSegments += 1;
+        index = task.beginOfSegment(tokens, index, args);
+        index = task.insertSegment(tokens, index, body, controlMethods);
+        index = task.endOfSegment(tokens, index, args);
+      }
+      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+      tokens.splice(index++, 0, ["]"      , "]", _]);
+    }
+    index = task.endOfSegmentedFunction(tokens, index, outerVars);
+    
+    for (var i = index - 1; i >= begin; --i) {
+      tokens[i].cc_tasked = true;
+    }
+  };
+  
+  task.beginOfSegmentedFunction = function(tokens, index, outerVars) {
+    if (outerVars.length) {
       tokens.splice(index++, 0, ["UNARY"      , "do", _]);
       tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
       for (var i = 0, imax = outerVars.length; i < imax; ++i) {
@@ -722,153 +735,136 @@ define(function(require, exports, module) {
       tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
       tokens.splice(index++, 0, ["->"         , "->", _]);
       tokens.splice(index++, 0, ["INDENT" , 2   , _]);
-      index += offset;
     }
+    tokens.splice(index++, 0, ["->"     , "->", _]);
+    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
     
-    var indent = 0;
-    LOOP:
-    while ((t = body.shift()) !== undefined) {
-      tokens.splice(index++, 0, t);
-      switch (t[TAG]) {
-      case "INDENT":
-        indent += 1;
-        break;
-      case "->": case "=>":
-        index = insertClosureFuction(tokens, index, t, body);
-        break;
-      case "OUTDENT":
-        indent -= 1;
-        break LOOP;
-      }
-    }
-    if (outerVars && outerVars.length) {
+    return index;
+  };
+
+  task.endOfSegmentedFunction = function(tokens, index, outerVars) {
+    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
+    if (outerVars.length) {
       tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
     }
     return index;
   };
   
-  var makeSegmentedFunction = function(op, controlMethods) {
-    var tokens = op.tokens;
-    var index  = op.begin;
-    var begin  = index;
-    var body = tokens.splice(op.begin, op.end-op.begin+1);
-    var t, bracket, indent;
-    var localVars, outerVars, controlMethodCalled, numOfSegments;
-    var i, imax;
-    
-    var params = [];
-    for (bracket = 0; (t = body.shift()) !== undefined; ) {
-      if (t[TAG] === "PARAM_START") {
-        bracket += 1;
-      } else if (t[TAG] === "PARAM_END") {
-        bracket -= 1;
-      } else if (t[TAG] === "->" || t[TAG] === "=>") {
-        if (bracket === 0) {
-          break;
-        }
-      }
-      params.push(t);
-    }
-    localVars = t.cc_funcParams.local;
-    outerVars = t.cc_funcParams.outer;
-    body.shift(); // remove INDENT
-    body.pop();   // remove OUTDENT
-    
-    // replace function
-    if (outerVars.length) {
-      tokens.splice(index++, 0, ["UNARY"      , "do", _]);
-      tokens.splice(index++, 0, ["PARAM_START", "(" , _]);
-      for (i = 0, imax = outerVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.splice(index++, 0, [",", ",", _]);
-        }
-        tokens.splice(index++, 0, ["IDENTIFIER", outerVars[i], _]);
-      }
-      tokens.splice(index++, 0, ["PARAM_END"  , ")" , _]);
-      tokens.splice(index++, 0, ["->"         , "->", _]);
-      tokens.splice(index++, 0, ["INDENT" , 2   , _]);
-    }
-    
-    tokens.splice(index++, 0, ["->"     , "->", _]);
-    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
-    
-    // declare local variables
+  task.insertLocalVariables = function(tokens, index, localVars) {
     if (localVars.length) {
-      for (i = 0, imax = localVars.length; i < imax; i++) {
+      for (var i = 0, imax = localVars.length; i < imax; i++) {
         tokens.splice(index++, 0, ["IDENTIFIER", localVars[i], _]);
         tokens.splice(index++, 0, ["="         , "="         , _]);
       }
       tokens.splice(index++, 0, ["UNDEFINED" , "undefined", _]);
       tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
     }
-    
-    // return an array of function segments
-    tokens.splice(index++, 0, ["["      , "[" , _]);
-    tokens.splice(index++, 0, ["INDENT" , 2   , _]);
-    
-    numOfSegments = 0;
-    
-    NEXT_SEGMENTS:
-    while (body.length) {
-      if (numOfSegments) {
-        tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+    return index;
+  };
+  
+  task.beginOfSegment = function(tokens, index, args) {
+    if (args.length) {
+      tokens.splice(index++, 0, ["PARAM_START", "(", _]);
+      for (var i = 0, imax = args.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", args[i], _]);
       }
-      numOfSegments += 1;
-
-      // insert arguments
-      for (i = 0, imax = params.length; i < imax; ++i) {
-        tokens.splice(index++, 0, params[i]);
+      tokens.splice(index++, 0, ["PARAM_END"  , ")", _]);
+    }
+    tokens.splice(index++, 0, ["->"    , "->", _]);
+    tokens.splice(index++, 0, ["INDENT", 2   , _]);
+    return index;
+  };
+  
+  task.endOfSegment = function(tokens, index) {
+    tokens.splice(index++, 0, ["OUTDENT", 2, _]);
+    return index;
+  };
+  
+  task.insertSegment = function(tokens, index, body, controlMethods) {
+    var controlMethodCalled = false;
+    
+    while (!controlMethodCalled && body.length) {
+      var line = getLine(body, 0);
+      var closureVars = task.getClosureVariables(line);
+      
+      index = task.beginOfLine(tokens, index, line, closureVars);
+      for (var i = line.len; i--; ) {
+        if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
+          if (controlMethods.indexOf(getIdentifier(body[1])) !== -1) {
+            controlMethodCalled = true;
+          }
+        }
+        tokens.splice(index++, 0, body.shift());
       }
+      index = task.endOfLine(tokens, index, line, closureVars);
+    }
+    
+    return index;
+  };
+  
+  task.getClosureVariables = function(line) {
+    var tokens = line.tokens;
+    var list = [];
+    for (var i = 0, imax = line.len; i < imax; ++i) {
+      if (!tokens[i].cc_tasked && (tokens[i][TAG] === "->" || tokens[i][TAG] === "=>")) {
+        list = list.concat(tokens[i].cc_funcParams.outer);
+      }
+    }
+    var set = {};
+    return list.filter(function(name) {
+      return set[name] ? false : !!(set[name] = true);
+    });
+  };
+  
+  task.beginOfLine = function(tokens, index, line, closureVars) {
+    var i, imax;
+    if (closureVars.length) {
+      index = task.insertAssignment(tokens, index, line);
+      
+      tokens.splice(index++, 0, ["UNARY" , "do", _]);
+      
+      tokens.splice(index++, 0, ["PARAM_START", "(", _]);
+      for (i = 0, imax = closureVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.splice(index++, 0, [",", ",", _]);
+        }
+        tokens.splice(index++, 0, ["IDENTIFIER", closureVars[i], _]);
+      }
+      tokens.splice(index++, 0, ["PARAM_END", ")", _]);
+      
       tokens.splice(index++, 0, ["->"    , "->", _]);
       tokens.splice(index++, 0, ["INDENT", 2   , _]);
-      
-      controlMethodCalled = 0;
-      for (bracket = indent = 0; (t = body.shift()) !== undefined; ) {
-        tokens.splice(index++, 0, t);
-        if (t.cc_tasked) {
-          continue;
-        }
-        switch (t[TAG]) {
-        case "CALL_START":
-          bracket += 1;
-          continue;
-        case "CALL_END":
-          bracket -= 1;
-          continue;
-        case "INDENT":
-          indent += 1;
-          continue;
-        case "OUTDENT":
-          indent -= 1;
-          continue;
-        case "->": case "=>":
-          index = insertClosureFuction(tokens, index, t, body);
-          continue;
-        case "TERMINATOR":
-          if (bracket === 0 && indent === 0 && controlMethodCalled) {
-            tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
-            continue NEXT_SEGMENTS;
-          }
-          break;
-        }
-        if (bracket === 0 && t[TAG] === "@" && body[0] &&
-            controlMethods.indexOf(getIdentifier(body[0])) !== -1) {
-          controlMethodCalled = 1;
-        }
-      }
-      tokens.splice(index++, 0, ["OUTDENT", 2, _]);
     }
-    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
-    tokens.splice(index++, 0, ["]"      , "]", _]);
-    tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
-    if (outerVars.length) {
-      tokens.splice(index++, 0, ["OUTDENT", 2  , _]);
-    }
-    
-    for (i = index - 1; i >= begin; --i) {
-      tokens[i].cc_tasked = true;
-    }
+    return index;
   };
+  
+  task.endOfLine = function(tokens, index, line, closureVars) {
+    if (closureVars.length) {
+      tokens.splice(index++, 0, ["OUTDENT", 2, _]);
+      tokens.splice(index++, 0, ["TERMINATOR", "\n", _]);
+    }
+    return index;
+  };
+  
+  // TODO: fix it ( destructuring assginment? )
+  task.insertAssignment = function(tokens, index, line) {
+    var list = [];
+    var line_tokens = line.tokens;
+    if (line_tokens[0][TAG] === "IDENTIFIER") {
+      var op = getNextOperand(line_tokens, 0);
+      if (line_tokens[op.end+1] && line_tokens[op.end+1][TAG] === "=") {
+        list = line_tokens.slice(0, op.end + 2);
+      }
+    }
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      tokens.splice(index++, 0, list[i]);
+    }
+    return index;
+  };
+  
   
   var replaceGlobalVariables = function(tokens) {
     for (var i = tokens.length - 1; i--; ) {
