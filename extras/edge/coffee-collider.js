@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131109074400",
+    version: "0.0.0+20131109101800",
     global : {},
     Object : function CCObject() {}
   };
@@ -6552,23 +6552,28 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     var begin = index;
     var end   = indexOfParamEnd(tokens, index);
     var args  = [];
+    var defaults = [];
     for (var i = begin+1; i < end; ++i) {
       var op = getNextOperand(tokens, i);
+      defaults.push(formatArgument(op));
       getVariables(op, args);
       i += op.end - op.begin + 1;
       if (tokens[i][TAG] === "=") {
         op = getNextOperand(tokens, i+1);
+        defaults.push(formatArgument(op));
         i += op.end - op.begin + 1;
+      } else {
+        defaults.push(0);
       }
       if (tokens[i][TAG] !== ",") {
         i += 1;
       }
     }
-    return {args:args, end:end};
+    return {args:args, end:end, defaults:defaults};
   };
   
   var detectFunctionParameters = function(tokens) {
-    if (tokens.cc_localVars) {
+    if (tokens.cc_funcParams) {
       return tokens;
     }
     var stack = [
@@ -6601,13 +6606,14 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
       }
     };
     var indent = 0;
-    var args   = [];
+    var args     = [];
     for (var i = 0, imax = tokens.length; i < imax; ++i) {
       var op, token = tokens[i];
       peek = stack[stack.length-1];
       switch (token[TAG]) {
       case "PARAM_START":
         args = getInfoOfArguments(tokens, i);
+        console.log(args.defaults);
         i    = args.end ;
         args = args.args;
         break;
@@ -6616,8 +6622,10 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
           declared: peek.declared.concat(peek.local),
           local:[], outer:[], args:args.splice(0), indent:indent
         };
-        tokens[i].cc_localVars = scope.local;
-        tokens[i].cc_outerVars = scope.outer;
+        tokens[i].cc_funcParams = {
+          local: scope.local,
+          outer: scope.outer,
+        };
         stack.push(scope);
         break;
       case "FOR":
@@ -6645,7 +6653,9 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
         }
       }
     }
-    tokens.cc_localVars = stack[0].local;
+    tokens.cc_funcParams = {
+      local: stack[0].local
+    };
     return tokens;
   };
   
@@ -6942,7 +6952,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
   };
   
   var insertClosureFuction = function(tokens, index, t, body) {
-    var outerVars = t.cc_outerVars;
+    var outerVars = t.cc_funcParams.outer;
     if (outerVars && outerVars.length) {
       var offset = 0;
       if (tokens[index-2][TAG] !== "PARAM_END") {
@@ -7021,8 +7031,8 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
       }
       params.push(t);
     }
-    localVars = t.cc_localVars;
-    outerVars = t.cc_outerVars;
+    localVars = t.cc_funcParams.local;
+    outerVars = t.cc_funcParams.outer;
     body.shift(); // remove INDENT
     body.pop();   // remove OUTDENT
     

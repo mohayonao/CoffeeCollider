@@ -414,10 +414,10 @@ define(function(require, exports, module) {
     describe("detectFunctionParameters", function() {
       var tokens, code, actual;
       var crawlLocalVars = function(tokens) {
-        var list = [ tokens.cc_localVars ];
+        var list = [ tokens.cc_funcParams.local ];
         tokens.forEach(function(token) {
-          if (token.cc_localVars) {
-            list.push(token.cc_localVars.sort());
+          if (token.cc_funcParams) {
+            list.push(token.cc_funcParams.local.sort());
           }
         });
         return list;
@@ -425,8 +425,17 @@ define(function(require, exports, module) {
       var crawlOuterVars = function(tokens) {
         var list = [];
         tokens.forEach(function(token) {
-          if (token.cc_outerVars) {
-            list.push(token.cc_outerVars.sort());
+          if (token.cc_funcParams) {
+            list.push(token.cc_funcParams.outer.sort());
+          }
+        });
+        return list;
+      };
+      var crawlArgs = function(tokens) {
+        var list = [];
+        tokens.forEach(function(token) {
+          if (token.cc_funcParams) {
+            list.push(token.cc_funcParams.args);
           }
         });
         return list;
@@ -434,7 +443,7 @@ define(function(require, exports, module) {
       it("basic", function() {
         code = [
           "a = b = c = d = e = f = 10",
-          "g = (h, i, j)->",
+          "g = (h, i=10, j=20)->",
           "  k = a + b",
           "  for l, [m, n] in j",
           "    o += i * m",
@@ -453,6 +462,10 @@ define(function(require, exports, module) {
         actual = crawlOuterVars(tokens);
         assert.deepEqual(actual, [
           ["a","b","d","e","f"], ["d","e","f"]
+        ]);
+        actual = crawlArgs(tokens);
+        assert.deepEqual(actual, [
+          [ "h", null, "i", "10", "j", "20" ], []
         ]);
       });
     });
@@ -607,63 +620,23 @@ define(function(require, exports, module) {
         ].join("\n");
         testSuite(compiler.replaceSynthDefinition, code, expected);
       });
-    });
-    describe("replaceIteratorFunction", function() {
-      var code, expected;
-      it("case 1", function() {
+      it("SynthDefTemplate", function() {
         code = [
-          "i = Iterator ->",
-          "  @yield 100",
-          "  if true",
-          "    @yield 200",
-          "  else 0",
-          "  a = => @yield 300",
-          "  @yield 400",
+          "SynthDefTemplate (out=0, osc)->",
+          "  (a=1, b=2)->", // should be skipped
+          "    0",
+          "  (freq=440, amp=0.5)->",
+          "    Out.ar(0, SinOsc.ar(freq) * amp)",
         ].join("\n");
         expected = [
-          "i = Iterator(->",
-          "  a = undefined",
-          "  [",
-          "    ->",
-          "      @yield(100)",
-          "    ->",
-          "      if true",
-          "        @yield(200)",
-          "      else",
-          "        0",
-          "    ->",
-          "      a = =>",
-          "        @yield(300)",
-          "      @yield(400)",
-          "  ]",
-          ")"
+          "SynthDefTemplate((out = 0, osc)->",
+          "  (a = 1, b = 2)->",
+          "    0",
+          "  (freq, amp)->",
+          "    Out.ar(0, SinOsc.ar(freq) * amp)",
+          ", ['freq', '440', 'amp', '0.5'])",
         ].join("\n");
-        testSuite(compiler.replaceIteratorFunction, code, expected);
-      });
-      it("case 2", function() {
-        code = [
-          "func = Iterator func",
-          "func = (i)->",
-          "  100",
-        ].join("\n");
-        expected = [
-          "func = Iterator(func)",
-          "func = (i)->",
-          "  100",
-        ].join("\n");
-        testSuite(compiler.replaceIteratorFunction, code, expected);
-      });
-      it("case 3", function() {
-        code = [
-          "func = Iterator(func).on 'end', ->",
-          "  100"
-        ].join("\n");
-        expected = [
-          "func = Iterator(func).on('end', ->",
-          "  100",
-          ")"
-        ].join("\n");
-        testSuite(compiler.replaceIteratorFunction, code, expected);
+        testSuite(compiler.replaceSynthDefinition, code, expected);
       });
     });
     describe("replaceTaskFunction", function() {
@@ -868,33 +841,6 @@ define(function(require, exports, module) {
           ").call(cc.__context__, this.self || global)",
         ].join("\n");
         testSuite(compiler.finalize, code, expected);
-      });
-    });
-    describe("getSynthDefArguments", function() {
-      var tokens, code, actual, expected;
-      it("empty", function() {
-        code = "def ->";
-        tokens = coffee.tokens(code);
-        actual = compiler.getSynthDefArguments(tokens, 2);
-        assert.deepEqual(actual, []);
-      });
-      it("undefined", function() {
-        code = "def (a,b)->";
-        tokens = coffee.tokens(code);
-        actual = compiler.getSynthDefArguments(tokens, 2);
-        assert.deepEqual(actual, ["a",0,"b",0]);
-      });
-      it("defaults", function() {
-        code = "def (a={},b='')->";
-        tokens = coffee.tokens(code);
-        actual = compiler.getSynthDefArguments(tokens, 2);
-        assert.deepEqual(actual, ["a","{}","b",'""']);
-      });
-      it("defaults 2", function() {
-        code = "def (a={a:100,'200':300})->";
-        tokens = coffee.tokens(code);
-        actual = compiler.getSynthDefArguments(tokens, 2);
-        assert.deepEqual(actual, ["a",'{"a":100,"200":300}']);
       });
     });
     describe("Compiler", function() {
