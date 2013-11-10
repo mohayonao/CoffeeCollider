@@ -10,7 +10,7 @@ SynthDef ->
 Task.loop ->
   root  = 880.rand() + 220
   synth = def.play().on "done", ->
-    @stop()
+    synth.stop()
   task  = Task.each [1,4,3,2,8,4,3,2], (x, i)->
     freq = root * x
     amp  = 1 - (i / 8)
