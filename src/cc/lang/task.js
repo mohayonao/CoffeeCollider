@@ -47,9 +47,15 @@ define(function(require, exports, module) {
   })();
   
   var TaskFunction = (function() {
-    function TaskFunction(init) {
+    function TaskFunction() {
       emitter.mixin(this);
       this.klassName = "TaskFunction";
+      this.segments = [];
+      this.index    = 0;
+    }
+    extend(TaskFunction, cc.Object);
+
+    TaskFunction.prototype._init = function(init) {
       if (typeof init !== "function") {
         throw new TypeError("TaskFunction: first argument should be a Function.");
       }
@@ -59,8 +65,8 @@ define(function(require, exports, module) {
       }
       this.segments = segments;
       this.index    = 0;
-    }
-    extend(TaskFunction, cc.Object);
+      return this;
+    };
     
     TaskFunction.prototype.perform = function(context) {
       var func = this.segments[this.index++];
@@ -69,6 +75,12 @@ define(function(require, exports, module) {
         return true;
       }
       return false;
+    };
+
+    TaskFunction.prototype.clone = function() {
+      var newInstance = new TaskFunction();
+      newInstance.segments = this.segments;
+      return newInstance;
     };
     
     return TaskFunction;
@@ -394,6 +406,48 @@ define(function(require, exports, module) {
     
     return TaskProcessorEach;
   })();
+
+  var TaskProcessorRecursive = (function() {
+    function TaskProcessorRecursive(func) {
+      var that = this;
+      TaskProcessor.call(this, func);
+      this.klassName = "TaskProcessorRecursive";
+      this._value   = 0;
+      this._args    = [];
+      this._context.recursive = function() {
+        var next = new TaskProcessorRecursive(func.clone());
+        next.play.apply(next, slice.call(arguments));
+        that._wait = cc.createTaskWaitToken(next);
+        return next;
+      };
+      this._context["return"] = function(value) {
+        that._value = value;
+        that.stop();
+      };
+    }
+    extend(TaskProcessorRecursive, TaskProcessor);
+    
+    TaskProcessorRecursive.prototype.play = function() {
+      this._args = slice.call(arguments).map(function(value) {
+        if (value instanceof TaskProcessorRecursive) {
+          value = value._value;
+        }
+        return value;
+      });
+      TaskProcessor.prototype.play.call(this);
+      return this;
+    };
+    TaskProcessorRecursive.prototype._execute = function() {
+      return this._func.perform.apply(this._func, [this._context].concat(this._args));
+    };
+    TaskProcessorRecursive.prototype._done = function() {
+      this.stop();
+    };
+    
+    return TaskProcessorRecursive;
+  })();
+
+  
   
   cc.global.Task = function(func) {
     return cc.createTaskFunction(func);
@@ -407,6 +461,9 @@ define(function(require, exports, module) {
   cc.global.Task.each = function(list, func) {
     return new TaskProcessorEach(list, cc.createTaskFunction(func));
   };
+  cc.global.Task.recursive = function(func) {
+    return new TaskProcessorRecursive(cc.createTaskFunction(func));
+  };
   
   module.exports = {
     TaskManager  : TaskManager,
@@ -418,9 +475,10 @@ define(function(require, exports, module) {
     TaskWaitTokenBlockable: TaskWaitTokenBlockable,
     TaskWaitTokenLogicAND : TaskWaitTokenLogicAND,
     TaskWaitTokenLogicOR  : TaskWaitTokenLogicOR,
-    TaskProcessor        : TaskProcessor,
-    TaskProcessorDo      : TaskProcessorDo,
-    TaskProcessorEach    : TaskProcessorEach,
+    TaskProcessor         : TaskProcessor,
+    TaskProcessorDo       : TaskProcessorDo,
+    TaskProcessorEach     : TaskProcessorEach,
+    TaskProcessorRecursive: TaskProcessorRecursive,
     
     use: function() {
       cc.createTaskManager = function() {
@@ -431,7 +489,7 @@ define(function(require, exports, module) {
         return obj instanceof TaskManager;
       };
       cc.createTaskFunction = function(init) {
-        return new TaskFunction(init);
+        return new TaskFunction()._init(init);
       };
       cc.instanceOfTaskFunction = function(obj) {
         return obj instanceof TaskFunction;

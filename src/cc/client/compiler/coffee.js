@@ -705,7 +705,7 @@ define(function(require, exports, module) {
   
 
   var task = {
-    contextMethods: ["wait", "break", "continue", "redo"]
+    contextMethods: ["wait", "break", "continue", "redo", "recursive", "return"]
   };
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);

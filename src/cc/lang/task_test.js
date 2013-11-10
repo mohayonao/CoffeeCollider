@@ -98,7 +98,7 @@ define(function(require, exports, module) {
       });
     });
     describe("TaskFunction", function() {
-      it("create", function() {
+      it.only("create", function() {
         var f = cc.global.Task(func);
         assert.instanceOf(f, task.TaskFunction);
         assert.isTrue(cc.instanceOfTaskFunction(f));
