@@ -3,7 +3,8 @@ $(function() {
   
   var isEdge = /extras\/edge/.test(location.href);
   
-  var srcFragment = "try:";
+  var srcFragment  = "try:";
+  var loadFragment = "load:";
   var $code = $("#code");
   var $boot = $("#boot");
   
@@ -64,11 +65,15 @@ $(function() {
         console.log(res);
       }
     });
-    window.location = "#" + srcFragment + encodeURIComponent(code);
   });
-
+  
   $("#reset").on("click", function() {
     cc.reset();
+  });
+
+  $("#link").on("click", function() {
+    var code = $code.val().trim();
+    window.location = "#" + srcFragment + encodeURIComponent(code);
   });
   
   $("a", "#example-list").each(function(i, a) {
@@ -86,7 +91,8 @@ $(function() {
   });
   
   $("#version").text(cc.version);
-  var devMode = function() {
+  
+  cc.dev = function() {
     $("#compile-coffee").on("click", function() {
       var code = cc.impl.compiler.toString($code.val().trim());
       console.log(code);
@@ -98,15 +104,21 @@ $(function() {
     }).show();
   };
   
-  if (isEdge) {
-    devMode();
-  }
-  
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {
     $code.val(hash.substr(srcFragment.length));
+  } else if (hash.indexOf(loadFragment) === 0) {
+    var path = "./extras/examples/";
+    if (isEdge) {
+      path = "../examples/";
+    }
+    $.get(path + hash.substr(loadFragment.length)).then(function(res) {
+      $code.val(res);
+    });
   }
-
-  cc.dev = devMode;
+  
+  if (isEdge) {
+    cc.dev();
+  }
 
 });

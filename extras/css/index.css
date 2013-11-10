@@ -56,15 +56,20 @@ button {
     top  : 75px;
     right: 225px;
 }
-#compile-coffee {
+#link {
     position: absolute;
     top  : 110px;
+    right: 225px;
+}
+#compile-coffee {
+    position: absolute;
+    top  : 145px;
     right: 225px;
     display: none;
 }
 #compile-js {
     position: absolute;
-    top  : 145px;
+    top  : 180px;
     right: 225px;
     display: none;
 }
