@@ -443,7 +443,7 @@ define(function(require, exports, module) {
       it("basic", function() {
         code = [
           "a = b = c = d = e = f = 10",
-          "g = (h, i=10, j=20)->",
+          "g = ([h], i=10, j=20)->",
           "  k = a + b",
           "  for l, [m, n] in j",
           "    o += i * m",
@@ -465,7 +465,7 @@ define(function(require, exports, module) {
         ]);
         actual = crawlArgs(tokens);
         assert.deepEqual(actual, [
-          [ "h", null, "i", "10", "j", "20" ], []
+          [ "[h]", null, "i", "10", "j", "20" ], []
         ]);
       });
     });
@@ -626,7 +626,7 @@ define(function(require, exports, module) {
       it("case 1", function() {
         code = [
           "t = Task (i)->",
-          "  @func()",
+          "  @func(a:0)",
           "  @wait 100",
           "  @break()",
           "  @continue()",
@@ -638,7 +638,7 @@ define(function(require, exports, module) {
           "t = Task(->",
           "  [",
           "    (i)->",
-          "      @func()",
+          "      @func({a:0})",
           "      @wait(100)",
           "    (i)->",
           "      @break()",
@@ -658,7 +658,8 @@ define(function(require, exports, module) {
         code = [
           "Task.do (i)->",
           "  a = 100",
-          "  @wait 100",
+          "  if true",
+          "    @wait 100",
           "  [b, c] = [200, 300]",
           "  @break()",
           ".play()"
@@ -669,7 +670,8 @@ define(function(require, exports, module) {
           "  [",
           "    (i)->",
           "      a = 100",
-          "      @wait(100)",
+          "      if true",
+          "        @wait(100)",
           "    (i)->",
           "      [b, c] = [200, 300]",
           "      @break()",
@@ -706,17 +708,18 @@ define(function(require, exports, module) {
       it("case 5", function() {
         code = [
           "def = make()",
-          "Task.do (i)->", // outer:[def], local:[s, t]
-          "  s = def.play()",
-          "  @wait Task.each [500, 250, 500], (n, i)->", // outer:[s, def], local:[t, x]
-          "    s.set()",
+          "Task.do (i)->", // outer:[def], local:[s1, t]
+          "  s1 = def.play()",
+          "  @wait Task.each [500, 250, 500], (n, i)->", // outer:[s1, def], local:[t, x]
+          "    s1.set()",
           "    x = n",
-          "    t = Task.interval 100, (i)->", // outer:[x, def], local:[y]
+          "    t = Task.interval 100, (i)->", // outer:[x, def], local:[s2, y]
           "      x = i",
           "      y = i * 2",
-          "      def.play(x, y).on 'end', (i)->", // outer:[y], local:[z]
+          "      s2 = def.play(x, y).on 'end', (i)->", // outer:[s2, y], local:[z]
           "        y = 10",
           "        z = 20",
+          "        s2.stop()",
           "    .play()",
           "    @wait x",
           "    t.stop()",
@@ -731,31 +734,32 @@ define(function(require, exports, module) {
         
         expected = [
           "def = make()",
-          "Task.do(do (def)->", // outer:[def], local:[s, t]
+          "Task.do(do (def)->", // outer:[def], local:[s1, t]
           "  ->",
-          "    s = t = undefined",
+          "    s1 = t = undefined",
           "    [",
           "      (i)->",
-          "        s = def.play()",
-          "        @wait(Task.each([500, 250, 500], do (s, def)->", // outer:[s, def], local:[t, x]
+          "        s1 = def.play()",
+          "        @wait(Task.each([500, 250, 500], do (s1, def)->", // outer:[s1, def], local:[t, x]
           "          ->",
           "            x = t = undefined",
           "            [",
           "              (n, i)->",
-          "                s.set()",
+          "                s1.set()",
           "                x = n",
-          "                t = Task.interval(100, do (x, def)->", // outer:[x, def], local:[y]
+          "                t = Task.interval(100, do (x, def)->", // outer:[x, def], local:[s2, y]
           "                  ->",
-          "                    y = undefined",
+          "                    y = s2 = undefined",
           "                    [",
           "                      (i)->",
           "                        x = i",
-          "                        y = i * 2", // outer:[y], local:[z]
-          "                        def.play(x, y).on('end', do (y)->",
-          "                          (i)->",
+          "                        y = i * 2",
+          "                        s2 = do (y, s2)->", // outer:[s2, y], local:[z]
+          "                          s2 = def.play(x, y).on('end', (i)->",
           "                            y = 10",
           "                            z = 20",
-          "                        )",
+          "                            s2.stop()",
+          "                          )",
           "                    ]",
           "                ).play()",
           "                @wait(x)",
