@@ -170,6 +170,11 @@ module.exports = function(grunt) {
       grunt.fail.warn("NOT built with debug mode.");
       return;
     }
+    if (grunt.file.exists(".grunt-config")) {
+      if (grunt.file.readJSON(".grunt-config")["build"] === 0) {
+        return;
+      }
+    }
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
@@ -336,6 +341,12 @@ module.exports = function(grunt) {
       }
       return false;
     });
+
+    if (grunt.file.exists(".grunt-config")) {
+      if (grunt.file.readJSON(".grunt-config")["cov"] === 0) {
+        covFiles = [];
+      }
+    }
     
     if (covFiles.length) {
       istanbul = require("istanbul");
