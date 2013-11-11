@@ -6,19 +6,20 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var osc = require("./osc");
 
-  // unitTestSuite("unit/osc.js", [
-  //   [ "FSinOsc" , ["ar", "kr"], 2, 1 ],
-  //   [ "SinOsc"  , ["ar", "kr"], 2, 1 ],
-  //   [ "SinOscFB", ["ar", "kr"], 2, 1 ],
-  //   [ "LFSaw"   , ["ar", "kr"], 2, 1 ],
-  //   [ "LFPar"   , ["ar", "kr"], 2, 1 ],
-  //   [ "LFCub"   , ["ar", "kr"], 2, 1 ],
-  //   [ "LFTri"   , ["ar", "kr"], 2, 1 ],
-  //   [ "LFPulse" , ["ar", "kr"], 3, 1 ],
-  // ]);
+  unitTestSuite("unit/osc.js", [
+    [ "FSinOsc" , ["ar", "kr"], 2, 1 ],
+    [ "SinOsc"  , ["ar", "kr"], 2, 1 ],
+    [ "SinOscFB", ["ar", "kr"], 2, 1 ],
+    [ "LFSaw"   , ["ar", "kr"], 2, 1 ],
+    [ "LFPar"   , ["ar", "kr"], 2, 1 ],
+    [ "LFCub"   , ["ar", "kr"], 2, 1 ],
+    [ "LFTri"   , ["ar", "kr"], 2, 1 ],
+    [ "LFPulse" , ["ar", "kr"], 3, 1 ],
+  ]);
 
   unitTestSuite("unit/osc.js", [
     [ "Blip", ["ar"], 2, 1 ],
+    [ "Saw" , ["ar"], 1, 1 ],
   ], {
     filter: function(obj) {
       var inRates = obj.inRates;
@@ -26,8 +27,10 @@ define(function(require, exports, module) {
         // freq
         return false;
       }
+      if (inRates[1] === undefined) {
+        return true;
+      }
       if (inRates[1] !== C.CONTROL) {
-        // numharm
         return false;
       }
       return true;

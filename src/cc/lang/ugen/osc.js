@@ -88,11 +88,14 @@ define(function(require, exports, module) {
       ctor: function(freq, numharm, mul, add) {
         return this.init(C.AUDIO, freq, numharm).madd(mul, add);
       }
-    },
-    kr: {
-      defaults: "freq=440,numharm=200,mul=1,add=0",
-      ctor: function(freq, numharm, mul, add) {
-        return this.init(C.CONTROL, freq, numharm).madd(mul, add);
+    }
+  };
+  
+  cc.ugen.specs.Saw = {
+    ar: {
+      defaults: "freq=440,mul=1,add=0",
+      ctor: function(freq, mul, add) {
+        return this.init(C.AUDIO, freq).madd(mul, add);
       }
     }
   };
