@@ -2,7 +2,9 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var zapgremlins = require("./utils").zapgremlins;
+  var utils = require("./utils");
+  var nanToZero   = utils.nanToZero;
+  var zapgremlins = utils.zapgremlins;
   
   cc.unit.specs.RLPF = (function() {
     var ctor = function() {
@@ -82,6 +84,7 @@ define(function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -118,6 +121,9 @@ define(function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      if (isNaN(out[0])) {
+        out[0] = 0;
+      }
     };
     return ctor;
   })();
@@ -200,6 +206,7 @@ define(function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -236,6 +243,9 @@ define(function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      if (isNaN(out[0])) {
+        out[0] = 0;
+      }
     };
     return ctor;
   })();

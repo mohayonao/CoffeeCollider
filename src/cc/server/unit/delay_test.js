@@ -6,39 +6,28 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var delay = require("./delay");
   
-  describe("unit/delay.js", function() {
-    ["CombN", "CombL", "CombC"].forEach(function(name) {
-      describe(name, function() {
-        unitTestSuite.ratesCombination(2).forEach(function(items, i) {
-          it("case " + i, function() {
-            unitTestSuite([
-              name, C.AUDIO, 0, [ 0,0, 0,0, 0,0, 0,0 ], [ C.AUDIO ]
-            ], [
-              unitTestSuite.inputSpec({
-                name   : "in",
-                rate   : C.AUDIO,
-                process: unitTestSuite.writer.whiteNoise()
-              }),
-              unitTestSuite.inputSpec({
-                name : "maxdelaytime",
-                rate : C.SCALAR,
-                value: 1
-              }),
-              unitTestSuite.inputSpec({
-                name   : "delaytime",
-                rate   : items[0],
-                process: unitTestSuite.writer.liner(0, 2, 2)
-              }),
-              unitTestSuite.inputSpec({
-                name   :"decaytime",
-                rate   : items[1],
-                process: unitTestSuite.writer.liner(0, 2, 2)
-              }),
-            ]);
-          });
-        });
-      });
-    });
-  });
+  unitTestSuite("unit/delay.js", [
+    [ "CombN", 4, 1 ],
+    [ "CombL", 4, 1 ],
+    [ "CombC", 4, 1 ],
+  ], {
+    filter: function(obj) {
+      var rate    = obj.rate;
+      var inRates = obj.inRates;
+      if (inRates[1] !== C.SCALAR) {
+        // maxDelayTime
+        return false;
+      }
+      if (inRates[2] !== C.CONTROL) {
+        // delayTime
+        return false;
+      }
+      if (inRates[3] !== C.CONTROL) {
+        // decayTime
+        return false;
+      }
+      return unitTestSuite.filterUGen(obj);
+    }
+  })
 
 });

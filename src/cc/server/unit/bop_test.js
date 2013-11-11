@@ -7,7 +7,6 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   var bop  = require("./bop");
   var ops  = require("../../common/ops");
-  var unitTestSuite = require("./unit_test").unitTestSuite;
   
   describe("bop.js", function() {
     describe("calcFunc", function() {

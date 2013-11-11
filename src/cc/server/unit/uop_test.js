@@ -7,8 +7,7 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   var uop  = require("./uop");
   var ops  = require("../../common/ops");
-  var unitTestSuite = require("./unit_test").unitTestSuite;
-  
+   
   describe("uop.js", function() {
     describe("calcFunc", function() {
       Object.keys(uop.calcFunc).forEach(function(selector) {

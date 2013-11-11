@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131111110200",
+    version: "0.0.0+20131111165700",
     global : {},
     Object : function CCObject() {}
   };
@@ -9259,6 +9259,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -9269,6 +9272,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -9286,6 +9292,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
           irdphase = iwrphase - (dsamp|0);
           value = dlybuf[irdphase & mask];
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -9330,6 +9339,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -9342,6 +9354,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -9361,6 +9376,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d2 = dlybuf[(irdphase-1)&mask];
           value = d1 + frac * (d2 - d1);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -9407,6 +9425,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -9421,6 +9442,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -9442,6 +9466,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d3 = dlybuf[(irdphase-2)&mask];
           value = cubicinterp(frac, d0, d1, d2, d3);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -9465,7 +9492,9 @@ define('cc/server/unit/delay', function(require, exports, module) {
 define('cc/server/unit/filter', function(require, exports, module) {
 
   var cc = require("../cc");
-  var zapgremlins = require("./utils").zapgremlins;
+  var utils = require("./utils");
+  var nanToZero   = utils.nanToZero;
+  var zapgremlins = utils.zapgremlins;
   
   cc.unit.specs.RLPF = (function() {
     var ctor = function() {
@@ -9545,6 +9574,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -9581,6 +9611,9 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      if (isNaN(out[0])) {
+        out[0] = 0;
+      }
     };
     return ctor;
   })();
@@ -9663,6 +9696,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -9699,6 +9733,9 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
+      if (isNaN(out[0])) {
+        out[0] = 0;
+      }
     };
     return ctor;
   })();
@@ -9707,6 +9744,15 @@ define('cc/server/unit/filter', function(require, exports, module) {
 
 });
 define('cc/server/unit/utils', function(require, exports, module) {
+
+  var nanToZero = function(out) {
+    for (var i = out.length; i--; ) {
+      if (isNaN(out[i])) {
+        out[i] = 0;
+      }
+    }
+    return out;
+  };
   
   var zapgremlins = function(a) {
     if (isNaN(a) || (-1e-6 < a && a < 0) || (0 <= a && a < +1e-6)) {
@@ -9727,6 +9773,7 @@ define('cc/server/unit/utils', function(require, exports, module) {
   };
   
   module.exports = {
+    nanToZero  : nanToZero,
     zapgremlins: zapgremlins,
     avoidzero  : avoidzero,
   };
@@ -10140,101 +10187,6 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[1][0][0] = function() {
       this.outputs[0][0] = this.inputs[0][0] * this._mul + this._add;
     };
-    next[0][2][2] = function(inNumSamples) {
-      var out = this.outputs[0];
-      var _in   = this._in;
-      var mulIn = this.inputs[1];
-      var addIn = this.inputs[2];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = _in * mulIn[i  ] + addIn[i  ];
-        out[i+1] = _in * mulIn[i+1] + addIn[i+1];
-        out[i+2] = _in * mulIn[i+2] + addIn[i+2];
-        out[i+3] = _in * mulIn[i+3] + addIn[i+3];
-        out[i+4] = _in * mulIn[i+4] + addIn[i+4];
-        out[i+5] = _in * mulIn[i+5] + addIn[i+5];
-        out[i+6] = _in * mulIn[i+6] + addIn[i+6];
-        out[i+7] = _in * mulIn[i+7] + addIn[i+7];
-      }
-    };
-    next[0][2][1] = function(inNumSamples) {
-      var out = this.outputs[0];
-      var _in   = this._in;
-      var mulIn = this.inputs[1];
-      var add = this._add;
-      var nextAdd = this.inputs[2][0];
-      var add_slope = (nextAdd - add) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = _in * mulIn[i  ] + add; add += add_slope;
-        out[i+1] = _in * mulIn[i+1] + add; add += add_slope;
-        out[i+2] = _in * mulIn[i+2] + add; add += add_slope;
-        out[i+3] = _in * mulIn[i+3] + add; add += add_slope;
-        out[i+4] = _in * mulIn[i+4] + add; add += add_slope;
-        out[i+5] = _in * mulIn[i+5] + add; add += add_slope;
-        out[i+6] = _in * mulIn[i+6] + add; add += add_slope;
-        out[i+7] = _in * mulIn[i+7] + add; add += add_slope;
-      }
-      this._add = nextAdd;
-    };
-    next[0][2][0] = function(inNumSamples) {
-      var out = this.outputs[0];
-      var _in   = this._in;
-      var mulIn = this.inputs[1];
-      var add = this._add;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = _in * mulIn[i  ] + add;
-        out[i+1] = _in * mulIn[i+1] + add;
-        out[i+2] = _in * mulIn[i+2] + add;
-        out[i+3] = _in * mulIn[i+3] + add;
-        out[i+4] = _in * mulIn[i+4] + add;
-        out[i+5] = _in * mulIn[i+5] + add;
-        out[i+6] = _in * mulIn[i+6] + add;
-        out[i+7] = _in * mulIn[i+7] + add;
-      }
-    };
-    next[0][1][2] = function(inNumSamples) {
-      var out = this.outputs[0];
-      var _in   = this._in;
-      var mul   = this._mul;
-      var addIn = this.inputs[2];
-      var nextMul = this.inputs[1][0];
-      var mul_slope = (nextMul - mul) * this.rate.slopeFactor;
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = _in * mul + addIn[i  ]; mul += mul_slope;
-        out[i+1] = _in * mul + addIn[i+1]; mul += mul_slope;
-        out[i+2] = _in * mul + addIn[i+2]; mul += mul_slope;
-        out[i+3] = _in * mul + addIn[i+3]; mul += mul_slope;
-        out[i+4] = _in * mul + addIn[i+4]; mul += mul_slope;
-        out[i+5] = _in * mul + addIn[i+5]; mul += mul_slope;
-        out[i+6] = _in * mul + addIn[i+6]; mul += mul_slope;
-        out[i+7] = _in * mul + addIn[i+7]; mul += mul_slope;
-      }
-      this._mul = nextMul;
-    };
-    next[0][1][1] = function() {
-      this.outputs[0][0] = this._in * this.inputs[1][0] + this.inputs[2][0];
-    };
-    next[0][1][0] = function() {
-      this.outputs[0][0] = this._in * this.inputs[1][0] + this._add;
-    };
-    next[0][0][2] = function(inNumSamples) {
-      var out = this.outputs[0];
-      var _in   = this._in;
-      var mul   = this._mul;
-      var addIn = this.inputs[2];
-      for (var i = 0; i < inNumSamples; i += 8) {
-        out[i  ] = _in * mul + addIn[i  ];
-        out[i+1] = _in * mul + addIn[i+1];
-        out[i+2] = _in * mul + addIn[i+2];
-        out[i+3] = _in * mul + addIn[i+3];
-        out[i+4] = _in * mul + addIn[i+4];
-        out[i+5] = _in * mul + addIn[i+5];
-        out[i+6] = _in * mul + addIn[i+6];
-        out[i+7] = _in * mul + addIn[i+7];
-      }
-    };
-    next[0][0][1] = function() {
-      this.outputs[0][0] = this._in * this._mul + this.inputs[2][0];
-    };
     
     return ctor;
   })();
@@ -10250,7 +10202,7 @@ define('cc/server/unit/madd', function(require, exports, module) {
       if (this.process) {
         this.process(1);
       } else {
-        this.outputs[0][0] = this._in0 * this._in1 + this._in2;
+        this.outputs[0][0] = this._in0 + this._in1 + this._in2;
       }
     };
     
@@ -10262,6 +10214,8 @@ define('cc/server/unit/madd', function(require, exports, module) {
     next[1] = {};
     next[1][1] = {};
     next[1][0] = {};
+    next[0] = {};
+    next[0][0] = {};
 
     next[2][2][2] = function(inNumSamples) {
       var out = this.outputs[0];
@@ -11099,42 +11053,44 @@ define('cc/server/unit/pan', function(require, exports, module) {
       next_aa.call(this, 1);
     };
     var next_ak = function(inNumSamples) {
-      var leftOut  = this.outputs[0];
-      var rightOut = this.outputs[1];
-      var inIn  = this.inputs[0];
-      var pos   = this.inputs[1][0];
-      var level = this.inputs[2][0];
-      var leftAmp  = this._leftAmp;
-      var rightAmp = this._rightAmp;
-      var i, _in;
-      if (pos !== this._pos || level !== this._level) {
-        var ipos = (1024 * pos + 1024 + 0.5)|0;
-        ipos = Math.max(0, Math.min(ipos, 2048));
-        var nextLeftAmp  = level * gSine[2048 - ipos];
-        var nextRightAmp = level * gSine[ipos];
-        var slopeFactor = this.rate.slopeFactor;
-        var leftAmp_slope  = (nextLeftAmp  - leftAmp ) * slopeFactor;
-        var rightAmp_slope = (nextRightAmp - rightAmp) * slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          _in = inIn[i];
-          leftOut[i]  = _in * leftAmp;
-          rightOut[i] = _in * rightAmp;
-          leftAmp  += leftAmp_slope;
-          rightAmp += rightAmp_slope;
-        }
-        this._pos = pos;
-        this._level = level;
-        this._leftAmp  = nextLeftAmp;
-        this._rightAmp = nextRightAmp;
-      } else {
-        for (i = 0; i < inNumSamples; ++i) {
-          _in = inIn[i];
-          leftOut[i]  = _in * leftAmp;
-          rightOut[i] = _in * rightAmp;
-        }
-      }
+      inNumSamples = inNumSamples|0;
+      // var leftOut  = this.outputs[0];
+      // var rightOut = this.outputs[1];
+      // var inIn  = this.inputs[0];
+      // var pos   = this.inputs[1][0];
+      // var level = this.inputs[2][0];
+      // var leftAmp  = this._leftAmp;
+      // var rightAmp = this._rightAmp;
+      // var i, _in;
+      // if (pos !== this._pos || level !== this._level) {
+      //   var ipos = (1024 * pos + 1024 + 0.5)|0;
+      //   ipos = Math.max(0, Math.min(ipos, 2048));
+      //   var nextLeftAmp  = level * gSine[2048 - ipos];
+      //   var nextRightAmp = level * gSine[ipos];
+      //   var slopeFactor = this.rate.slopeFactor;
+      //   var leftAmp_slope  = (nextLeftAmp  - leftAmp ) * slopeFactor;
+      //   var rightAmp_slope = (nextRightAmp - rightAmp) * slopeFactor;
+      //   for (i = 0; i < inNumSamples; ++i) {
+      //     _in = inIn[i];
+      //     leftOut[i]  = _in * leftAmp;
+      //     rightOut[i] = _in * rightAmp;
+      //     leftAmp  += leftAmp_slope;
+      //     rightAmp += rightAmp_slope;
+      //   }
+      //   this._pos = pos;
+      //   this._level = level;
+      //   this._leftAmp  = nextLeftAmp;
+      //   this._rightAmp = nextRightAmp;
+      // } else {
+      //   for (i = 0; i < inNumSamples; ++i) {
+      //     _in = inIn[i];
+      //     leftOut[i]  = _in * leftAmp;
+      //     rightOut[i] = _in * rightAmp;
+      //   }
+      // }
     };
     var next_aa = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
       var leftOut  = this.outputs[0];
       var rightOut = this.outputs[1];
       var inIn  = this.inputs[0];

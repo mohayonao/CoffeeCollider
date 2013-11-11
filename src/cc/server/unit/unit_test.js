@@ -118,34 +118,13 @@ define(function(require, exports, module) {
     return _in;
   };
   
-  var writer = {};
-  writer.whiteNoise = function() {
-    return function(_in) {
-      for (var i = _in.length; i--; ) {
-        _in[i] = Math.random() * 2 - 1;
-      }
-      return _in;
-    };
-  };
-  writer.liner = function(start, end, dur) {
-    var value = start;
-    return function(_in) {
-      var valueIncr = (end - start) * (this.sampleDur / dur);
-      for (var i = 0, imax = _in.length; i < imax; ++i) {
-        _in[i] = value;
-        if (value < end) {
-          value += valueIncr;
-        }
-      }
-      return _in;
-    };
-  };
-  writer.tri = function(offset) {
+  var triangle = function(offset) {
     var index = offset || 0;
-    var pattern = [-1.0, -0.8, -0.6, -0.4, -0.2, -0, +0.2, +0.4, +0.6, +0.8,
-                   +1.0, +0.8, +0.6, +0.4, +0.2, +0, -0.2, -0.4, -0.6, -0.8 ];
+    var pattern = [+1.0, +0.5, +0.5, +0.2, +0.0, -0.5, -0.5, -0.5,
+                   -1.0, -0.5, -0.5, -0.5, -0.0, +0.2, +0.5, +0.5 ];
     return function(_in) {
-      writeScalarValue(_in, pattern[(index++) % pattern.length]);
+      var value = pattern[(index++) % pattern.length];
+      writeScalarValue(_in, value);
       return _in;
     };
   };
@@ -155,20 +134,8 @@ define(function(require, exports, module) {
     opts.sampleDur = rate.sampleDur;
     return opts;
   };
-
-  var ratesCombination = function(n) {
-    var m = Math.pow(3, n);
-    var result = new Array(m);
-    for (var i = 0; i < m; ++i) {
-      result[i] = new Array(n);
-      for (var j = 0; j < n; ++j) {
-        result[i][j] = ((i / Math.pow(3, j))|0) % 3;
-      }
-    }
-    return result;
-  };
   
-  var unitTestSuite = function(spec, inputSpecs, opts) {
+  var unitTest = function(spec, inputSpecs, opts) {
     opts = opts || {};
     
     unit.use();
@@ -176,8 +143,6 @@ define(function(require, exports, module) {
       return (rate === C.AUDIO) ? a_rate : k_rate;
     };
     
-    var min = typeof opts.min === "undefined" ? -Infinity : opts.min;
-    var max = typeof opts.max === "undefined" ? +Infinity : opts.max;
     var i, j, k;
     var u = cc.createUnit(parent, spec);
     for (i = 0; i < u.numOfInputs; ++i) {
@@ -212,18 +177,15 @@ define(function(require, exports, module) {
         opts.preProcess.call(u, i, n);
       }
       if (u.process) {
-        u.process(u.rate.bufLength, opts.instance);
+        u.process(u.rate.bufLength, unitTestSuite.instance);
         for (j = u.allOutputs.length; j--; ) {
           var x = u.allOutputs[j];
           if (isNaN(x)) {
             throw new Error("NaN");
           }
-          if (x < min || max < x) {
-            throw new Error("Out of range: " + x);
+          if (Math.abs(x) === Infinity) {
+            throw new Error("Infinity");
           }
-        }
-        if (opts.validator) {
-          opts.validator.call(u, u.inputs, u.outputs);
         }
       }
       if (opts.postProcess) {
@@ -232,13 +194,113 @@ define(function(require, exports, module) {
     }
     assert.ok(true);
   };
+
+  var ratesCombination = function(n) {
+    var m = Math.pow(3, n);
+    var result = new Array(m);
+    for (var i = 0; i < m; ++i) {
+      result[i] = new Array(n);
+      for (var j = 0; j < n; ++j) {
+        result[i][j] = ((i / Math.pow(3, j))|0) % 3;
+      }
+    }
+    return result;
+  };
   
-  unitTestSuite.inputSpec = inputSpec;
-  unitTestSuite.ratesCombination = ratesCombination;
-  unitTestSuite.writer = writer;
+  var unitTestSuite = function(name, suites, opts) {
+    opts = opts || {};
+    describe(name, function() {
+      suites.forEach(function(items) {
+        var name = items[0];
+        var numOfInputs  = items[1];
+        var numOfOutputs = items[2];
+        
+        unitTestSuite.instance = {};
+        
+        if (opts.before) {
+          beforeEach(opts.before);
+        }
+        if (opts.beforeEach) {
+          beforeEach(opts.beforeEach);
+        }
+        if (opts.after) {
+          afterEach(opts.after);
+        }
+        if (opts.afterEach) {
+          afterEach(opts.afterEach);
+        }
+        
+        var list = ratesCombination(numOfInputs+1);
+        if (opts.filter) {
+          list = list.map(function(items) {
+            return { rate:items[0], inRates:items.slice(1) };
+          }).filter(opts.filter).map(function(obj) {
+            return [ obj.rate ].concat(obj.inRates);
+          });
+        }
+        
+        list.forEach(function(rates) {
+          var inputs = [], outputs = [];
+          var i;
+          for (i = numOfInputs; i--; ) {
+            inputs.push(0, 0);
+          }
+          for (i = numOfOutputs; i--; ) {
+            outputs.push(rates[0]);
+          }
+          var spec = [ name, rates[0], 0, inputs, outputs ];
+          var rateStr = ["ir","kr","ar"][rates[0]];
+          
+          items = rates.slice(1);
+          var caseName = items.map(function(rate) {
+            return ["ir","kr","ar"][rate];
+          }).join(", ");
+          var testName = name + "." + rateStr + "(" + caseName + ")";
+          if (opts.verbose) {
+            console.log(testName);
+          }
+          it(testName, (function(items) {
+            return function() {
+              var inputSpecs = items.map(function(rate, i) {
+                return inputSpec({
+                  rate   : rate,
+                  process: triangle(i * 3),
+                });
+              });
+              unitTest(spec, inputSpecs, opts);
+            };
+          })(items));
+        });
+      });
+    });
+  };
+
+  unitTestSuite.filterUGen = function(obj) {
+    var rate    = obj.rate;
+    var inRates = obj.inRates;
+    if (rate === C.SCALAR) {
+      return false;
+    }
+    if (inRates[0] === C.SCALAR) {
+      return false;
+    }
+    if (rate > inRates[0]) {
+      return false;
+    }
+    return true;
+  };
+  
+  cc.checkNaN = function(out) {
+    for (var i = out.length; i--; ) {
+      if (isNaN(out[i])) {
+        return true;
+      }
+    }
+    return false;
+  };
   
   module.exports = {
-    unitTestSuite: unitTestSuite
+    unitTestSuite: unitTestSuite,
   };
 
 });

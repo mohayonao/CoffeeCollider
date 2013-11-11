@@ -1,10 +1,10 @@
 def = SynthDef (freq=440, amp=1)->
-  amp *= Line.kr(0.5, 0, 2.5)
+  amp *= Line.kr(0.45, 0, 2.5)
   Out.ar(2, SinOsc.ar([freq, freq * 1.25]) * amp)
 .build()  
 
 SynthDef ->
-  Out.ar(0, CombL.ar(In.ar([2, 3], decaytime:5)))
+  Out.ar(0, CombL.ar(In.ar([2, 3]), decaytime:2.5))
 .play()
  
 Task.loop ->
