@@ -8,6 +8,48 @@ define(function(require, exports, module) {
   var kSineSize = table.kSineSize;
   var kSineMask = table.kSineMask;
   var gSineWavetable = table.gSineWavetable;
+
+  cc.unit.specs.FSinOsc = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._freq = this.inputs[0][0];
+      var iphase = this.inputs[1][0];
+      var w = this._freq * this.rate.radiansPerSample;
+      this._b1 = 2 * Math.cos(w);
+      this._y1 = Math.sin(iphase);
+      this._y2 = Math.sin(iphase - w);
+      this.outputs[0][0] = this._y1;
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var rate = this.rate;
+      var b1, y0, y1, y2, w, i, imax, j;
+      if (freq !== this._freq) {
+        this._freq = freq;
+        w = freq * rate.radiansPerSample;
+        this._b1 = b1 = 2 * Math.cos(w);
+      } else {
+        b1 = this._b1;
+      }
+      y1 = this._y1;
+      y2 = this._y2;
+      j = 0;
+      for (i = 0, imax = rate.filterLoops; i < imax; ++i) {
+        out[j++] = y0 = b1 * y1 - y2;
+        out[j++] = y2 = b1 * y0 - y1;
+        out[j++] = y1 = b1 * y2 - y0;
+      }
+      for (i = 0, imax = rate.filterRemain; i < imax; ++i) {
+        out[j++] = y0 = b1 * y1 - y2;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
   
   cc.unit.specs.SinOsc = (function() {
     var ctor = function() {

@@ -2,6 +2,21 @@ define(function(require, exports, module) {
   "use strict";
   
   var cc = require("../cc");
+
+  cc.ugen.specs.FSinOsc = {
+    ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(C.AUDIO, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(C.CONTROL, freq, phase).madd(mul, add);
+      }
+    }
+  };
   
   cc.ugen.specs.SinOsc = {
     ar: {

@@ -7,6 +7,7 @@ define(function(require, exports, module) {
   var osc = require("./osc");
 
   unitTestSuite("unit/osc.js", [
+    [ "FSinOsc" , ["ar", "kr"], 2, 1 ],
     [ "SinOsc"  , ["ar", "kr"], 2, 1 ],
     [ "SinOscFB", ["ar", "kr"], 2, 1 ],
     [ "LFSaw"   , ["ar", "kr"], 2, 1 ],
