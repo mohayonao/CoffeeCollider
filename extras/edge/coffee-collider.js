@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131110170800",
+    version: "0.0.0+20131111110200",
     global : {},
     Object : function CCObject() {}
   };
@@ -2512,40 +2512,41 @@ define('cc/lang/task', function(require, exports, module) {
   })();
   
   var TaskFunction = (function() {
-    function TaskFunction() {
+    function TaskFunction(init) {
       emitter.mixin(this);
       this.klassName = "TaskFunction";
-      this.segments = [];
-      this.index    = 0;
+      if (arguments.length === 0) {
+        this.segments = [];
+      } else if (typeof init !== "function") {
+        throw new TypeError("TaskFunction: first argument should be a Function.");
+      } else {
+        var segments = init();
+        if (!Array.isArray(segments)) {
+          throw new TypeError("TaskFunction: invalid initialize function");
+        }
+        this.segments = segments;
+      }
+      this._pc = 0;
     }
     extend(TaskFunction, cc.Object);
-
-    TaskFunction.prototype._init = function(init) {
-      if (typeof init !== "function") {
-        throw new TypeError("TaskFunction: first argument should be a Function.");
-      }
-      var segments = init();
-      if (!Array.isArray(segments)) {
-        throw new TypeError("TaskFunction: invalid initialize function");
-      }
-      this.segments = segments;
-      this.index    = 0;
-      return this;
-    };
     
     TaskFunction.prototype.perform = function(context) {
-      var func = this.segments[this.index++];
+      var func = this.segments[this._pc++];
       if (func) {
         func.apply(context, slice.call(arguments, 1));
         return true;
       }
       return false;
     };
-
+    
     TaskFunction.prototype.clone = function() {
       var newInstance = new TaskFunction();
       newInstance.segments = this.segments;
       return newInstance;
+    };
+    
+    TaskFunction.prototype.goTo = function(pc) {
+      this._pc = Math.max(0, Math.min(pc, this.segments.length));
     };
     
     return TaskFunction;
@@ -2711,15 +2712,15 @@ define('cc/lang/task', function(require, exports, module) {
         },
         continue: function(token) {
           that._wait = cc.createTaskWaitToken(token||0);
-          that._func.index = 0;
+          that._func.goTo(0);
           that._done();
         },
         redo: function(token) {
           that._wait = cc.createTaskWaitToken(token||0);
-          that._func.index = 0;
+          that._func.goTo(0);
         },
         break: function() {
-          that._func.index = that._func.segments.length;
+          that._func.goTo(Infinity);
           that.stop();
         }
       };
@@ -2837,7 +2838,7 @@ define('cc/lang/task', function(require, exports, module) {
     TaskProcessorDo.prototype._done = function() {
       this._count += 1;
       if (this._count < this._num) {
-        this._func.index = 0;
+        this._func.goTo(0);
       } else {
         this.stop();
       }
@@ -2863,7 +2864,7 @@ define('cc/lang/task', function(require, exports, module) {
     TaskProcessorEach.prototype._done = function() {
       this._count += 1;
       if (this._count < this._list.length) {
-        this._func.index = 0;
+        this._func.goTo(0);
       } else {
         this.stop();
       }
@@ -2954,7 +2955,7 @@ define('cc/lang/task', function(require, exports, module) {
         return obj instanceof TaskManager;
       };
       cc.createTaskFunction = function(init) {
-        return new TaskFunction()._init(init);
+        return new TaskFunction(init);
       };
       cc.instanceOfTaskFunction = function(obj) {
         return obj instanceof TaskFunction;
