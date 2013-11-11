@@ -18,6 +18,8 @@ define(function(require, exports, module) {
     },
   };
   
+  cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
+  
   module.exports = {};
 
 });

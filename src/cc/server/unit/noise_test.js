@@ -7,7 +7,8 @@ define(function(require, exports, module) {
   var noise = require("./noise");
 
   unitTestSuite("unit/noise.js", [
-    [ "WhiteNoise", ["ar", "kr"], 0, 1 ]
+    [ "WhiteNoise", ["ar", "kr"], 0, 1 ],
+    [ "PinkNoise" , ["ar", "kr"], 0, 1 ],
   ]);
 
 });
