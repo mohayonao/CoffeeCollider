@@ -231,6 +231,7 @@ define(function(require, exports, module) {
   require("./filter");
   require("./inout");
   require("./line");
+  require("./noise");
   require("./osc");
   require("./pan");
   require("./ui");

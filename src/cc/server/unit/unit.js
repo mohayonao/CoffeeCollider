@@ -71,6 +71,7 @@ define(function(require, exports, module) {
   require("./inout");
   require("./line");
   require("./madd");
+  require("./noise");
   require("./osc");
   require("./pan");
   require("./ui");
