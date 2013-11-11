@@ -7,8 +7,8 @@ define(function(require, exports, module) {
   var filter = require("./filter");
 
   unitTestSuite("unit/filter.js", [
-    [ "RLPF", 3, 1 ],
-    [ "RHPF", 3, 1 ],
+    [ "RLPF", ["ar", "kr"], 3, 1 ],
+    [ "RHPF", ["ar", "kr"], 3, 1 ],
   ], {
     filter: unitTestSuite.filterUGen
   });

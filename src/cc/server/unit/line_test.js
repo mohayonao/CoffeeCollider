@@ -7,15 +7,10 @@ define(function(require, exports, module) {
   var line = require("./line");
 
   unitTestSuite("unit/line.js", [
-    [ "Line", 4, 1 ]
+    [ "Line", ["ar", "kr"], 4, 1 ]
   ], {
     filter: function(obj) {
-      var rate    = obj.rate;
-      var inRates = obj.inRates;
-      if (rate === C.SCALAR) {
-        return false;
-      }
-      return inRates.every(function(rate) {
+      return obj.inRates.every(function(rate) {
         return rate !== C.AUDIO;
       });
     }

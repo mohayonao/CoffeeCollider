@@ -7,12 +7,11 @@ define(function(require, exports, module) {
   var delay = require("./delay");
   
   unitTestSuite("unit/delay.js", [
-    [ "CombN", 4, 1 ],
-    [ "CombL", 4, 1 ],
-    [ "CombC", 4, 1 ],
+    [ "CombN", ["ar", "kr"], 4, 1 ],
+    [ "CombL", ["ar", "kr"], 4, 1 ],
+    [ "CombC", ["ar", "kr"], 4, 1 ],
   ], {
     filter: function(obj) {
-      var rate    = obj.rate;
       var inRates = obj.inRates;
       if (inRates[1] !== C.SCALAR) {
         // maxDelayTime

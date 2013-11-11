@@ -212,8 +212,11 @@ define(function(require, exports, module) {
     describe(name, function() {
       suites.forEach(function(items) {
         var name = items[0];
-        var numOfInputs  = items[1];
-        var numOfOutputs = items[2];
+        var rates = items[1].map(function(rate) {
+          return {"ar":C.AUDIO,"kr":C.CONTROL,"ir":C.SCALAR}[rate];
+        });
+        var numOfInputs  = items[2];
+        var numOfOutputs = items[3];
         
         unitTestSuite.instance = {};
         
@@ -232,7 +235,9 @@ define(function(require, exports, module) {
         
         var list = ratesCombination(numOfInputs+1);
         if (opts.filter) {
-          list = list.map(function(items) {
+          list = list.filter(function(items) {
+            return rates.indexOf(items[0]) !== -1;
+          }).map(function(items) {
             return { rate:items[0], inRates:items.slice(1) };
           }).filter(opts.filter).map(function(obj) {
             return [ obj.rate ].concat(obj.inRates);
@@ -278,9 +283,6 @@ define(function(require, exports, module) {
   unitTestSuite.filterUGen = function(obj) {
     var rate    = obj.rate;
     var inRates = obj.inRates;
-    if (rate === C.SCALAR) {
-      return false;
-    }
     if (inRates[0] === C.SCALAR) {
       return false;
     }

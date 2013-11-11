@@ -7,14 +7,10 @@ define(function(require, exports, module) {
   var bufio = require("./bufio");
 
   unitTestSuite("unit/bufio", [
-    [ "PlayBuf", 6, 1 ]
+    [ "PlayBuf", ["ar", "kr"], 6, 1 ]
   ], {
     filter: function(obj) {
-      var rate    = obj.rate;
       var inRates = obj.inRates;
-      if (rate === C.SCALAR) {
-        return false;
-      }
       if (inRates[3] !== C.CONTROL) {
         // phase
         return false;

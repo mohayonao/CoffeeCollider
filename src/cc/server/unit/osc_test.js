@@ -7,13 +7,13 @@ define(function(require, exports, module) {
   var osc = require("./osc");
 
   unitTestSuite("unit/osc.js", [
-    [ "SinOsc"  , 2, 1 ],
-    [ "SinOscFB", 2, 1 ],
-    [ "LFSaw"   , 2, 1 ],
-    [ "LFPar"   , 2, 1 ],
-    [ "LFCub"   , 2, 1 ],
-    [ "LFTri"   , 2, 1 ],
-    [ "LFPulse" , 3, 1 ],
+    [ "SinOsc"  , ["ar", "kr"], 2, 1 ],
+    [ "SinOscFB", ["ar", "kr"], 2, 1 ],
+    [ "LFSaw"   , ["ar", "kr"], 2, 1 ],
+    [ "LFPar"   , ["ar", "kr"], 2, 1 ],
+    [ "LFCub"   , ["ar", "kr"], 2, 1 ],
+    [ "LFTri"   , ["ar", "kr"], 2, 1 ],
+    [ "LFPulse" , ["ar", "kr"], 3, 1 ],
   ]);
 
 });

@@ -7,7 +7,7 @@ define(function(require, exports, module) {
   var pan = require("./pan");
 
   unitTestSuite("unit/pan.js", [
-    [ "Pan2", 3, 2 ],
+    [ "Pan2", ["ar", "kr"], 3, 2 ],
   ], {
     filter: unitTestSuite.filterUGen
   });

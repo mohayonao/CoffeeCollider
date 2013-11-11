@@ -9,14 +9,11 @@ define(function(require, exports, module) {
   var instance;
   
   unitTestSuite("unit/ui.js", [
-    [ "MouseX", 4, 1],
-    [ "MouseY", 4, 1],
-    [ "MouseButton", 3, 1],
+    [ "MouseX"     , ["kr"], 4, 1],
+    [ "MouseY"     , ["kr"], 4, 1],
+    [ "MouseButton", ["kr"], 3, 1],
   ], {
     filter: function(obj) {
-      if (obj.rate !== C.CONTROL) {
-        return false;
-      }
       return obj.inRates.every(function(rate) {
         return rate !== C.AUDIO;
       });
