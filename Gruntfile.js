@@ -170,7 +170,7 @@ module.exports = function(grunt) {
       grunt.fail.warn("NOT built with debug mode.");
       return;
     }
-    if (grunt.file.exists(".grunt-config")) {
+    if (arg0 !== "force" && grunt.file.exists(".grunt-config")) {
       if (grunt.file.readJSON(".grunt-config")["build"] === 0) {
         return;
       }
@@ -179,10 +179,11 @@ module.exports = function(grunt) {
     var srcroot = "src";
     var main = "cc/loader";
     var dest;
-    if (arg0 === "edge") {
-      dest = "extras/edge/coffee-collider";
-    } else {
+    if (arg0 === "build") {
       dest = "build/coffee-collider";
+      
+    } else {
+      dest = "extras/edge/coffee-collider";
     }
     
     var coffeeColliderProject = {
@@ -228,7 +229,7 @@ module.exports = function(grunt) {
       },
       function(text) {
         var version = grunt.config.get("pkg.version");
-        if (arg0 === "edge") {
+        if (arg0 !== "build") {
           var now = new Date();
           version += "+";
           version += now.getYear() + 1900;
@@ -470,9 +471,9 @@ module.exports = function(grunt) {
   
   grunt.registerTask("check", ["typo", "jshint", "test"]);
   grunt.registerTask("build", ["typo", "jshint", "test", "dryice"]);
-  grunt.registerTask("build:all"  , ["build", "uglify", "compress"]);
+  grunt.registerTask("build:all"  , ["build:build", "uglify", "compress"]);
   grunt.registerTask("build:edge" , ["typo", "jshint", "test", "dryice:edge"]);
-  grunt.registerTask("build:force", ["dryice:edge"]);
+  grunt.registerTask("build:force", ["dryice:force"]);
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 
