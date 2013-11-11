@@ -81,6 +81,21 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Blip = {
+    ar: {
+      defaults: "freq=440,numharm=200,mul=1,add=0",
+      ctor: function(freq, numharm, mul, add) {
+        return this.init(C.AUDIO, freq, numharm).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,numharm=200,mul=1,add=0",
+      ctor: function(freq, numharm, mul, add) {
+        return this.init(C.CONTROL, freq, numharm).madd(mul, add);
+      }
+    }
+  };
   
   module.exports = {};
 

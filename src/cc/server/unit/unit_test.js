@@ -168,8 +168,14 @@ define(function(require, exports, module) {
     for (i = 0; i < n; ++i) {
       for (j = 0; j < u.numOfInputs; ++j) {
         if (inputSpecs[j].rate !== C.SCALAR) {
-          if (inputSpecs[j].process) {
-            inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
+          inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
+        }
+        if (opts.madd && opts.madd[j]) {
+          var madd = opts.madd[j];
+          var mul  = madd[0], add = madd[1];
+          var inp  = u.inputs[j];
+          for (k = inp.length; k--; ) {
+            inp[k] = inp[k] * mul + add;
           }
         }
       }

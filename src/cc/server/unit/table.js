@@ -8,6 +8,7 @@ define(function(require, exports, module) {
   var gSine          = new Float32Array(kSineSize + 1);
   var gInvSine       = new Float32Array(kSineSize + 1);
   var gSineWavetable = new Float32Array(kSineSize * 2);
+  
   (function() {
     var i;
     for (i = 0; i < kSineSize; ++i) {
@@ -42,6 +43,7 @@ define(function(require, exports, module) {
   module.exports = {
     kSineSize: kSineSize,
     kSineMask: kSineMask,
+    kBadValue: kBadValue,
     gSine         : gSine,
     gInvSine      : gInvSine,
     gSineWavetable: gSineWavetable,
