@@ -16,10 +16,9 @@ define(function(require, exports, module) {
     [ "LFTri"   , ["ar", "kr"], 2, 1 ],
     [ "LFPulse" , ["ar", "kr"], 3, 1 ],
   ]);
-
+  
   unitTestSuite("unit/osc.js", [
     [ "Blip", ["ar"], 2, 1 ],
-    [ "Saw" , ["ar"], 1, 1 ],
   ], {
     filter: function(obj) {
       var inRates = obj.inRates;
@@ -27,10 +26,8 @@ define(function(require, exports, module) {
         // freq
         return false;
       }
-      if (inRates[1] === undefined) {
-        return true;
-      }
       if (inRates[1] !== C.CONTROL) {
+        // numharm
         return false;
       }
       return true;
@@ -38,6 +35,38 @@ define(function(require, exports, module) {
     madd: [
       [ 800, 1600 ],
       [  20,  200 ],
+    ]
+  });
+
+  unitTestSuite("unit/osc.js", [
+    [ "Saw", ["ar"], 1, 1 ],
+  ], {
+    filter: function(obj) {
+      var inRates = obj.inRates;
+      if (inRates[0] !== C.CONTROL) {
+        // freq
+        return false;
+      }
+      return true;
+    },
+    madd: [
+      [ 800, 1600 ],
+    ]
+  });
+
+  unitTestSuite("unit/osc.js", [
+    [ "Pulse", ["ar"], 2, 1 ],
+  ], {
+    filter: function(obj) {
+      var inRates = obj.inRates;
+      if (inRates[0] !== C.CONTROL) {
+        // freq
+        return false;
+      }
+      return true;
+    },
+    madd: [
+      [ 800, 1600 ],
     ]
   });
 

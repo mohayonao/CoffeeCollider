@@ -100,6 +100,15 @@ define(function(require, exports, module) {
     }
   };
   
+  cc.ugen.specs.Pulse = {
+    ar: {
+      defaults: "freq=440,width=0.5,mul=1,add=0",
+      ctor: function(freq, width, mul, add) {
+        return this.init(C.AUDIO, freq, width).madd(mul, add);
+      }
+    }
+  };
+  
   module.exports = {};
 
 });
