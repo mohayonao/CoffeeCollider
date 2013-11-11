@@ -98,6 +98,9 @@ define(function(require, exports, module) {
       cc.createControl = function(rate) {
         return new Control(rate);
       };
+      cc.createOut = function(rate, bus, channelsArray) {
+        return out_ctor(rate)(bus, channelsArray);
+      };
       cc.instanceOfOut = function(obj) {
         return obj instanceof Out;
       };

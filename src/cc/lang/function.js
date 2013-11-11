@@ -40,6 +40,16 @@ define(function(require, exports, module) {
   fn.setupBinaryOp(Function, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", [this].concat(b));
   });
+
+  // others
+  fn.definePrototypeProperty(Function, "play", function() {
+    var func = this;
+    return cc.createSynthDef(
+      function() {
+        cc.createOut(C.AUDIO, 0, func());
+      }, []
+    ).play();
+  });
   
   module.exports = {};
 
