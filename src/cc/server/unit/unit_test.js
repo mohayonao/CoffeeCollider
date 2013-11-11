@@ -124,7 +124,7 @@ define(function(require, exports, module) {
                    -1.0, -0.5, -0.5, -0.5, -0.0, +0.2, +0.5, +0.5 ];
     return function(_in) {
       var value = pattern[(index++) % pattern.length];
-      writeScalarValue(_in, value);
+      writeScalarValue(_in, 0);
       return _in;
     };
   };
@@ -168,14 +168,15 @@ define(function(require, exports, module) {
     for (i = 0; i < n; ++i) {
       for (j = 0; j < u.numOfInputs; ++j) {
         if (inputSpecs[j].rate !== C.SCALAR) {
+          writeScalarValue(u.inputs[j], 0);
           inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
-        }
-        if (opts.madd && opts.madd[j]) {
-          var madd = opts.madd[j];
-          var mul  = madd[0], add = madd[1];
-          var inp  = u.inputs[j];
-          for (k = inp.length; k--; ) {
-            inp[k] = inp[k] * mul + add;
+          if (opts.madd && opts.madd[j]) {
+            var madd = opts.madd[j];
+            var mul  = madd[0], add = madd[1];
+            var inp  = u.inputs[j];
+            for (k = inp.length; k--; ) {
+              inp[k] = (inp[k] * mul) + add;
+            }
           }
         }
       }
@@ -239,11 +240,11 @@ define(function(require, exports, module) {
           afterEach(opts.afterEach);
         }
         
-        var list = ratesCombination(numOfInputs+1);
+        var list = ratesCombination(numOfInputs+1).filter(function(items) {
+          return rates.indexOf(items[0]) !== -1;
+        });
         if (opts.filter) {
-          list = list.filter(function(items) {
-            return rates.indexOf(items[0]) !== -1;
-          }).map(function(items) {
+          list = list.map(function(items) {
             return { rate:items[0], inRates:items.slice(1) };
           }).filter(opts.filter).map(function(obj) {
             return [ obj.rate ].concat(obj.inRates);

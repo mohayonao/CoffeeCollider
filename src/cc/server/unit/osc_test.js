@@ -15,8 +15,12 @@ define(function(require, exports, module) {
     [ "LFCub"   , ["ar", "kr"], 2, 1 ],
     [ "LFTri"   , ["ar", "kr"], 2, 1 ],
     [ "LFPulse" , ["ar", "kr"], 3, 1 ],
-  ]);
-  
+  ], {
+    madd: [
+      [ 800, 1600 ],
+    ]
+  });
+
   unitTestSuite("unit/osc.js", [
     [ "Blip", ["ar"], 2, 1 ],
   ], {
