@@ -8,6 +8,8 @@ define(function(require, exports, module) {
   
   unitTestSuite("unit/decay.js", [
     [ "Integrator", ["ar", "kr"], 2, 1 ],
+    [ "Decay"     , ["ar", "kr"], 2, 1 ],
+    [ "Decay2"    , ["ar", "kr"], 3, 1 ],
   ], {
     filter: unitTestSuite.filterUGen
   });
