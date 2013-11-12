@@ -7,7 +7,8 @@ define(function(require, exports, module) {
   var line = require("./line");
 
   unitTestSuite("unit/line.js", [
-    [ "Line", ["ar", "kr"], 4, 1 ]
+    [ "Line" , ["ar", "kr"], 4, 1 ],
+    [ "XLine", ["ar", "kr"], 4, 1 ],
   ], {
     filter: function(obj) {
       return obj.inRates.every(function(rate) {
