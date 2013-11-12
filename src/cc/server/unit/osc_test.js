@@ -15,12 +15,8 @@ define(function(require, exports, module) {
     [ "LFCub"   , ["ar", "kr"], 2, 1 ],
     [ "LFTri"   , ["ar", "kr"], 2, 1 ],
     [ "LFPulse" , ["ar", "kr"], 3, 1 ],
-  ], {
-    madd: [
-      [ 800, 1600 ],
-    ]
-  });
-
+  ]);
+  
   unitTestSuite("unit/osc.js", [
     [ "Blip", ["ar"], 2, 1 ],
   ], {
@@ -35,13 +31,9 @@ define(function(require, exports, module) {
         return false;
       }
       return true;
-    },
-    madd: [
-      [ 800, 1600 ],
-      [  20,  200 ],
-    ]
+    }
   });
-
+  
   unitTestSuite("unit/osc.js", [
     [ "Saw", ["ar"], 1, 1 ],
   ], {
@@ -52,12 +44,9 @@ define(function(require, exports, module) {
         return false;
       }
       return true;
-    },
-    madd: [
-      [ 800, 1600 ],
-    ]
+    }
   });
-
+  
   unitTestSuite("unit/osc.js", [
     [ "Pulse", ["ar"], 2, 1 ],
   ], {
@@ -68,10 +57,7 @@ define(function(require, exports, module) {
         return false;
       }
       return true;
-    },
-    madd: [
-      [ 800, 1600 ],
-    ]
+    }
   });
 
 });

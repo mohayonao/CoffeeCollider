@@ -118,10 +118,11 @@ define(function(require, exports, module) {
     return _in;
   };
   
-  var triangle = function(offset) {
+  var signal = function(offset) {
     var index = offset || 0;
-    var pattern = [+1.0, +0.5, +0.5, +0.2, +0.0, -0.5, -0.5, -0.5,
-                   -1.0, -0.5, -0.5, -0.5, -0.0, +0.2, +0.5, +0.5 ];
+    var pattern = [
+      +100, 10, 1, 1, 0.5, 0.5, 0, 0, 0, -0.5, -0.5, -1, -1, -10, -100
+    ];
     return function(_in) {
       var value = pattern[(index++) % pattern.length];
       writeScalarValue(_in, 0);
@@ -170,14 +171,6 @@ define(function(require, exports, module) {
         if (inputSpecs[j].rate !== C.SCALAR) {
           writeScalarValue(u.inputs[j], 0);
           inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
-          if (opts.madd && opts.madd[j]) {
-            var madd = opts.madd[j];
-            var mul  = madd[0], add = madd[1];
-            var inp  = u.inputs[j];
-            for (k = inp.length; k--; ) {
-              inp[k] = (inp[k] * mul) + add;
-            }
-          }
         }
       }
       if (opts.preProcess) {
@@ -276,7 +269,7 @@ define(function(require, exports, module) {
               var inputSpecs = items.map(function(rate, i) {
                 return inputSpec({
                   rate   : rate,
-                  process: triangle(i * 3),
+                  process: signal(i * 3),
                 });
               });
               unitTest(spec, inputSpecs, opts);
