@@ -227,6 +227,7 @@ define(function(require, exports, module) {
   };
   
   require("./bufio");
+  require("./decay");
   require("./delay");
   require("./filter");
   require("./inout");
