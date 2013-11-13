@@ -100,6 +100,9 @@ define(function(require, exports, module) {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.sendToLang(["/play"]);
+        if (this.api) {
+          this.api.play();
+        }
       }
     };
     SynthClientImpl.prototype._played = function(syncCount) {
@@ -112,7 +115,6 @@ define(function(require, exports, module) {
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         this.syncCount = syncCount;
-        this.api.play();
       }
       this.exports.emit("play");
     };

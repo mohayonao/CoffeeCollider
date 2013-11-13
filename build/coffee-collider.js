@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0",
+    version: "0.0.0+20131113223700",
     global : {},
     Object : function CCObject() {}
   };
@@ -3537,10 +3537,12 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
   };
   
   require("./bufio");
+  require("./decay");
   require("./delay");
   require("./filter");
   require("./inout");
   require("./line");
+  require("./noise");
   require("./osc");
   require("./pan");
   require("./ui");
@@ -4048,6 +4050,9 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
       cc.createControl = function(rate) {
         return new Control(rate);
       };
+      cc.createOut = function(rate, bus, channelsArray) {
+        return out_ctor(rate)(bus, channelsArray);
+      };
       cc.instanceOfOut = function(obj) {
         return obj instanceof Out;
       };
@@ -4147,6 +4152,58 @@ define('cc/lang/ugen/bufio', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/lang/ugen/decay', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.Integrator = {
+    ar: {
+      defaults: "in=0,coef=1,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(2, _in, coef).mad(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,coef=1,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(1, _in, coef).mad(mul, add);
+      }
+    },
+  };
+
+  cc.ugen.specs.Decay = {
+    ar: {
+      defaults: "in=0,decayTime=1,mul=1,add=0",
+      ctor: function(_in, decayTime, mul, add) {
+        return this.init(2, _in, decayTime).mad(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,decayTime=1,mul=1,add=0",
+      ctor: function(_in, decayTime, mul, add) {
+        return this.init(1, _in, decayTime).mad(mul, add);
+      }
+    },
+  };
+  
+  cc.ugen.specs.Decay2 = {
+    ar: {
+      defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
+      ctor: function(_in, attackTime, decayTime, mul, add) {
+        return this.init(2, _in, attackTime, decayTime).mad(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
+      ctor: function(_in, attackTime, decayTime, mul, add) {
+        return this.init(1, _in, attackTime, decayTime).mad(mul, add);
+      }
+    },
+  };
+  
+  module.exports = {};
+
+});
 define('cc/lang/ugen/delay', function(require, exports, module) {
   
   var cc = require("../cc");
@@ -4214,6 +4271,45 @@ define('cc/lang/ugen/line', function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.XLine = {
+    ar: {
+      defaults: "start=1,end=2,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(2, start, end, dur, doneAction).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "start=1,end=2,dur=1,mul=1,add=0,doneAction=0",
+      ctor: function(start, end, dur, mul, add, doneAction) {
+        return this.init(1, start, end, dur, doneAction).madd(mul, add);
+      }
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/lang/ugen/noise', function(require, exports, module) {
+  
+  var cc = require("../cc");
+
+  cc.ugen.specs.WhiteNoise = {
+    ar: {
+      defaults: "mul=1,add=0",
+      ctor: function(mul, add) {
+        return this.init(2).madd(mul, add);
+      }
+    },
+    ak: {
+      defaults: "mul=1,add=0",
+      ctor: function(mul, add) {
+        return this.init(2).madd(mul, add);
+      }
+    },
+  };
+  
+  cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
   
   module.exports = {};
 
@@ -4221,6 +4317,21 @@ define('cc/lang/ugen/line', function(require, exports, module) {
 define('cc/lang/ugen/osc', function(require, exports, module) {
   
   var cc = require("../cc");
+
+  cc.ugen.specs.FSinOsc = {
+    ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
+    }
+  };
   
   cc.ugen.specs.SinOsc = {
     ar: {
@@ -4282,6 +4393,33 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
         return this.init(1, freq, iphase, width).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.Blip = {
+    ar: {
+      defaults: "freq=440,numharm=200,mul=1,add=0",
+      ctor: function(freq, numharm, mul, add) {
+        return this.init(2, freq, numharm).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Saw = {
+    ar: {
+      defaults: "freq=440,mul=1,add=0",
+      ctor: function(freq, mul, add) {
+        return this.init(2, freq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Pulse = {
+    ar: {
+      defaults: "freq=440,width=0.5,mul=1,add=0",
+      ctor: function(freq, width, mul, add) {
+        return this.init(2, freq, width).madd(mul, add);
       }
     }
   };
@@ -4954,6 +5092,16 @@ define('cc/lang/function', function(require, exports, module) {
   fn.setupBinaryOp(Function, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", [this].concat(b));
   });
+
+  // others
+  fn.definePrototypeProperty(Function, "play", function() {
+    var func = this;
+    return cc.createSynthDef(
+      function() {
+        cc.createOut(2, 0, func());
+      }, []
+    ).play();
+  });
   
   module.exports = {};
 
@@ -5541,6 +5689,9 @@ define('cc/client/client', function(require, exports, module) {
       if (!this.isPlaying) {
         this.isPlaying = true;
         this.sendToLang(["/play"]);
+        if (this.api) {
+          this.api.play();
+        }
       }
     };
     SynthClientImpl.prototype._played = function(syncCount) {
@@ -5553,7 +5704,6 @@ define('cc/client/client', function(require, exports, module) {
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         this.syncCount = syncCount;
-        this.api.play();
       }
       this.exports.emit("play");
     };
@@ -8426,11 +8576,13 @@ define('cc/server/unit/unit', function(require, exports, module) {
 
   require("./bop");
   require("./bufio");
+  require("./decay");
   require("./delay");
   require("./filter");
   require("./inout");
   require("./line");
   require("./madd");
+  require("./noise");
   require("./osc");
   require("./pan");
   require("./ui");
@@ -9193,6 +9345,170 @@ define('cc/server/unit/bufio', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/server/unit/decay', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var log001 = Math.log(0.001);
+  
+  cc.unit.specs.Integrator = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 0) {
+        this.process = next_i;
+      } else {
+        this.process = next;
+      }
+      this._b1 = this.inputs[1][0];
+      this._y1 = 0;
+      next.call(this, 1);
+    };
+    var next_i = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1 = this._b1;
+      var y1 = this._y1;
+      var i;
+      if (b1 === 1) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = inIn[i] + y1;
+        }
+      } else if (b1 === 0) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = inIn[i];
+        }
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = inIn[i] + b1 * y1;
+        }
+      }
+      this._y1 = y1;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1 = this.inputs[1][0];
+      var y1 = this._y1;
+      var i;
+      if (this._b1 === b1) {
+        if (b1 === 1) {
+          for (i = 0; i < inNumSamples; ++i) {
+            out[i] = y1 = inIn[i] + y1;
+          }
+        } else if (b1 === 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            out[i] = y1 = inIn[i];
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            out[i] = y1 = inIn[i] + b1 * y1;
+          }
+        }
+      } else {
+        var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = inIn[i] + b1 * y1;
+          b1 += b1_slope;
+        }
+        this._b1 = b1;
+      }
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Decay = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._decayTime = undefined;
+      this._b1 = 0;
+      this._y1 = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var decayTime = this.inputs[1][0];
+      var b1 = this._b1;
+      var y1 = this._y1;
+      var i;
+      if (decayTime === this._decayTime) {
+        if (b1 === 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            out[i] = y1 = inIn[i];
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            out[i] = y1 = inIn[i] + b1 * y1;
+          }
+        }
+      } else {
+        this._b1 = decayTime === 0 ? 0 : Math.exp(log001 / (decayTime * this.rate.sampleRate));
+        this._decayTime = decayTime;
+        var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = inIn[i] + b1 * y1;
+          b1 += b1_slope;
+        }
+      }
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Decay2 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._attackTime = undefined;
+      this._decayTime  = undefined;
+      this._b1a = 0;
+      this._b1b = 0;
+      this._y1a = 0;
+      this._y1b = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var attackTime = this.inputs[1][0];
+      var decayTime  = this.inputs[2][0];
+      var b1a = this._b1a;
+      var b1b = this._b1b;
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var i;
+      if (attackTime === this._attackTime && this.decayTime === this._decayTime) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y1a = inIn[i] + b1a * y1a;
+          y1b = inIn[i] + b1b * y1b;
+          out[i] = y1a - y1b;
+        }
+      } else {
+        this._decayTime  = decayTime;
+        this._attackTime = attackTime;
+        var next_b1a = decayTime  === 0 ? 0 : Math.exp(log001 / (decayTime  * this.rate.sampleRate));
+        var next_b1b = attackTime === 0 ? 0 : Math.exp(log001 / (attackTime * this.rate.sampleRate));
+        var b1a_slope = (this._b1a - next_b1a) * this.rate.slopeFactor;
+        var b1b_slope = (this._b1b - next_b1b) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          y1a = inIn[i] + b1a * y1a;
+          y1b = inIn[i] + b1b * y1b;
+          out[i] = y1a - y1b;
+          b1a += b1a_slope;
+          b1b += b1b_slope;
+        }
+        b1a = next_b1a;
+        b1b = next_b1b;
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+      this._b1a = b1a;
+      this._b1b = b1b;
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
 define('cc/server/unit/delay', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -9881,7 +10197,7 @@ define('cc/server/unit/line', function(require, exports, module) {
   
   cc.unit.specs.Line = (function() {
     var ctor = function() {
-      this.process = next_kkk;
+      this.process = next;
       var start = this.inputs[0][0];
       var end = this.inputs[1][0];
       var dur = this.inputs[2][0];
@@ -9898,7 +10214,7 @@ define('cc/server/unit/line', function(require, exports, module) {
       this._doneAction = this.inputs[3][0];
       this.outputs[0][0] = this._level;
     };
-    var next_kkk = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out = this.outputs[0];
       var level   = this._level;
       var counter = this._counter;
@@ -9932,6 +10248,62 @@ define('cc/server/unit/line', function(require, exports, module) {
     
     return ctor;
   })();
+  
+  
+  cc.unit.specs.XLine = (function() {
+    var ctor = function() {
+      this.process = next;
+      var start = this.inputs[0][0];
+      var end = this.inputs[1][0];
+      var dur = this.inputs[2][0];
+      var counter = Math.round(dur * this.rate.sampleRate);
+      if (counter === 0) {
+        this._level   = end;
+        this._counter = 0;
+        this._growth  = 0;
+      } else {
+        this._counter = counter;
+        this._growth = Math.pow(end / start, 1 / counter);
+        this._level  = start * this._growth;
+      }
+      this._endLevel = end;
+      this._doneAction = this.inputs[3][0];
+      this.outputs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var level   = this._level;
+      var counter = this._counter;
+      var growth  = this._growth;
+      var i, remain = inNumSamples;
+      do {
+        var nsmps;
+        if (counter === 0) {
+          nsmps  = remain;
+          remain = 0;
+          var endLevel = this._endLevel;
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = endLevel;
+          }
+        } else {
+          nsmps = Math.min(remain, counter);
+          counter -= nsmps;
+          remain  -= nsmps;
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            level *= growth;
+          }
+          if (counter === 0) {
+            this.doneAction(this._doneAction);
+          }
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  })();
+  
   
   module.exports = {};
 
@@ -10490,6 +10862,62 @@ define('cc/server/unit/madd', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/server/unit/noise', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.unit.specs.WhiteNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = Math.random() * 2 - 1;
+      }
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.PinkNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      var whites = new Uint8Array(5);
+      for (var i = 0; i < 5; ++i) {
+        whites[i] = ((Math.random() * 1073741824)|0) % 25;
+      }
+      this._whites = whites;
+      this._key    = 0;
+      this.process(1);
+    };
+    var MAX_KEY = 31;
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var key = this._key|0, whites = this._whites;
+      var last_key, sum, diff, i, j;
+      for (i = 0; i < inNumSamples; ++i) {
+        last_key = key++;
+        if (key > MAX_KEY) {
+          key = 0;
+        }
+        diff = last_key ^ key;
+        for (j = sum = 0; j < 5; ++j) {
+          if (diff & (1 << j)) {
+            whites[j] = ((Math.random() * 1073741824)|0) % 25;
+          }
+          sum += whites[j];
+        }
+        out[i] = (sum * 0.01666666) - 1;
+      }
+      this._key = key;
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
 define('cc/server/unit/osc', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -10498,7 +10926,52 @@ define('cc/server/unit/osc', function(require, exports, module) {
   var twopi = 2 * Math.PI;
   var kSineSize = table.kSineSize;
   var kSineMask = table.kSineMask;
+  var kBadValue = table.kBadValue;
   var gSineWavetable = table.gSineWavetable;
+  var gSine    = table.gSine;
+  var gInvSine = table.gInvSine;
+    
+  cc.unit.specs.FSinOsc = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._freq = this.inputs[0][0];
+      var iphase = this.inputs[1][0];
+      var w = this._freq * this.rate.radiansPerSample;
+      this._b1 = 2 * Math.cos(w);
+      this._y1 = Math.sin(iphase);
+      this._y2 = Math.sin(iphase - w);
+      this.outputs[0][0] = this._y1;
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var rate = this.rate;
+      var b1, y0, y1, y2, w, i, imax, j;
+      if (freq !== this._freq) {
+        this._freq = freq;
+        w = freq * rate.radiansPerSample;
+        this._b1 = b1 = 2 * Math.cos(w);
+      } else {
+        b1 = this._b1;
+      }
+      y1 = this._y1;
+      y2 = this._y2;
+      j = 0;
+      for (i = 0, imax = rate.filterLoops; i < imax; ++i) {
+        out[j++] = y0 = b1 * y1 - y2;
+        out[j++] = y2 = b1 * y0 - y1;
+        out[j++] = y1 = b1 * y2 - y0;
+      }
+      for (i = 0, imax = rate.filterRemain; i < imax; ++i) {
+        out[j++] = y0 = b1 * y1 - y2;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
   
   cc.unit.specs.SinOsc = (function() {
     var ctor = function() {
@@ -10979,6 +11452,549 @@ define('cc/server/unit/osc', function(require, exports, module) {
     return ctor;
   })();
   
+  cc.unit.specs.Blip = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._freq    = this.inputs[0][0];
+      this._numharm = this.inputs[1][0]|0;
+      this._cpstoinc = kSineSize * this.rate.sampleDur * 0.5;
+      var N = this._numharm;
+      var maxN = Math.max(1, (this.rate.sampleRate * 0.5 / this._freq)|0);
+      this._N  = Math.max(1, Math.min(N, maxN));
+      this._mask = kSineMask;
+      this._scale = 0.5 / this._N;
+      this._phase = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var freq  = this.inputs[0][0];
+      var numharm = this.inputs[1][0]|0;
+      var phase = this._phase;
+      var mask = this._mask;
+      var numtbl = gSine, dentbl = gInvSine;
+      var N, N2, maxN, prevN, prevN2, scale, prevScale, crossfade;
+      var tblIndex, t0, t1, pfrac, denom, rphase, numer, n1, n2;
+      var i, xfade, xfade_slope;
+      if (numharm !== this._numharm || freq !== this._freq) {
+        N    = numharm;
+        maxN = Math.max(1, (this.rate.sampleRate * 0.5 / this._freq)|0);
+        if (maxN < N) {
+          N = maxN;
+          freq = this._cpstoinc * Math.max(this._freq, freq);
+        } else {
+          if (N < 1) {
+            N = 1;
+          }
+          freq = this._cpstoinc * freq;
+        }
+        crossfade = (N !== this._N);
+        prevN = this._N;
+        prevScale = this._scale;
+        this._N = Math.max(1, Math.min(N, maxN));
+        this._scale = scale = 0.5 / N;
+      } else {
+        N = this._N;
+        freq = this._cpstoinc * freq;
+        scale = this._scale;
+        crossfade = false;
+      }
+      N2 = 2 * N + 1;
+      if (crossfade) {
+        prevN2 = 2 * prevN + 1;
+        xfade_slope = this.rate.slopeFactor;
+        xfade = 0;
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              out[i] = 1;
+            } else {
+              rphase = phase * prevN2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n1 = (numer / denom - 1) * prevScale;
+
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n2 = (numer / denom - 1) * scale;
+
+              out[i] = n1 + xfade * (n2 - n1);
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+
+            rphase = phase * prevN2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n1 = (numer * denom - 1) * prevScale;
+
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n2 = (numer * denom - 1) * scale;
+
+            out[i] = n1 + xfade * (n2 - n1);
+          }
+          phase += freq;
+          xfade += xfade_slope;
+        }
+      } else {
+        // hmm, if freq is above sr/4 then revert to sine table osc ?
+        // why bother, it isn't a common choice for a fundamental.
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              out[i] = 1;
+            } else {
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              out[i] = (numer / denom - 1) * scale;
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            out[i] = (numer * denom - 1) * scale;
+          }
+          phase += freq;
+        }
+      }
+      if (phase >= 65536) {
+        phase -= 65536;
+      }
+      this._phase = phase;
+      this._freq = this.inputs[0][0];
+      this._numharm = numharm;
+    };
+    return ctor;
+  })();
+  
+  
+  cc.unit.specs.Saw = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._freq = this.inputs[0][0];
+      this._cpstoinc = kSineSize * this.rate.sampleDur * 0.5;
+      this._N    = Math.max(1, (this.rate.sampleRate * 0.5 / this._freq)|0);
+      this._mask = kSineMask;
+      this._scale = 0.5 / this._N;
+      this._phase = 0;
+      this._y1 = -0.46;
+    };
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0];
+      var phase = this._phase;
+      var y1 = this._y1;
+      var mask = this._mask;
+      var numtbl = gSine, dentbl = gInvSine;
+      var N, N2, prevN, prevN2, scale, prevScale, crossfade;
+      var tblIndex, t0, t1, pfrac, denom, rphase, numer, n1, n2;
+      var i, xfade, xfade_slope;
+      if (freq !== this._freq) {
+        N = Math.max(1, (this.rate.sampleRate * 0.5 / freq)|0);
+        if (N !== this._N) {
+          freq = this._cpstoinc * Math.max(this._freq, freq);
+          crossfade = true;
+        } else {
+          freq = this._cpstoinc * freq;
+          crossfade = false;
+        }
+        prevN = this._N;
+        prevScale = this._scale;
+        this._N = N;
+        this._scale = scale = 0.5 / N;
+      } else {
+        N = this._N;
+        freq = this._cpstoinc * freq;
+        scale = this._scale;
+        crossfade = false;
+      }
+      N2 = 2 * N + 1;
+      if (crossfade) {
+        prevN2 = 2 * prevN + 1;
+        xfade_slope = this.rate.slopeFactor;
+        xfade = 0;
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              out[i] = y1 = 1 + 0.999 * y1;
+            } else {
+              rphase = phase * prevN2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n1 = (numer / denom - 1) * prevScale;
+
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n2 = (numer / denom - 1) * scale;
+
+              out[i] = y1 = n1 + xfade * (n2 - n1) + 0.999 * y1;
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+
+            rphase = phase * prevN2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n1 = (numer * denom - 1) * prevScale;
+
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n2 = (numer * denom - 1) * scale;
+
+            out[i] = y1 = n1 + xfade * (n2 - n1) + 0.999 * y1;
+          }
+          phase += freq;
+          xfade += xfade_slope;
+        }
+      } else {
+        // hmm, if freq is above sr/4 then revert to sine table osc ?
+        // why bother, it isn't a common choice for a fundamental.
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              out[i] = y1 = 1 + 0.999 * y1;
+            } else {
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              out[i] = y1 = (numer / denom - 1) * scale + 0.999 * y1;
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            out[i] = y1 = (numer * denom - 1) * scale + 0.999 * y1;
+          }
+          phase += freq;
+        }
+      }
+      if (phase >= 65536) { phase -= 65536; }
+      this._y1 = y1;
+      this._phase = phase;
+      this._freq = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  
+  cc.unit.specs.Pulse = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._freq = this.inputs[0][0];
+      this._cpstoinc = kSineSize * this.rate.sampleDur * 0.5;
+      this._N = Math.max(1, (this.rate.sampleRate * 0.5 / this._freq)|0);
+      this._mask = kSineMask;
+      this._scale = 0.5 / this._N;
+      this._phase = 0;
+      this._duty  = 0;
+      this._y1 = 0;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq  = this.inputs[0][0];
+      var duty  = this._duty;
+      var phase = this._phase;
+      var y1 = this._y1;
+      var mask = this._mask;
+      var numtbl = gSine, dentbl = gInvSine;
+      var N, N2, prevN, prevN2, scale, prevScale, crossfade;
+      var tblIndex, t0, t1, pfrac, denom, rphase, numer, n1, n2;
+      var phase2, nextDuty, duty_slope, rscale, pul1, pul2;
+      var i, xfade, xfade_slope;
+      if (freq !== this._freq) {
+        N = Math.max(1, (this.rate.sampleRate * 0.5 / freq)|0);
+        if (N !== this._N) {
+          freq = this._cpstoinc * Math.max(this._freq, freq);
+          crossfade = true;
+        } else {
+          freq = this._cpstoinc * freq;
+          crossfade = false;
+        }
+        prevN = this._N;
+        prevScale = this._scale;
+        this._N = N;
+        this._scale = scale = 0.5 / N;
+      } else {
+        N = this._N;
+        freq = this._cpstoinc * freq;
+        scale = this._scale;
+        crossfade = false;
+      }
+      N2 = 2 * N + 1;
+
+      nextDuty = this.inputs[1][0];
+      duty_slope = (nextDuty - duty) * this.rate.slopeFactor;
+      rscale = 1 / scale + 1;
+      if (crossfade) {
+        prevN2 = 2 * prevN + 1;
+        xfade_slope = this.rate.slopeFactor;
+        xfade = 0;
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              pul1 = 1;
+            } else {
+              rphase = phase * prevN2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n1 = (numer / denom - 1) * prevScale;
+
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n2 = (numer / denom - 1) * scale;
+
+              pul1 = n1 + xfade * (n2 - n1);
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+
+            rphase = phase * prevN2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n1 = (numer * denom - 1) * prevScale;
+
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n2 = (numer * denom - 1) * scale;
+
+            pul1 = n1 + xfade * (n2 - n1);
+          }
+
+          phase2 = phase + (duty * kSineSize * 0.5);
+          tblIndex = phase2 & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase2 - (phase2|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              pul2 = 1;
+            } else {
+              rphase = phase2 * prevN2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n1 = (numer / denom - 1) * prevScale;
+
+              rphase = phase2 * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              n2 = (numer / denom - 1) * scale;
+
+              pul2 = n1 + xfade * (n2 - n1);
+            }
+          } else {
+            pfrac = phase2 - (phase2|0);
+            denom = t0 + (t1 - t0) * pfrac;
+
+            rphase = phase2 * prevN2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n1 = (numer * denom - 1) * prevScale;
+
+            rphase = phase2 * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            n2 = (numer * denom - 1) * scale;
+
+            pul2 = n1 + xfade * (n2 - n1);
+          }
+          out[i] = y1 = pul1 - pul2 + 0.999 * y1;
+          phase += freq;
+          duty  += duty_slope;
+          xfade += xfade_slope;
+        }
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          tblIndex = phase & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              pul1 = rscale;
+            } else {
+              rphase = phase * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              pul1 = numer / denom;
+            }
+          } else {
+            pfrac = phase - (phase|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            rphase = phase * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            pul1 = numer * denom;
+          }
+
+          phase2 = phase + (duty * kSineSize * 0.5);
+          tblIndex = phase2 & mask;
+          t0 = dentbl[tblIndex];
+          t1 = dentbl[tblIndex+1];
+          if (t0 === kBadValue || t1 === kBadValue) {
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            pfrac = phase2 - (phase2|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            if (Math.abs(denom) < 0.0005) {
+              pul2 = rscale;
+            } else {
+              rphase = phase2 * N2;
+              pfrac = rphase - (rphase|0);
+              tblIndex = rphase & mask;
+              t0 = numtbl[tblIndex];
+              t1 = numtbl[tblIndex+1];
+              numer = t0 + (t1 - t0) * pfrac;
+              pul2 = numer / denom;
+            }
+          } else {
+            pfrac = phase2 - (phase2|0);
+            denom = t0 + (t1 - t0) * pfrac;
+            rphase = phase2 * N2;
+            pfrac = rphase - (rphase|0);
+            tblIndex = rphase & mask;
+            t0 = numtbl[tblIndex];
+            t1 = numtbl[tblIndex+1];
+            numer = t0 + (t1 - t0) * pfrac;
+            pul2 = numer * denom;
+          }
+          out[i] = y1 = (pul1 - pul2) * scale + 0.999 * y1;
+          phase += freq;
+          duty  += duty_slope;
+        }
+      }
+      if (phase >= 65536) { phase -= 65536; }
+      this._y1 = y1;
+      this._phase = phase;
+      this._freq = this.inputs[0][0];
+      this._duty = nextDuty;
+    };
+    return ctor;
+  })();
+  
+  
+  
   module.exports = {};
 
 });
@@ -10991,6 +12007,7 @@ define('cc/server/unit/table', function(require, exports, module) {
   var gSine          = new Float32Array(kSineSize + 1);
   var gInvSine       = new Float32Array(kSineSize + 1);
   var gSineWavetable = new Float32Array(kSineSize * 2);
+  
   (function() {
     var i;
     for (i = 0; i < kSineSize; ++i) {
@@ -11025,6 +12042,7 @@ define('cc/server/unit/table', function(require, exports, module) {
   module.exports = {
     kSineSize: kSineSize,
     kSineMask: kSineMask,
+    kBadValue: kBadValue,
     gSine         : gSine,
     gInvSine      : gInvSine,
     gSineWavetable: gSineWavetable,
