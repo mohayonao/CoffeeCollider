@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131114174700",
+    version: "0.0.0+20131115065800",
     global : {},
     Object : function CCObject() {}
   };
@@ -3391,6 +3391,69 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
     
+    UGen.prototype.lag = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === 2) {
+          return cc.global.Lag.ar(this, t1);
+        } else {
+          return cc.global.Lag.kr(this, t1);
+        }
+      } else if (this.rate === 2) {
+        return cc.global.LagUD.ar(this, t1, t2);
+      } else {
+        return cc.global.LagUD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag2 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === 2) {
+          return cc.global.Lag2.ar(this, t1);
+        } else {
+          return cc.global.Lag2.kr(this, t1);
+        }
+      } else if (this.rate === 2) {
+        return cc.global.Lag2UD.ar(this, t1, t2);
+      } else {
+        return cc.global.Lag2UD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag3 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === 2) {
+          return cc.global.Lag3.ar(this, t1);
+        } else {
+          return cc.global.Lag3.kr(this, t1);
+        }
+      } else if (this.rate === 2) {
+        return cc.global.Lag3UD.ar(this, t1, t2);
+      } else {
+        return cc.global.Lag3UD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lagud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === 2) {
+        return cc.global.LagUD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.LagUD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag2ud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === 2) {
+        return cc.global.Lag2UD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.Lag2UD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === 2) {
+        return cc.global.Lag3UD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.Lag3UD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
         UGen.prototype[selector] = function() {
@@ -3528,6 +3591,7 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
       require("./madd");
       require("./inout");
       require("./mix");
+      require("./filter");
       
       // redefinition for tests
       cc.UGen = UGen;
@@ -4115,6 +4179,67 @@ define('cc/lang/ugen/mix', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/lang/ugen/filter', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  cc.ugen.specs.RLPF = {
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(2, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(1, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
+
+  cc.ugen.specs.Lag = {
+    ar: {
+      defaults: "in=0,latTime=0.1,mul=1,add=0",
+      ctor: function(_in, lagTime, mul, add) {
+        return this.init(2, _in, lagTime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,latTime=0.1,mul=1,add=0",
+      ctor: function(_in, lagTime, mul, add) {
+        return this.init(1, _in, lagTime).madd(mul, add);
+      }
+    },
+  };
+
+  cc.ugen.specs.Lag2 = cc.ugen.specs.Lag;
+  cc.ugen.specs.Lag3 = cc.ugen.specs.Lag;
+  cc.ugen.specs.Ramp = cc.ugen.specs.Lag;
+
+  cc.ugen.specs.LagUD = {
+    ar: {
+      defaults: "in=0,latTimeU=0.1,latTimeD-0.1,mul=1,add=0",
+      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
+        return this.init(2, _in, lagTimeU, lagTimeD).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,latTimeU=0.1,latTimeD-0.1,mul=1,add=0",
+      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
+        return this.init(1, _in, lagTimeU, lagTimeD).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Lag2UD = cc.ugen.specs.LagUD;
+  cc.ugen.specs.Lag3UD = cc.ugen.specs.LagUD;
+  
+  module.exports = {};
+
+});
 define('cc/lang/ugen/bufio', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -4225,67 +4350,6 @@ define('cc/lang/ugen/delay', function(require, exports, module) {
   cc.ugen.specs.CombN = Comb;
   cc.ugen.specs.CombL = Comb;
   cc.ugen.specs.CombC = Comb;
-  
-  module.exports = {};
-
-});
-define('cc/lang/ugen/filter', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  cc.ugen.specs.RLPF = {
-    ar: {
-      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
-      ctor: function(_in, freq, rq, mul, add) {
-        return this.init(2, _in, freq, rq).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
-      ctor: function(_in, freq, rq, mul, add) {
-        return this.init(1, _in, freq, rq).madd(mul, add);
-      }
-    }
-  };
-  
-  cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
-
-  cc.ugen.specs.Lag = {
-    ar: {
-      defaults: "in=0,latTime=0.1,mul=1,add=0",
-      ctor: function(_in, lagTime, mul, add) {
-        return this.init(2, _in, lagTime).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,latTime=0.1,mul=1,add=0",
-      ctor: function(_in, lagTime, mul, add) {
-        return this.init(1, _in, lagTime).madd(mul, add);
-      }
-    },
-  };
-
-  cc.ugen.specs.Lag2 = cc.ugen.specs.Lag;
-  cc.ugen.specs.Lag3 = cc.ugen.specs.Lag;
-  cc.ugen.specs.Ramp = cc.ugen.specs.Lag;
-
-  cc.ugen.specs.LagUD = {
-    ar: {
-      defaults: "in=0,latTimeU=0.1,latTimeD-0.1,mul=1,add=0",
-      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
-        return this.init(2, _in, lagTimeU, lagTimeD).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,latTimeU=0.1,latTimeD-0.1,mul=1,add=0",
-      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
-        return this.init(1, _in, lagTimeU, lagTimeD).madd(mul, add);
-      }
-    }
-  };
-  
-  cc.ugen.specs.LagUD2 = cc.ugen.specs.LagUD;
-  cc.ugen.specs.LagUD3 = cc.ugen.specs.LagUD;
   
   module.exports = {};
 
@@ -5003,11 +5067,64 @@ define('cc/lang/array', function(require, exports, module) {
   });
   
   fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
+    return this.map(function(_in) {
       return cc.createMulAdd(_in, mul, add);
     });
   }).defaults("mul=1,add=0").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "range", fn(function(lo, hi) {
+    return this.map(function(_in) {
+      return _in.range(lo, hi);
+    });
+  }).defaults("lo=0,hi=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "unipolar", fn(function(mul) {
+    return this.map(function(_in) {
+      return _in.unipolar(mul);
+    });
+  }).defaults("mul=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "bipolar", fn(function(mul) {
+    return this.map(function(_in) {
+      return _in.bipolar(mul);
+    });
+  }).defaults("mul=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "lag", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag2", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag2(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag3", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag3(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lagud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lagud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag2ud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lag2ud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag3ud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lag3ud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
   
   cc.global.SHORT = 1;
   cc.global.FOLD  = 2;
@@ -5604,6 +5721,25 @@ define('cc/lang/number', function(require, exports, module) {
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "lag", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag2", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag3", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lagud", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag2ud", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag3ud", function() {
+    return this;
+  });
   
   module.exports = {};
 
@@ -10261,7 +10397,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
           out[i] = y1b;
         }
       } else {
-        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.mSampleRate));
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         this._lag = lag;
         for (i = 0; i < inNumSamples; ++i) {
@@ -10342,7 +10478,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
           out[i] = y1c;
         }
       } else {
-        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.mSampleRate));
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         this._lag = lag;
         for (i = 0; i < inNumSamples; ++i) {
