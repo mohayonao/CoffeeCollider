@@ -9,6 +9,7 @@ define(function(require, exports, module) {
   unitTestSuite("unit/noise.js", [
     [ "WhiteNoise" , ["ar", "kr"], 0, 1 ],
     [ "PinkNoise"  , ["ar", "kr"], 0, 1 ],
+    [ "ClipNoise"  , ["ar", "kr"], 0, 1 ],
     [ "Dust"       , ["ar", "kr"], 1, 1 ],
     [ "Dust2"      , ["ar", "kr"], 1, 1 ],
     [ "LFNoise0"   , ["ar", "kr"], 1, 1 ],

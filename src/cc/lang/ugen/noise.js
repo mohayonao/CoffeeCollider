@@ -19,7 +19,8 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
-
+  cc.ugen.specs.ClipNoise = cc.ugen.specs.WhiteNoise;
+  
   cc.ugen.specs.Dust = {
     ar: {
       defaults: "density=0,mul=1,add=0",
