@@ -54,8 +54,8 @@ define(function(require, exports, module) {
     }
   };
   
-  cc.ugen.specs.LagUD = cc.ugen.specs.LagUD2;
-  cc.ugen.specs.LagUD = cc.ugen.specs.LagUD3;
+  cc.ugen.specs.LagUD2 = cc.ugen.specs.LagUD;
+  cc.ugen.specs.LagUD3 = cc.ugen.specs.LagUD;
   
   module.exports = {};
 
