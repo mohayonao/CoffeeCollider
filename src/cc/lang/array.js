@@ -112,11 +112,64 @@ define(function(require, exports, module) {
   });
   
   fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
+    return this.map(function(_in) {
       return cc.createMulAdd(_in, mul, add);
     });
   }).defaults("mul=1,add=0").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "range", fn(function(lo, hi) {
+    return this.map(function(_in) {
+      return _in.range(lo, hi);
+    });
+  }).defaults("lo=0,hi=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "unipolar", fn(function(mul) {
+    return this.map(function(_in) {
+      return _in.unipolar(mul);
+    });
+  }).defaults("mul=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "bipolar", fn(function(mul) {
+    return this.map(function(_in) {
+      return _in.bipolar(mul);
+    });
+  }).defaults("mul=1").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "lag", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag2", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag2(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag3", fn(function(t1, t2) {
+    return this.map(function(_in) {
+      return _in.lag3(t1, t2);
+    });
+  }).defaults("t1=0.1,t2").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lagud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lagud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag2ud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lag2ud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "lag3ud", fn(function(lagTimeU, lagTimeD) {
+    return this.map(function(_in) {
+      return _in.lag3ud(lagTimeU, lagTimeD);
+    });
+  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
   
   cc.global.SHORT = C.SHORT;
   cc.global.FOLD  = C.FOLD;

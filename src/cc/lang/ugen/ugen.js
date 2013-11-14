@@ -81,6 +81,69 @@ define(function(require, exports, module) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
     
+    UGen.prototype.lag = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === C.AUDIO) {
+          return cc.global.Lag.ar(this, t1);
+        } else {
+          return cc.global.Lag.kr(this, t1);
+        }
+      } else if (this.rate === C.AUDIO) {
+        return cc.global.LagUD.ar(this, t1, t2);
+      } else {
+        return cc.global.LagUD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag2 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === C.AUDIO) {
+          return cc.global.Lag2.ar(this, t1);
+        } else {
+          return cc.global.Lag2.kr(this, t1);
+        }
+      } else if (this.rate === C.AUDIO) {
+        return cc.global.Lag2UD.ar(this, t1, t2);
+      } else {
+        return cc.global.Lag2UD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag3 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        if (this.rate === C.AUDIO) {
+          return cc.global.Lag3.ar(this, t1);
+        } else {
+          return cc.global.Lag3.kr(this, t1);
+        }
+      } else if (this.rate === C.AUDIO) {
+        return cc.global.Lag3UD.ar(this, t1, t2);
+      } else {
+        return cc.global.Lag3UD.kr(this, t1, t2);
+      }
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lagud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === C.AUDIO) {
+        return cc.global.LagUD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.LagUD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag2ud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === C.AUDIO) {
+        return cc.global.Lag2UD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.Lag2UD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
+      if (this.rate === C.AUDIO) {
+        return cc.global.Lag3UD.ar(this, lagTimeU, lagTimeD);
+      }
+      return cc.global.Lag3UD.kr(this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
         UGen.prototype[selector] = function() {
@@ -218,6 +281,7 @@ define(function(require, exports, module) {
       require("./madd");
       require("./inout");
       require("./mix");
+      require("./filter");
       
       // redefinition for tests
       cc.UGen = UGen;

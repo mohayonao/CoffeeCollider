@@ -384,6 +384,25 @@ define(function(require, exports, module) {
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "lag", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag2", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag3", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lagud", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag2ud", function() {
+    return this;
+  });
+  fn.definePrototypeProperty(Number, "lag3ud", function() {
+    return this;
+  });
   
   module.exports = {};
 

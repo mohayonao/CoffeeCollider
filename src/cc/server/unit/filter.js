@@ -337,7 +337,7 @@ define(function(require, exports, module) {
           out[i] = y1b;
         }
       } else {
-        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.mSampleRate));
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         this._lag = lag;
         for (i = 0; i < inNumSamples; ++i) {
@@ -418,7 +418,7 @@ define(function(require, exports, module) {
           out[i] = y1c;
         }
       } else {
-        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.mSampleRate));
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         this._lag = lag;
         for (i = 0; i < inNumSamples; ++i) {
