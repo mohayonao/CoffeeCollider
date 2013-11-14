@@ -1074,7 +1074,106 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  
+  cc.unit.specs.Impulse = (function() {
+    var ctor = function() {
+      this._phase = this.inputs[1][0];
+      if (this.inRates[0] === C.AUDIO) {
+        if (this.inRates[1] !== C.SCALAR) {
+          this.process = next_ak;
+          this._phase = 1;
+        } else {
+          this.process = next_a;
+        }
+      } else {
+        if (this.inRates[1] !== C.SCALAR) {
+          this.process = next_kk;
+          this._phase = 1;
+        } else {
+          this.process = next_k;
+        }
+      }
+      this._phaseOffset = 0;
+      this._cpstoinc    = this.rate.sampleDur;
+      if (this._phase === 0) {
+        this._phase = 1;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      var out    = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_ak = function(inNumSamples) {
+      var out     = this.outputs[0];
+      var freqIn  = this.inputs[0];
+      var phaseOffset = this.inputs[1][0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+    };
+    var next_kk = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
+      var phaseOffset = this.inputs[1][0];
+      var phase = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freq;
+      }
+      this._phase = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+    };
+    var next_k = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

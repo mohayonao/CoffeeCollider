@@ -15,6 +15,7 @@ define(function(require, exports, module) {
     [ "LFCub"   , ["ar", "kr"], 2, 1 ],
     [ "LFTri"   , ["ar", "kr"], 2, 1 ],
     [ "LFPulse" , ["ar", "kr"], 3, 1 ],
+    [ "Impulse" , ["ar", "kr"], 2, 1 ],
   ]);
   
   unitTestSuite("unit/osc.js", [
