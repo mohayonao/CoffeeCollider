@@ -107,6 +107,155 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.LFNoise0 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = 0;
+      this._counter = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          level = Math.random() * 2 - 1;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFNoise1 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = Math.random() * 2 - 1;
+      this._counter = 0;
+      this._slope   = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var slope   = this._slope;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          var nextLevel = Math.random() * 2 - 1;
+          slope = (nextLevel - level) / counter;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+          level += slope;
+        }
+      } while (remain);
+      this._level   = level;
+      this._slope   = slope;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFNoise2 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = 0;
+      this._counter = 0;
+      this._slope   = 0;
+      this._curve   = 0;
+      this._nextValue = Math.random() * 2 - 1;
+      this._nextMidPt = this._nextValue * 0.5;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var slope   = this._slope;
+      var curve   = this._curve;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          var value = this._nextValue;
+          this._nextValue = Math.random() * 2 - 1;
+          level = this._nextMidPt;
+          this._nextMidPt = (this._nextValue + value) * 0.5;
+          counter = Math.max(2, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          var fseglen = counter;
+          curve = 2 * (this._nextMidPt - level - fseglen * slope) / (fseglen * fseglen + fseglen);
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+          slope += curve;
+          level += slope;
+        }
+      } while (remain);
+      this._level   = level;
+      this._slope   = slope;
+      this._curve   = curve;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFClipNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._counter = 0;
+      this._level   = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 
