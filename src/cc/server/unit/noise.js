@@ -51,6 +51,62 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.Dust = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._density = 0;
+      this._scale   = 0;
+      this._thresh  = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var density = this.inputs[0][0];
+      var thresh, scale;
+      if (density !== this._density) {
+        thresh = this._thresh = density * this.rate.sampleDur;
+        scale  = this._scale  = thresh > 0 ? 1 / thresh : 0;
+        this._density = density;
+      } else {
+        thresh = this._thresh;
+        scale  = this._scale;
+      }
+      for (var i = 0; i < inNumSamples; ++i) {
+        var z = Math.random();
+        out[i] = z < thresh ? z * scale : 0;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Dust2 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._density = 0;
+      this._scale   = 0;
+      this._thresh  = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var density = this.inputs[0][0];
+      var thresh, scale;
+      if (density !== this._density) {
+        thresh = this._thresh = density * this.rate.sampleDur;
+        scale  = this._scale  = thresh > 0 ? 2 / thresh : 0;
+        this._density = density;
+      } else {
+        thresh = this._thresh;
+        scale  = this._scale;
+      }
+      for (var i = 0; i < inNumSamples; ++i) {
+        var z = Math.random();
+        out[i] = z < thresh ? z * scale - 1 : 0;
+      }
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 
