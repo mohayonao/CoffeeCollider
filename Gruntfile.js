@@ -29,11 +29,7 @@ module.exports = function(grunt) {
     var files = grunt.file.expand("src/cc/**/*.js");
     return files.some(function(file) {
       var code = grunt.file.read(file);
-      if (/_test\.js/.test(file)) {
-        return /^\s*(describe|it)\.only\(\"/m.test(code);
-      } else {
-        return /console\.debug\(.*\)/m.test(code);
-      }
+      return /^\s*(describe|it)\.only\(\"/m.test(code);
     });
   };
   
@@ -66,7 +62,7 @@ module.exports = function(grunt) {
             return "test:" + filepath;
           }
           grunt.config(["jshint", "files"], filepath);
-          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice:edge" ];
+          var tasks = [ "typo", "jshint", "test:" + filepath, "dryice" ];
           return tasks;
         }
       },
@@ -166,25 +162,20 @@ module.exports = function(grunt) {
 
   grunt.registerTask("dryice", function() {
     var arg0 = arguments[0];
-    if (arg0 !== "edge" && isDebugging()) {
-      grunt.fail.warn("NOT built with debug mode.");
-      return;
-    }
-    if (arg0 !== "force" && grunt.file.exists(".grunt-config")) {
-      if (grunt.file.readJSON(".grunt-config")["build"] === 0) {
+    if (arg0 !== "force") {
+      if (isDebugging()) {
         return;
+      }
+      if (grunt.file.exists(".grunt-config")) {
+        if (grunt.file.readJSON(".grunt-config")["build"] === 0) {
+          return;
+        }
       }
     }
     var copy = require("dryice").copy;
     var srcroot = "src";
     var main = "cc/loader";
-    var dest;
-    if (arg0 === "build") {
-      dest = "build/coffee-collider";
-      
-    } else {
-      dest = "extras/edge/coffee-collider";
-    }
+    var dest = "extras/edge/coffee-collider";
     
     var coffeeColliderProject = {
       roots: [srcroot]
@@ -229,16 +220,14 @@ module.exports = function(grunt) {
       },
       function(text) {
         var version = grunt.config.get("pkg.version");
-        if (arg0 !== "build") {
-          var now = new Date();
-          version += "+";
-          version += now.getYear() + 1900;
-          version += ("00"+(now.getMonth()+1)).substr(-2);
-          version += ("00"+(now.getDate()   )).substr(-2)
-          version += ("00"+(now.getHours()  )).substr(-2)
-          version += ("00"+(now.getMinutes())).substr(-2)
-          version += "00";
-        }
+        var now = new Date();
+        version += "+";
+        version += now.getYear() + 1900;
+        version += ("00"+(now.getMonth()+1)).substr(-2);
+        version += ("00"+(now.getDate()   )).substr(-2)
+        version += ("00"+(now.getHours()  )).substr(-2)
+        version += ("00"+(now.getMinutes())).substr(-2)
+        version += "00";
         text = text.replace(/^define\((['"].+?['"]), \[(.+?)\], function\(require, exports, module\) {$/gm, "define($1, function(require, exports, module) {");
         text = text.replace(/\s*['"]use strict['"];$/gm, "");
         text = text.replace(/#{VERSION}/g, version);
@@ -277,6 +266,12 @@ module.exports = function(grunt) {
     child.stderr.pipe(process.stderr);
   });
 
+  grunt.registerTask("copy", function() {
+    var src = grunt.file.read("extras/edge/coffee-collider.js");
+    src = src.replace(/(version: "[\d.]+)\+\d+/g, "$1");
+    grunt.file.write("build/coffee-collider.js", src);
+  });
+  
   grunt.registerTask("test", function() {
     var arg0 = arguments[0];
     if (arg0 === "integration") {
@@ -471,9 +466,9 @@ module.exports = function(grunt) {
   
   grunt.registerTask("check", ["typo", "jshint", "test"]);
   grunt.registerTask("build", ["typo", "jshint", "test", "dryice"]);
-  grunt.registerTask("build:all"  , ["build:build", "uglify", "compress"]);
-  grunt.registerTask("build:edge" , ["typo", "jshint", "test", "dryice:edge"]);
   grunt.registerTask("build:force", ["dryice:force"]);
+  grunt.registerTask("build:all"  , ["build", "copy", "uglify", "compress"]);
+  
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);
 
