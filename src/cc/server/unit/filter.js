@@ -506,6 +506,202 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.LagUD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = undefined;
+      this._lagd = undefined;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1 = this._y1;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0 = inIn[i];
+          if (y0 > y1) {
+            out[i] = y1 = y0 + b1u * (y1 - y0);
+          } else {
+            out[i] = y1 = y0 + b1d * (y1 - y0);
+          }
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0 = inIn[i];
+          if (y0 > y1) {
+            out[i] = y1 = y0 + b1u * (y1 - y0);
+          } else {
+            out[i] = y1 = y0 + b1d * (y1 - y0);
+          }
+        }
+      }
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Lag2UD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = 0;
+      this._lagd = 0;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0a;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          out[i] = y1b;
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          out[i] = y1b;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Lag3UD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = 0;
+      this._lagd = 0;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      this._y1c = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var y1c = this._y1c;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0a;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          if (y1a > y1b) {
+            y1c = y1b + b1u * (y1c - y1b);
+          } else {
+            y1c = y1b + b1d * (y1c - y1b);
+          }
+          out[i] = y1c;
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          if (y1a > y1b) {
+            y1c = y1b + b1u * (y1c - y1b);
+          } else {
+            y1c = y1b + b1d * (y1c - y1b);
+          }
+          out[i] = y1c;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+      this._y1c = y1c;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

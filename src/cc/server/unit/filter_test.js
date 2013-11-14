@@ -13,6 +13,9 @@ define(function(require, exports, module) {
     [ "Lag2", ["ar", "kr"], 2, 1 ],
     [ "Lag3", ["ar", "kr"], 2, 1 ],
     [ "Ramp", ["ar", "kr"], 2, 1 ],
+    [ "LagUD" , ["ar", "kr"], 3, 1 ],
+    [ "Lag2UD", ["ar", "kr"], 3, 1 ],
+    [ "Lag3UD", ["ar", "kr"], 3, 1 ],
   ], {
     filter: unitTestSuite.filterUGen
   });
