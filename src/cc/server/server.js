@@ -44,6 +44,7 @@ define(function(require, exports, module) {
         if (msg) {
           this.sampleRate = msg[1]|0;
           this.channels   = msg[2]|0;
+          this.strmLength = msg[3]|0;
         }
         this.strm  = new Int16Array(this.strmLength * this.channels);
         this.instanceManager.init(this);

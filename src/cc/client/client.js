@@ -69,6 +69,9 @@ define(function(require, exports, module) {
       this.api = cc.createAudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
+      if (this.api.strmLength) {
+        this.strmLength = this.api.strmLength;
+      }
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
       this.strmList = new Array(C.STRM_LIST_LENGTH);
@@ -263,7 +266,7 @@ define(function(require, exports, module) {
       });
     }
     this.sendToLang([
-      "/init", this.sampleRate, this.channels
+      "/init", this.sampleRate, this.channels, this.strmLength
     ]);
     this.exports.emit("connected");
   };

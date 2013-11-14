@@ -124,7 +124,7 @@ define(function(require, exports, module) {
         event = posted = "";
         cc.createAudioAPI = function() {
           return {
-            sampleRate:8000, channels:1,
+            sampleRate:8000, channels:1, strmLength:1024,
             init:nop, play:nop, pause:nop,
           };
         };
@@ -217,7 +217,7 @@ define(function(require, exports, module) {
           it("/connected", function() {
             instance.recvFromLang(["/connected", 96000, 4, []]);
             assert.equal(event, "connected");
-            assert.deepEqual(posted, ["/init", 8000, 1]);
+            assert.deepEqual(posted, ["/init", 8000, 1, 1024]);
           });
           it("/executed", function() {
             var result;

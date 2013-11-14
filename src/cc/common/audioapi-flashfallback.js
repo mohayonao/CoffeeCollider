@@ -11,6 +11,7 @@ define(function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.strmLength = Math.max(2048, sys.strmLength);
         this.type = "Fallback";
       }
       FallbackAudioAPI.prototype.init = function() {

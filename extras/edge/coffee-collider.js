@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131113223700",
+    version: "0.0.0+20131114113800",
     global : {},
     Object : function CCObject() {}
   };
@@ -5658,6 +5658,9 @@ define('cc/client/client', function(require, exports, module) {
       this.api = cc.createAudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
+      if (this.api.strmLength) {
+        this.strmLength = this.api.strmLength;
+      }
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
       this.strmList = new Array(16);
@@ -5852,7 +5855,7 @@ define('cc/client/client', function(require, exports, module) {
       });
     }
     this.sendToLang([
-      "/init", this.sampleRate, this.channels
+      "/init", this.sampleRate, this.channels, this.strmLength
     ]);
     this.exports.emit("connected");
   };
@@ -6310,6 +6313,7 @@ define('cc/common/audioapi-flashfallback', function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.strmLength = Math.max(2048, sys.strmLength);
         this.type = "Fallback";
       }
       FallbackAudioAPI.prototype.init = function() {
@@ -7767,6 +7771,7 @@ define('cc/server/server', function(require, exports, module) {
         if (msg) {
           this.sampleRate = msg[1]|0;
           this.channels   = msg[2]|0;
+          this.strmLength = msg[3]|0;
         }
         this.strm  = new Int16Array(this.strmLength * this.channels);
         this.instanceManager.init(this);
