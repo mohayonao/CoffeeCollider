@@ -9,6 +9,10 @@ define(function(require, exports, module) {
   unitTestSuite("unit/filter.js", [
     [ "RLPF", ["ar", "kr"], 3, 1 ],
     [ "RHPF", ["ar", "kr"], 3, 1 ],
+    [ "Lag" , ["ar", "kr"], 2, 1 ],
+    [ "Lag2", ["ar", "kr"], 2, 1 ],
+    [ "Lag3", ["ar", "kr"], 2, 1 ],
+    [ "Ramp", ["ar", "kr"], 2, 1 ],
   ], {
     filter: unitTestSuite.filterUGen
   });
