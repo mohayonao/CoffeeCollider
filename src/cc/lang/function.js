@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ops = require("../common/ops");
 
   // unary operator methods
   fn.definePrototypeProperty(Function, "__plus__", function() {
@@ -49,6 +50,29 @@ define(function(require, exports, module) {
         cc.createOut(C.AUDIO, 0, func());
       }, []
     ).play();
+  });
+
+  // global method
+  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function(a) {
+        if (typeof a[selector] === "function") {
+          return a[selector]();
+        }
+        return a;
+      };
+    }
+  });
+
+  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function(a, b) {
+        if (typeof a[selector] === "function") {
+          return a[selector](b);
+        }
+        return a;
+      };
+    }
   });
   
   module.exports = {};
