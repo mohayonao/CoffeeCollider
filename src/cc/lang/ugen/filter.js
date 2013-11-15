@@ -2,6 +2,23 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+
+  cc.ugen.specs.LPF = {
+    ar: {
+      defaults: "in=0,freq=440,mul=1,add=0",
+      ctor: function(_in, freq, mul, add) {
+        return this.init(C.AUDIO, _in, freq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,mul=1,add=0",
+      ctor: function(_in, freq, mul, add) {
+        return this.init(C.CONTROL, _in, freq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.HPF = cc.ugen.specs.LPF;
   
   cc.ugen.specs.RLPF = {
     ar: {
