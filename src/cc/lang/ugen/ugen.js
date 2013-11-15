@@ -143,17 +143,15 @@ define(function(require, exports, module) {
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
     UGen.prototype.explin = fn(function(inMin, inMax, outMin, outMax, clip) {
-      return ((prune.call(this, inMin, inMax, clip).__div__(inMin)).log()).__div__(
-        ((inMax.__div__(inMin)).log()).__mul__(outMax.__sub__(outMin)).__add__(outMin)
+      return cc.global.ExpLin(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
       );
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
-
+    
     UGen.prototype.expexp = fn(function(inMin, inMax, outMin, outMax, clip) {
-      return (outMax.__div__(outMin)).pow(
-        ((prune.call(this, inMin, inMax, clip).__div__(inMin)).log()).__div(
-          (inMax.__div__(inMin).log()).__mul__(outMin)
-        )
-      );
+      return outMax.__div__(outMin).pow(prune.call(this, inMin, inMax, clip).__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
