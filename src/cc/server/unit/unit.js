@@ -75,6 +75,7 @@ define(function(require, exports, module) {
   require("./noise");
   require("./osc");
   require("./pan");
+  require("./range");
   require("./ui");
   require("./uop");
   

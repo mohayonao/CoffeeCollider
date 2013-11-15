@@ -80,6 +80,18 @@ define(function(require, exports, module) {
     UGen.prototype.bipolar = fn(function(mul) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
+
+    UGen.prototype.clip = fn(function(lo, hi) {
+      return cc.global.Clip(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
+
+    UGen.prototype.fold = fn(function(lo, hi) {
+      return cc.global.Fold(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
+    
+    UGen.prototype.wrap = fn(function(lo, hi) {
+      return cc.global.Wrap(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
     
     UGen.prototype.lag = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
@@ -276,6 +288,7 @@ define(function(require, exports, module) {
   require("./noise");
   require("./osc");
   require("./pan");
+  require("./range");
   require("./ui");
   
   Object.keys(specs).forEach(function(name) {
