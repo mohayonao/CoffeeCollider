@@ -20,6 +20,24 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.HPF = cc.ugen.specs.LPF;
+
+  cc.ugen.specs.BPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(C.AUDIO, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(C.CONTROL, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.BRF = cc.ugen.specs.BPF;
   
   cc.ugen.specs.RLPF = {
     _checkInputs: cc.ugen.checkSameRateAsFirstInput,

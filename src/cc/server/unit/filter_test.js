@@ -9,6 +9,8 @@ define(function(require, exports, module) {
   unitTestSuite("unit/filter.js", [
     [ "LPF", ["ar", "kr"], 2, 1 ],
     [ "HPF", ["ar", "kr"], 2, 1 ],
+    [ "BPF", ["ar", "kr"], 3, 1 ],
+    [ "BRF", ["ar", "kr"], 3, 1 ],
     [ "RLPF", ["ar", "kr"], 3, 1 ],
     [ "RHPF", ["ar", "kr"], 3, 1 ],
     [ "Lag" , ["ar", "kr"], 2, 1 ],
