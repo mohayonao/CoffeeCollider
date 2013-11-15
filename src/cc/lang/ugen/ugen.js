@@ -142,6 +142,20 @@ define(function(require, exports, module) {
       );
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
+    UGen.prototype.explin = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return ((prune.call(this, inMin, inMax, clip).__div__(inMin)).log()).__div__(
+        ((inMax.__div__(inMin)).log()).__mul__(outMax.__sub__(outMin)).__add__(outMin)
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+
+    UGen.prototype.expexp = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return (outMax.__div__(outMin)).pow(
+        ((prune.call(this, inMin, inMax, clip).__div__(inMin)).log()).__div(
+          (inMax.__div__(inMin).log()).__mul__(outMin)
+        )
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
         UGen.prototype[selector] = function() {
@@ -308,6 +322,7 @@ define(function(require, exports, module) {
   };
   
   require("./bufio");
+  require("./debug");
   require("./decay");
   require("./delay");
   require("./filter");

@@ -66,6 +66,7 @@ define(function(require, exports, module) {
 
   require("./bop");
   require("./bufio");
+  require("./debug");
   require("./decay");
   require("./delay");
   require("./filter");

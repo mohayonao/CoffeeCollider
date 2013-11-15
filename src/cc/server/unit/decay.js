@@ -2,8 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var utils = require("./utils");
-  var invalidToZero = utils.invalidToZero;
   var log001 = Math.log(0.001);
   
   cc.unit.specs.Integrator = (function() {
@@ -25,7 +23,7 @@ define(function(require, exports, module) {
       var i;
       if (b1 === 1) {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + y1;
+          out[i] = y1 = (inIn[i] + y1) || 0;
         }
       } else if (b1 === 0) {
         for (i = 0; i < inNumSamples; ++i) {
@@ -33,11 +31,10 @@ define(function(require, exports, module) {
         }
       } else {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
         }
       }
       this._y1 = y1;
-      invalidToZero(out);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -48,7 +45,7 @@ define(function(require, exports, module) {
       if (this._b1 === b1) {
         if (b1 === 1) {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + y1;
+            out[i] = y1 = (inIn[i] + y1) || 0;
           }
         } else if (b1 === 0) {
           for (i = 0; i < inNumSamples; ++i) {
@@ -56,19 +53,18 @@ define(function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + b1 * y1;
+            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           }
         }
       } else {
         var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           b1 += b1_slope;
         }
         this._b1 = b1;
       }
       this._y1 = y1;
-      invalidToZero(out);
     };
     return ctor;
   })();
@@ -95,7 +91,7 @@ define(function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + b1 * y1;
+            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           }
         }
       } else {
@@ -103,7 +99,7 @@ define(function(require, exports, module) {
         this._decayTime = decayTime;
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           b1 += b1_slope;
         }
       }
@@ -137,7 +133,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = y1a - y1b;
+          out[i] = (y1a - y1b) || 0;
         }
       } else {
         this._decayTime  = decayTime;
@@ -149,7 +145,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = y1a - y1b;
+          out[i] = (y1a - y1b) || 0;
           b1a += b1a_slope;
           b1b += b1b_slope;
         }

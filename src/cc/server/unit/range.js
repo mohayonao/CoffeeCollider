@@ -2,6 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+  var utils = require("./utils");
+  var invalidToZero = utils.invalidToZero;
 
   cc.unit.specs.InRange = (function() {
     var ctor = function() {
@@ -252,6 +254,7 @@ define(function(require, exports, module) {
           out[i] = Math.pow(x, y) * dstlo;
         }
       }
+      invalidToZero(out);
     };
     var next_kk = function(inNumSamples) {
       var out = this.outputs[0];
@@ -276,8 +279,8 @@ define(function(require, exports, module) {
         } else {
           x = dstratio;
           for (i = 0; i < inNumSamples; ++i) {
-            y = ((inIn[i] - srclo) / srcrange)|0;
-            if (x === 0 && y < 0) {
+            y = (inIn[i] - srclo) / srcrange;
+            if (x < 0 && y !== (y|0)) {
               out[i] = 0;
             } else {
               out[i] = Math.pow(x, y) * dstlo;
@@ -300,8 +303,8 @@ define(function(require, exports, module) {
             out[i] = 0;
           } else {
             x = dstratio;
-            y = ((inIn[i] - srclo) / srcrange)|0;
-            if (x === 0 && y < 0) {
+            y = (inIn[i] - srclo) / srcrange;
+            if (x < 0 && y !== (y|0)) {
               out[i] = 0;
             } else {
               out[i] = Math.pow(x, y) * dstlo;
@@ -315,6 +318,7 @@ define(function(require, exports, module) {
         this._srcrange = next_srcrange;
         this._dstratio = next_dstratio;
       }
+      invalidToZero(out);
     };
     return ctor;
   })();

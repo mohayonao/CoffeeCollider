@@ -183,9 +183,6 @@ define(function(require, exports, module) {
           if (isNaN(x)) {
             throw new Error("NaN");
           }
-          if (Math.abs(x) === Infinity) {
-            throw new Error("Infinity");
-          }
         }
       }
       if (opts.postProcess) {

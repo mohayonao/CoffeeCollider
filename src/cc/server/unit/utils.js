@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var invalidToZero = function(out) {
     for (var i = out.length; i--; ) {
-      if (out[i] === Infinity || out[i] === -Infinity || isNaN(out[i])) {
+      if (out[i] === Infinity || out[i] === -Infinity) {
         out[i] = 0;
       }
     }
