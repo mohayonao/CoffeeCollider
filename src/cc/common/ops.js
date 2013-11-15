@@ -13,11 +13,25 @@ define(function(require, exports, module) {
     __div__  : "/",
     __mod__  : "%",
   };
+
+  var COMMON_FUNCTIONS = {
+    madd: "mul=1,add=0",
+    range: "lo=0,hi=1",
+    unipolar: "mul=1",
+    bipolar : "mul=1",
+    lag   : "t1=0.1,t2",
+    lag2  : "t1=0.1,t2",
+    lag3  : "t1=0.1,t2",
+    lagud : "lagTimeU=0.1,lagTimeD=0.1",
+    lag2ud: "lagTimeU=0.1,lagTimeD=0.1",
+    lag3ud: "lagTimeU=0.1,lagTimeD=0.1",
+  };
   
   module.exports = {
     UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
     BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
     UGEN_OP_ALIASES   : UGEN_OP_ALIASES,
+    COMMON_FUNCTIONS  : COMMON_FUNCTIONS,
   };
 
 });

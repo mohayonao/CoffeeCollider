@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ops = require("../common/ops");
   
   // unary operator methods
   fn.definePrototypeProperty(Number, "__plus__", function() {
@@ -385,23 +386,14 @@ define(function(require, exports, module) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "lag", function() {
-    return this;
-  });
-  fn.definePrototypeProperty(Number, "lag2", function() {
-    return this;
-  });
-  fn.definePrototypeProperty(Number, "lag3", function() {
-    return this;
-  });
-  fn.definePrototypeProperty(Number, "lagud", function() {
-    return this;
-  });
-  fn.definePrototypeProperty(Number, "lag2ud", function() {
-    return this;
-  });
-  fn.definePrototypeProperty(Number, "lag3ud", function() {
-    return this;
+  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
+  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
+    if (Number.prototype[selector]) {
+      return;
+    }
+    fn.definePrototypeProperty(Number, selector, function() {
+      return this;
+    });
   });
   
   module.exports = {};

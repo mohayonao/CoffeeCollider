@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var ops   = require("../common/ops");
   var utils = require("./utils");
+  var slice = [].slice;
 
   var setupUnaryOp = function(selector) {
     fn.definePrototypeProperty(Array, selector, function() {
@@ -110,66 +111,19 @@ define(function(require, exports, module) {
       setupBinaryOp(selector);
     }
   });
-  
-  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return this.map(function(_in) {
-      return cc.createMulAdd(_in, mul, add);
-    });
-  }).defaults("mul=1,add=0").multiCall().build());
 
-  fn.definePrototypeProperty(Array, "range", fn(function(lo, hi) {
-    return this.map(function(_in) {
-      return _in.range(lo, hi);
-    });
-  }).defaults("lo=0,hi=1").multiCall().build());
-  
-  fn.definePrototypeProperty(Array, "unipolar", fn(function(mul) {
-    return this.map(function(_in) {
-      return _in.unipolar(mul);
-    });
-  }).defaults("mul=1").multiCall().build());
-  
-  fn.definePrototypeProperty(Array, "bipolar", fn(function(mul) {
-    return this.map(function(_in) {
-      return _in.bipolar(mul);
-    });
-  }).defaults("mul=1").multiCall().build());
-  
-  fn.definePrototypeProperty(Array, "lag", fn(function(t1, t2) {
-    return this.map(function(_in) {
-      return _in.lag(t1, t2);
-    });
-  }).defaults("t1=0.1,t2").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "lag2", fn(function(t1, t2) {
-    return this.map(function(_in) {
-      return _in.lag2(t1, t2);
-    });
-  }).defaults("t1=0.1,t2").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "lag3", fn(function(t1, t2) {
-    return this.map(function(_in) {
-      return _in.lag3(t1, t2);
-    });
-  }).defaults("t1=0.1,t2").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "lagud", fn(function(lagTimeU, lagTimeD) {
-    return this.map(function(_in) {
-      return _in.lagud(lagTimeU, lagTimeD);
-    });
-  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "lag2ud", fn(function(lagTimeU, lagTimeD) {
-    return this.map(function(_in) {
-      return _in.lag2ud(lagTimeU, lagTimeD);
-    });
-  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "lag3ud", fn(function(lagTimeU, lagTimeD) {
-    return this.map(function(_in) {
-      return _in.lag3ud(lagTimeU, lagTimeD);
-    });
-  }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build());
+  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
+  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
+    fn.definePrototypeProperty(Array, selector, fn(function() {
+      var args = slice.call(arguments);
+      return this.map(function(_in) {
+        if (_in[selector]) {
+          return _in[selector].apply(_in, args);
+        }
+        return _in;
+      });
+    }).defaults(COMMON_FUNCTIONS[selector]).multiCall().build());
+  });
   
   cc.global.SHORT = C.SHORT;
   cc.global.FOLD  = C.FOLD;
