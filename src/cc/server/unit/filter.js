@@ -99,7 +99,7 @@ define(function(require, exports, module) {
         b2 = -(1 - sqrt2C + C2) * a0;
         
         y0 = inIn[0] + b1 * y1 + b2 * y2;
-        out[0] = (a0 * (y0 + 2 * y1 + y2)) || 0;
+        out[0] = a0 * (y0 + 2 * y1 + y2);
         y2 = y1;
         y1 = y0;
         
@@ -109,7 +109,7 @@ define(function(require, exports, module) {
         this._b2 = b2;
       } else {
         y0 = inIn[0] + b1 * y1 + b2 * y2;
-        out[0] = (a0 * (y0 + 2 * y1 + y2)) || 0;
+        out[0] = a0 * (y0 + 2 * y1 + y2);
         y2 = y1;
         y1 = y0;
       }
@@ -159,11 +159,11 @@ define(function(require, exports, module) {
         var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
         for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
           y0 = inIn[j] + b1 * y1 + b2 * y2;
-          out[j++] = a0 * (y0 + 2 * y1 + y2);
+          out[j++] = a0 * (y0 - 2 * y1 + y2);
           y2 = inIn[j] + b1 * y0 + b2 * y1;
-          out[j++] = a0 * (y2 + 2 * y0 + y1);
+          out[j++] = a0 * (y2 - 2 * y0 + y1);
           y1 = inIn[j] + b1 * y2 + b2 * y0;
-          out[j++] = a0 * (y1 + 2 * y2 + y0);
+          out[j++] = a0 * (y1 - 2 * y2 + y0);
           a0 += a0_slope;
           b1 += b1_slope;
           b2 += b2_slope;
@@ -175,16 +175,16 @@ define(function(require, exports, module) {
       } else {
         for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
           y0 = inIn[j] + b1 * y1 + b2 * y2;
-          out[j++] = a0 * (y0 + 2 * y1 + y2);
+          out[j++] = a0 * (y0 - 2 * y1 + y2);
           y2 = inIn[j] + b1 * y0 + b2 * y1;
-          out[j++] = a0 * (y2 + 2 * y0 + y1);
+          out[j++] = a0 * (y2 - 2 * y0 + y1);
           y1 = inIn[j] + b1 * y2 + b2 * y0;
-          out[j++] = a0 * (y1 + 2 * y2 + y0);
+          out[j++] = a0 * (y1 - 2 * y2 + y0);
         }
       }
       for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
         y0 = inIn[j] + b1 * y1 + b2 * y2;
-        out[j++] = a0 * (y0 + 2 * y1 + y2);
+        out[j++] = a0 * (y0 - 2 * y1 + y2);
         y2 = y1;
         y1 = y0;
       }
@@ -211,7 +211,7 @@ define(function(require, exports, module) {
         b2 = -(1 - sqrt2C + C2) * a0;
         
         y0 = inIn[0] + b1 * y1 + b2 * y2;
-        out[0] = (a0 * (y0 + 2 * y1 + y2)) || 0;
+        out[0] = a0 * (y0 - 2 * y1 + y2);
         y2 = y1;
         y1 = y0;
         
@@ -221,7 +221,7 @@ define(function(require, exports, module) {
         this._b2 = b2;
       } else {
         y0 = inIn[0] + b1 * y1 + b2 * y2;
-        out[0] = (a0 * (y0 + 2 * y1 + y2)) || 0;
+        out[0] = a0 * (y0 - 2 * y1 + y2);
         y2 = y1;
         y1 = y0;
       }
