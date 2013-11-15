@@ -6,7 +6,336 @@ define(function(require, exports, module) {
   var zapgremlins = utils.zapgremlins;
   var log001 = Math.log(0.001);
   var sqrt2  = Math.sqrt(2);
-
+  
+  cc.unit.specs.OnePole = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = this.inputs[1][0];
+      this._y1 = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1   = this._b1;
+      var y1   = this._y1;
+      var next_b1 = Math.max(-1, Math.min(this.inputs[1][0], 1));
+      var y0, i;
+      if (b1 !== next_b1) {
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
+        if (b1 > 0 && next_b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 - y0);
+            b1 += b1_slope;
+          }
+        } else if (b1 <= 0 && next_b1 <= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 + y0);
+            b1 += b1_slope;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = (1 - Math.abs(b1)) * y0 + b1 * y1;
+            b1 += b1_slope;
+          }
+        }
+        this._b1 = next_b1;
+      } else {
+        if (b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 - y0);
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 + y0);
+          }
+        }
+      }
+      this._y1 = zapgremlins(y1);
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.OneZero = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = this.inputs[1][0];
+      this._x1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1   = this._b1;
+      var x1   = this._x1;
+      var next_b1 = Math.max(-1, Math.min(this.inputs[1][0], 1));
+      var x0, i;
+      if (b1 !== next_b1) {
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
+        if (b1 >= 0 && next_b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 - x0);
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        } else if (b1 <= 0 && next_b1 <= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 + x0);
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = (1 - Math.abs(b1)) * x0 + b1 * x1;
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        }
+        this._b1 = next_b1;
+      } else {
+        if (b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 - x0);
+            x1 = x0;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 + x0);
+            x1 = x0;
+          }
+        }
+      }
+      this._x1 = x1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TwoPole = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var b1_next = 2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = -(reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0;
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2;
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1 = b1_next;
+        this._b2 = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0;
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2;
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1;
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = y0;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TwoZero = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._x1 = 0;
+      this._x2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var x0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var x1 = this._x1;
+      var x2 = this._x2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var b1_next = -2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = (reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = x0 + b1 * x1 + b2 * x2;
+          x2 = inIn[j];
+          out[j++] = x2 + b1 * x0 + b2 * x1;
+          x1 = inIn[j];
+          out[j++] = x1 + b1 * x2 + b2 * x0;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1    = b1_next;
+        this._b2    = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = x0 + b1 * x1 + b2 * x2;
+          x2 = inIn[j];
+          out[j++] = x2 + b1 * x0 + b2 * x1;
+          x1 = inIn[j];
+          out[j++] = x1 + b1 * x2 + b2 * x0;
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = x0 + b1 * x1 + b2 * x2;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.APF = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._x1 = 0;
+      this._x2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var x0;
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var x1 = this._x1;
+      var x2 = this._x2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq && reson !== this._reson) {
+        var b1_next = 2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = -(reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+          x1 = inIn[j];
+          out[j++] = y2 = x2 + b1 * (y0 - x0) + b2 * (y2 - x1);
+          x2 = inIn[j];
+          out[j++] = y1 = x1 + b1 * (y2 - x2) + b2 * (y2 - x0);
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1 = b1_next;
+        this._b2 = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+          x1 = inIn[j];
+          out[j++] = y2 = x2 + b1 * (y0 - x0) + b2 * (y2 - x1);
+          x2 = inIn[j];
+          out[j++] = y1 = x1 + b1 * (y2 - x2) + b2 * (y2 - x0);
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+        y2 = y1;
+        y1 = y0;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
   cc.unit.specs.LPF = (function() {
     var ctor = function() {
       if (this.bufLength === 1) {

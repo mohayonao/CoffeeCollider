@@ -7,6 +7,11 @@ define(function(require, exports, module) {
   var filter = require("./filter");
 
   unitTestSuite("unit/filter.js", [
+    [ "OnePole", ["ar", "kr"], 2, 1 ],
+    [ "OneZero", ["ar", "kr"], 2, 1 ],
+    [ "TwoPole", ["ar", "kr"], 3, 1 ],
+    [ "TwoZero", ["ar", "kr"], 3, 1 ],
+    [ "APF"    , ["ar", "kr"], 3, 1 ],
     [ "LPF", ["ar", "kr"], 2, 1 ],
     [ "HPF", ["ar", "kr"], 2, 1 ],
     [ "BPF", ["ar", "kr"], 3, 1 ],

@@ -3,6 +3,43 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
 
+  cc.ugen.specs.OnePole = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,coef=0.5,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(C.AUDIO, _in, coef).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,coef=0.5,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(C.CONTROL, _in, coef).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.OneZero = cc.ugen.specs.OnePole;
+
+  cc.ugen.specs.TwoPole = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
+      ctor: function(_in, freq, radius, mul, add) {
+        return this.init(C.AUDIO, _in, freq, radius).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
+      ctor: function(_in, freq, radius, mul, add) {
+        return this.init(C.CONTROL, _in, freq, radius).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.TwoZero = cc.ugen.specs.TwoPole;
+  cc.ugen.specs.APF     = cc.ugen.specs.TwoPole;
+  
   cc.ugen.specs.LPF = {
     _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
