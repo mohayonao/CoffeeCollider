@@ -125,6 +125,22 @@ define(function(require, exports, module) {
     UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+
+    UGen.prototype.linlin = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return cc.global.LinLin(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+
+    UGen.prototype.linexp = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return cc.global.LinExp(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
@@ -141,6 +157,18 @@ define(function(require, exports, module) {
         });
       }
     });
+
+    var prune = function(min, max, type) {
+      switch (type) {
+      case "minmax":
+        return this.clip(min, max);
+      case "min":
+        return this.max(min);
+      case "max":
+        return this.min(max);
+      }
+      return this;
+    };
     
     return UGen;
   })();
