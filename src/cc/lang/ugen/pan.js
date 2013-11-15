@@ -16,16 +16,16 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Pan2 = {
+    _Klass: cc.MultiOutUGen,
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(C.AUDIO),
-      Klass: cc.MultiOutUGen
+      ctor: pan2_ctor(C.AUDIO)
     },
     kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.CONTROL),
-      Klass: cc.MultiOutUGen
-    },
+    }
   };
   
   module.exports = {};

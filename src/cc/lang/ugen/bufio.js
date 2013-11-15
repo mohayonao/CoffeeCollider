@@ -21,16 +21,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.PlayBuf = {
+    _Klass: cc.MultiOutUGen,
     ar: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(C.AUDIO),
-      Klass: cc.MultiOutUGen
+      ctor: playbuf_ctor(C.AUDIO)
     },
     kr: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(C.CONTROL),
-      Klass: cc.MultiOutUGen
-    },
+      ctor: playbuf_ctor(C.CONTROL)
+    }
   };
   
   module.exports = {};

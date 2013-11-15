@@ -9,7 +9,15 @@ define(function(require, exports, module) {
   
   var addToSynthDef = null;
   var specs = {};
-  cc.ugen = { specs:specs };
+  cc.ugen = {
+    specs:specs,
+    checkSameRateAsFirstInput: function(ugen) {
+      if (ugen.rate !== ugen.inputs[0].rate) {
+        var strRate = ["ir","kr","ar"][ugen.rate];
+        throw new TypeError("first input is not " + strRate + " rate");
+      }
+    }
+  };
   
   var UGen = (function() {
     function UGen(name) {
@@ -224,9 +232,45 @@ define(function(require, exports, module) {
     extend(OutputProxy, UGen);
     return OutputProxy;
   })();
+
+  var checkBadInput = function(ugen) {
+    ugen.inputs.forEach(function(_in, i) {
+      if (!(typeof _in === "number" || _in instanceof UGen)) {
+        throw new TypeError("arg[" + i + "] bad input");
+      }
+    });
+  };
+  
+  var init_instance = function(instance, tag, checkInputs) {
+    if (Array.isArray(instance)) {
+      instance.forEach(function(ugen) {
+        if (ugen instanceof UGen) {
+          checkBadInput(instance);
+          if (checkInputs) {
+            checkInputs(instance);
+          }
+          instance.tag = tag || "";
+        }
+      });
+    } else if (instance instanceof UGen) {
+      checkBadInput(instance);
+      if (checkInputs) {
+        checkInputs(instance);
+      }
+      instance.tag = tag || "";
+    }
+    return instance;
+  };
   
   
   var registerUGen = function(name, spec) {
+    var BaseClass = (spec._Klass === null) ? null : (spec._Klass || UGen);
+    var multiCall   = spec._multiCall;
+    var checkInputs = spec._checkInputs;
+    if (multiCall === undefined) {
+      multiCall = true;
+    }
+    
     var klass = cc.global[name] = function(rate) {
       if (typeof rate === "number") {
         rate = ["ir", "kr", "ar"][rate];
@@ -239,33 +283,25 @@ define(function(require, exports, module) {
     };
     
     Object.keys(spec).forEach(function(key) {
+      if (key.charAt(0) === "_") {
+        return;
+      }
       var setting   = spec[key];
       var defaults  = setting.defaults + ",tag";
       var ctor      = setting.ctor;
-      var multiCall = setting.multiCall;
-      if (multiCall === undefined) {
-        multiCall = true;
-      }
-      if (setting.Klass !== null) {
-        var Klass = setting.Klass || UGen;
+      if (BaseClass !== null) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new Klass(name, tag), args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
+          var instance = ctor.apply(new BaseClass(name, tag), args);
+          return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       } else {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
+          return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       }
     });

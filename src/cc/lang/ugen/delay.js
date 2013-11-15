@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   
   var Comb = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {

@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.LPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,freq=440,mul=1,add=0",
       ctor: function(_in, freq, mul, add) {
@@ -21,6 +22,7 @@ define(function(require, exports, module) {
   cc.ugen.specs.HPF = cc.ugen.specs.LPF;
   
   cc.ugen.specs.RLPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
@@ -38,6 +40,7 @@ define(function(require, exports, module) {
   cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
 
   cc.ugen.specs.Lag = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,lagTime=0.1,mul=1,add=0",
       ctor: function(_in, lagTime, mul, add) {
@@ -49,7 +52,7 @@ define(function(require, exports, module) {
       ctor: function(_in, lagTime, mul, add) {
         return this.init(C.CONTROL, _in, lagTime).madd(mul, add);
       }
-    },
+    }
   };
 
   cc.ugen.specs.Lag2 = cc.ugen.specs.Lag;
@@ -57,6 +60,7 @@ define(function(require, exports, module) {
   cc.ugen.specs.Ramp = cc.ugen.specs.Lag;
 
   cc.ugen.specs.LagUD = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
       ctor: function(_in, lagTimeU, lagTimeD, mul, add) {

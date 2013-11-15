@@ -36,11 +36,11 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.LinLin = {
     ar: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     },
     kr: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     }
   };
@@ -54,15 +54,15 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.LinExp = {
     ar: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
     kr: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
     ir: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     }
   };
@@ -78,15 +78,15 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.ExpLin = {
     ar: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
     kr: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
     ir: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     }
   };
@@ -102,15 +102,15 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.ExpExp = {
     ar: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
     kr: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
     ir: {
-      defaults: "in,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     }
   };

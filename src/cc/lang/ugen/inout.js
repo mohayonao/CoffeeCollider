@@ -21,6 +21,7 @@ define(function(require, exports, module) {
   })();
   
   cc.ugen.specs.In = {
+    _Klass: cc.MultiOutUGen,
     ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
@@ -28,7 +29,6 @@ define(function(require, exports, module) {
         this.inputs = [ bus ];
         return this.initOutputs(numChannels, this.rate);
       },
-      Klass: cc.MultiOutUGen
     },
     kr: {
       defaults: "bus=0,numChannels=1",
@@ -36,8 +36,7 @@ define(function(require, exports, module) {
         this.init.call(this, C.CONTROL);
         this.inputs = [ bus ];
         return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: cc.MultiOutUGen
+      }
     }
   };
   
@@ -79,17 +78,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Out = {
+    _Klass    : null,
+    _multiCall: false,
     ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.AUDIO),
-      multiCall: false,
-      Klass: null
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.CONTROL),
-      multiCall: false,
-      Klass: null
     }
   };
   

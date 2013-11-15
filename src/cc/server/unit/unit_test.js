@@ -283,7 +283,7 @@ define(function(require, exports, module) {
     if (inRates[0] === C.SCALAR) {
       return false;
     }
-    if (rate > inRates[0]) {
+    if (rate !== inRates[0]) {
       return false;
     }
     return true;
