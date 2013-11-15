@@ -125,7 +125,7 @@ define(function(require, exports, module) {
     ];
     return function(_in) {
       var value = pattern[(index++) % pattern.length];
-      writeScalarValue(_in, 0);
+      writeScalarValue(_in, value);
       return _in;
     };
   };

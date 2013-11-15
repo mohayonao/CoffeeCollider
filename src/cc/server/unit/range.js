@@ -23,14 +23,8 @@ define(function(require, exports, module) {
 
   cc.unit.specs.Clip = (function() {
     var ctor = function() {
-      if (this.inRates[1] === C.AUDIO) {
-        if (this.inRates[2] === C.AUDIO) {
-          this.process = next_aa;
-        } else {
-          this.process = next_ak;
-        }
-      } else if (this.inRates[2] === C.AUDIO) {
-        this.process = next_ka;
+      if (this.inRates[1] === C.AUDIO && this.inRates[2] === C.AUDIO) {
+        this.process = next_aa;
       } else {
         this.process = next_kk;
       }
@@ -43,51 +37,8 @@ define(function(require, exports, module) {
       var inIn = this.inputs[0];
       var loIn = this.inputs[1];
       var hiIn = this.inputs[2];
-      
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
-      }
-    };
-    var next_ak = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var loIn = this.inputs[1];
-      var next_hi = this.inputs[2][0];
-      var hi = this._hi;
-      var i;
-      
-      if (next_hi === hi) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = Math.max(loIn[i], Math.min(inIn[i], hi));
-        }
-      } else {
-        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          hi += hi_slope;
-          out[i] = Math.max(loIn[i], Math.min(inIn[i], hi));
-        }
-        this._hi = next_hi;
-      }
-    };
-    var next_ka = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var next_lo = this.inputs[1][0];
-      var hiIn = this.inputs[2];
-      var lo = this._lo;
-      var i;
-      
-      if (next_lo === lo) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = Math.max(lo, Math.min(inIn[i], hiIn[i]));
-        }
-      } else {
-        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          lo += lo_slope;
-          out[i] = Math.max(lo, Math.min(inIn[i], hiIn[i]));
-        }
-        this._lo = next_lo;
       }
     };
     var next_kk = function(inNumSamples) {
@@ -98,7 +49,6 @@ define(function(require, exports, module) {
       var lo = this._lo;
       var hi = this._hi;
       var i;
-      
       if (next_lo === lo && next_hi === hi) {
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = Math.max(lo, Math.min(inIn[i], hi));
@@ -147,14 +97,8 @@ define(function(require, exports, module) {
       return c + lo;
     };
     var ctor = function() {
-      if (this.inRates[1] === C.AUDIO) {
-        if (this.inRates[2] === C.AUDIO) {
-          this.process = next_aa;
-        } else {
-          this.process = next_ak;
-        }
-      } else if (this.inRates[2] === C.AUDIO) {
-        this.process = next_ka;
+      if (this.inRates[1] === C.AUDIO && this.inRates[2] === C.AUDIO) {
+        this.process = next_aa;
       } else {
         this.process = next_kk;
       }
@@ -167,51 +111,8 @@ define(function(require, exports, module) {
       var inIn = this.inputs[0];
       var loIn = this.inputs[1];
       var hiIn = this.inputs[2];
-      
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
-      }
-    };
-    var next_ak = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var loIn = this.inputs[1];
-      var next_hi = this.inputs[2][0];
-      var hi = this._hi;
-      var i;
-      
-      if (next_hi === hi) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = fold(inIn[i], loIn[i], hi);
-        }
-      } else {
-        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          hi += hi_slope;
-          out[i] = fold(inIn[i], loIn[i], hi);
-        }
-        this._hi = next_hi;
-      }
-    };
-    var next_ka = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var next_lo = this.inputs[1][0];
-      var hiIn = this.inputs[2];
-      var lo = this._lo;
-      var i;
-      
-      if (next_lo === lo) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = fold(inIn[i], lo, hiIn[i]);
-        }
-      } else {
-        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          lo += lo_slope;
-          out[i] = fold(inIn[i], lo, hiIn[i]);
-        }
-        this._lo = next_lo;
       }
     };
     var next_kk = function(inNumSamples) {
@@ -222,7 +123,6 @@ define(function(require, exports, module) {
       var lo = this._lo;
       var hi = this._hi;
       var i;
-      
       if (next_lo === lo && next_hi === hi) {
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = fold(inIn[i], lo, hi);
@@ -269,14 +169,8 @@ define(function(require, exports, module) {
       return _in - range * Math.floor((_in - lo) / range);
     };
     var ctor = function() {
-      if (this.inRates[1] === C.AUDIO) {
-        if (this.inRates[2] === C.AUDIO) {
-          this.process = next_aa;
-        } else {
-          this.process = next_ak;
-        }
-      } else if (this.inRates[2] === C.AUDIO) {
-        this.process = next_ka;
+      if (this.inRates[1] === C.AUDIO && this.inRates[2] === C.AUDIO) {
+        this.process = next_aa;
       } else {
         this.process = next_kk;
       }
@@ -289,51 +183,8 @@ define(function(require, exports, module) {
       var inIn = this.inputs[0];
       var loIn = this.inputs[1];
       var hiIn = this.inputs[2];
-      
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
-      }
-    };
-    var next_ak = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var loIn = this.inputs[1];
-      var next_hi = this.inputs[2][0];
-      var hi = this._hi;
-      var i;
-      
-      if (next_hi === hi) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = wrap(inIn[i], loIn[i], hi);
-        }
-      } else {
-        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          hi += hi_slope;
-          out[i] = wrap(inIn[i], loIn[i], hi);
-        }
-        this._hi = next_hi;
-      }
-    };
-    var next_ka = function(inNumSamples) {
-      var out = this.outputs[0];
-      var inIn = this.inputs[0];
-      var next_lo = this.inputs[1][0];
-      var hiIn = this.inputs[2];
-      var lo = this._lo;
-      var i;
-      
-      if (next_lo === lo) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = wrap(inIn[i], lo, hiIn[i]);
-        }
-      } else {
-        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          lo += lo_slope;
-          out[i] = wrap(inIn[i], lo, hiIn[i]);
-        }
-        this._lo = next_lo;
       }
     };
     var next_kk = function(inNumSamples) {
@@ -344,7 +195,6 @@ define(function(require, exports, module) {
       var lo = this._lo;
       var hi = this._hi;
       var i;
-      
       if (next_lo === lo && next_hi === hi) {
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = wrap(inIn[i], lo, hi);
@@ -363,7 +213,7 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
-
+  
   cc.unit.specs.LinExp = (function() {
     var ctor = function() {
       if (this.inRates[1] === C.AUDIO && this.inRates[2] === C.AUDIO &&
@@ -388,6 +238,7 @@ define(function(require, exports, module) {
       var dstloIn = this.inputs[3];
       var dsthiIn = this.inputs[4];
       var srclo, srchi, dstlo, dsthi;
+      var x, y;
       for (var i = 0; i < inNumSamples; ++i) {
         srclo = srcloIn[i];
         srchi = srchiIn[i];
@@ -396,7 +247,9 @@ define(function(require, exports, module) {
         if (dstlo === 0 ||srchi === srclo) {
           out[i] = 0;
         } else {
-          out[i] = Math.pow(dsthi/dstlo, (inIn[i]-srclo)/(srchi-srclo)) * dstlo;
+          x = dsthi / dstlo;
+          y = ((inIn[i] - srclo) / (srchi - srclo))|0;
+          out[i] = Math.pow(x, y) * dstlo;
         }
       }
     };
@@ -413,7 +266,7 @@ define(function(require, exports, module) {
       var dsthi = this._dsthi;
       var srcrange = this._srcrange;
       var dstratio = this._dstratio;
-      var i;
+      var x, y, i;
       if (next_srclo === srclo && next_srchi === srchi &&
           next_dstlo === dstlo && next_dsthi === dsthi) {
         if (srcrange === 0 || dstlo === 0) {
@@ -421,8 +274,14 @@ define(function(require, exports, module) {
             out[i] = 0;
           }
         } else {
+          x = dstratio;
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = Math.pow(dstratio, (inIn[i]-srclo)/srcrange) * dstlo;
+            y = ((inIn[i] - srclo) / srcrange)|0;
+            if (x === 0 && y < 0) {
+              out[i] = 0;
+            } else {
+              out[i] = Math.pow(x, y) * dstlo;
+            }
           }
         }
       } else {
@@ -440,7 +299,13 @@ define(function(require, exports, module) {
           if (srcrange === 0 || dstlo === 0) {
             out[i] = 0;
           } else {
-            out[i] = Math.pow(dstratio, (inIn[i]-srclo)/srcrange) * dstlo;
+            x = dstratio;
+            y = ((inIn[i] - srclo) / srcrange)|0;
+            if (x === 0 && y < 0) {
+              out[i] = 0;
+            } else {
+              out[i] = Math.pow(x, y) * dstlo;
+            }
           }
         }
         this._srclo = next_srclo;
