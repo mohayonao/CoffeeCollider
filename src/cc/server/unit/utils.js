@@ -1,9 +1,9 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var nanToZero = function(out) {
+  var invalidToZero = function(out) {
     for (var i = out.length; i--; ) {
-      if (isNaN(out[i])) {
+      if (out[i] === Infinity || out[i] === -Infinity || isNaN(out[i])) {
         out[i] = 0;
       }
     }
@@ -29,9 +29,9 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    nanToZero  : nanToZero,
-    zapgremlins: zapgremlins,
-    avoidzero  : avoidzero,
+    invalidToZero: invalidToZero,
+    zapgremlins  : zapgremlins,
+    avoidzero    : avoidzero,
   };
 
 });

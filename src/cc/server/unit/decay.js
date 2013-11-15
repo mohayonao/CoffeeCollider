@@ -2,6 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+  var utils = require("./utils");
+  var invalidToZero = utils.invalidToZero;
   var log001 = Math.log(0.001);
   
   cc.unit.specs.Integrator = (function() {
@@ -35,6 +37,7 @@ define(function(require, exports, module) {
         }
       }
       this._y1 = y1;
+      invalidToZero(out);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -65,6 +68,7 @@ define(function(require, exports, module) {
         this._b1 = b1;
       }
       this._y1 = y1;
+      invalidToZero(out);
     };
     return ctor;
   })();

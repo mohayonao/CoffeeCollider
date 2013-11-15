@@ -292,9 +292,9 @@ define(function(require, exports, module) {
     return true;
   };
   
-  cc.checkNaN = function(out) {
+  cc.checkInvalidValue = function(out) {
     for (var i = out.length; i--; ) {
-      if (isNaN(out[i])) {
+      if (isNaN(out[i]) || Math.abs(out[i]) === Infinity) {
         return true;
       }
     }
