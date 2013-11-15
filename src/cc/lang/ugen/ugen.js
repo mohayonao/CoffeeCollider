@@ -83,65 +83,35 @@ define(function(require, exports, module) {
     
     UGen.prototype.lag = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
-        if (this.rate === C.AUDIO) {
-          return cc.global.Lag.ar(this, t1);
-        } else {
-          return cc.global.Lag.kr(this, t1);
-        }
-      } else if (this.rate === C.AUDIO) {
-        return cc.global.LagUD.ar(this, t1, t2);
-      } else {
-        return cc.global.LagUD.kr(this, t1, t2);
+        return cc.global.Lag(this.rate, this, t1);
       }
+      return cc.global.LagUD(this.rate, this, t1, t2);
     }).defaults("t1=0.1,t2").multiCall().build();
     
     UGen.prototype.lag2 = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
-        if (this.rate === C.AUDIO) {
-          return cc.global.Lag2.ar(this, t1);
-        } else {
-          return cc.global.Lag2.kr(this, t1);
-        }
-      } else if (this.rate === C.AUDIO) {
-        return cc.global.Lag2UD.ar(this, t1, t2);
-      } else {
-        return cc.global.Lag2UD.kr(this, t1, t2);
+        return cc.global.Lag2(this.rate, this, t1);
       }
+      return cc.global.Lag2UD(this.rate, this, t1, t2);
     }).defaults("t1=0.1,t2").multiCall().build();
     
     UGen.prototype.lag3 = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
-        if (this.rate === C.AUDIO) {
-          return cc.global.Lag3.ar(this, t1);
-        } else {
-          return cc.global.Lag3.kr(this, t1);
-        }
-      } else if (this.rate === C.AUDIO) {
-        return cc.global.Lag3UD.ar(this, t1, t2);
-      } else {
-        return cc.global.Lag3UD.kr(this, t1, t2);
+        return cc.global.Lag3(this.rate, this, t1);
       }
+      return cc.global.Lag3UD(this.rate, this, t1, t2);
     }).defaults("t1=0.1,t2").multiCall().build();
     
     UGen.prototype.lagud = fn(function(lagTimeU, lagTimeD) {
-      if (this.rate === C.AUDIO) {
-        return cc.global.LagUD.ar(this, lagTimeU, lagTimeD);
-      }
-      return cc.global.LagUD.kr(this, lagTimeU, lagTimeD);
+      return cc.global.LagUD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
     
     UGen.prototype.lag2ud = fn(function(lagTimeU, lagTimeD) {
-      if (this.rate === C.AUDIO) {
-        return cc.global.Lag2UD.ar(this, lagTimeU, lagTimeD);
-      }
-      return cc.global.Lag2UD.kr(this, lagTimeU, lagTimeD);
+      return cc.global.Lag2UD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
     
     UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
-      if (this.rate === C.AUDIO) {
-        return cc.global.Lag3UD.ar(this, lagTimeU, lagTimeD);
-      }
-      return cc.global.Lag3UD.kr(this, lagTimeU, lagTimeD);
+      return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
@@ -205,7 +175,14 @@ define(function(require, exports, module) {
   
   
   var registerUGen = function(name, spec) {
-    var klass = cc.global[name] = function() {
+    var klass = cc.global[name] = function(rate) {
+      if (typeof rate === "number") {
+        rate = ["ir", "kr", "ar"][rate];
+      }
+      var func = cc.global[name][rate];
+      if (func) {
+        return func.apply(null, slice.call(arguments, 1));
+      }
       return new UGen(name);
     };
     
