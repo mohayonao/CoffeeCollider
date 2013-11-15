@@ -76,18 +76,6 @@ define(function(require, exports, module) {
       }
       return false;
     };
-    // var containsArray2 = function(list) {
-    //   for (var i = 0, imax = list.length; i < imax; ++i) {
-    //     if (Array.isArray(list[i])) {
-    //       for (var j = 0, jmax = list[i].length; j < jmax; ++j) {
-    //         if (Array.isArray(list[i][j])) {
-    //           return true;
-    //         }
-    //       }
-    //     }
-    //   }
-    //   return false;
-    // };
     var resolve_args = function(keys, vals, given) {
       var dict;
       var args = vals.slice();

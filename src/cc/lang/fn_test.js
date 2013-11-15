@@ -70,6 +70,12 @@ define(function(require, exports, module) {
         }).defaults("val=0,mul=1,add=0").multiCall(true).build();
         assert.deepEqual(calc(10, 1), 10);
       });
+      it("defaults with string", function() {
+        var calc = fn(function(a, clip) {
+          return a + clip;
+        }).defaults('a=0,clip="minmax"').build();
+        assert.equal(calc(10), "10minmax");
+      });
     });
     it("definePrototypeProperty", function() {
       fn.definePrototypeProperty(Array, "fn_test", function() {
