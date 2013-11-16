@@ -36,6 +36,9 @@ define(function(require, exports, module) {
     [ "CombN", ["ar", "kr"], 4, 1 ],
     [ "CombL", ["ar", "kr"], 4, 1 ],
     [ "CombC", ["ar", "kr"], 4, 1 ],
+    [ "AllpassN", ["ar", "kr"], 4, 1 ],
+    [ "AllpassL", ["ar", "kr"], 4, 1 ],
+    [ "AllpassC", ["ar", "kr"], 4, 1 ],
   ], {
     filter: function(obj) {
       var inRates = obj.inRates;

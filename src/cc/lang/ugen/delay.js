@@ -58,6 +58,10 @@ define(function(require, exports, module) {
   cc.ugen.specs.CombL = cc.ugen.specs.CombN;
   cc.ugen.specs.CombC = cc.ugen.specs.CombN;
   
+  cc.ugen.specs.AllpassN = cc.ugen.specs.CombN;
+  cc.ugen.specs.AllpassL = cc.ugen.specs.CombN;
+  cc.ugen.specs.AllpassC = cc.ugen.specs.CombN;
+  
   module.exports = {};
 
 });
