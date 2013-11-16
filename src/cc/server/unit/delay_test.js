@@ -5,6 +5,13 @@ define(function(require, exports, module) {
 
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var delay = require("./delay");
+
+  unitTestSuite("unit/delay.js", [
+    [ "Delay1", ["ar", "kr"], 1, 1 ],
+    [ "Delay2", ["ar", "kr"], 1, 1 ],
+  ], {
+    filter: unitTestSuite.filterUGen
+  });
   
   unitTestSuite("unit/delay.js", [
     [ "CombN", ["ar", "kr"], 4, 1 ],

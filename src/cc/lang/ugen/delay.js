@@ -2,8 +2,26 @@ define(function(require, exports, module) {
   "use strict";
   
   var cc = require("../cc");
+
+  cc.ugen.specs.Delay1 = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(C.AUDIO, _in).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(C.CONTROL, _in).madd(mul, add);
+      }
+    }
+  };
   
-  var Comb = {
+  cc.ugen.specs.Delay1 = cc.ugen.specs.Delay2;
+  
+  cc.ugen.specs.CombN = {
     _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
@@ -18,9 +36,8 @@ define(function(require, exports, module) {
       }
     },
   };
-  cc.ugen.specs.CombN = Comb;
-  cc.ugen.specs.CombL = Comb;
-  cc.ugen.specs.CombC = Comb;
+  cc.ugen.specs.CombL = cc.ugen.specs.CombN
+  cc.ugen.specs.CombC = cc.ugen.specs.CombN
   
   module.exports = {};
 

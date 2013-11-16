@@ -4,6 +4,79 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var log001 = Math.log(0.001);
 
+  cc.unit.specs.Delay1 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._x1 = this.inputs[0][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x1 = this._x1;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = x1;
+        out[i+1] = inIn[i  ];
+        out[i+2] = inIn[i+1];
+        out[i+3] = inIn[i+2];
+        out[i+4] = inIn[i+3];
+        out[i+5] = inIn[i+4];
+        out[i+6] = inIn[i+5];
+        out[i+7] = inIn[i+6];
+        x1 = inIn[i+7];
+      }
+      this._x1 = x1;
+    };
+    var next_k = function() {
+      this.outputs[0] = this._x1;
+      this._x1 = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Delay2 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._x1 = this.inputs[0][0];
+      this._x2 = this._x1;
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x1 = this._x1;
+      var x2 = this._x2;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = x1;
+        out[i+1] = x2;
+        out[i+2] = inIn[i  ];
+        out[i+3] = inIn[i+1];
+        out[i+4] = inIn[i+2];
+        out[i+5] = inIn[i+3];
+        out[i+6] = inIn[i+4];
+        out[i+7] = inIn[i+5];
+        x1 = inIn[i+6];
+        x2 = inIn[i+7];
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    var next_k = function() {
+      this.outputs[0] = this._x1;
+      this._x1 = this._x2;
+      this._x2 = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
   var calcDelay = function(unit, delaytime, minDelay) {
     return Math.max(minDelay, Math.min(delaytime * unit.rate.sampleRate, unit._fdelaylen));
   };
