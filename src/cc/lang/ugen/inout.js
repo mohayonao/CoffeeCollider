@@ -89,6 +89,24 @@ define(function(require, exports, module) {
       ctor: out_ctor(C.CONTROL),
     }
   };
+
+  cc.ugen.specs.A2K = {
+    kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(C.CONTROL, _in);
+      }
+    }
+  };
+  
+  cc.ugen.specs.K2A = {
+    ar: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(C.AUDIO, _in);
+      }
+    }
+  };
   
   module.exports = {
     use: function() {

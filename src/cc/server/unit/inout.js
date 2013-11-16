@@ -91,6 +91,30 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.A2K = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function() {
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.K2A = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var value = this.inputs[0][0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = value;
+      }
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 
