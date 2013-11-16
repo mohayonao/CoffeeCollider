@@ -12,6 +12,25 @@ define(function(require, exports, module) {
   ], {
     filter: unitTestSuite.filterUGen
   });
+
+  unitTestSuite("unit/delay.js", [
+    [ "DelayN", ["ar", "kr"], 3, 1 ],
+    [ "DelayL", ["ar", "kr"], 3, 1 ],
+    [ "DelayC", ["ar", "kr"], 3, 1 ],
+  ], {
+    filter: function(obj) {
+      var inRates = obj.inRates;
+      if (inRates[1] !== C.SCALAR) {
+        // maxDelayTime
+        return false;
+      }
+      if (inRates[1] !== C.CONTROL) {
+        // delayTime
+        return false;
+      }
+      return unitTestSuite.filterUGen(obj);
+    }
+  });
   
   unitTestSuite("unit/delay.js", [
     [ "CombN", ["ar", "kr"], 4, 1 ],
