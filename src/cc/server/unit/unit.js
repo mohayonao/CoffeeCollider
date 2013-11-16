@@ -77,6 +77,7 @@ define(function(require, exports, module) {
   require("./osc");
   require("./pan");
   require("./range");
+  require("./reverb");
   require("./ui");
   require("./uop");
   
