@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131117072300",
+    version: "0.0.0+20131117101800",
     global : {},
     Object : function CCObject() {}
   };
@@ -6272,13 +6272,13 @@ define('cc/client/client', function(require, exports, module) {
         window.addEventListener("mousemove", function(e) {
           f32_syncItems[2] = e.pageX / window.innerWidth;
           f32_syncItems[3] = e.pageY / window.innerHeight;
-        }, false);
+        }, true);
         window.addEventListener("mousedown", function() {
           f32_syncItems[4] = 1;
-        }, false);
+        }, true);
         window.addEventListener("mouseup", function() {
           f32_syncItems[4] = 0;
-        }, false);
+        }, true);
       }
       this.syncItems = syncItems;
       this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
