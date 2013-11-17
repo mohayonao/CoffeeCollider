@@ -579,7 +579,7 @@ define(function(require, exports, module) {
     }
   };
   var replaceCompoundAssign = function(tokens) {
-    for (var i = tokens.length; --i > 0; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (compound.operatorDict.hasOwnProperty(token[VALUE])) {
         var selector = compound.operatorDict[token[VALUE]];
@@ -649,7 +649,7 @@ define(function(require, exports, module) {
   var synthdef = {};
   var replaceSynthDefinition = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 4; i--; ) {
+    for (var i = tokens.length - 5; i >= 0; i--) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
         continue;
       }
@@ -709,7 +709,7 @@ define(function(require, exports, module) {
   };
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 4; i--; ) {
+    for (var i = tokens.length - 5; i >= 0; i--) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
         continue;
       }
@@ -837,7 +837,7 @@ define(function(require, exports, module) {
       var closureVars = task.getClosureVariables(line);
       
       task.beginOfLine(tokens, line, closureVars);
-      for (var i = line.len; i--; ) {
+      for (var i = line.len-1; i >= 0; i--) {
         if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
           if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
             contextMethodCalled = true;
@@ -903,7 +903,7 @@ define(function(require, exports, module) {
   
   
   var replaceGlobalVariables = function(tokens) {
-    for (var i = tokens.length - 1; i--; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;
@@ -927,7 +927,7 @@ define(function(require, exports, module) {
   };
   
   var replaceCCVariables = function(tokens) {
-    for (var i = tokens.length - 1; i--; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;

@@ -125,7 +125,9 @@ define(function(require, exports, module) {
     if (cc.global !== global) {
       global.cc = cc.global;
     }
-    global.cc.__context__ = this.taskManager.context;
+    global.cc.__context__ = {
+      version: cc.version
+    };
     var result = eval.call(global, code);
     if (callback) {
       this.sendToClient(["/executed", execId, pack(result)]);
