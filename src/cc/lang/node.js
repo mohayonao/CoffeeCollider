@@ -132,7 +132,21 @@ define(function(require, exports, module) {
   };
   
   var GroupInterface = cc.global.Group = function() {
-    return new Group();
+    var target, addAction;
+    var i = 0;
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.lang.rootNode;
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = {
+        addToHead:C.ADD_TO_HEAD, addToTail:C.ADD_TO_TAIL, addBefore:C.ADD_BEFORE, addAfter:C.ADD_AFTER, replace:C.REPLACE
+      }[arguments[i++]] || C.ADD_TO_HEAD;
+    } else {
+      addAction = C.ADD_TO_HEAD;
+    }
+    return new Group(target, addAction);
   };
   GroupInterface.after = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_AFTER);
@@ -150,8 +164,27 @@ define(function(require, exports, module) {
     return new Group(node, C.REPLACE);
   };
   
-  var SynthInterface = cc.global.Synth = function() {
-    return new Synth();
+  var SynthInterface = cc.global.Synth = function(def) {
+    var args, target, addAction;
+    var i = 1;
+    if (utils.isDict(arguments[i])) {
+      args = arguments[i++];
+    } else {
+      args = {};
+    }
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.lang.rootNode;
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = {
+        addToHead:C.ADD_TO_HEAD, addToTail:C.ADD_TO_TAIL, addBefore:C.ADD_BEFORE, addAfter:C.ADD_AFTER, replace:C.REPLACE
+      }[arguments[i++]] || C.ADD_TO_HEAD;
+    } else {
+      addAction = C.ADD_TO_HEAD;
+    }
+    return new Synth(target, addAction, def, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
