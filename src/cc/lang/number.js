@@ -380,12 +380,109 @@ define(function(require, exports, module) {
     }
     return _in - range * Math.floor((_in + b) / range);
   });
+
+  fn.definePrototypeProperty(Number, "rrand", fn(function(num) {
+    var a = this, b = num;
+    return a > b ?
+      Math.random() * (b - a) + a :
+      Math.random() * (a - b) + b;
+  }).defaults("num=0").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "exprand", fn(function(num) {
+    var a = this, b = num;
+    if (a === 0 && b === 0) {
+      return 0;
+    }
+    return a > b ?
+      b * Math.exp(Math.log(a / b) * Math.random()) :
+      a * Math.exp(Math.log(b / a) * Math.random());
+  }).defaults("num=0").multiCall().build());
   
   // others
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
 
+  fn.definePrototypeProperty(Number, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) {
+        return outMin;
+      }
+      break;
+    case "max":
+      if (this >= inMax) {
+        return outMax;
+      }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) {
+        return outMin;
+      }
+      if (this >= inMax) {
+        return outMax;
+      }
+      break;
+    }
+    return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return Math.pow(outMax/outMin, (this-inMin)/(inMax-inMin)) * outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return (Math.log(this/inMin)) / (Math.log(inMax/inMin)) * (outMax-outMin) + outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return Math.pow(outMax/outMin, Math.log(this/inMin) / Math.log(inMax/inMin)) * outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+  
   var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
   Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
     if (Number.prototype[selector]) {
