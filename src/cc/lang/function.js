@@ -52,6 +52,15 @@ define(function(require, exports, module) {
     ).play();
   });
 
+  fn.definePrototypeProperty(Function, "dup", fn(function(n) {
+    n |= 0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = this(i);
+    }
+    return a;
+  }).defaults("n=2").build());
+  
   // global method
   ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
     if (!cc.global.hasOwnProperty(selector)) {

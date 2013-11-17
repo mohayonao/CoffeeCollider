@@ -270,17 +270,25 @@ define(function(require, exports, module) {
     if (multiCall === undefined) {
       multiCall = true;
     }
-    
-    var klass = cc.global[name] = function(rate) {
-      if (typeof rate === "number") {
-        rate = ["ir", "kr", "ar"][rate];
-      }
-      var func = cc.global[name][rate];
-      if (func) {
-        return func.apply(null, slice.call(arguments, 1));
-      }
-      return new UGen(name);
-    };
+
+    var klass;
+    if (spec["new"]) {
+      klass = function() {
+        return cc.global[name]["new"].apply(null, slice.call(arguments));
+      };
+    } else {
+      klass = function(rate) {
+        if (typeof rate === "number") {
+          rate = ["ir", "kr", "ar"][rate];
+        }
+        var func = cc.global[name][rate];
+        if (func) {
+          return func.apply(null, slice.call(arguments, 1));
+        }
+        return new UGen(name);
+      };
+    }
+    cc.global[name] = klass;
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "_") {
@@ -365,6 +373,7 @@ define(function(require, exports, module) {
   require("./noise");
   require("./osc");
   require("./pan");
+  require("./random");
   require("./range");
   require("./reverb");
   require("./ui");
