@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var ops = require("../common/ops");
+  var slice = [].slice;
 
   // unary operator methods
   fn.definePrototypeProperty(Function, "__plus__", function() {
@@ -78,6 +79,21 @@ define(function(require, exports, module) {
       cc.global[selector] = function(a, b) {
         if (typeof a[selector] === "function") {
           return a[selector](b);
+        }
+        return a;
+      };
+    }
+  });
+
+  [
+    "rrand", "exprand", "madd",
+    "linlin", "linexp", "explin", "expexp",
+  ].forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function() {
+        var a = arguments[0];
+        if (typeof a[selector] === "function") {
+          return a[selector].apply(a, slice.call(arguments, 1));
         }
         return a;
       };
