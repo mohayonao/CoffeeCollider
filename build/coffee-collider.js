@@ -131,7 +131,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131113223700",
+    version: "0.0.0",
     global : {},
     Object : function CCObject() {}
   };
@@ -263,7 +263,9 @@ define('cc/lang/lang', function(require, exports, module) {
     if (cc.global !== global) {
       global.cc = cc.global;
     }
-    global.cc.__context__ = this.taskManager.context;
+    global.cc.__context__ = {
+      version: cc.version
+    };
     var result = eval.call(global, code);
     if (callback) {
       this.sendToClient(["/executed", execId, pack(result)]);
@@ -839,18 +841,6 @@ define('cc/lang/fn', function(require, exports, module) {
       }
       return false;
     };
-    // var containsArray2 = function(list) {
-    //   for (var i = 0, imax = list.length; i < imax; ++i) {
-    //     if (Array.isArray(list[i])) {
-    //       for (var j = 0, jmax = list[i].length; j < jmax; ++j) {
-    //         if (Array.isArray(list[i][j])) {
-    //           return true;
-    //         }
-    //       }
-    //     }
-    //   }
-    //   return false;
-    // };
     var resolve_args = function(keys, vals, given) {
       var dict;
       var args = vals.slice();
@@ -1000,11 +990,25 @@ define('cc/common/ops', function(require, exports, module) {
     __div__  : "/",
     __mod__  : "%",
   };
+
+  var COMMON_FUNCTIONS = {
+    madd: "mul=1,add=0",
+    range: "lo=0,hi=1",
+    unipolar: "mul=1",
+    bipolar : "mul=1",
+    lag   : "t1=0.1,t2",
+    lag2  : "t1=0.1,t2",
+    lag3  : "t1=0.1,t2",
+    lagud : "lagTimeU=0.1,lagTimeD=0.1",
+    lag2ud: "lagTimeU=0.1,lagTimeD=0.1",
+    lag3ud: "lagTimeU=0.1,lagTimeD=0.1",
+  };
   
   module.exports = {
     UNARY_OP_UGEN_MAP : UNARY_OP_UGEN_MAP,
     BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
     UGEN_OP_ALIASES   : UGEN_OP_ALIASES,
+    COMMON_FUNCTIONS  : COMMON_FUNCTIONS,
   };
 
 });
@@ -1246,7 +1250,21 @@ define('cc/lang/node', function(require, exports, module) {
   };
   
   var GroupInterface = cc.global.Group = function() {
-    return new Group();
+    var target, addAction;
+    var i = 0;
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.lang.rootNode;
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = {
+        addToHead:0, addToTail:1, addBefore:2, addAfter:3, replace:4
+      }[arguments[i++]] || 0;
+    } else {
+      addAction = 0;
+    }
+    return new Group(target, addAction);
   };
   GroupInterface.after = function(node) {
     return new Group(node || cc.lang.rootNode, 3);
@@ -1264,8 +1282,27 @@ define('cc/lang/node', function(require, exports, module) {
     return new Group(node, 4);
   };
   
-  var SynthInterface = cc.global.Synth = function() {
-    return new Synth();
+  var SynthInterface = cc.global.Synth = function(def) {
+    var args, target, addAction;
+    var i = 1;
+    if (utils.isDict(arguments[i])) {
+      args = arguments[i++];
+    } else {
+      args = {};
+    }
+    if (cc.instanceOfNode(arguments[i])) {
+      target = arguments[i++];
+    } else {
+      target = cc.lang.rootNode;
+    }
+    if (typeof arguments[i] === "string") {
+      addAction = {
+        addToHead:0, addToTail:1, addBefore:2, addAfter:3, replace:4
+      }[arguments[i++]] || 0;
+    } else {
+      addAction = 0;
+    }
+    return new Synth(target, addAction, def, args);
   };
   SynthInterface.after = function() {
     var list = sortArgs(arguments);
@@ -3319,7 +3356,15 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
   
   var addToSynthDef = null;
   var specs = {};
-  cc.ugen = { specs:specs };
+  cc.ugen = {
+    specs:specs,
+    checkSameRateAsFirstInput: function(ugen) {
+      if (ugen.rate !== ugen.inputs[0].rate) {
+        var strRate = ["ir","kr","ar"][ugen.rate];
+        throw new TypeError("first input is not " + strRate + " rate");
+      }
+    }
+  };
   
   var UGen = (function() {
     function UGen(name) {
@@ -3390,6 +3435,79 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
     UGen.prototype.bipolar = fn(function(mul) {
       return this.range(mul.neg(), mul);
     }).defaults("mul=1").multiCall().build();
+
+    UGen.prototype.clip = fn(function(lo, hi) {
+      return cc.global.Clip(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
+
+    UGen.prototype.fold = fn(function(lo, hi) {
+      return cc.global.Fold(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
+    
+    UGen.prototype.wrap = fn(function(lo, hi) {
+      return cc.global.Wrap(this.rate, this, lo, hi);
+    }).defaults("lo=1,hi=1").multiCall().build();
+    
+    UGen.prototype.lag = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        return cc.global.Lag(this.rate, this, t1);
+      }
+      return cc.global.LagUD(this.rate, this, t1, t2);
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag2 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        return cc.global.Lag2(this.rate, this, t1);
+      }
+      return cc.global.Lag2UD(this.rate, this, t1, t2);
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lag3 = fn(function(t1, t2) {
+      if (typeof t2 === "undefined") {
+        return cc.global.Lag3(this.rate, this, t1);
+      }
+      return cc.global.Lag3UD(this.rate, this, t1, t2);
+    }).defaults("t1=0.1,t2").multiCall().build();
+    
+    UGen.prototype.lagud = fn(function(lagTimeU, lagTimeD) {
+      return cc.global.LagUD(this.rate, this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag2ud = fn(function(lagTimeU, lagTimeD) {
+      return cc.global.Lag2UD(this.rate, this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    
+    UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
+      return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
+    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+
+    UGen.prototype.linlin = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return cc.global.LinLin(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+
+    UGen.prototype.linexp = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return cc.global.LinExp(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    
+    UGen.prototype.explin = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return cc.global.ExpLin(
+        this.rate,
+        prune.call(this, inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    
+    UGen.prototype.expexp = fn(function(inMin, inMax, outMin, outMax, clip) {
+      return outMax.__div__(outMin).pow(prune.call(this, inMin, inMax, clip).__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
+    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
@@ -3406,6 +3524,18 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
         });
       }
     });
+
+    var prune = function(min, max, type) {
+      switch (type) {
+      case "minmax":
+        return this.clip(min, max);
+      case "min":
+        return this.max(min);
+      case "max":
+        return this.min(max);
+      }
+      return this;
+    };
     
     return UGen;
   })();
@@ -3449,41 +3579,84 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
     extend(OutputProxy, UGen);
     return OutputProxy;
   })();
+
+  var checkBadInput = function(ugen) {
+    ugen.inputs.forEach(function(_in, i) {
+      if (!(typeof _in === "number" || _in instanceof UGen)) {
+        throw new TypeError("arg[" + i + "] bad input");
+      }
+    });
+  };
+  
+  var init_instance = function(instance, tag, checkInputs) {
+    if (Array.isArray(instance)) {
+      instance.forEach(function(ugen) {
+        if (ugen instanceof UGen) {
+          checkBadInput(instance);
+          if (checkInputs) {
+            checkInputs(instance);
+          }
+          instance.tag = tag || "";
+        }
+      });
+    } else if (instance instanceof UGen) {
+      checkBadInput(instance);
+      if (checkInputs) {
+        checkInputs(instance);
+      }
+      instance.tag = tag || "";
+    }
+    return instance;
+  };
   
   
   var registerUGen = function(name, spec) {
-    var klass = cc.global[name] = function() {
-      return new UGen(name);
-    };
+    var BaseClass = (spec._Klass === null) ? null : (spec._Klass || UGen);
+    var multiCall   = spec._multiCall;
+    var checkInputs = spec._checkInputs;
+    if (multiCall === undefined) {
+      multiCall = true;
+    }
+
+    var klass;
+    if (spec["new"]) {
+      klass = function() {
+        return cc.global[name]["new"].apply(null, slice.call(arguments));
+      };
+    } else {
+      klass = function(rate) {
+        if (typeof rate === "number") {
+          rate = ["ir", "kr", "ar"][rate];
+        }
+        var func = cc.global[name][rate];
+        if (func) {
+          return func.apply(null, slice.call(arguments, 1));
+        }
+        return new UGen(name);
+      };
+    }
+    cc.global[name] = klass;
     
     Object.keys(spec).forEach(function(key) {
+      if (key.charAt(0) === "_") {
+        return;
+      }
       var setting   = spec[key];
       var defaults  = setting.defaults + ",tag";
       var ctor      = setting.ctor;
-      var multiCall = setting.multiCall;
-      if (multiCall === undefined) {
-        multiCall = true;
-      }
-      if (setting.Klass !== null) {
-        var Klass = setting.Klass || UGen;
+      if (BaseClass !== null) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new Klass(name, tag), args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
+          var instance = ctor.apply(new BaseClass(name, tag), args);
+          return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       } else {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
-          if (instance instanceof UGen) {
-            instance.tag = tag || "";
-          }
-          return instance;
+          return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       }
     });
@@ -3528,6 +3701,7 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
       require("./madd");
       require("./inout");
       require("./mix");
+      require("./filter");
       
       // redefinition for tests
       cc.UGen = UGen;
@@ -3537,6 +3711,7 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
   };
   
   require("./bufio");
+  require("./debug");
   require("./decay");
   require("./delay");
   require("./filter");
@@ -3545,6 +3720,9 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
   require("./noise");
   require("./osc");
   require("./pan");
+  require("./random");
+  require("./range");
+  require("./reverb");
   require("./ui");
   
   Object.keys(specs).forEach(function(name) {
@@ -3973,6 +4151,7 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   })();
   
   cc.ugen.specs.In = {
+    _Klass: cc.MultiOutUGen,
     ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
@@ -3980,7 +4159,6 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
         this.inputs = [ bus ];
         return this.initOutputs(numChannels, this.rate);
       },
-      Klass: cc.MultiOutUGen
     },
     kr: {
       defaults: "bus=0,numChannels=1",
@@ -3988,8 +4166,7 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
         this.init.call(this, 1);
         this.inputs = [ bus ];
         return this.initOutputs(numChannels, this.rate);
-      },
-      Klass: cc.MultiOutUGen
+      }
     }
   };
   
@@ -4031,17 +4208,33 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   };
   
   cc.ugen.specs.Out = {
+    _Klass    : null,
+    _multiCall: false,
     ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(2),
-      multiCall: false,
-      Klass: null
     },
     kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(1),
-      multiCall: false,
-      Klass: null
+    }
+  };
+
+  cc.ugen.specs.A2K = {
+    kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(1, _in);
+      }
+    }
+  };
+  
+  cc.ugen.specs.K2A = {
+    ar: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(2, _in);
+      }
     }
   };
   
@@ -4115,6 +4308,143 @@ define('cc/lang/ugen/mix', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/lang/ugen/filter', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.OnePole = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,coef=0.5,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(2, _in, coef).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,coef=0.5,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.init(1, _in, coef).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.OneZero = cc.ugen.specs.OnePole;
+
+  cc.ugen.specs.TwoPole = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
+      ctor: function(_in, freq, radius, mul, add) {
+        return this.init(2, _in, freq, radius).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
+      ctor: function(_in, freq, radius, mul, add) {
+        return this.init(1, _in, freq, radius).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.TwoZero = cc.ugen.specs.TwoPole;
+  cc.ugen.specs.APF     = cc.ugen.specs.TwoPole;
+  
+  cc.ugen.specs.LPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,mul=1,add=0",
+      ctor: function(_in, freq, mul, add) {
+        return this.init(2, _in, freq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,mul=1,add=0",
+      ctor: function(_in, freq, mul, add) {
+        return this.init(1, _in, freq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.HPF = cc.ugen.specs.LPF;
+
+  cc.ugen.specs.BPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(2, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(1, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.BRF = cc.ugen.specs.BPF;
+  
+  cc.ugen.specs.RLPF = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(2, _in, freq, rq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
+      ctor: function(_in, freq, rq, mul, add) {
+        return this.init(1, _in, freq, rq).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
+
+  cc.ugen.specs.Lag = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,lagTime=0.1,mul=1,add=0",
+      ctor: function(_in, lagTime, mul, add) {
+        return this.init(2, _in, lagTime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,lagTime=0.1,mul=1,add=0",
+      ctor: function(_in, lagTime, mul, add) {
+        return this.init(1, _in, lagTime).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.Lag2 = cc.ugen.specs.Lag;
+  cc.ugen.specs.Lag3 = cc.ugen.specs.Lag;
+  cc.ugen.specs.Ramp = cc.ugen.specs.Lag;
+
+  cc.ugen.specs.LagUD = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
+      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
+        return this.init(2, _in, lagTimeU, lagTimeD).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
+      ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
+        return this.init(1, _in, lagTimeU, lagTimeD).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Lag2UD = cc.ugen.specs.LagUD;
+  cc.ugen.specs.Lag3UD = cc.ugen.specs.LagUD;
+  
+  module.exports = {};
+
+});
 define('cc/lang/ugen/bufio', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -4137,16 +4467,37 @@ define('cc/lang/ugen/bufio', function(require, exports, module) {
   };
   
   cc.ugen.specs.PlayBuf = {
+    _Klass: cc.MultiOutUGen,
     ar: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(2),
-      Klass: cc.MultiOutUGen
+      ctor: playbuf_ctor(2)
     },
     kr: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
-      ctor: playbuf_ctor(1),
-      Klass: cc.MultiOutUGen
+      ctor: playbuf_ctor(1)
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/lang/ugen/debug', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.Debug = {
+    ar: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(2, _in);
+      }
     },
+    kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(1, _in);
+      }
+    }
   };
   
   module.exports = {};
@@ -4155,50 +4506,53 @@ define('cc/lang/ugen/bufio', function(require, exports, module) {
 define('cc/lang/ugen/decay', function(require, exports, module) {
 
   var cc = require("../cc");
-
+  
   cc.ugen.specs.Integrator = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return this.init(2, _in, coef).mad(mul, add);
+        return this.init(2, _in, coef).madd(mul, add);
       }
     },
     kr: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return this.init(1, _in, coef).mad(mul, add);
+        return this.init(1, _in, coef).madd(mul, add);
       }
-    },
+    }
   };
 
   cc.ugen.specs.Decay = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
-        return this.init(2, _in, decayTime).mad(mul, add);
+        return this.init(2, _in, decayTime).madd(mul, add);
       }
     },
     kr: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
-        return this.init(1, _in, decayTime).mad(mul, add);
+        return this.init(1, _in, decayTime).madd(mul, add);
       }
-    },
+    }
   };
   
   cc.ugen.specs.Decay2 = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
-        return this.init(2, _in, attackTime, decayTime).mad(mul, add);
+        return this.init(2, _in, attackTime, decayTime).madd(mul, add);
       }
     },
     kr: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
-        return this.init(1, _in, attackTime, decayTime).mad(mul, add);
+        return this.init(1, _in, attackTime, decayTime).madd(mul, add);
       }
-    },
+    }
   };
   
   module.exports = {};
@@ -4207,48 +4561,65 @@ define('cc/lang/ugen/decay', function(require, exports, module) {
 define('cc/lang/ugen/delay', function(require, exports, module) {
   
   var cc = require("../cc");
-  
-  var Comb = {
+
+  cc.ugen.specs.Delay1 = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(2, _in).madd(mul, add);
       }
     },
     kr: {
-      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
-      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
-        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
-      }
-    },
-  };
-  cc.ugen.specs.CombN = Comb;
-  cc.ugen.specs.CombL = Comb;
-  cc.ugen.specs.CombC = Comb;
-  
-  module.exports = {};
-
-});
-define('cc/lang/ugen/filter', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  cc.ugen.specs.RLPF = {
-    ar: {
-      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
-      ctor: function(_in, freq, rq, mul, add) {
-        return this.init(2, _in, freq, rq).madd(mul, add);
-      }
-    },
-    kr: {
-      defaults: "in=0,freq=440,rq=1,mul=1,add=0",
-      ctor: function(_in, freq, rq, mul, add) {
-        return this.init(1, _in, freq, rq).madd(mul, add);
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(1, _in).madd(mul, add);
       }
     }
   };
   
-  cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
+  cc.ugen.specs.Delay2 = cc.ugen.specs.Delay1;
+
+  cc.ugen.specs.DelayN = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, mul, add) {
+        return this.init(1, _in, maxdelaytime, delaytime).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.DelayL = cc.ugen.specs.DelayN;
+  cc.ugen.specs.DelayC = cc.ugen.specs.DelayN;
+  
+  cc.ugen.specs.CombN = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
+      ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
+        return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
+      }
+    },
+  };
+  cc.ugen.specs.CombL = cc.ugen.specs.CombN;
+  cc.ugen.specs.CombC = cc.ugen.specs.CombN;
+  
+  cc.ugen.specs.AllpassN = cc.ugen.specs.CombN;
+  cc.ugen.specs.AllpassL = cc.ugen.specs.CombN;
+  cc.ugen.specs.AllpassC = cc.ugen.specs.CombN;
   
   module.exports = {};
 
@@ -4301,15 +4672,52 @@ define('cc/lang/ugen/noise', function(require, exports, module) {
         return this.init(2).madd(mul, add);
       }
     },
-    ak: {
+    kr: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
-        return this.init(2).madd(mul, add);
+        return this.init(1).madd(mul, add);
       }
-    },
+    }
   };
   
   cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
+  cc.ugen.specs.ClipNoise = cc.ugen.specs.WhiteNoise;
+  
+  cc.ugen.specs.Dust = {
+    ar: {
+      defaults: "density=0,mul=1,add=0",
+      ctor: function(density, mul, add) {
+        return this.init(2, density).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "density=0,mul=1,add=0",
+      ctor: function(density, mul, add) {
+        return this.init(1, density).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Dust2 = cc.ugen.specs.Dust;
+
+  cc.ugen.specs.LFNoise0 = {
+    ar: {
+      defaults: "freq=500,mul=1,add=0",
+      ctor: function(freq, mul, add) {
+        return this.init(2, freq).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=500,mul=1,add=0",
+      ctor: function(freq, mul, add) {
+        return this.init(1, freq).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.LFNoise1 = cc.ugen.specs.LFNoise0;
+  cc.ugen.specs.LFNoise2 = cc.ugen.specs.LFNoise0;
+  cc.ugen.specs.LFClipNoise = cc.ugen.specs.LFNoise0;
   
   module.exports = {};
 
@@ -4423,6 +4831,21 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Impulse = {
+    ar: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(2, freq, phase).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "freq=440,phase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(1, freq, phase).madd(mul, add);
+      }
+    }
+  };
   
   module.exports = {};
 
@@ -4444,16 +4867,174 @@ define('cc/lang/ugen/pan', function(require, exports, module) {
   };
   
   cc.ugen.specs.Pan2 = {
+    _Klass: cc.MultiOutUGen,
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
     ar: {
       defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(2),
-      Klass: cc.MultiOutUGen
+      ctor: pan2_ctor(2)
     },
     kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(1),
-      Klass: cc.MultiOutUGen
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/lang/ugen/random', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.Rand = {
+    "new": {
+      defaults: "lo=0,hi=1",
+      ctor: function(lo, hi) {
+        return this.init(0, lo, hi);
+      }
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/lang/ugen/range', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.InRange = {
+    ar: {
+      defaults: "in,lo=0,hi=1",
+      ctor: function(_in, lo, hi) {
+        return this.init(2, _in, lo, hi);
+      }
     },
+    kr: {
+      defaults: "in,lo=0,hi=1",
+      ctor: function(_in, lo, hi) {
+        return this.init(1, _in, lo, hi);
+      }
+    },
+    ir: {
+      defaults: "in,lo=0,hi=1",
+      ctor: function(_in, lo, hi) {
+        return this.init(0, _in, lo, hi);
+      }
+    }
+  };
+
+  cc.ugen.specs.Clip = cc.ugen.specs.InRange;
+  cc.ugen.specs.Fold = cc.ugen.specs.InRange;
+  cc.ugen.specs.Wrap = cc.ugen.specs.InRange;
+
+  var linlin_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
+    var scale  = (dsthi.__sub__(dstlo)).__div__(srchi.__sub__(srclo));
+    var offset = dstlo.__sub__(scale.__mul__(srclo));
+    return cc.createMulAdd(_in, scale, offset);
+  };
+  
+  cc.ugen.specs.LinLin = {
+    ar: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linlin_ctor
+    },
+    kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linlin_ctor
+    }
+  };
+  
+  var linexp_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
+    // Math.pow(dsthi / dstlo, (_in-srclo)/(srchi-srclo)) * dstlo
+    return dsthi.__div__(dstlo).pow(
+      (_in.__sub__(srclo)).__div__(srchi.__sub__(srclo))
+    ).__mul__(dstlo);
+  };
+  
+  cc.ugen.specs.LinExp = {
+    ar: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linexp_ctor
+    },
+    kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linexp_ctor
+    },
+    ir: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linexp_ctor
+    }
+  };
+
+  var explin_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
+    // Math.log(_in/srclo) / Math.log(srchi/srclo) * (dsthi-dstlo) + dstlo
+    return _in.__div__(srclo).log().__div__(
+      srchi.__div__(srclo).log()
+    ).__mul__(
+      dsthi.__sub__(dstlo)
+    ).__add__(dstlo);
+  };
+  
+  cc.ugen.specs.ExpLin = {
+    ar: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: explin_ctor
+    },
+    kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: explin_ctor
+    },
+    ir: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: explin_ctor
+    }
+  };
+
+  var expexp_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
+    // Math.pow(dsthi/dstlo, Math.log(_in/srclo) / Math.log(srchi-srclo)) * dstlo
+    return dsthi.__div__(dstlo).pow(
+      _in.__div__(srclo).log().__div__(
+        srchi.__div__(srclo).log()
+      )
+    ).__mul__(dstlo);
+  };
+  
+  cc.ugen.specs.ExpExp = {
+    ar: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: expexp_ctor
+    },
+    kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: expexp_ctor
+    },
+    ir: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: expexp_ctor
+    }
+  };
+  
+  module.exports = {};
+
+});
+define('cc/lang/ugen/reverb', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.ugen.specs.FreeVerb = {
+    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    ar: {
+      defaults: "in=0,mix=0.33,room=0.5,damp=0.5,mul=1,add=0",
+      ctor: function(_in, mix, room, damp, mul, add) {
+        return this.init(2, _in, mix, room, damp).madd(mul, add);
+      }
+    },
+    kr: {
+      defaults: "in=0,mix=0.33,room=0.5,damp=0.5,mul=1,add=0",
+      ctor: function(_in, mix, room, damp, mul, add) {
+        return this.init(1, _in, mix, room, damp).madd(mul, add);
+      }
+    }
   };
   
   module.exports = {};
@@ -4807,6 +5388,7 @@ define('cc/lang/array', function(require, exports, module) {
   var fn = require("./fn");
   var ops   = require("../common/ops");
   var utils = require("./utils");
+  var slice = [].slice;
 
   var setupUnaryOp = function(selector) {
     fn.definePrototypeProperty(Array, selector, function() {
@@ -4912,18 +5494,538 @@ define('cc/lang/array', function(require, exports, module) {
       setupBinaryOp(selector);
     }
   });
+
+  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
+  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
+    fn.definePrototypeProperty(Array, selector, fn(function() {
+      var args = slice.call(arguments);
+      return this.map(function(_in) {
+        if (_in[selector]) {
+          return _in[selector].apply(_in, args);
+        }
+        return _in;
+      });
+    }).defaults(COMMON_FUNCTIONS[selector]).multiCall().build());
+  });
+
   
-  fn.definePrototypeProperty(Array, "madd", fn(function(mul, add) {
-    return utils.flop([this, mul, add]).map(function(items) {
-      var _in = items[0], mul = items[1], add = items[2];
-      return cc.createMulAdd(_in, mul, add);
+  fn.definePrototypeProperty(Array, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    return this.map(function(a) {
+      return a.linlin(inMin, inMax, outMin, outMax, clip);
     });
-  }).defaults("mul=1,add=0").multiCall().build());
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    return this.map(function(a) {
+      return a.linexp(inMin, inMax, outMin, outMax, clip);
+    });
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Array, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    return this.map(function(a) {
+      return a.explin(inMin, inMax, outMin, outMax, clip);
+    });
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+  
+  fn.definePrototypeProperty(Array, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    return this.map(function(a) {
+      return a.expexp(inMin, inMax, outMin, outMax, clip);
+    });
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
   
   cc.global.SHORT = 1;
   cc.global.FOLD  = 2;
   cc.global.TABLE = 3;
   cc.global.FLAT  = 4;
+
+  // utils
+  var cc_func = function(func) {
+    if (typeof func === "function") {
+      return func;
+    }
+    return function() {
+      return func;
+    };
+  };
+  
+  // array class methods
+  Array.series = fn(function(size, start, step) {
+    size |= 0;
+    var a = new Array(size);
+    var value = start;
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = value;
+      value += step;
+    }
+    return a;
+  }).defaults("size=0,start=0,step=1").build();
+
+  Array.geom = fn(function(size, start, grow) {
+    size |= 0;
+    var a = new Array(size);
+    var value = start;
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = value;
+      value *= grow;
+    }
+    return a;
+  }).defaults("size=0,start=1,grow=2").build();
+
+  Array.fill = fn(function(size, func) {
+    size |= 0;
+    var a = new Array(size);
+    func  = cc_func(func);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = func(i);
+    }
+    return a;
+  }).defaults("size=0,func=0").build();
+
+  Array.fill2D = fn(function(rows, cols, func) {
+    rows |= 0;
+    cols |= 0;
+    func = cc_func(func);
+    var a, a2, row, col;
+    a = new Array(rows);
+    for (row = 0; row < rows; ++row) {
+      a2 = a[row] = new Array(cols);
+      for (col = 0; col < cols; ++col) {
+        a2[col] = func(row, col);
+      }
+    }
+    return a;
+  }).defaults("rows=0,cols=0,func=0").build();
+
+  Array.fillND = (function() {
+    var fillND = function(dimensions, func, args) {
+      var n, a, argIndex, i;
+      n = dimensions[0];
+      a = [];
+      argIndex = args.length;
+      args = args.concat(0);
+      if (dimensions.length <= 1) {
+        for (i = 0; i < n; ++i) {
+          args[argIndex] = i;
+          a.push(func.apply(null, args));
+        }
+      } else {
+        dimensions = dimensions.slice(1);
+        for (i = 0; i < n; ++i) {
+          args[argIndex] = i;
+          a.push(fillND(dimensions, func, args));
+        }
+      }
+      return a;
+    };
+    return fn(function(dimensions, func) {
+      return fillND(dimensions, cc_func(func), []);
+    }).defaults("dimensions=[],func=0").build();
+  })();
+
+  Array.fib = fn(function(size, x, y) {
+    var a = new Array(size|0);
+    for (var t, i = 0, imax = a.length; i < imax; i++) {
+      a[i] = y;
+      t = y;
+      y = x + y;
+      x = t;
+    }
+    return a;
+  }).defaults("size=0,a=0,b=1").build();
+
+  Array.rand = fn(function(size, minVal, maxVal) {
+    var a = new Array(size|0);
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = minVal.rrand(maxVal);
+    }
+    return a;
+  }).defaults("size=0,minVal=0,maxVal=1").build();
+
+  Array.rand2 = fn(function(size, val) {
+    var a = new Array(size|0);
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = val.rand2();
+    }
+    return a;
+  }).defaults("size=0,val=1").build();
+
+  Array.linrand = fn(function(size, minVal, maxVal) {
+    var a = new Array(size|0);
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = minVal.linrand(maxVal);
+    }
+    return a;
+  }).defaults("size=0,minVal=0,maxVal=1").build();
+
+  Array.exprand = fn(function(size, minVal, maxVal) {
+    var a = new Array(size|0);
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = minVal.exprand(maxVal);
+    }
+    return a;
+  }).defaults("size=0,minVal=0,maxVal=1").build();
+  
+  Array.interpolation = fn(function(size, start, end) {
+    if (size === 1) {
+      return [start];
+    }
+    var a = new Array(size|0);
+    var step = (end - start) / (size - 1);
+    for (var i = 0, imax = a.length; i < imax; i++) {
+      a[i] = start + (i * step);
+    }
+    return a;
+  }).defaults("size=0,start=0,end=1").build();
+  
+  
+  // array instance methods
+  var ifold = function(index, len) {
+    var len2 = len * 2 - 2;
+    index = (index|0) % len2;
+    if (len <= index) {
+      index = len2 - index;
+    }
+    return index;
+  };
+  
+  fn.definePrototypeProperty(Array, "size", function() {
+    return this.length;
+  });
+  
+  var minItem = function(func) {
+    var i, imax, val, minVal, minItem;
+    if (func) {
+      func = cc_func(func);
+      minItem = this[0];
+      minVal  = func(this[0], 0);
+      for (i = 1, imax = this.length; i < imax; ++i) {
+        val = func(this[i], i);
+        if (val < minVal) {
+          minItem = this[i];
+          minVal = val;
+        }
+      }
+    } else {
+      minItem = this[0];
+      for (i = 1, imax = this.length; i < imax; ++i) {
+        if (this[i] < minItem) {
+          minItem = this[i];
+        }
+      }
+    }
+    return minItem;
+  };
+  
+  fn.definePrototypeProperty(Array, "minItem" , minItem);
+  fn.definePrototypeProperty(Array, "minValue", minItem);
+  
+  var maxItem = function(func) {
+    var i, imax, val, maxVal, maxItem;
+    if (func) {
+      func = cc_func(func);
+      maxItem = this[0];
+      maxVal  = func(this[0], 0);
+      for (i = 1, imax = this.length; i < imax; ++i) {
+        val = func(this[i], i);
+        if (maxVal < val) {
+          maxItem = this[i];
+          maxVal = val;
+        }
+      }
+    } else {
+      maxItem = this[0];
+      for (i = 1, imax = this.length; i < imax; ++i) {
+        if (maxItem < this[i]) {
+          maxItem = this[i];
+        }
+      }
+    }
+    return maxItem;
+  };
+  
+  fn.definePrototypeProperty(Array, "maxItem" , maxItem);
+  fn.definePrototypeProperty(Array, "maxValue", maxItem);
+  
+  fn.definePrototypeProperty(Array, "at", fn(function(index) {
+    return this[index|0];
+  }).multiCall().build());
+
+  fn.definePrototypeProperty(Array, "clipAt", fn(function(index) {
+    return this[Math.max(0, Math.min(index, this.length-1))|0];
+  }).multiCall().build());
+
+  fn.definePrototypeProperty(Array, "wrapAt", fn(function(index) {
+    return this[(index|0) % this.length];
+  }).multiCall().build());
+
+  fn.definePrototypeProperty(Array, "foldAt", fn(function(index) {
+    return this[ifold(index, this.length)];
+  }).multiCall().build());
+  
+
+  fn.definePrototypeProperty(Array, "put", function(index, item) {
+    if (Array.isArray(index)) {
+      index.forEach(function(index) {
+        this.put(index, item);
+      }, this);
+    } else {
+      index |= 0;
+      if (0 <= index && index < this.length) {
+        this[index] = item;
+      }
+    }
+    return this;
+  });
+
+  fn.definePrototypeProperty(Array, "clipPut", function(index, item) {
+    if (Array.isArray(index)) {
+      index.forEach(function(index) {
+        this.clipPut(index, item);
+      }, this);
+    } else {
+      this[Math.max(0, Math.min(index, this.length-1))|0] = item;
+    }
+    return this;
+  });
+
+  fn.definePrototypeProperty(Array, "wrapPut", function(index, item) {
+    if (Array.isArray(index)) {
+      index.forEach(function(index) {
+        this.wrapPut(index, item);
+      }, this);
+    } else {
+      this[(index|0) % this.length] = item;
+    }
+    return this;
+  });
+  
+  fn.definePrototypeProperty(Array, "foldPut", function(index, item) {
+    if (Array.isArray(index)) {
+      index.forEach(function(index) {
+        this.foldPut(index, item);
+      }, this);
+    } else {
+      this[ifold(index, this.length)] = item;
+    }
+    return this;
+  });
+
+  fn.definePrototypeProperty(Array, "insert", function(index, item) {
+    if (Array.isArray(index)) {
+      index.forEach(function(index) {
+        this.insert(index, item);
+      }, this);
+    }
+    this.splice(index, 0, item);
+    return this;
+  });
+
+  fn.definePrototypeProperty(Array, "swap", function(i, j) {
+    var t = this[i|0];
+    this[i|0] = this[j|0];
+    this[j|0] = t;
+    return this;
+  });
+
+  fn.definePrototypeProperty(Array, "clipSwap", function(i, j) {
+    i = Math.max(0, Math.min(i, this.length-1))|0;
+    j = Math.max(0, Math.min(j, this.length-1))|0;
+    return this.swap(i, j);
+  });
+  
+  fn.definePrototypeProperty(Array, "wrapSwap", function(i, j) {
+    i = (i|0) % this.length;
+    j = (j|0) % this.length;
+    return this.swap(i, j);
+  });
+  
+  fn.definePrototypeProperty(Array, "foldSwap", function(i, j) {
+    i = ifold(i, this.length);
+    j = ifold(j, this.length);
+    return this.swap(i, j);
+  });
+
+  fn.definePrototypeProperty(Array, "sum", function() {
+    var value = 0;
+    for (var i = 0, imax = this.length; i < imax; ++i) {
+      value += this[i];
+    }
+    return value;
+  });
+  
+  fn.definePrototypeProperty(Array, "normalize", fn(function(min, max) {
+    var minItem = this.minItem();
+    var maxItem = this.maxItem();
+    return this.map(function(item) {
+      return item.linlin(minItem, maxItem, min, max);
+    });
+  }).defaults("min=0,max=1").build());
+
+  fn.definePrototypeProperty(Array, "normalizeSum", function() {
+    var sum = this.sum();
+    return this.map(function(item) {
+      return item / sum;
+    });
+  });
+  
+  
+  fn.definePrototypeProperty(Array, "mirror", function() {
+    var size = this.length * 2 - 1;
+    if (size < 2) {
+      return this.slice(0);
+    }
+    var i, j, imax, a = new Array(size);
+    for (i = 0, imax = this.length; i < imax; ++i) {
+      a[i] = this[i];
+    }
+    for (j = imax - 2, imax = size; i < imax; ++i, --j) {
+      a[i] = this[j];
+    }
+    return a;
+  });
+
+  fn.definePrototypeProperty(Array, "mirror1", function() {
+    var size = this.length * 2 - 2;
+    if (size < 2) {
+      return this.slice(0);
+    }
+    var i, j, imax, a = new Array(size);
+    for (i = 0, imax = this.length; i < imax; ++i) {
+      a[i] = this[i];
+    }
+    for (j = imax - 2, imax = size; i < imax; ++i, --j) {
+      a[i] = this[j];
+    }
+    return a;
+  });
+
+  fn.definePrototypeProperty(Array, "mirror2", function() {
+    var size = this.length * 2;
+    if (size < 2) {
+      return this.slice(0);
+    }
+    var i, j, imax, a = new Array(size);
+    for (i = 0, imax = this.length; i < imax; ++i) {
+      a[i] = this[i];
+    }
+    for (j = imax - 1, imax = size; i < imax; ++i, --j) {
+      a[i] = this[j];
+    }
+    return a;
+  });
+
+  fn.definePrototypeProperty(Array, "stutter", fn(function(n) {
+    n = Math.max(0, n)|0;
+    var a = new Array(this.length * n);
+    for (var i = 0, j = 0, imax = this.length; i < imax; ++i) {
+      for (var k = 0; k < n; ++k, ++j) {
+        a[j] = this[i];
+      }
+    }
+    return a;
+  }).defaults("n=2").build());
+
+  fn.definePrototypeProperty(Array, "rotate", fn(function(n) {
+    n = Math.max(0, n)|0;
+    var a = new Array(this.length);
+    var size = a.length;
+    n %= size;
+    if (n < 0) {
+      n = size + n;
+    }
+    for (var i = 0, j = n; i < size; ++i) {
+      a[j] = this[i];
+      if (++j >= size) {
+        j = 0;
+      }
+    }
+    return a;
+  }).defaults("n=1").build());
+
+  fn.definePrototypeProperty(Array, "sputter", fn(function(probability, maxlen) {
+    var a = [], i = 0, j = 0, size = this.length;
+    while (i < size && j < maxlen) {
+      a[j++] = this[i];
+      if (probability < Math.random()) {
+        i += 1;
+      }
+    }
+    return a;
+  }).defaults("probability=0.25,maxlen=100").build());
+
+  fn.definePrototypeProperty(Array, "clipExtend", function(size) {
+    size = Math.max(0, size|0);
+    if (this.length < size) {
+      var a = new Array(size);
+      for (var i = 0, imax = this.length; i< imax; ++i) {
+        a[i] = this[i];
+      }
+      for (var b = a[i-1]; i < size; ++i) {
+        a[i] = b;
+      }
+      return a;
+    } else {
+      return this.slice(0, size);
+    }
+  });
+
+  fn.definePrototypeProperty(Array, "wrapExtend", function(size) {
+    size = Math.max(0, size|0);
+    if (this.length < size) {
+      var a = new Array(size);
+      for (var i = 0; i < size; ++i) {
+        a[i] = this[i % this.length];
+      }
+      return a;
+    } else {
+      return this.slice(0, size);
+    }
+  });
+
+  fn.definePrototypeProperty(Array, "foldExtend", function(size) {
+    size = Math.max(0, size|0);
+    if (this.length < size) {
+      var a = new Array(size);
+      for (var i = 0; i < size; ++i) {
+        a[i] = this[ifold(i, this.length)];
+      }
+      return a;
+    } else {
+      return this.slice(0, size);
+    }
+  });
+
+  fn.definePrototypeProperty(Array, "resamp0", function(newSize) {
+    var factor = (this.length - 1) / (newSize - 1);
+    var a = new Array(newSize);
+    for (var i = 0; i < newSize; ++i) {
+      a[i] = this[Math.round(i * factor)];
+    }
+    return a;
+  });
+
+  fn.definePrototypeProperty(Array, "resamp1", function(newSize) {
+    var factor = (this.length - 1) / (newSize - 1);
+    var a = new Array(newSize);
+    for (var i = 0; i < newSize; ++i) {
+      a[i] = this.blendAt(i * factor);
+    }
+    return a;
+  });
+
+  var scramble = function() {
+    return Math.random() - 0.5;
+  };
+  fn.definePrototypeProperty(Array, "scramble", function() {
+    return this.sort(scramble);
+  });
+  fn.definePrototypeProperty(Array, "shuffle", function() {
+    return this.sort(scramble);
+  });
+  
+  fn.definePrototypeProperty(Array, "choose", function() {
+    return this[(Math.random() * this.length)|0];
+  });
   
   module.exports = {};
 
@@ -5055,6 +6157,8 @@ define('cc/lang/function', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ops = require("../common/ops");
+  var slice = [].slice;
 
   // unary operator methods
   fn.definePrototypeProperty(Function, "__plus__", function() {
@@ -5102,6 +6206,53 @@ define('cc/lang/function', function(require, exports, module) {
       }, []
     ).play();
   });
+
+  fn.definePrototypeProperty(Function, "dup", fn(function(n) {
+    n |= 0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = this(i);
+    }
+    return a;
+  }).defaults("n=2").build());
+  
+  // global method
+  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function(a) {
+        if (typeof a[selector] === "function") {
+          return a[selector]();
+        }
+        return a;
+      };
+    }
+  });
+
+  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function(a, b) {
+        if (typeof a[selector] === "function") {
+          return a[selector](b);
+        }
+        return a;
+      };
+    }
+  });
+
+  [
+    "rrand", "exprand", "madd",
+    "linlin", "linexp", "explin", "expexp",
+  ].forEach(function(selector) {
+    if (!cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function() {
+        var a = arguments[0];
+        if (typeof a[selector] === "function") {
+          return a[selector].apply(a, slice.call(arguments, 1));
+        }
+        return a;
+      };
+    }
+  });
   
   module.exports = {};
 
@@ -5110,6 +6261,7 @@ define('cc/lang/number', function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ops = require("../common/ops");
   
   // unary operator methods
   fn.definePrototypeProperty(Number, "__plus__", function() {
@@ -5486,11 +6638,118 @@ define('cc/lang/number', function(require, exports, module) {
     }
     return _in - range * Math.floor((_in + b) / range);
   });
+
+  fn.definePrototypeProperty(Number, "rrand", fn(function(num) {
+    var a = this, b = num;
+    return a > b ?
+      Math.random() * (b - a) + a :
+      Math.random() * (a - b) + b;
+  }).defaults("num=0").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "exprand", fn(function(num) {
+    var a = this, b = num;
+    if (a === 0 && b === 0) {
+      return 0;
+    }
+    return a > b ?
+      b * Math.exp(Math.log(a / b) * Math.random()) :
+      a * Math.exp(Math.log(b / a) * Math.random());
+  }).defaults("num=0").multiCall().build());
   
   // others
   fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) {
+        return outMin;
+      }
+      break;
+    case "max":
+      if (this >= inMax) {
+        return outMax;
+      }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) {
+        return outMin;
+      }
+      if (this >= inMax) {
+        return outMax;
+      }
+      break;
+    }
+    return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return Math.pow(outMax/outMin, (this-inMin)/(inMax-inMin)) * outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return (Math.log(this/inMin)) / (Math.log(inMax/inMin)) * (outMax-outMin) + outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+
+  fn.definePrototypeProperty(Number, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    return Math.pow(outMax/outMin, Math.log(this/inMin) / Math.log(inMax/inMin)) * outMin;
+  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
+  
+  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
+  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
+    if (Number.prototype[selector]) {
+      return;
+    }
+    fn.definePrototypeProperty(Number, selector, function() {
+      return this;
+    });
+  });
   
   module.exports = {};
 
@@ -5658,6 +6917,9 @@ define('cc/client/client', function(require, exports, module) {
       this.api = cc.createAudioAPI(this, opts);
       this.sampleRate = this.api.sampleRate;
       this.channels   = this.api.channels;
+      if (this.api.strmLength) {
+        this.strmLength = this.api.strmLength;
+      }
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
       this.strmList = new Array(16);
@@ -5673,13 +6935,13 @@ define('cc/client/client', function(require, exports, module) {
         window.addEventListener("mousemove", function(e) {
           f32_syncItems[2] = e.pageX / window.innerWidth;
           f32_syncItems[3] = e.pageY / window.innerHeight;
-        }, false);
+        }, true);
         window.addEventListener("mousedown", function() {
           f32_syncItems[4] = 1;
-        }, false);
+        }, true);
         window.addEventListener("mouseup", function() {
           f32_syncItems[4] = 0;
-        }, false);
+        }, true);
       }
       this.syncItems = syncItems;
       this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
@@ -5852,7 +7114,7 @@ define('cc/client/client', function(require, exports, module) {
       });
     }
     this.sendToLang([
-      "/init", this.sampleRate, this.channels
+      "/init", this.sampleRate, this.channels, this.strmLength
     ]);
     this.exports.emit("connected");
   };
@@ -6310,6 +7572,7 @@ define('cc/common/audioapi-flashfallback', function(require, exports, module) {
         this.sys = sys;
         this.sampleRate = 44100;
         this.channels   = 2;
+        this.strmLength = Math.max(2048, sys.strmLength);
         this.type = "Fallback";
       }
       FallbackAudioAPI.prototype.init = function() {
@@ -6614,14 +7877,39 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     return -1;
   };
   var indexOfFunctionStart = function(tokens, index) {
+    var depth = 0;
     for (var i = index, imax = tokens.length; i < imax; ++i) {
-      if (tokens[i][TAG] === "TERMINATOR" || tokens[i][TAG] === ".") {
+      switch (tokens[i][TAG]) {
+      case "TERMINATOR":
+        if (depth === 0) {
+          return -1;
+        }
+        break;
+      case "PARAM_START":
+        if (depth === 0) {
+          return i;
+        }
+        depth += 1;
+        break;
+      case "PARAM_END":
+        depth -= 1;
+        break;
+      case "->": case "=>":
+        if (depth === 0) {
+          return i;
+        }
+        break;
+      case "[": case "{": case "(":
+      case "CALL_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case ")": case "}": case "]":
+      case "CALL_END": case "INDEX_END": case "PARAM_END":
+        depth -= 1;
         break;
       }
-      if (tokens[i][TAG] === "->" ||
-          tokens[i][TAG] === "=>" ||
-          tokens[i][TAG] === "PARAM_START") {
-        return i;
+      if (depth < 0) {
+        break;
       }
     }
     return -1;
@@ -7068,7 +8356,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
     }
   };
   var replaceCompoundAssign = function(tokens) {
-    for (var i = tokens.length; --i > 0; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (compound.operatorDict.hasOwnProperty(token[VALUE])) {
         var selector = compound.operatorDict[token[VALUE]];
@@ -7138,11 +8426,18 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
   var synthdef = {};
   var replaceSynthDefinition = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 4; i--; ) {
+    for (var i = tokens.length - 5; i >= 0; i--) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
         continue;
       }
-      var index = indexOfFunctionStart(tokens, i + 2);
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
       if (index === -1) {
         continue;
       }
@@ -7198,11 +8493,18 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
   };
   var replaceTaskFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 4; i--; ) {
+    for (var i = tokens.length - 5; i >= 0; i--) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
         continue;
       }
-      var index = indexOfFunctionStart(tokens, i + 2);
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
       if (index === -1) {
         continue;
       }
@@ -7326,7 +8628,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
       var closureVars = task.getClosureVariables(line);
       
       task.beginOfLine(tokens, line, closureVars);
-      for (var i = line.len; i--; ) {
+      for (var i = line.len-1; i >= 0; i--) {
         if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
           if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
             contextMethodCalled = true;
@@ -7392,7 +8694,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
   
   
   var replaceGlobalVariables = function(tokens) {
-    for (var i = tokens.length - 1; i--; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;
@@ -7416,7 +8718,7 @@ define('cc/client/compiler/coffee', function(require, exports, module) {
   };
   
   var replaceCCVariables = function(tokens) {
-    for (var i = tokens.length - 1; i--; ) {
+    for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;
@@ -7767,6 +9069,7 @@ define('cc/server/server', function(require, exports, module) {
         if (msg) {
           this.sampleRate = msg[1]|0;
           this.channels   = msg[2]|0;
+          this.strmLength = msg[3]|0;
         }
         this.strm  = new Int16Array(this.strmLength * this.channels);
         this.instanceManager.init(this);
@@ -8576,6 +9879,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
 
   require("./bop");
   require("./bufio");
+  require("./debug");
   require("./decay");
   require("./delay");
   require("./filter");
@@ -8585,6 +9889,9 @@ define('cc/server/unit/unit', function(require, exports, module) {
   require("./noise");
   require("./osc");
   require("./pan");
+  require("./random");
+  require("./range");
+  require("./reverb");
   require("./ui");
   require("./uop");
   
@@ -9345,6 +10652,28 @@ define('cc/server/unit/bufio', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/server/unit/debug', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.unit.specs.Debug = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = inIn[i];
+      }
+      console.log(out[0]);
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
 define('cc/server/unit/decay', function(require, exports, module) {
 
   var cc = require("../cc");
@@ -9369,7 +10698,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
       var i;
       if (b1 === 1) {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + y1;
+          out[i] = y1 = (inIn[i] + y1) || 0;
         }
       } else if (b1 === 0) {
         for (i = 0; i < inNumSamples; ++i) {
@@ -9377,7 +10706,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         }
       } else {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
         }
       }
       this._y1 = y1;
@@ -9391,7 +10720,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
       if (this._b1 === b1) {
         if (b1 === 1) {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + y1;
+            out[i] = y1 = (inIn[i] + y1) || 0;
           }
         } else if (b1 === 0) {
           for (i = 0; i < inNumSamples; ++i) {
@@ -9399,13 +10728,13 @@ define('cc/server/unit/decay', function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + b1 * y1;
+            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           }
         }
       } else {
         var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           b1 += b1_slope;
         }
         this._b1 = b1;
@@ -9437,7 +10766,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i] + b1 * y1;
+            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           }
         }
       } else {
@@ -9445,7 +10774,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         this._decayTime = decayTime;
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i] + b1 * y1;
+          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
           b1 += b1_slope;
         }
       }
@@ -9479,7 +10808,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = y1a - y1b;
+          out[i] = (y1a - y1b) || 0;
         }
       } else {
         this._decayTime  = decayTime;
@@ -9491,7 +10820,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = y1a - y1b;
+          out[i] = (y1a - y1b) || 0;
           b1a += b1a_slope;
           b1b += b1b_slope;
         }
@@ -9513,7 +10842,7 @@ define('cc/server/unit/delay', function(require, exports, module) {
 
   var cc = require("../cc");
   var log001 = Math.log(0.001);
-
+  
   var calcDelay = function(unit, delaytime, minDelay) {
     return Math.max(minDelay, Math.min(delaytime * unit.rate.sampleRate, unit._fdelaylen));
   };
@@ -9534,8 +10863,251 @@ define('cc/server/unit/delay', function(require, exports, module) {
     var c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
     return ((c3 * x + c2) * x + c1) * x + c0;
   };
+  
+  cc.unit.specs.Delay1 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._x1 = this.inputs[0][0];
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x1 = this._x1;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = x1;
+        out[i+1] = inIn[i  ];
+        out[i+2] = inIn[i+1];
+        out[i+3] = inIn[i+2];
+        out[i+4] = inIn[i+3];
+        out[i+5] = inIn[i+4];
+        out[i+6] = inIn[i+5];
+        out[i+7] = inIn[i+6];
+        x1 = inIn[i+7];
+      }
+      this._x1 = x1;
+    };
+    var next_k = function() {
+      this.outputs[0] = this._x1;
+      this._x1 = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Delay2 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._x1 = this.inputs[0][0];
+      this._x2 = this._x1;
+      this.process(1);
+    };
+    var next_a = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x1 = this._x1;
+      var x2 = this._x2;
+      for (var i = 0; i < inNumSamples; i += 8) {
+        out[i  ] = x1;
+        out[i+1] = x2;
+        out[i+2] = inIn[i  ];
+        out[i+3] = inIn[i+1];
+        out[i+4] = inIn[i+2];
+        out[i+5] = inIn[i+3];
+        out[i+6] = inIn[i+4];
+        out[i+7] = inIn[i+5];
+        x1 = inIn[i+6];
+        x2 = inIn[i+7];
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    var next_k = function() {
+      this.outputs[0] = this._x1;
+      this._x1 = this._x2;
+      this._x2 = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  
+  // DelayN/DelayL/DelayC
+  var Delay_Ctor = function() {
+    this._maxdelaytime = this.inputs[1][0];
+    this._delaytime    = this.inputs[2][0];
+    this._dlybuf       = 0;
 
-  var feedbackdelay_ctor = function() {
+    var delaybufsize = Math.ceil(this._maxdelaytime * this.rate.sampleRate + 1);
+    delaybufsize = delaybufsize + this.rate.bufLength;
+    delaybufsize = 1 << Math.ceil(Math.log(delaybufsize) * Math.LOG2E);
+    this._fdelaylen = this._idelaylen = delaybufsize;
+
+    this._dlybuf = new Float32Array(delaybufsize);
+    this._mask   = delaybufsize - 1;
+    
+    this._dsamp = calcDelay(this, this._delaytime, 1);
+    this._numoutput = 0;
+    this._iwrphase  = 0;
+  };
+  
+  cc.unit.specs.DelayN = (function() {
+    var ctor = function() {
+      Delay_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var mask     = this._mask;
+      var irdphase;
+      var i;
+      if (delaytime === this._delaytime) {
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          
+          irdphase = iwrphase - (dsamp|0);
+          out[i] = dlybuf[irdphase & mask];
+          iwrphase += 1;
+        }
+      } else {
+        var next_dsamp  = calcDelay(this, delaytime, 1);
+        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          
+          dsamp += dsamp_slope;
+          irdphase = iwrphase - (dsamp|0);
+          out[i] = dlybuf[irdphase & mask];
+          iwrphase += 1;
+        }
+        this._dsamp     = next_dsamp;
+        this._delaytime = delaytime;
+      }
+      if (iwrphase > dlybuf.length) {
+        iwrphase -= dlybuf.length;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.DelayL = (function() {
+    var ctor = function() {
+      Delay_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var mask     = this._mask;
+      var frac, irdphase, d1, d2;
+      var i;
+      if (delaytime === this._delaytime) {
+        frac = dsamp - (dsamp|0);
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          irdphase = iwrphase - (dsamp|0);
+          d1 = dlybuf[(irdphase  ) & mask];
+          d2 = dlybuf[(irdphase-1) & mask];
+          out[i] = d1 + frac * (d2 - d1);
+          iwrphase += 1;
+        }
+      } else {
+        var next_dsamp  = calcDelay(this, delaytime, 1);
+        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          
+          dsamp += dsamp_slope;
+          frac     = dsamp - (dsamp|0);
+          irdphase = iwrphase - (dsamp|0);
+          d1 = dlybuf[(irdphase  ) & mask];
+          d2 = dlybuf[(irdphase-1) & mask];
+          out[i] = d1 + frac * (d2 - d1);
+          iwrphase += 1;
+        }
+        this._dsamp     = next_dsamp;
+        this._delaytime = delaytime;
+      }
+      if (iwrphase > dlybuf.length) {
+        iwrphase -= dlybuf.length;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.DelayC = (function() {
+    var ctor = function() {
+      Delay_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var mask     = this._mask;
+      var frac, irdphase, d0, d1, d2, d3;
+      var i;
+      if (delaytime === this._delaytime) {
+        frac = dsamp - (dsamp|0);
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          irdphase = iwrphase - (dsamp|0);
+          d0 = dlybuf[(irdphase+1) & mask];
+          d1 = dlybuf[(irdphase  ) & mask];
+          d2 = dlybuf[(irdphase-1) & mask];
+          d3 = dlybuf[(irdphase-2) & mask];
+          out[i] = cubicinterp(frac, d0, d1, d2, d3);
+          iwrphase += 1;
+        }
+      } else {
+        var next_dsamp  = calcDelay(this, delaytime, 1);
+        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          dlybuf[iwrphase & mask] = inIn[i];
+          
+          dsamp += dsamp_slope;
+          frac     = dsamp - (dsamp|0);
+          irdphase = iwrphase - (dsamp|0);
+          d0 = dlybuf[(irdphase+1) & mask];
+          d1 = dlybuf[(irdphase  ) & mask];
+          d2 = dlybuf[(irdphase-1) & mask];
+          d3 = dlybuf[(irdphase-2) & mask];
+          out[i] = cubicinterp(frac, d0, d1, d2, d3);
+          iwrphase += 1;
+        }
+        this._dsamp     = next_dsamp;
+        this._delaytime = delaytime;
+      }
+      if (iwrphase > dlybuf.length) {
+        iwrphase -= dlybuf.length;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
+  
+  // CombN/CombL/CombC
+  var Comb_Ctor = function() {
     var delaybufsize;
     this._maxdelaytime = this.inputs[1][0];
     this._delaytime    = this.inputs[2][0];
@@ -9553,10 +11125,10 @@ define('cc/server/unit/delay', function(require, exports, module) {
 
   cc.unit.specs.CombN = (function() {
     var ctor = function() {
-      this.process = next_akk;
-      feedbackdelay_ctor.call(this);
+      Comb_Ctor.call(this);
+      this.process = next;
     };
-    var next_akk = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -9630,10 +11202,10 @@ define('cc/server/unit/delay', function(require, exports, module) {
 
   cc.unit.specs.CombL = (function() {
     var ctor = function() {
-      this.process = next_akk;
-      feedbackdelay_ctor.call(this);
+      Comb_Ctor.call(this);
+      this.process = next;
     };
-    var next_akk = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -9714,10 +11286,10 @@ define('cc/server/unit/delay', function(require, exports, module) {
   
   cc.unit.specs.CombC = (function() {
     var ctor = function() {
-      this.process = next_akk;
-      feedbackdelay_ctor.call(this);
+      Comb_Ctor.call(this);
+      this.process = next;
     };
-    var next_akk = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
       var delaytime = this.inputs[2][0];
@@ -9801,6 +11373,268 @@ define('cc/server/unit/delay', function(require, exports, module) {
 
     return ctor;
   })();
+
+  // AllpassN/AllpassL/AllpassC
+  var Allpass_Ctor = Comb_Ctor;
+  
+  cc.unit.specs.AllpassN = (function() {
+    var ctor = function() {
+      Allpass_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var decaytime = this.inputs[3][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var feedbk   = this._feedbk;
+      var mask     = this._mask;
+      var irdphase, value, dwr;
+      var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
+      var i;
+      if (delaytime === this._delaytime) {
+        irdphase = iwrphase - (dsamp|0);
+        if (decaytime === this._decaytime) {
+          for (i = 0; i < inNumSamples; ++i) {
+            value = dlybuf[irdphase & mask];
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            irdphase++;
+            iwrphase++;
+          }
+        } else {
+          next_feedbk  = calcFeedback(delaytime, decaytime);
+          feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+          for (i = 0; i < inNumSamples; ++i) {
+            value = dlybuf[irdphase & mask];
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            feedbk += feedbk_slope;
+            irdphase++;
+            iwrphase++;
+          }
+          this._feedbk = next_feedbk;
+          this._decaytime = decaytime;
+        }
+      } else {
+        next_dsamp  = calcDelay(this, delaytime, 1);
+        dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        next_feedbk  = calcFeedback(delaytime, decaytime);
+        feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          irdphase = iwrphase - (dsamp|0);
+          value = dlybuf[irdphase & mask];
+          dwr = value * feedbk + inIn[i];
+          dlybuf[iwrphase & mask] = dwr;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
+          out[i] = value - feedbk * dwr;
+          dsamp  += dsamp_slope;
+          feedbk += feedbk_slope;
+          irdphase++;
+          iwrphase++;
+        }
+        this._feedbk = feedbk;
+        this._dsamp  = dsamp;
+        this._delaytime = delaytime;
+        this._decaytime = decaytime;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.AllpassL = (function() {
+    var ctor = function() {
+      Allpass_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var decaytime = this.inputs[3][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var feedbk   = this._feedbk;
+      var mask     = this._mask;
+      var irdphase, frac, value, d1, d2, dwr;
+      var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
+      var i;
+      if (delaytime === this._delaytime) {
+        irdphase = iwrphase - (dsamp|0);
+        frac     = dsamp - (dsamp|0);
+        if (decaytime === this._decaytime) {
+          for (i = 0; i < inNumSamples; ++i) {
+            d1 = dlybuf[(irdphase  )&mask];
+            d2 = dlybuf[(irdphase-1)&mask];
+            value = d1 + frac * (d2 - d1);
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            irdphase++;
+            iwrphase++;
+          }
+        } else {
+          next_feedbk  = calcFeedback(delaytime, decaytime);
+          feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+          for (i = 0; i < inNumSamples; ++i) {
+            d1 = dlybuf[(irdphase  )&mask];
+            d2 = dlybuf[(irdphase-1)&mask];
+            value = d1 + frac * (d2 - d1);
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            feedbk += feedbk_slope;
+            irdphase++;
+            iwrphase++;
+          }
+          this._feedbk = next_feedbk;
+          this._decaytime = decaytime;
+        }
+      } else {
+        next_dsamp  = calcDelay(this, delaytime, 1);
+        dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        next_feedbk  = calcFeedback(delaytime, decaytime);
+        feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          irdphase = iwrphase - (dsamp|0);
+          frac     = dsamp - (dsamp|0);
+          d1 = dlybuf[(irdphase  )&mask];
+          d2 = dlybuf[(irdphase-1)&mask];
+          value = d1 + frac * (d2 - d1);
+          dwr = value * feedbk + inIn[i];
+          dlybuf[iwrphase & mask] = dwr;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
+          out[i] = value - feedbk * dwr;
+          dsamp  += dsamp_slope;
+          feedbk += feedbk_slope;
+          irdphase++;
+          iwrphase++;
+        }
+        this._feedbk = feedbk;
+        this._dsamp  = dsamp;
+        this._delaytime = delaytime;
+        this._decaytime = decaytime;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.AllpassC = (function() {
+    var ctor = function() {
+      Allpass_Ctor.call(this);
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var delaytime = this.inputs[2][0];
+      var decaytime = this.inputs[3][0];
+      var dlybuf   = this._dlybuf;
+      var iwrphase = this._iwrphase;
+      var dsamp    = this._dsamp;
+      var feedbk   = this._feedbk;
+      var mask     = this._mask;
+      var irdphase, frac, value, d0, d1, d2, d3, dwr;
+      var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
+      var i;
+      if (delaytime === this._delaytime) {
+        irdphase = iwrphase - (dsamp|0);
+        frac     = dsamp - (dsamp|0);
+        if (decaytime === this._decaytime) {
+          for (i = 0; i < inNumSamples; ++i) {
+            d0 = dlybuf[(irdphase+1)&mask];
+            d1 = dlybuf[(irdphase  )&mask];
+            d2 = dlybuf[(irdphase-1)&mask];
+            d3 = dlybuf[(irdphase-2)&mask];
+            value = cubicinterp(frac, d0, d1, d2, d3);
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            irdphase++;
+            iwrphase++;
+          }
+        } else {
+          next_feedbk  = calcFeedback(delaytime, decaytime);
+          feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+          for (i = 0; i < inNumSamples; ++i) {
+            d0 = dlybuf[(irdphase+1)&mask];
+            d1 = dlybuf[(irdphase  )&mask];
+            d2 = dlybuf[(irdphase-1)&mask];
+            d3 = dlybuf[(irdphase-2)&mask];
+            value = cubicinterp(frac, d0, d1, d2, d3);
+            dwr = value * feedbk + inIn[i];
+            dlybuf[iwrphase & mask] = dwr;
+            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+              dlybuf[iwrphase & mask] = 0;
+            }
+            out[i] = value - feedbk * dwr;
+            feedbk += feedbk_slope;
+            irdphase++;
+            iwrphase++;
+          }
+          this._feedbk = next_feedbk;
+          this._decaytime = decaytime;
+        }
+      } else {
+        next_dsamp  = calcDelay(this, delaytime, 1);
+        dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+        next_feedbk  = calcFeedback(delaytime, decaytime);
+        feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          irdphase = iwrphase - (dsamp|0);
+          frac     = dsamp - (dsamp|0);
+          d0 = dlybuf[(irdphase+1)&mask];
+          d1 = dlybuf[(irdphase  )&mask];
+          d2 = dlybuf[(irdphase-1)&mask];
+          d3 = dlybuf[(irdphase-2)&mask];
+          value = cubicinterp(frac, d0, d1, d2, d3);
+          dwr = value * feedbk + inIn[i];
+          dlybuf[iwrphase & mask] = dwr;
+          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
+            dlybuf[iwrphase & mask] = 0;
+          }
+          out[i] = value - feedbk * dwr;
+          dsamp  += dsamp_slope;
+          feedbk += feedbk_slope;
+          irdphase++;
+          iwrphase++;
+        }
+        this._feedbk = feedbk;
+        this._dsamp  = dsamp;
+        this._delaytime = delaytime;
+        this._decaytime = decaytime;
+      }
+      this._iwrphase = iwrphase;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 
@@ -9809,8 +11643,801 @@ define('cc/server/unit/filter', function(require, exports, module) {
 
   var cc = require("../cc");
   var utils = require("./utils");
-  var nanToZero   = utils.nanToZero;
   var zapgremlins = utils.zapgremlins;
+  var log001 = Math.log(0.001);
+  var sqrt2  = Math.sqrt(2);
+  
+  cc.unit.specs.OnePole = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = this.inputs[1][0];
+      this._y1 = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1   = this._b1;
+      var y1   = this._y1;
+      var next_b1 = Math.max(-1, Math.min(this.inputs[1][0], 1));
+      var y0, i;
+      if (b1 !== next_b1) {
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
+        if (b1 > 0 && next_b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 - y0);
+            b1 += b1_slope;
+          }
+        } else if (b1 <= 0 && next_b1 <= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 + y0);
+            b1 += b1_slope;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = (1 - Math.abs(b1)) * y0 + b1 * y1;
+            b1 += b1_slope;
+          }
+        }
+        this._b1 = next_b1;
+      } else {
+        if (b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 - y0);
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            y0 = inIn[i];
+            out[i] = y1 = y0 + b1 * (y1 + y0);
+          }
+        }
+      }
+      this._y1 = zapgremlins(y1);
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.OneZero = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = this.inputs[1][0];
+      this._x1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var b1   = this._b1;
+      var x1   = this._x1;
+      var next_b1 = Math.max(-1, Math.min(this.inputs[1][0], 1));
+      var x0, i;
+      if (b1 !== next_b1) {
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
+        if (b1 >= 0 && next_b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 - x0);
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        } else if (b1 <= 0 && next_b1 <= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 + x0);
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = (1 - Math.abs(b1)) * x0 + b1 * x1;
+            x1 = x0;
+            b1 += b1_slope;
+          }
+        }
+        this._b1 = next_b1;
+      } else {
+        if (b1 >= 0) {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 - x0);
+            x1 = x0;
+          }
+        } else {
+          for (i = 0; i < inNumSamples; ++i) {
+            x0 = inIn[i];
+            out[i] = x0 + b1 * (x1 + x0);
+            x1 = x0;
+          }
+        }
+      }
+      this._x1 = x1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TwoPole = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var b1_next = 2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = -(reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0;
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2;
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1 = b1_next;
+        this._b2 = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = y0;
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = y2;
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = y1;
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = y0;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TwoZero = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._x1 = 0;
+      this._x2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var x0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var x1 = this._x1;
+      var x2 = this._x2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || reson !== this._reson) {
+        var b1_next = -2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = (reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = x0 + b1 * x1 + b2 * x2;
+          x2 = inIn[j];
+          out[j++] = x2 + b1 * x0 + b2 * x1;
+          x1 = inIn[j];
+          out[j++] = x1 + b1 * x2 + b2 * x0;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1    = b1_next;
+        this._b2    = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = x0 + b1 * x1 + b2 * x2;
+          x2 = inIn[j];
+          out[j++] = x2 + b1 * x0 + b2 * x1;
+          x1 = inIn[j];
+          out[j++] = x1 + b1 * x2 + b2 * x0;
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = x0 + b1 * x1 + b2 * x2;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.APF = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._x1 = 0;
+      this._x2 = 0;
+      this._freq  = undefined;
+      this._reson = undefined;
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq  = this.inputs[1][0];
+      var reson = Math.max(0, Math.min(this.inputs[2][0], 1));
+      var x0;
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var x1 = this._x1;
+      var x2 = this._x2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq && reson !== this._reson) {
+        var b1_next = 2 * reson * Math.cos(freq * this.rate.radiansPerSample);
+        var b2_next = -(reson * reson);
+        var b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        var b2_slope = (b2_next - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+          x1 = inIn[j];
+          out[j++] = y2 = x2 + b1 * (y0 - x0) + b2 * (y2 - x1);
+          x2 = inIn[j];
+          out[j++] = y1 = x1 + b1 * (y2 - x2) + b2 * (y2 - x0);
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq  = freq;
+        this._reson = reson;
+        this._b1 = b1_next;
+        this._b2 = b2_next;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          x0 = inIn[j];
+          out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+          x1 = inIn[j];
+          out[j++] = y2 = x2 + b1 * (y0 - x0) + b2 * (y2 - x1);
+          x2 = inIn[j];
+          out[j++] = y1 = x1 + b1 * (y2 - x2) + b2 * (y2 - x0);
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = y0 = x0 + b1 * (y1 - x1) + b2 * (y2 - x2);
+        y2 = y1;
+        y1 = y0;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.LPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      
+      if (freq !== this._freq) {
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var C2 = C * C;
+        var sqrt2C = C * sqrt2;
+        var next_a0 = 1 / (1 + sqrt2C + C2);
+        var next_b1 = -2 * (1 - C2) * next_a0;
+        var next_b2 = -(1 - sqrt2C + C2) * next_a0;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 + 2 * y1 + y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 + 2 * y0 + y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 + 2 * y2 + y0);
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 + 2 * y1 + y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 + 2 * y0 + y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 + 2 * y2 + y0);
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * (y0 + 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq) {
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var C2 = C * C;
+        var sqrt2C = C * sqrt2;
+        a0 = 1 / (1 + sqrt2C + C2);
+        b1 = -2 * (1 - C2) * a0;
+        b2 = -(1 - sqrt2C + C2) * a0;
+        
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 + 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+        
+        this._freq = freq;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 + 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.HPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq  = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      
+      if (freq !== this._freq) {
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var C = Math.tan(pfreq);
+        var C2 = C * C;
+        var sqrt2C = C * sqrt2;
+        var next_a0 = 1 / (1 + sqrt2C + C2);
+        var next_b1 = 2 * (1 - C2) * next_a0;
+        var next_b2 = -(1 - sqrt2C + C2) * next_a0;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - 2 * y1 + y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - 2 * y0 + y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - 2 * y2 + y0);
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - 2 * y1 + y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - 2 * y0 + y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - 2 * y2 + y0);
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * (y0 - 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq) {
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var C = Math.tan(pfreq);
+        var C2 = C * C;
+        var sqrt2C = C * sqrt2;
+        a0 = 1 / (1 + sqrt2C + C2);
+        b1 = 2 * (1 - C2) * a0;
+        b2 = -(1 - sqrt2C + C2) * a0;
+        
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 - 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+        
+        this._freq = freq;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 - 2 * y1 + y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.BPF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq = undefined;
+      this._bw   = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var bw   = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || bw !== this._bw) {
+        var pfreq = freq * this.rate.radiansPerSample;
+        var pbw   = bw * pfreq * 0.5;
+        var C = pbw ? 1 / Math.tan(pbw) : 0;
+        var D = 2 * Math.cos(pfreq);
+        var next_a0 = 1 / (1 + C);
+        var next_b1 = C * D * next_a0;
+        var next_b2 = (1 - C) * next_a0;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - y0);
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._bw   = bw;
+        this._a0   = next_a0;
+        this._b1   = next_b1;
+        this._b2   = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - y2);
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - y1);
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - y0);
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * (y0 - y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var bw   = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      if (freq !== this._freq || bw !== this._bw) {
+        var pfreq = freq * this.rate.radiansPerSample;
+        var pbw   = bw * pfreq * 0.5;
+        var C = pbw ? 1 / Math.tan(pbw) : 0;
+        var D = 2 * Math.cos(pfreq);
+        a0 = 1 / (1 + C);
+        b1 = C * D * a0;
+        b2 = (1 - C) * a0;
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 - y2);
+        y2 = y1;
+        y1 = y0;
+        this._freq = freq;
+        this._bw   = bw;
+        this._a0 = a0;
+        this._b1 = b1;
+        this._b2 = b2;
+      } else {
+        y0 = inIn[0] + b1 * y1 + b2 * y2;
+        out[0] = a0 * (y0 - y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.BRF = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._a0 = 0;
+      this._a1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq = undefined;
+      this._bw   = undefined;
+      next_1.call(this, 1);
+    };
+    var next = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var bw   = this.inputs[2][0];
+      var ay;
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var a1 = this._a1;
+      var b2 = this._b2;
+      var i, imax, j = 0;
+      if (freq !== this._freq || bw !== this._bw) {
+        var pfreq = freq * this.rate.radiansPerSample;
+        var pbw   = bw * pfreq * 0.5;
+        var C = Math.tan(pbw);
+        var D = 2 * Math.cos(pfreq);
+        var next_a0 = 1 / (1 + C);
+        var next_a1 = -D * next_a0;
+        var next_b2 = (1 - C) * next_a0;
+        var a0_slope = (next_a0 - a0) * this.rate.filterSlope;
+        var a1_slope = (next_a1 - a1) * this.rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * this.rate.filterSlope;
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          ay = a1 * y1;
+          y0 = inIn[j] - ay - b2 * y2;
+          out[j++] = a0 * (y0 + y2) + ay;
+          ay = a1 * y0;
+          y2 = inIn[j] - ay - b2 * y1;
+          out[j++] = a0 * (y2 + y1) + ay;
+          ay = a1 * y2;
+          y1 = inIn[j] - ay - b2 * y0;
+          out[j++] = a0 * (y1 + y0) + ay;
+          a0 += a0_slope;
+          a1 += a1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._bw   = bw;
+        this._a0   = next_a0;
+        this._a1   = next_a1;
+        this._b2   = next_b2;
+      } else {
+        for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+          ay = a1 * y1;
+          y0 = inIn[j] - ay - b2 * y2;
+          out[j++] = a0 * (y0 + y2) + ay;
+          ay = a1 * y0;
+          y2 = inIn[j] - ay - b2 * y1;
+          out[j++] = a0 * (y2 + y1) + ay;
+          ay = a1 * y2;
+          y1 = inIn[j] - ay - b2 * y0;
+          out[j++] = a0 * (y1 + y0) + ay;
+        }
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        ay = a1 * y1;
+        y0 = inIn[j] - ay - b2 * y2;
+        out[j++] = a0 * (y0 + y2) + ay;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var bw   = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var a1 = this._a1;
+      var b2 = this._b2;
+      var ay;
+      if (freq !== this._freq || bw !== this._bw) {
+        var pfreq = freq * this.rate.radiansPerSample;
+        var pbw   = bw * pfreq * 0.5;
+        var C = Math.tan(pbw);
+        var D = 2 * Math.cos(pfreq);
+        a0 = 1 / (1 + C);
+        a1 = -D * a0;
+        b2 = (1 - C) * a0;
+        ay = a1 * y1;
+        y0 = inIn[0] - ay - b2 * y2;
+        out[0] = a0 * (y0 + y2) + ay;
+        y2 = y1;
+        y1 = y0;
+        this._freq = freq;
+        this._bw   = bw;
+        this._a0 = a0;
+        this._a1 = a1;
+        this._b2 = b2;
+      } else {
+        ay = a1 * y1;
+        y0 = inIn[0] - ay - b2 * y2;
+        out[0] = a0 * (y0 + y2) + ay;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
   
   cc.unit.specs.RLPF = (function() {
     var ctor = function() {
@@ -9866,7 +12493,8 @@ define('cc/server/unit/filter', function(require, exports, module) {
         for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
           y0 = a0 * inIn[j] + b1 * y1 + b2 * y2;
           out[j++] = y0 + 2.0 * y1 + y2;
-          y2 = y1; y1 = y0;
+          y2 = y1;
+          y1 = y0;
         }
         this._freq = freq;
         this._reson = reson;
@@ -9890,7 +12518,6 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
-      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -9927,9 +12554,6 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
-      if (isNaN(out[0])) {
-        out[0] = 0;
-      }
     };
     return ctor;
   })();
@@ -10012,7 +12636,6 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
-      nanToZero(out);
     };
     var next_1 = function() {
       var out = this.outputs[0];
@@ -10049,9 +12672,458 @@ define('cc/server/unit/filter', function(require, exports, module) {
       }
       this._y1 = zapgremlins(y1);
       this._y2 = zapgremlins(y2);
-      if (isNaN(out[0])) {
-        out[0] = 0;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Lag = (function() {
+    var ctor = function() {
+      if (this.rate.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
       }
+      this._lag = undefined;
+      this._b1 = 0;
+      this._y1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lag = this.inputs[1][0];
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var y0, i;
+      if (lag === this._lag) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0 = inIn[i];
+          out[i] = y1 = y0 + b1 * (y1 - y0);
+        }
+      } else {
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        this._lag = lag;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1 += b1_slope;
+          y0 = inIn[i];
+          out[i] = y1 = y0 + b1 * (y1 - y0);
+        }
+      }
+      this._y1 = y1;
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      var lag = this.inputs[1][0];
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var y0;
+      if (lag !== this._lag) {
+        this._b1 = b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        this._lag = lag;
+      }
+      y0 = this.inputs[0][0];
+      out[0] = y1 = y0 + b1 * (y1 - y0);
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Lag2 = (function() {
+    var ctor = function() {
+      if (this.inRates[1] !== 0) {
+        this.process = next_k;
+      } else {
+        if (this.rate.bufLength === 1) {
+          this.process = next_1_i;
+        } else {
+          this.process = next_i;
+        }
+      }
+      this._lag = NaN;
+      this._b1 = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      next_k.call(this, 1);
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lag = this.inputs[1][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var b1 = this._b1;
+      var y0a, b1_slope, i;
+      if (lag === this._lag) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          y1a = y0a + b1 * (y1a - y0a);
+          y1b = y1a + b1 * (y1b - y1a);
+          out[i] = y1b;
+        }
+      } else {
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        this._lag = lag;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1 += b1_slope;
+          y0a = inIn[i];
+          y1a = y0a + b1 * (y1a - y0a);
+          y1b = y1a + b1 * (y1b - y1a);
+          out[i] = y1b;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+    };
+    var next_i = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var b1 = this._b1;
+      var y0a, i;
+      for (i = 0; i < inNumSamples; ++i) {
+        y0a = inIn[i];
+        y1a = y0a + b1 * (y1a - y0a);
+        y1b = y1a + b1 * (y1b - y1a);
+        out[i] = y1b;
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+    };
+    var next_1_i = function() {
+      var out = this.outputs[0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var b1 = this._b1;
+      var y0a = this.inputs[0][0];
+      y1a = y0a + b1 * (y1a - y0a);
+      y1b = y1a + b1 * (y1b - y1a);
+      out[0] = y1b;
+      this._y1a = y1a;
+      this._y1b = y1b;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Lag3 = (function() {
+    var ctor = function() {
+      if (this.inRates[1] !== 0) {
+        this.process = next;
+      } else {
+        if (this.rate.bufLength === 1) {
+          this.process = next_1_i;
+        } else {
+          this.process = next;
+        }
+      }
+      this._lag = NaN;
+      this._b1 = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      this._y1c = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lag = this.inputs[1][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var y1c = this._y1c;
+      var b1 = this._b1;
+      var y0a, i;
+      if (lag === this._lag) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          y1a = y0a + b1 * (y1a - y0a);
+          y1b = y1a + b1 * (y1b - y1a);
+          y1c = y1b + b1 * (y1c - y1b);
+          out[i] = y1c;
+        }
+      } else {
+        this._b1 = (lag === 0) ? 0 : Math.exp(log001 / (lag * this.rate.sampleRate));
+        var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        this._lag = lag;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1 += b1_slope;
+          y0a = inIn[i];
+          y1a = y0a + b1 * (y1a - y0a);
+          y1b = y1a + b1 * (y1b - y1a);
+          y1c = y1b + b1 * (y1c - y1b);
+          out[i] = y1c;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+      this._y1c = y1c;
+    };
+    var next_1_i = function() {
+      var out = this.outputs[0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var y1c = this._y1c;
+      var b1 = this._b1;
+      var y0a = this.inputs[0][0];
+      y1a = y0a + b1 * (y1a - y0a);
+      y1b = y1a + b1 * (y1b - y1a);
+      y1c = y1b + b1 * (y1c - y1b);
+      out[0] = y1c;
+      this._y1a = y1a;
+      this._y1b = y1b;
+      this._y1c = y1c;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Ramp = (function() {
+    var ctor = function() {
+      if (this.rate.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      this._counter = 1;
+      this._level = this.inputs[0][0];
+      this._slope = 0;
+      this.outputs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var period = this.inputs[1][0];
+      var slope = this._slope;
+      var level = this._level;
+      var counter = this._counter;
+      var remain = inNumSamples;
+      var sampleRate = this.rate.sampleRate;
+      var nsmps, i, j = 0;
+      while (remain) {
+        nsmps = Math.min(remain, counter);
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+          level += slope;
+        }
+        counter -= nsmps;
+        remain  -= nsmps;
+        if (counter <= 0){
+          counter = (period * sampleRate)|0;
+          counter = Math.max(1, counter);
+          slope = (inIn[j-1] - level) / counter;
+        }
+      }
+      this._level = level;
+      this._slope = slope;
+      this._counter = counter;
+    };
+    var next_1 = function() {
+      var out = this.outputs[0];
+      out[0] = this._level;
+      this._level += this._slope;
+      if (--this._counter <= 0) {
+        var _in = this.inputs[0][0];
+        var period = this.inputs[1][0];
+        var counter = (period * this.rate.sampleRate)|0;
+        this._counter = counter = Math.max(1, counter);
+        this._slope = (_in - this._level) / counter;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LagUD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = undefined;
+      this._lagd = undefined;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1 = this._y1;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0 = inIn[i];
+          if (y0 > y1) {
+            out[i] = y1 = y0 + b1u * (y1 - y0);
+          } else {
+            out[i] = y1 = y0 + b1d * (y1 - y0);
+          }
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0 = inIn[i];
+          if (y0 > y1) {
+            out[i] = y1 = y0 + b1u * (y1 - y0);
+          } else {
+            out[i] = y1 = y0 + b1d * (y1 - y0);
+          }
+        }
+      }
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Lag2UD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = 0;
+      this._lagd = 0;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0a;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          out[i] = y1b;
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          out[i] = y1b;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Lag3UD = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lagu = 0;
+      this._lagd = 0;
+      this._b1u = 0;
+      this._b1d = 0;
+      this._y1a = this.inputs[0][0];
+      this._y1b = this.inputs[0][0];
+      this._y1c = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var lagu = this.inputs[1][0];
+      var lagd = this.inputs[2][0];
+      var y1a = this._y1a;
+      var y1b = this._y1b;
+      var y1c = this._y1c;
+      var b1u = this._b1u;
+      var b1d = this._b1d;
+      var i, y0a;
+      if ((lagu === this._lagu) && (lagd === this._lagd)) {
+        for (i = 0; i < inNumSamples; ++i) {
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          if (y1a > y1b) {
+            y1c = y1b + b1u * (y1c - y1b);
+          } else {
+            y1c = y1b + b1d * (y1c - y1b);
+          }
+          out[i] = y1c;
+        }
+      } else {
+        this._b1u = (lagu === 0) ? 0 : Math.exp(log001 / (lagu * this.rate.sampleRate));
+        var b1u_slope = (this._b1u - b1u) * this.rate.slopeFactor;
+        this._lagu = lagu;
+        this._b1d = (lagd === 0) ? 0 : Math.exp(log001 / (lagd * this.rate.sampleRate));
+        var b1d_slope = (this._b1d - b1d) * this.rate.slopeFactor;
+        this._lagd = lagd;
+        for (i = 0; i < inNumSamples; ++i) {
+          b1u += b1u_slope;
+          b1d += b1d_slope;
+          y0a = inIn[i];
+          if (y0a > y1a) {
+            y1a = y0a + b1u * (y1a - y0a);
+          } else {
+            y1a = y0a + b1d * (y1a - y0a);
+          }
+          if (y1a > y1b) {
+            y1b = y1a + b1u * (y1b - y1a);
+          } else {
+            y1b = y1a + b1d * (y1b - y1a);
+          }
+          if (y1a > y1b) {
+            y1c = y1b + b1u * (y1c - y1b);
+          } else {
+            y1c = y1b + b1d * (y1c - y1b);
+          }
+          out[i] = y1c;
+        }
+      }
+      this._y1a = y1a;
+      this._y1b = y1b;
+      this._y1c = y1c;
     };
     return ctor;
   })();
@@ -10061,9 +13133,9 @@ define('cc/server/unit/filter', function(require, exports, module) {
 });
 define('cc/server/unit/utils', function(require, exports, module) {
 
-  var nanToZero = function(out) {
+  var invalidToZero = function(out) {
     for (var i = out.length; i--; ) {
-      if (isNaN(out[i])) {
+      if (out[i] === Infinity || out[i] === -Infinity) {
         out[i] = 0;
       }
     }
@@ -10089,9 +13161,9 @@ define('cc/server/unit/utils', function(require, exports, module) {
   };
   
   module.exports = {
-    nanToZero  : nanToZero,
-    zapgremlins: zapgremlins,
-    avoidzero  : avoidzero,
+    invalidToZero: invalidToZero,
+    zapgremlins  : zapgremlins,
+    avoidzero    : avoidzero,
   };
 
 });
@@ -10183,6 +13255,30 @@ define('cc/server/unit/inout', function(require, exports, module) {
       var offset    = this._busOffset + (inputs[0][0]|0) - 1;
       for (var i = 1, imax = inputs.length; i < imax; ++i) {
         bus[offset + i] += inputs[i][0];
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.A2K = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function() {
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.K2A = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var value = this.inputs[0][0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = value;
       }
     };
     return ctor;
@@ -10911,6 +14007,225 @@ define('cc/server/unit/noise', function(require, exports, module) {
         out[i] = (sum * 0.01666666) - 1;
       }
       this._key = key;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.ClipNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = Math.random() < 0.5 ? -1 : +1;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Dust = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._density = 0;
+      this._scale   = 0;
+      this._thresh  = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var density = this.inputs[0][0];
+      var thresh, scale;
+      if (density !== this._density) {
+        thresh = this._thresh = density * this.rate.sampleDur;
+        scale  = this._scale  = thresh > 0 ? 1 / thresh : 0;
+        this._density = density;
+      } else {
+        thresh = this._thresh;
+        scale  = this._scale;
+      }
+      for (var i = 0; i < inNumSamples; ++i) {
+        var z = Math.random();
+        out[i] = z < thresh ? z * scale : 0;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Dust2 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._density = 0;
+      this._scale   = 0;
+      this._thresh  = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var density = this.inputs[0][0];
+      var thresh, scale;
+      if (density !== this._density) {
+        thresh = this._thresh = density * this.rate.sampleDur;
+        scale  = this._scale  = thresh > 0 ? 2 / thresh : 0;
+        this._density = density;
+      } else {
+        thresh = this._thresh;
+        scale  = this._scale;
+      }
+      for (var i = 0; i < inNumSamples; ++i) {
+        var z = Math.random();
+        out[i] = z < thresh ? z * scale - 1 : 0;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFNoise0 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = 0;
+      this._counter = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          level = Math.random() * 2 - 1;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFNoise1 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = Math.random() * 2 - 1;
+      this._counter = 0;
+      this._slope   = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var slope   = this._slope;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          var nextLevel = Math.random() * 2 - 1;
+          slope = (nextLevel - level) / counter;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+          level += slope;
+        }
+      } while (remain);
+      this._level   = level;
+      this._slope   = slope;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFNoise2 = (function() {
+    var ctor = function() {
+      this.process  = next;
+      this._level   = 0;
+      this._counter = 0;
+      this._slope   = 0;
+      this._curve   = 0;
+      this._nextValue = Math.random() * 2 - 1;
+      this._nextMidPt = this._nextValue * 0.5;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      inNumSamples = inNumSamples|0;
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var slope   = this._slope;
+      var curve   = this._curve;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          var value = this._nextValue;
+          this._nextValue = Math.random() * 2 - 1;
+          level = this._nextMidPt;
+          this._nextMidPt = (this._nextValue + value) * 0.5;
+          counter = Math.max(2, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          var fseglen = counter;
+          curve = 2 * (this._nextMidPt - level - fseglen * slope) / (fseglen * fseglen + fseglen);
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+          slope += curve;
+          level += slope;
+        }
+      } while (remain);
+      this._level   = level;
+      this._slope   = slope;
+      this._curve   = curve;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LFClipNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._counter = 0;
+      this._level   = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level   = this._level;
+      var counter = this._counter;
+      var i, remain = inNumSamples;
+      var j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, (this.rate.sampleRate / Math.max(freq, 0.001))|0);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        var nsmps = Math.min(remain, counter);
+        remain  -= nsmps;
+        counter -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = level;
+        }
+      } while (remain);
+      this._counter = counter;
+      this._level   = level;
     };
     return ctor;
   })();
@@ -11993,7 +15308,106 @@ define('cc/server/unit/osc', function(require, exports, module) {
     return ctor;
   })();
   
-  
+  cc.unit.specs.Impulse = (function() {
+    var ctor = function() {
+      this._phase = this.inputs[1][0];
+      if (this.inRates[0] === 2) {
+        if (this.inRates[1] !== 0) {
+          this.process = next_ak;
+          this._phase = 1;
+        } else {
+          this.process = next_a;
+        }
+      } else {
+        if (this.inRates[1] !== 0) {
+          this.process = next_kk;
+          this._phase = 1;
+        } else {
+          this.process = next_k;
+        }
+      }
+      this._phaseOffset = 0;
+      this._cpstoinc    = this.rate.sampleDur;
+      if (this._phase === 0) {
+        this._phase = 1;
+      }
+    };
+    var next_a = function(inNumSamples) {
+      var out    = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
+    var next_ak = function(inNumSamples) {
+      var out     = this.outputs[0];
+      var freqIn  = this.inputs[0];
+      var phaseOffset = this.inputs[1][0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+    };
+    var next_kk = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
+      var phaseOffset = this.inputs[1][0];
+      var phase = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freq;
+      }
+      this._phase = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+    };
+    var next_k = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var freq = this.inputs[0][0] * this._cpstoinc;
+      var phase = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freq;
+      }
+      this._phase = phase;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 
@@ -12142,6 +15556,504 @@ define('cc/server/unit/pan', function(require, exports, module) {
       }
     };
 
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
+define('cc/server/unit/random', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.unit.specs.Rand = (function() {
+    var ctor = function() {
+      var lo = this.inputs[0][0];
+      var hi = this.inputs[1][0];
+      var range = hi - lo;
+      this.outputs[0][0] = Math.random() * range + lo;
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
+define('cc/server/unit/range', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  cc.unit.specs.InRange = (function() {
+    var ctor = function() {
+      this.process = next;
+      this.process(1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var loIn = this.inputs[1];
+      var hiIn = this.inputs[2];
+      for (var i = 0; i < inNumSamples; ++i) {
+        var _in = inIn[i];
+        out[i] = (loIn[i] <= _in && _in <= hiIn[i]) ? 1 : 0;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Clip = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2 && this.inRates[2] === 2) {
+        this.process = next_aa;
+      } else {
+        this.process = next_kk;
+      }
+      this._lo = this.inputs[1][0];
+      this._hi = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var loIn = this.inputs[1];
+      var hiIn = this.inputs[2];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
+      }
+    };
+    var next_kk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var next_lo = this.inputs[1][0];
+      var next_hi = this.inputs[2][0];
+      var lo = this._lo;
+      var hi = this._hi;
+      var i;
+      if (next_lo === lo && next_hi === hi) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = Math.max(lo, Math.min(inIn[i], hi));
+        }
+      } else {
+        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
+        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          lo += lo_slope;
+          hi += hi_slope;
+          out[i] = Math.max(lo, Math.min(inIn[i], hi));
+        }
+        this._lo = next_lo;
+        this._hi = next_hi;
+      }
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Fold = (function() {
+    var fold = function(_in, lo, hi) {
+      var x, c, range, range2;
+      x = _in - lo;
+      if (hi <= _in) {
+        _in = hi + hi - _in;
+        if (lo <= _in) {
+          return _in;
+        }
+      } else if (_in < lo) {
+        _in = lo + lo - _in;
+        if (_in < hi) {
+          return _in;
+        }
+      } else {
+        return _in;
+      }
+      if (hi === lo) {
+        return lo;
+      }
+      range = hi - lo;
+      range2 = range + range;
+      c = x - range2 * Math.floor(x / range2);
+      if (c >= range) {
+        c = range2 - c;
+      }
+      return c + lo;
+    };
+    var ctor = function() {
+      if (this.inRates[1] === 2 && this.inRates[2] === 2) {
+        this.process = next_aa;
+      } else {
+        this.process = next_kk;
+      }
+      this._lo = this.inputs[1][0];
+      this._hi = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var loIn = this.inputs[1];
+      var hiIn = this.inputs[2];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
+      }
+    };
+    var next_kk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var next_lo = this.inputs[1][0];
+      var next_hi = this.inputs[2][0];
+      var lo = this._lo;
+      var hi = this._hi;
+      var i;
+      if (next_lo === lo && next_hi === hi) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = fold(inIn[i], lo, hi);
+        }
+      } else {
+        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
+        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          lo += lo_slope;
+          hi += hi_slope;
+          out[i] = fold(inIn[i], lo, hi);
+        }
+        this._lo = next_lo;
+        this._hi = next_hi;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Wrap = (function() {
+    var wrap = function(_in, lo, hi) {
+      if (lo > hi) {
+        return wrap(_in, hi, lo);
+      }
+      var range;
+      if (hi <= _in) {
+        range = hi - lo;
+        _in -= range;
+        if (_in < hi) {
+          return _in;
+        }
+      } else if (_in < lo) {
+        range = hi - lo;
+        _in += range;
+        if (_in >= lo) {
+          return _in;
+        }
+      } else {
+        return _in;
+      }
+      if (hi === lo) {
+        return lo;
+      }
+      return _in - range * Math.floor((_in - lo) / range);
+    };
+    var ctor = function() {
+      if (this.inRates[1] === 2 && this.inRates[2] === 2) {
+        this.process = next_aa;
+      } else {
+        this.process = next_kk;
+      }
+      this._lo = this.inputs[1][0];
+      this._hi = this.inputs[2][0];
+      this.process(1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var loIn = this.inputs[1];
+      var hiIn = this.inputs[2];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = Math.max(loIn[i], Math.min(inIn[i], hiIn[i]));
+      }
+    };
+    var next_kk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var next_lo = this.inputs[1][0];
+      var next_hi = this.inputs[2][0];
+      var lo = this._lo;
+      var hi = this._hi;
+      var i;
+      if (next_lo === lo && next_hi === hi) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = wrap(inIn[i], lo, hi);
+        }
+      } else {
+        var lo_slope = (next_lo - lo) * this.rate.slopeFactor;
+        var hi_slope = (next_hi - hi) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          lo += lo_slope;
+          hi += hi_slope;
+          out[i] = wrap(inIn[i], lo, hi);
+        }
+        this._lo = next_lo;
+        this._hi = next_hi;
+      }
+    };
+    return ctor;
+  })();
+  
+  module.exports = {};
+
+});
+define('cc/server/unit/reverb', function(require, exports, module) {
+
+  var cc = require("../cc");
+
+  cc.unit.specs.FreeVerb = (function() {
+    var ctor = function() {
+      this.process = next;
+      
+      this._iota0 = 0;
+      this._iota1 = 0;
+      this._iota2 = 0;
+      this._iota3 = 0;
+      this._iota4 = 0;
+      this._iota5 = 0;
+      this._iota6 = 0;
+      this._iota7 = 0;
+      this._iota8 = 0;
+      this._iota9 = 0;
+      this._iota10 = 0;
+      this._iota11 = 0;
+
+      this._R0_0 = 0;
+      this._R1_0 = 0;
+      this._R2_0 = 0;
+      this._R3_0 = 0;
+      this._R4_0 = 0;
+      this._R5_0 = 0;
+      this._R6_0 = 0;
+      this._R7_0 = 0;
+      this._R8_0 = 0;
+      this._R9_0 = 0;
+      this._R10_0 = 0;
+      this._R11_0 = 0;
+      this._R12_0 = 0;
+      this._R13_0 = 0;
+      this._R14_0 = 0;
+      this._R15_0 = 0;
+      this._R16_0 = 0;
+      this._R17_0 = 0;
+      this._R18_0 = 0;
+      this._R19_0 = 0;
+
+      this._R0_1 = 0;
+      this._R1_1 = 0;
+      this._R2_1 = 0;
+      this._R3_1 = 0;
+
+      this._dline0 = new Float32Array(225);
+      this._dline1 = new Float32Array(341);
+      this._dline2 = new Float32Array(441);
+      this._dline3 = new Float32Array(556);
+      this._dline4 = new Float32Array(1617);
+      this._dline5 = new Float32Array(1557);
+      this._dline6 = new Float32Array(1491);
+      this._dline7 = new Float32Array(1422);
+      this._dline8 = new Float32Array(1277);
+      this._dline9 = new Float32Array(1116);
+      this._dline10 = new Float32Array(1188);
+      this._dline11 = new Float32Array(1356);
+      
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var ftemp0 = Math.max(0, Math.min(this.inputs[1][0], 1)); // mix
+      var ftemp1 = 1 - ftemp0;
+
+      var room = Math.max(0, Math.min(this.inputs[2][0], 1)); // room
+      var ftemp5 = 0.7 + (0.28 * room);
+
+      var damp = Math.max(0, Math.min(this.inputs[3][0], 1)); // damp
+      var ftemp6 = 0.4 * damp;
+      var ftemp7 = 1 - ftemp6;
+
+      var iota0 = this._iota0;
+      var iota1 = this._iota1;
+      var iota2 = this._iota2;
+      var iota3 = this._iota3;
+      var iota4 = this._iota4;
+      var iota5 = this._iota5;
+      var iota6 = this._iota6;
+      var iota7 = this._iota7;
+      var iota8 = this._iota8;
+      var iota9 = this._iota9;
+      var iota10 = this._iota10;
+      var iota11 = this._iota11;
+
+      var R0_1 = this._R0_1;
+      var R1_1 = this._R1_1;
+      var R2_1 = this._R2_1;
+      var R3_1 = this._R3_1;
+
+      var R0_0 = this._R0_0;
+      var R1_0 = this._R1_0;
+      var R2_0 = this._R2_0;
+      var R3_0 = this._R3_0;
+      var R4_0 = this._R4_0;
+      var R5_0 = this._R5_0;
+      var R6_0 = this._R6_0;
+      var R7_0 = this._R7_0;
+      var R8_0 = this._R8_0;
+      var R9_0 = this._R9_0;
+      var R10_0 = this._R10_0;
+      var R11_0 = this._R11_0;
+      var R12_0 = this._R12_0;
+      var R13_0 = this._R13_0;
+      var R14_0 = this._R14_0;
+      var R15_0 = this._R15_0;
+      var R16_0 = this._R16_0;
+      var R17_0 = this._R17_0;
+      var R18_0 = this._R18_0;
+      var R19_0 = this._R19_0;
+
+      var dline0 = this._dline0;
+      var dline1 = this._dline1;
+      var dline2 = this._dline2;
+      var dline3 = this._dline3;
+      var dline4 = this._dline4;
+      var dline5 = this._dline5;
+      var dline6 = this._dline6;
+      var dline7 = this._dline7;
+      var dline8 = this._dline8;
+      var dline9 = this._dline9;
+      var dline10 = this._dline10;
+      var dline11 = this._dline11;
+
+      for (var i = 0; i < inNumSamples; ++i) {
+        var ftemp2 = inIn[i];
+        var ftemp4 = 1.500000e-2 * ftemp2;
+        if (++iota0 === 225) {
+          iota0 = 0;
+        }
+        var T0 = dline0[iota0];
+        if (++iota1 === 341) {
+          iota1 = 0;
+        }
+        var T1 = dline1[iota1];
+        if (++iota2 === 441) {
+          iota2 = 0;
+        }
+        var T2 = dline2[iota2];
+        if (++iota3 === 556) {
+          iota3 = 0;
+        }
+        var T3 = dline3[iota3];
+        if (++iota4 === 1617) {
+          iota4 = 0;
+        }
+        var T4 = dline4[iota4];
+        R5_0 = (ftemp7 * R4_0) + (ftemp6 * R5_0);
+        dline4[iota4] = ftemp4 + (ftemp5 * R5_0);
+        R4_0 = T4;
+        if (++iota5 === 1557) {
+          iota5 = 0;
+        }
+        var T5 = dline5[iota5];
+        R7_0 = (ftemp7 * R6_0) + (ftemp6 * R7_0);
+        dline5[iota5] = ftemp4 + (ftemp5 * R7_0);
+        R6_0 = T5;
+        if (++iota6 === 1491) {
+          iota6 = 0;
+        }
+        var T6 = dline6[iota6];
+        R9_0 = (ftemp7 * R8_0) + (ftemp6 * R9_0);
+        dline6[iota6] = ftemp4 + (ftemp5 * R9_0);
+        R8_0 = T6;
+        if (++iota7 === 1422) {
+          iota7 = 0;
+        }
+        var T7 = dline7[iota7];
+        R11_0 = (ftemp7 * R10_0) + (ftemp6 * R11_0);
+        dline7[iota7] = ftemp4 + (ftemp5 * R11_0);
+        R10_0 = T7;
+        if (++iota8 === 1277) {
+          iota8 = 0;
+        }
+        var T8 = dline8[iota8];
+        R13_0 = (ftemp7 * R12_0) + (ftemp6 * R13_0);
+        dline8[iota8] = ftemp4 + (ftemp5 * R13_0);
+        R12_0 = T8;
+        if (++iota9 === 1116) {
+          iota9 = 0;
+        }
+        var T9 = dline9[iota9];
+        R15_0 = (ftemp7 * R14_0) + (ftemp6 * R15_0);
+        dline9[iota9] = ftemp4 + (ftemp5 * R15_0);
+        R14_0 = T9;
+        if (++iota10 === 1188) {
+          iota10 = 0;
+        }
+        var T10 = dline10[iota10];
+        R17_0 = (ftemp7 * R16_0) + (ftemp6 * R17_0);
+        dline10[iota10] = ftemp4 + (ftemp5 * R17_0);
+        R16_0 = T10;
+        if (++iota11 === 1356) {
+          iota11 = 0;
+        }
+        var T11 = dline11[iota11];
+        R19_0 = (ftemp7 * R18_0) + (ftemp6 * R19_0);
+        dline11[iota11] = ftemp4 + (ftemp5 * R19_0);
+        R18_0 = T11;
+        var ftemp8 = R16_0 + R18_0;
+        dline3[iota3] = (((0.5 * R3_0) + R4_0) + (R6_0 + R8_0)) + ((R10_0 + R12_0) + (R14_0 + ftemp8));
+        R3_0 = T3;
+        R3_1 = R3_0 - (((R4_0 + R6_0) + (R8_0 + R10_0)) + ((R12_0 + R14_0) + ftemp8));
+        dline2[iota2] = (0.5 * R2_0) + R3_1;
+        R2_0 = T2;
+        R2_1 = (R2_0 - R3_1);
+        dline1[iota1] = (0.5 * R1_0) + R2_1;
+        R1_0 = T1;
+        R1_1 = (R1_0 - R2_1);
+        dline0[iota0] = (0.5 * R0_0) + R1_1;
+        R0_0 = T0;
+        R0_1 = R0_0 - R1_1;
+        out[i] = (ftemp1 * ftemp2) + (ftemp0 * R0_1);
+      }
+      
+      this._iota0 = iota0;
+      this._iota1 = iota1;
+      this._iota2 = iota2;
+      this._iota3 = iota3;
+      this._iota4 = iota4;
+      this._iota5 = iota5;
+      this._iota6 = iota6;
+      this._iota7 = iota7;
+      this._iota8 = iota8;
+      this._iota9 = iota9;
+      this._iota10 = iota10;
+      this._iota11 = iota11;
+
+      this._R0_1 = R0_1;
+      this._R1_1 = R1_1;
+      this._R2_1 = R2_1;
+      this._R3_1 = R3_1;
+
+      this._R0_0 = R0_0;
+      this._R1_0 = R1_0;
+      this._R2_0 = R2_0;
+      this._R3_0 = R3_0;
+      this._R4_0 = R4_0;
+      this._R5_0 = R5_0;
+      this._R6_0 = R6_0;
+      this._R7_0 = R7_0;
+      this._R8_0 = R8_0;
+      this._R9_0 = R9_0;
+      this._R10_0 = R10_0;
+      this._R11_0 = R11_0;
+      this._R12_0 = R12_0;
+      this._R13_0 = R13_0;
+      this._R14_0 = R14_0;
+      this._R15_0 = R15_0;
+      this._R16_0 = R16_0;
+      this._R17_0 = R17_0;
+      this._R18_0 = R18_0;
+      this._R19_0 = R19_0;
+    };
     return ctor;
   })();
   
