@@ -1,161 +1,157 @@
 @import url(http://fonts.googleapis.com/css?family=Lato:300,400,700);
 
 * {
-    -webkit-box-sizing: border-box;
-    -moz-box-sizing   : border-box;
-    -ms-box-sizing    : border-box;
-    box-sizing        : border-box;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing   : border-box;
+  -ms-box-sizing    : border-box;
+  box-sizing        : border-box;
 }
 *:focus {
-    outline: 0;
+  outline: 0;
 }
 button {
-    opacity: 0.8;
+  opacity: 0.8;
+  z-index:99;
 }
-#code {
-    position: absolute;
-    top   : 0;
-    left  : 0;
-    right : 0;
-    bottom: 0;
-    width: 100%;
-    height: 100%;
-    font-family: Monaco,Consolas,'Lucida Console',monospace;
-    font-size: 16px;
-    color: #34495e;
-    background: #ecf0f1;
-    border-width: 0;
-    margin: 0;
-    padding: 5px 10px;
+
+#main {
+  position: absolute;
+  top   : 0;
+  left  : 0;
+  right : 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  padding-right: 220px;
 }
-#ctrl {
-    position: absolute;
-    bottom: 0px;
-    left  : 0px;
-    width : 100%;
-    height: 120px;
-    opacity: 0.75;
-    cursor: move;
-    background: #ecf0f1;
+
+#editor { 
+  position: relative;
+  top   : 0;
+  left  : 0;
+  right : 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  font-size: 14px;
+  font-weight: bold;
 }
-#ctrl button {
-    opacity: 1;
-}
+
 #boot {
-    position: absolute;
-    top  : 5px;
-    right: 225px;
+  position: absolute;
+  top  : 5px;
+  right: 225px;
 }
 #run {
-    position: absolute;
-    top  : 40px;
-    right: 225px;
+  position: absolute;
+  top  : 40px;
+  right: 225px;
 }
 #reset {
-    position: absolute;
-    top  : 75px;
-    right: 225px;
+  position: absolute;
+  top  : 75px;
+  right: 225px;
 }
 #link {
-    position: absolute;
-    top  : 110px;
-    right: 225px;
+  position: absolute;
+  top  : 110px;
+  right: 225px;
 }
 #compile-coffee {
-    position: absolute;
-    top  : 145px;
-    right: 225px;
-    display: none;
+  position: absolute;
+  top  : 145px;
+  right: 225px;
+  display: none;
 }
 #compile-js {
-    position: absolute;
-    top  : 180px;
-    right: 225px;
-    display: none;
+  position: absolute;
+  top  : 180px;
+  right: 225px;
+  display: none;
 }
 #panel {
-    position: absolute;
-    top: 0px;
-    right: 0px;
-    width: 220px;
-    height: 100%;
-    padding: 5px 20px;
-    color: #ecf0f1;
-    background: #95a5a6;
-    font-family: Lato, sans-serif;
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  width: 220px;
+  height: 100%;
+  padding: 5px 20px;
+  color: #ecf0f1;
+  background: #95a5a6;
+  font-family: Lato, sans-serif;
 }
 #panel h1 {
-    font-size: 26px;
-    font-weight: 700px;
-    margin: 5px 0 0;
+  font-size: 26px;
+  font-weight: 700px;
+  margin: 5px 0 0;
 }
 #panel .desc {
-    font-size: 14px;
-    font-weight: 300;
+  font-size: 14px;
+  font-weight: 300;
 }
 .block {
-    margin-top: 25px;
+  margin-top: 25px;
 }
 h3 {
-    margin: 0;
+  margin: 0;
 }
 h5 {
-    margin: 0 5px 15px 0;
-    padding: 0;
-    text-align: right;
-    font-weight: 300;
-    font-size: 10px;
+  margin: 0 5px 15px 0;
+  padding: 0;
+  text-align: right;
+  font-weight: 300;
+  font-size: 10px;
 }
 ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 ul li {
-    margin: 5px 0;
+  margin: 5px 0;
 }
 ul li:before {
-    content: "- ";
+  content: "- ";
 }
 ul li a {
-    color: #ecf0f1;
+  color: #ecf0f1;
 }
 #canvas {
-    width: 180px;
-    height: 90px;
-    background: #2c3e50;
+  width: 180px;
+  height: 90px;
+  background: #2c3e50;
 }
 .btn {
-    width : 80px;
-    height: 30px;
-    font-size: 18px;
-    border: none;
-    border-radius: 4px;
-    transition: 0.25s;
-    color: white;
-    background-color: #bdc3c7;
+  width : 80px;
+  height: 30px;
+  font-size: 18px;
+  border: none;
+  border-radius: 4px;
+  transition: 0.25s;
+  color: white;
+  background-color: #bdc3c7;
 }
 .btn:hover, .btn:focus {
-    background-color: #cacfd2;
+  background-color: #cacfd2;
 }
 .btn:active {
-    background-color: #a1a6a9;
+  background-color: #a1a6a9;
 }
 .btn-primary {
-    background-color: #1abc9c;
+  background-color: #1abc9c;
 }
 .btn-primary:hover, .btn-primary:focus {
-    background-color: #2fe2bf;
+  background-color: #2fe2bf;
 }
 .btn-primary:active {
-    background-color: #16a085;
+  background-color: #16a085;
 }
 .btn-danger {
-    background-color: #e74c3c;
+  background-color: #e74c3c;
 }
 .btn-danger:hover, .btn-danger:focus {
-    background-color: #ec7063;
+  background-color: #ec7063;
 }
 .btn-danger:active {
-    background-color: #dc2d1b;
+  background-color: #dc2d1b;
 }

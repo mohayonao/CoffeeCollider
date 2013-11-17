@@ -5,8 +5,15 @@ $(function() {
   
   var srcFragment  = "try:";
   var loadFragment = "load:";
-  var $code = $("#code");
   var $boot = $("#boot");
+  
+  var editor = ace.edit("editor");
+  editor.setTheme("ace/theme/github");
+  editor.setPrintMarginColumn(-1);
+  editor.getSession().setTabSize(2);
+  editor.getSession().setMode("ace/mode/coffee");
+  editor.setSelectionStyle("text");
+  
   
   var config = {};
   location.search.substr(1).split("&").forEach(function(kv) {
@@ -59,7 +66,7 @@ $(function() {
   });
   
   $("#run").on("click", function() {
-    var code = $code.val().trim();
+    var code = editor.getValue().trim();
     cc.execute(code, function(res) {
       if (res !== undefined) {
         console.log(res);
@@ -72,7 +79,7 @@ $(function() {
   });
 
   $("#link").on("click", function() {
-    var code = $code.val().trim();
+    var code = editor.getValue().trim();
     window.location = "#" + srcFragment + encodeURIComponent(code);
   });
   
@@ -84,7 +91,8 @@ $(function() {
         path = "../examples/";
       }
       $.get(path + $(this).attr("data-path")).then(function(res) {
-        $code.val(res);
+        editor.setValue(res);
+        editor.clearSelection();
       });
       return false;
     });
@@ -94,11 +102,11 @@ $(function() {
   
   cc.dev = function() {
     $("#compile-coffee").on("click", function() {
-      var code = cc.impl.compiler.toString($code.val().trim());
+      var code = cc.impl.compiler.toString(editor.getValue().trim());
       console.log(code);
     }).show();
     $("#compile-js").on("click", function() {
-      var code = cc.impl.compiler.toString($code.val().trim());
+      var code = cc.impl.compiler.toString(editor.getValue().trim());
       code = CoffeeScript.compile(code, {bare:true});
       console.log(code);
     }).show();
@@ -106,19 +114,23 @@ $(function() {
   
   var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (hash.indexOf(srcFragment) === 0) {
-    $code.val(hash.substr(srcFragment.length));
+    editor.setValue(hash.substr(srcFragment.length));
+    editor.clearSelection();
   } else if (hash.indexOf(loadFragment) === 0) {
     var path = "./extras/examples/";
     if (isEdge) {
       path = "../examples/";
     }
     $.get(path + hash.substr(loadFragment.length)).then(function(res) {
-      $code.val(res);
+      editor.setValue(res);
+      editor.clearSelection();
     });
   }
   
   if (isEdge) {
     cc.dev();
   }
+
+  editor.focus();
 
 });

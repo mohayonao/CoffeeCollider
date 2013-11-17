@@ -7,13 +7,7 @@
     <link rel="stylesheet" href="../css/index.css">
   </head>
   <body>
-    <textarea id="code" spellcheck="false" placeholder="# write a code here"></textarea>
-    <button id="boot" class="btn">Boot</button>
-    <button id="run" class="btn btn-primary">Run</button>
-    <button id="reset" class="btn btn-primary">Reset</button>
-    <button id="link" class="btn">Link</button>
-    <button id="compile-coffee" class="btn">Coffee</button>
-    <button id="compile-js" class="btn">JS</button>
+    <div id="main"><div id="editor"></div></div>
     <div id="panel">
       <h1>CoffeeCollider</h1>
       <h5 id="version">version</h5>
@@ -28,8 +22,15 @@
         </ul>
       </div>
     </div>
+    <button id="boot" class="btn">Boot</button>
+    <button id="run" class="btn btn-primary">Run</button>
+    <button id="reset" class="btn btn-primary">Reset</button>
+    <button id="link" class="btn">Link</button>
+    <button id="compile-coffee" class="btn">Coffee</button>
+    <button id="compile-js" class="btn">JS</button>
     <script src="../vendor/jquery-2.0.0.min.js"></script>
     <script src="../vendor/coffee-script.js"></script>
+    <script src="../vendor/ace.js"></script>
     <script src="./coffee-collider.js"></script>
     <script src="../js/waveviewer.js"></script>
     <script src="../js/index.js"></script>
