@@ -125,14 +125,39 @@ define(function(require, exports, module) {
     return -1;
   };
   var indexOfFunctionStart = function(tokens, index) {
+    var depth = 0;
     for (var i = index, imax = tokens.length; i < imax; ++i) {
-      if (tokens[i][TAG] === "TERMINATOR" || tokens[i][TAG] === ".") {
+      switch (tokens[i][TAG]) {
+      case "TERMINATOR":
+        if (depth === 0) {
+          return -1;
+        }
+        break;
+      case "PARAM_START":
+        if (depth === 0) {
+          return i;
+        }
+        depth += 1;
+        break;
+      case "PARAM_END":
+        depth -= 1;
+        break;
+      case "->": case "=>":
+        if (depth === 0) {
+          return i;
+        }
+        break;
+      case "[": case "{": case "(":
+      case "CALL_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case ")": case "}": case "]":
+      case "CALL_END": case "INDEX_END": case "PARAM_END":
+        depth -= 1;
         break;
       }
-      if (tokens[i][TAG] === "->" ||
-          tokens[i][TAG] === "=>" ||
-          tokens[i][TAG] === "PARAM_START") {
-        return i;
+      if (depth < 0) {
+        break;
       }
     }
     return -1;
@@ -653,7 +678,14 @@ define(function(require, exports, module) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
         continue;
       }
-      var index = indexOfFunctionStart(tokens, i + 2);
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
       if (index === -1) {
         continue;
       }
@@ -713,7 +745,14 @@ define(function(require, exports, module) {
       if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
         continue;
       }
-      var index = indexOfFunctionStart(tokens, i + 2);
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
       if (index === -1) {
         continue;
       }
