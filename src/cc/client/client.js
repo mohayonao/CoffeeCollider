@@ -87,13 +87,13 @@ define(function(require, exports, module) {
         window.addEventListener("mousemove", function(e) {
           f32_syncItems[C.POS_X] = e.pageX / window.innerWidth;
           f32_syncItems[C.POS_Y] = e.pageY / window.innerHeight;
-        }, false);
+        }, true);
         window.addEventListener("mousedown", function() {
           f32_syncItems[C.BUTTON] = 1;
-        }, false);
+        }, true);
         window.addEventListener("mouseup", function() {
           f32_syncItems[C.BUTTON] = 0;
-        }, false);
+        }, true);
       }
       this.syncItems = syncItems;
       this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
