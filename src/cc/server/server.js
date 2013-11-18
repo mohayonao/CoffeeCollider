@@ -124,7 +124,6 @@ define(function(require, exports, module) {
       require("./rate");
       require("./unit/unit");
       require("./server-worker");
-      require("./server-iframe");
       require("./server-nodejs");
       require("./server-socket");
       
@@ -132,8 +131,6 @@ define(function(require, exports, module) {
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthServer();
-        case "iframe":
-          return cc.createIFrameSynthServer();
         case "nodejs":
           return cc.createNodeJSSynthServer();
         case "socket":

@@ -20,7 +20,12 @@ define(function(require, exports, module) {
       this.socketPath = null;
     }
     extend(SocketSynthLang, cc.SynthLang);
-    
+
+    SocketSynthLang.prototype.sendToClient = function(msg) {
+      postMessage(msg);
+    };
+    SocketSynthLang.prototype.sendToServer = function() {
+    };
     SocketSynthLang.prototype.process = function() {
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
@@ -84,7 +89,8 @@ define(function(require, exports, module) {
     };
 
     SocketSynthLang.prototype.extendCommands = function(commands) {
-      commands["/socket/open"] = function() {
+      commands["/socket/open"] = function(msg) {
+        this.socketPath = msg[1];
         this.openSocket();
       };
       commands["/socket/close"] = function() {
@@ -107,16 +113,7 @@ define(function(require, exports, module) {
     use: function() {
       cc.createSocketSynthLang = function() {
         var lang = new SocketSynthLang();
-        if (typeof window !== "undefined") {
-          window.onmessage = function(e) {
-            e.ports[0].onmessage = onmessage;
-            lang.sendToClient = function(msg) {
-              e.ports[0].postMessage(msg);
-            };
-            lang.socketPath = e.data;
-            window.onmessage = null;
-          };
-        }
+        global.onmessage = onmessage;
         cc.opmode = "socket";
         return lang;
       };

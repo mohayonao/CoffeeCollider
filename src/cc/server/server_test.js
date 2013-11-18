@@ -57,11 +57,6 @@ define(function(require, exports, module) {
           cc.createSynthServer();
           assert.equal(cc.opmode, "worker");
         });
-        it("IFrame", function() {
-          cc.opmode = "iframe";
-          cc.createSynthServer();
-          assert.equal(cc.opmode, "iframe");
-        });
         it("WebSocket", function() {
           cc.opmode = "socket";
           cc.createSynthServer();

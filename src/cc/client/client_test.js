@@ -12,10 +12,6 @@ define(function(require, exports, module) {
         cc.opmode = "worker";
         return { sampleRate: 44100, channels: 2 };
       };
-      cc.createSynthClientIFrameImpl = function() {
-        cc.opmode = "iframe";
-        return { sampleRate: 44100, channels: 2 };
-      };
     });
     beforeEach(function() {
       require("./client").use();
@@ -25,18 +21,10 @@ define(function(require, exports, module) {
       describe("createSynthClient", function() {
         beforeEach(function() {
           cc.createWebWorker = nop;
-          cc.createHTMLIFrameElement = nop;
-          cc.createMessageChannel = function() {
-            return { port1:{}, port2:{} };
-          };
         });
         it("WebWorker", function() {
           var exports = cc.createSynthClient();
           assert.equal("worker", cc.opmode);
-        });
-        it("IFrame", function() {
-          var exports = cc.createSynthClient({iframe:true});
-          assert.equal("iframe", cc.opmode);
         });
         it("WebSocket", function() {
           var exports = cc.createSynthClient({socket:"path/to/socket"});

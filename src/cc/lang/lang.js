@@ -23,7 +23,7 @@ define(function(require, exports, module) {
     }
     
     SynthLang.prototype.sendToClient = function() {
-      throw "SynthLang#sendToClient: should be overridden";
+      throw "SynthLang#sendToClient: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromClient = function(msg) {
       if (msg) {
@@ -34,7 +34,7 @@ define(function(require, exports, module) {
       }
     };
     SynthLang.prototype.sendToServer = function() {
-      throw "SynthLang#sendToServer: should be overridden";
+      throw "SynthLang#sendToServer: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromServer = function(msg) {
       if (msg instanceof Int16Array) {
@@ -191,7 +191,6 @@ define(function(require, exports, module) {
       require("./synthdef");
       require("./ugen/ugen");
       require("./lang-worker");
-      require("./lang-iframe");
       require("./lang-nodejs");
       require("./lang-socket");
       
@@ -208,8 +207,6 @@ define(function(require, exports, module) {
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthLang();
-        case "iframe":
-          return cc.createIFrameSynthLang();
         case "nodejs":
           return cc.createNodeJSSynthLang();
         case "socket":

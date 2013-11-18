@@ -13,21 +13,14 @@ define(function(require, exports, module) {
       cc.SynthClientImpl.call(this, exports, opts);
       
       var that = this;
-      var iframe = this.iframe = cc.createHTMLIFrameElement();
-      iframe.sandbox = "allow-scripts";
-      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
-      var channel = cc.createMessageChannel();
-      iframe.onload = function() {
-        iframe.contentWindow.postMessage(opts.socket, [channel.port2], "*");
-      };
-      channel.port1.onmessage = function(e) {
+      this.lang = cc.createWebWorker(cc.coffeeColliderPath + "#socket");
+      this.lang.onmessage = function(e) {
         that.recvFromLang(e.data);
       };
-      this.lang = channel.port1;
       
       exports.socket = {
         open: function() {
-          that.sendToLang([ "/socket/open" ]);
+          that.sendToLang([ "/socket/open", opts.socket ]);
         },
         close: function() {
           that.sendToLang([ "/socket/close" ]);

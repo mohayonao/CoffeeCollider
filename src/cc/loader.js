@@ -16,31 +16,18 @@ define(function(require, exports, module) {
         }
       }
     }
-    if (cc.coffeeColliderHash === "#iframe") {
-      cc.opmode  = "iframe";
-      cc.context = "lang";
-      require("./lang/lang");
-      cc.lang = cc.createSynthLang();
-    } else if (cc.coffeeColliderHash === "#socket") {
+    cc.opmode  = "client";
+    cc.context = "client";
+    require("./client/client");
+    global.CoffeeCollider = function(opts) {
+      return cc.createSynthClient(opts);
+    };
+  } else if (typeof WorkerLocation !== "undefined") {
+    if (location.hash === "#socket") {
       cc.opmode  = "socket";
       cc.context = "lang";
       require("./lang/lang");
       cc.lang = cc.createSynthLang();
-    } else {
-      cc.opmode  = "client";
-      cc.context = "client";
-      require("./client/client");
-      global.CoffeeCollider = function(opts) {
-        return cc.createSynthClient(opts);
-      };
-    }
-  } else if (typeof WorkerLocation !== "undefined") {
-    if (location.hash === "#iframe") {
-      cc.opmode  = "iframe";
-      cc.context = "server";
-      require("./server/server");
-      cc.server = cc.createSynthServer();
-      cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "lang/server";
@@ -74,7 +61,7 @@ define(function(require, exports, module) {
       cc.context = "server";
       require("./server/server");
       cc.server = cc.createSynthServer();
-      return cc.server.client.createServer(opts);
+      return cc.server.exports.createServer(opts);
     };
     module.exports = cc.global;
   }

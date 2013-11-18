@@ -47,11 +47,6 @@ define(function(require, exports, module) {
           cc.createSynthLang();
           assert.equal(cc.opmode, "worker");
         });
-        it("IFrame", function() {
-          cc.opmode = "iframe";
-          cc.createSynthLang();
-          assert.equal(cc.opmode, "iframe");
-        });
         it("WebSocket", function() {
           cc.opmode = "socket";
           cc.createSynthLang();
@@ -202,29 +197,6 @@ define(function(require, exports, module) {
           assert.deepEqual(called, ["tl.process"],
                            "WebWorkerLang processes one by one");
           assert.deepEqual(sendToServer, ["/processed", [] ]);
-        });
-        it("IFrame", function() {
-          sendToClient = sendToServer = [""];
-          cc.opmode = "iframe";
-          instance = cc.createSynthLang();
-          instance.sendToServer = function(msg) {
-            sendToServer = msg;
-          };
-          instance.sendToClient = function(msg) {
-            sendToClient = msg;
-          };
-
-          var expected = [];
-          var i, n = instance.strmLength / instance.bufLength;
-          for (var i = 0; i < n; ++i) {
-            expected.push("tl.process");
-          }
-          
-          instance.process();
-          assert.deepEqual(called, expected,
-                           "IFrameLang processes in a lump");
-          expected = expected.map(function(x) { return 0; });
-          assert.deepEqual(sendToServer, ["/processed", expected ]);
         });
         it("WebSocket", function() {
           sendToClient = sendToServer = [""];

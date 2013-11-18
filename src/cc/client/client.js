@@ -14,8 +14,6 @@ define(function(require, exports, module) {
       this.version = cc.version;
       if (opts.socket) {
         this.impl = cc.createSynthClientSocketImpl(this, opts);
-      } else if (opts.iframe) {
-        this.impl = cc.createSynthClientIFrameImpl(this, opts);
       } else if (opts.nodejs) {
         this.impl = cc.createSynthClientNodeJSImpl(this, opts);
       } else {
@@ -312,7 +310,6 @@ define(function(require, exports, module) {
     
     use: function() {
       require("./client-worker");
-      require("./client-iframe");
       require("./client-nodejs");
       require("./client-socket");
       require("../common/browser");
