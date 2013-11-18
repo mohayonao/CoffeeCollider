@@ -14,7 +14,6 @@ $(function() {
   editor.getSession().setMode("ace/mode/coffee");
   editor.setSelectionStyle("text");
   
-  
   var config = {};
   location.search.substr(1).split("&").forEach(function(kv) {
     var items = kv.split("=");
