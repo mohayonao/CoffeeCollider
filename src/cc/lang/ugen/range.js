@@ -4,19 +4,19 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.InRange = {
-    ar: {
+    $ar: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(C.AUDIO, _in, lo, hi);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(C.CONTROL, _in, lo, hi);
       }
     },
-    ir: {
+    $ir: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(C.SCALAR, _in, lo, hi);
@@ -35,11 +35,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.LinLin = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     },
-    kr: {
+    $kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linlin_ctor
+    },
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     }
@@ -53,15 +57,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.LinExp = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     }
@@ -77,15 +81,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.ExpLin = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     }
@@ -101,15 +105,15 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.ExpExp = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     }

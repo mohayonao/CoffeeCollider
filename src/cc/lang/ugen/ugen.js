@@ -264,15 +264,15 @@ define(function(require, exports, module) {
   
   
   var registerUGen = function(name, spec) {
-    var BaseClass = (spec._Klass === null) ? null : (spec._Klass || UGen);
-    var multiCall   = spec._multiCall;
-    var checkInputs = spec._checkInputs;
+    var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
+    var multiCall   = spec.multiCall;
+    var checkInputs = spec.checkInputs;
     if (multiCall === undefined) {
       multiCall = true;
     }
 
     var klass;
-    if (spec["new"]) {
+    if (spec.$new) {
       klass = function() {
         return cc.global[name]["new"].apply(null, slice.call(arguments));
       };
@@ -291,12 +291,13 @@ define(function(require, exports, module) {
     cc.global[name] = klass;
     
     Object.keys(spec).forEach(function(key) {
-      if (key.charAt(0) === "_") {
+      if (key.charAt(0) !== "$") {
         return;
       }
       var setting   = spec[key];
       var defaults  = setting.defaults + ",tag";
       var ctor      = setting.ctor;
+      key = key.substr(1);
       if (BaseClass !== null) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);

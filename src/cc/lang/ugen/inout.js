@@ -21,8 +21,8 @@ define(function(require, exports, module) {
   })();
   
   cc.ugen.specs.In = {
-    _Klass: cc.MultiOutUGen,
-    ar: {
+    Klass: cc.MultiOutUGen,
+    $ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
         this.init.call(this, C.AUDIO);
@@ -30,7 +30,7 @@ define(function(require, exports, module) {
         return this.initOutputs(numChannels, this.rate);
       },
     },
-    kr: {
+    $kr: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
         this.init.call(this, C.CONTROL);
@@ -51,16 +51,10 @@ define(function(require, exports, module) {
   
   var out_ctor = function(rate) {
     function ctor(bus, channelsArray) {
-      if (!(cc.instanceOfUGen(bus) || typeof bus === "number")) {
-        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
-      }
       if (!Array.isArray(channelsArray)) {
         channelsArray = [ channelsArray ];
       }
       channelsArray = utils.flatten(channelsArray);
-      channelsArray = channelsArray.filter(function(x) {
-        return x !== 0;
-      });
       if (channelsArray.length) {
         cc.UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
       }
@@ -78,20 +72,20 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Out = {
-    _Klass    : null,
-    _multiCall: false,
-    ar: {
+    Klass    : null,
+    multiCall: false,
+    $ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.AUDIO),
     },
-    kr: {
+    $kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.CONTROL),
     }
   };
-
+  
   cc.ugen.specs.A2K = {
-    kr: {
+    $kr: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(C.CONTROL, _in);
@@ -100,7 +94,7 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.K2A = {
-    ar: {
+    $ar: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(C.AUDIO, _in);

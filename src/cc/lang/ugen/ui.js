@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   
   var MouseXY = {
-    kr: {
+    $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
         if (warp === "exponential") {
@@ -20,7 +20,7 @@ define(function(require, exports, module) {
   cc.ugen.specs.MouseY = MouseXY;
   
   cc.ugen.specs.MouseButton = {
-    kr: {
+    $kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
         return this.init(C.CONTROL, minval, maxval, lag);

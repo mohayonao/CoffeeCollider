@@ -4,13 +4,13 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.Debug = {
-    ar: {
+    $ar: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(C.AUDIO, _in);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(C.CONTROL, _in);

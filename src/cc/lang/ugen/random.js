@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.Rand = {
-    "new": {
+    $new: {
       defaults: "lo=0,hi=1",
       ctor: function(lo, hi) {
         return this.init(C.SCALAR, lo, hi);

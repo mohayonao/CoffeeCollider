@@ -4,13 +4,13 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.FSinOsc = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.AUDIO, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.CONTROL, freq, phase).madd(mul, add);
@@ -19,13 +19,13 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.SinOsc = {
-    ar: {
+    $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.AUDIO, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.CONTROL, freq, phase).madd(mul, add);
@@ -34,13 +34,13 @@ define(function(require, exports, module) {
   };
 
   cc.ugen.specs.SinOscFB = {
-    ar: {
+    $ar: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
         return this.init(C.AUDIO, freq, feedback).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
         return this.init(C.CONTROL, freq, feedback).madd(mul, add);
@@ -49,13 +49,13 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.LFSaw = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(C.AUDIO, freq, iphase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(C.CONTROL, freq, iphase).madd(mul, add);
@@ -68,13 +68,13 @@ define(function(require, exports, module) {
   cc.ugen.specs.LFTri = cc.ugen.specs.LFSaw;
 
   cc.ugen.specs.LFPulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
         return this.init(C.AUDIO, freq, iphase, width).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
         return this.init(C.CONTROL, freq, iphase, width).madd(mul, add);
@@ -83,7 +83,7 @@ define(function(require, exports, module) {
   };
 
   cc.ugen.specs.Blip = {
-    ar: {
+    $ar: {
       defaults: "freq=440,numharm=200,mul=1,add=0",
       ctor: function(freq, numharm, mul, add) {
         return this.init(C.AUDIO, freq, numharm).madd(mul, add);
@@ -92,7 +92,7 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Saw = {
-    ar: {
+    $ar: {
       defaults: "freq=440,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(C.AUDIO, freq).madd(mul, add);
@@ -101,7 +101,7 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Pulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,width=0.5,mul=1,add=0",
       ctor: function(freq, width, mul, add) {
         return this.init(C.AUDIO, freq, width).madd(mul, add);
@@ -110,13 +110,13 @@ define(function(require, exports, module) {
   };
 
   cc.ugen.specs.Impulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.AUDIO, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(C.CONTROL, freq, phase).madd(mul, add);

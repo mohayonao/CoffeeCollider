@@ -16,13 +16,13 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Pan2 = {
-    _Klass: cc.MultiOutUGen,
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    Klass: cc.MultiOutUGen,
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.AUDIO)
     },
-    kr: {
+    $kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.CONTROL),
     }

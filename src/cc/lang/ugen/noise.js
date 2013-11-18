@@ -4,13 +4,13 @@ define(function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.WhiteNoise = {
-    ar: {
+    $ar: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
         return this.init(C.AUDIO).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
         return this.init(C.CONTROL).madd(mul, add);
@@ -22,13 +22,13 @@ define(function(require, exports, module) {
   cc.ugen.specs.ClipNoise = cc.ugen.specs.WhiteNoise;
   
   cc.ugen.specs.Dust = {
-    ar: {
+    $ar: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
         return this.init(C.AUDIO, density).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
         return this.init(C.CONTROL, density).madd(mul, add);
@@ -39,13 +39,13 @@ define(function(require, exports, module) {
   cc.ugen.specs.Dust2 = cc.ugen.specs.Dust;
 
   cc.ugen.specs.LFNoise0 = {
-    ar: {
+    $ar: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(C.AUDIO, freq).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(C.CONTROL, freq).madd(mul, add);
