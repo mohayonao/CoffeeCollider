@@ -98,10 +98,10 @@ module.exports = function(grunt) {
         files: {
           "build/coffee-collider-min.js": [ "build/coffee-collider.js" ]
         },
-        options: {
-          sourceMap: "build/coffee-collider-min.map",
-          report: "gzip"
-        }
+        // options: {
+        //   sourceMap: "build/coffee-collider-min.map",
+        //   report: "gzip"
+        // }
       }
     },
     compress: {
@@ -467,7 +467,7 @@ module.exports = function(grunt) {
   grunt.registerTask("check", ["typo", "jshint", "test"]);
   grunt.registerTask("build", ["typo", "jshint", "test", "dryice"]);
   grunt.registerTask("build:force", ["dryice:force"]);
-  grunt.registerTask("build:all"  , ["build", "copy", "uglify", "compress"]);
+  grunt.registerTask("build:all"  , ["build", "copy", "uglify"]);
   
   grunt.registerTask("default", ["connect", "esteWatch"]);
   grunt.registerTask("travis" , ["typo", "jshint", "test:travis", "test:integration"]);

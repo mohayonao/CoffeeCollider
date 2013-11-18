@@ -64,31 +64,18 @@ define('cc/loader', function(require, exports, module) {
         }
       }
     }
-    if (cc.coffeeColliderHash === "#iframe") {
-      cc.opmode  = "iframe";
-      cc.context = "lang";
-      require("./lang/lang");
-      cc.lang = cc.createSynthLang();
-    } else if (cc.coffeeColliderHash === "#socket") {
+    cc.opmode  = "client";
+    cc.context = "client";
+    require("./client/client");
+    global.CoffeeCollider = function(opts) {
+      return cc.createSynthClient(opts);
+    };
+  } else if (typeof WorkerLocation !== "undefined") {
+    if (location.hash === "#socket") {
       cc.opmode  = "socket";
       cc.context = "lang";
       require("./lang/lang");
       cc.lang = cc.createSynthLang();
-    } else {
-      cc.opmode  = "client";
-      cc.context = "client";
-      require("./client/client");
-      global.CoffeeCollider = function(opts) {
-        return cc.createSynthClient(opts);
-      };
-    }
-  } else if (typeof WorkerLocation !== "undefined") {
-    if (location.hash === "#iframe") {
-      cc.opmode  = "iframe";
-      cc.context = "server";
-      require("./server/server");
-      cc.server = cc.createSynthServer();
-      cc.server.connect();
     } else {
       cc.opmode  = "worker";
       cc.context = "lang/server";
@@ -122,7 +109,7 @@ define('cc/loader', function(require, exports, module) {
       cc.context = "server";
       require("./server/server");
       cc.server = cc.createSynthServer();
-      return cc.server.client.createServer(opts);
+      return cc.server.exports.createServer(opts);
     };
     module.exports = cc.global;
   }
@@ -131,9 +118,2395 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131118071600",
+    version: "0.0.0+20131118151800",
     global : {},
     Object : function CCObject() {}
+  };
+
+});
+define('cc/client/client', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var emitter  = require("../common/emitter");
+  var unpack   = require("../common/pack").unpack;
+  var commands = {};
+  var slice    = [].slice;
+  
+  var SynthClient = (function() {
+    function SynthClient(opts) {
+      emitter.mixin(this);
+      opts = opts || {};
+      this.version = cc.version;
+      if (opts.socket) {
+        this.impl = cc.createSynthClientSocketImpl(this, opts);
+      } else if (opts.nodejs) {
+        this.impl = cc.createSynthClientNodeJSImpl(this, opts);
+      } else {
+        this.impl = cc.createSynthClientWorkerImpl(this, opts);
+      }
+      this.sampleRate = this.impl.sampleRate;
+      this.channels   = this.impl.channels;
+    }
+    
+    SynthClient.prototype.play = function() {
+      this.impl.play();
+      return this;
+    };
+    SynthClient.prototype.pause = function() {
+      this.impl.pause();
+      return this;
+    };
+    SynthClient.prototype.reset = function() {
+      this.impl.reset();
+      return this;
+    };
+    SynthClient.prototype.execute = function() {
+      this.impl.execute.apply(this.impl, arguments);
+      return this;
+    };
+    SynthClient.prototype.getStream = function() {
+      return this.impl.getStream();
+    };
+    SynthClient.prototype.importScripts = function() {
+      this.impl.importScripts(slice.call(arguments));
+      return this;
+    };
+    SynthClient.prototype.getWebAudioComponents = function() {
+      return this.impl.getWebAudioComponents();
+    };
+    
+    return SynthClient;
+  })();
+
+  var SynthClientImpl = (function() {
+    function SynthClientImpl(exports, opts) {
+      this.exports  = exports;
+      this.compiler = cc.createCompiler("coffee");
+      
+      this.isPlaying = false;
+      this.execId = 0;
+      this.execCallbacks = {};
+
+      this.sampleRate = 44100;
+      this.channels   = 2;
+      this.api = cc.createAudioAPI(this, opts);
+      this.sampleRate = this.api.sampleRate;
+      this.channels   = this.api.channels;
+      if (this.api.strmLength) {
+        this.strmLength = this.api.strmLength;
+      }
+      this.strm  = new Int16Array(this.strmLength * this.channels);
+      this.clear = new Int16Array(this.strmLength * this.channels);
+      this.strmList = new Array(16);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.syncCount = 0;
+      this.speaker = opts.speaker !== false;
+      this.api.init();
+      
+      var syncItems = new Uint8Array(20);
+      if (typeof window !== "undefined" && opts.mouse !== false) {
+        var f32_syncItems = new Float32Array(syncItems.buffer);
+        window.addEventListener("mousemove", function(e) {
+          f32_syncItems[2] = e.pageX / window.innerWidth;
+          f32_syncItems[3] = e.pageY / window.innerHeight;
+        }, true);
+        window.addEventListener("mousedown", function() {
+          f32_syncItems[4] = 1;
+        }, true);
+        window.addEventListener("mouseup", function() {
+          f32_syncItems[4] = 0;
+        }, true);
+      }
+      this.syncItems = syncItems;
+      this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
+    }
+    
+    SynthClientImpl.prototype.play = function() {
+      if (!this.isPlaying) {
+        this.isPlaying = true;
+        this.sendToLang(["/play"]);
+        if (this.api) {
+          this.api.play();
+        }
+      }
+    };
+    SynthClientImpl.prototype._played = function(syncCount) {
+      if (this.api) {
+        var strm = this.strm;
+        for (var i = 0, imax = strm.length; i < imax; ++i) {
+          strm[i] = 0;
+        }
+        this.strmList.splice(0);
+        this.strmListReadIndex  = 0;
+        this.strmListWriteIndex = 0;
+        this.syncCount = syncCount;
+      }
+      this.exports.emit("play");
+    };
+    SynthClientImpl.prototype.pause = function() {
+      if (this.isPlaying) {
+        this.isPlaying = false;
+        this.sendToLang(["/pause"]);
+      }
+    };
+    SynthClientImpl.prototype._paused = function() {
+      if (this.api) {
+        this.api.pause();
+      }
+      this.exports.emit("pause");
+    };
+    SynthClientImpl.prototype.reset = function() {
+      this.execId = 0;
+      this.execCallbacks = {};
+      var strm = this.strm;
+      for (var i = 0, imax = strm.length; i < imax; ++i) {
+        strm[i] = 0;
+      }
+      this.strmList.splice(0);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.sendToLang(["/reset"]);
+      this.exports.emit("reset");
+    };
+    SynthClientImpl.prototype.process = function() {
+      var strm = this.strmList[this.strmListReadIndex & 15];
+      if (strm) {
+        this.strmListReadIndex += 1;
+        this.strm.set(strm);
+      }
+      this.syncCount += 1;
+      this.syncItemsUInt32[1] = this.syncCount;
+      this.sendToLang(this.syncItems);
+    };
+    SynthClientImpl.prototype.execute = function(code) {
+      var append, callback;
+      var i = 1;
+      if (typeof arguments[i] === "boolean") {
+        append = arguments[i++];
+      } else {
+        append = false;
+      }
+      if (typeof arguments[i] === "function") {
+        callback = arguments[i++];
+      }
+      if (typeof code === "string") {
+        code = this.compiler.compile(code.trim());
+        if (callback) {
+          this.execCallbacks[this.execId] = callback;
+        }
+        this.sendToLang([
+          "/execute", this.execId, code, append, this.compiler.data, !!callback
+        ]);
+        this.execId += 1;
+      }
+    };
+    SynthClientImpl.prototype.getStream = function() {
+      var f32 = new Float32Array(this.strm);
+      for (var i = f32.length; i--; ) {
+        f32[i] *= 0.000030517578125;
+      }
+      var strmLength = this.strmLength;
+      return {
+        getChannelData: function(channel) {
+          if (channel === 0) {
+            return new Float32Array(f32.buffer, 0, strmLength);
+          } else if (channel === 1) {
+            return new Float32Array(f32.buffer, strmLength * 4);
+          }
+        }
+      };
+    };
+    SynthClientImpl.prototype.importScripts = function(list) {
+      this.sendToLang(["/importScripts", list]);
+    };
+    SynthClientImpl.prototype.sendToLang = function(msg) {
+      if (this.lang) {
+        this.lang.postMessage(msg);
+      }
+    };
+    SynthClientImpl.prototype.recvFromLang = function(msg) {
+      if (msg instanceof Int16Array) {
+        this.strmList[this.strmListWriteIndex & 15] = msg;
+        this.strmListWriteIndex += 1;
+      } else {
+        var func = commands[msg[0]];
+        if (func) {
+          func.call(this, msg);
+        } else {
+          throw new Error("Unknown command: " + msg[0]);
+        }
+      }
+    };
+    SynthClientImpl.prototype.readAudioFile = function(path, callback) {
+      var api = this.api;
+      if (this.api) {
+        if (typeof path !== "string") {
+          throw new TypeError("readAudioFile: first argument must be a String.");
+        }
+        if (typeof callback !== "function") {
+          throw new TypeError("readAudioFile: second argument must be a Function.");
+        }
+        if (!api.decodeAudioFile) {
+          callback("Audio decoding not supported", null);
+          return;
+        }
+        var xhr = cc.createXMLHttpRequest();
+        xhr.open("GET", path);
+        xhr.responseType = "arraybuffer";
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200 && xhr.response) {
+              api.decodeAudioFile(xhr.response, function(err, buffer) {
+                callback(err, buffer);
+              });
+            } else {
+              callback("error", null);
+            }
+          }
+        };
+        xhr.send();
+      }
+    };
+    SynthClientImpl.prototype.getWebAudioComponents = function() {
+      if (this.api && this.api.type === "Web Audio API") {
+        return [ this.api.context, this.api.jsNode ];
+      }
+      return [];
+    };
+    
+    return SynthClientImpl;
+  })();
+  
+  
+  
+    
+  commands["/connected"] = function(msg) {
+    var globalIds = msg[3];
+    if (globalIds) {
+      globalIds.forEach(function(key) {
+        cc.global[key] = true;
+      });
+    }
+    this.sendToLang([
+      "/init", this.sampleRate, this.channels, this.strmLength
+    ]);
+    this.exports.emit("connected");
+  };
+  commands["/played"] = function(msg) {
+    var syncCount = msg[1];
+    this._played(syncCount);
+  };
+  commands["/paused"] = function(msg) {
+    var syncCount = msg[1];
+    this._paused(syncCount);
+  };
+  commands["/executed"] = function(msg) {
+    var execId = msg[1];
+    var result = msg[2];
+    var callback = this.execCallbacks[execId];
+    if (callback) {
+      if (result !== undefined) {
+        result = unpack(result);
+      }
+      callback(result);
+      delete this.execCallbacks[execId];
+    }
+  };
+  commands["/buffer/request"] = function(msg) {
+    var that = this;
+    var requestId = msg[2];
+    this.readAudioFile(msg[1], function(err, buffer) {
+      if (!err) {
+        that.sendToLang(["/buffer/response", buffer, requestId]);
+      }
+    });
+  };
+  commands["/socket/sendToClient"] = function(msg) {
+    this.exports.emit("message", msg[1]);
+  };
+  require("../common/console").bind(commands);
+  
+  cc.SynthClientImpl = SynthClientImpl;
+  
+  module.exports = {
+    SynthClient    : SynthClient,
+    SynthClientImpl: SynthClientImpl,
+    
+    use: function() {
+      require("./client-worker");
+      require("./client-nodejs");
+      require("./client-socket");
+      require("../common/browser");
+      require("../common/audioapi");
+      require("./compiler/compiler");
+      
+      cc.createSynthClient = function(opts) {
+        return new SynthClient(opts);
+      };
+      cc.createSynthClientImpl = function(exports, opts) {
+        return new SynthClientImpl(exports, opts);
+      };
+    }
+  };
+
+  module.exports.use();
+
+});
+define('cc/common/emitter', function(require, exports, module) {
+
+  var Emitter = (function() {
+    function Emitter(context) {
+      this.__context   = context || this;
+      this.__callbacks = {};
+    }
+    Emitter.prototype.getListeners = function(event) {
+      return this.__callbacks[event] || (this.__callbacks[event] = []);
+    };
+    Emitter.prototype.hasListeners = function(event) {
+      return this.getListeners(event).length > 0;
+    };
+    Emitter.prototype.on = function(event, callback) {
+      var __callbacks = this.getListeners(event);
+      if (__callbacks.indexOf(callback) === -1) {
+        __callbacks.push(callback);
+      }
+      return this;
+    };
+    Emitter.prototype.once = function(event, callback) {
+      var that = this;
+      function wrapper() {
+        that.off(event, wrapper);
+        callback.apply(that.__context, arguments);
+      }
+      wrapper.callback = callback;
+      this.on(event, wrapper);
+      return this;
+    };
+    Emitter.prototype.off = function(event, callback) {
+      if (arguments.length === 0) {
+        this.__callbacks = {};
+        return this;
+      }
+      var __callbacks = this.getListeners(event);
+      if (arguments.length === 1) {
+        __callbacks.splice(0);
+        return this;
+      }
+      var index = __callbacks.indexOf(callback);
+      if (index === -1) {
+        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+          if (__callbacks[i].callback === callback) {
+            index = i;
+            break;
+          }
+        }
+      }
+      if (index !== -1) {
+        __callbacks.splice(index, 1);
+      }
+      return this;
+    };
+    Emitter.prototype.emit = function(event) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      var __callbacks = this.getListeners(event).slice(0);
+      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
+        __callbacks[i].apply(this.__context, args);
+      }
+      return this;
+    };
+    return Emitter;
+  })();
+  
+  var mixin = function(obj) {
+    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
+      if (!obj[method]) {
+        obj[method] = Emitter.prototype[method];
+      }
+    });
+    Emitter.call(obj);
+    return obj;
+  };
+  
+  module.exports = {
+    Emitter: Emitter,
+    mixin: mixin
+  };
+
+});
+define('cc/common/pack', function(require, exports, module) {
+  
+  var pack = (function() {
+    var _pack = function(data, stack) {
+      if (!data) {
+        return data;
+      }
+      if (stack.indexOf(data) !== -1) {
+        return { klassName:"Circular" };
+      }
+      if (typeof data === "function") {
+        return "[Function]";
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        stack.push(data);
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _pack(data, stack);
+          });
+        } else {
+          result = {};
+          Object.keys(data).forEach(function(key) {
+            if (key.charAt(0) !== "_") {
+              result[key] = _pack(data[key], stack);
+            }
+          });
+        }
+        stack.pop();
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _pack(data, []);
+    };
+  })();
+
+  var unpack = (function() {
+    var func = function() {};
+    var _unpack = function(data) {
+      if (!data) {
+        return data;
+      }
+      if (typeof data === "string") {
+        if (data === "[Function]") {
+          return func;
+        }
+        return data;
+      }
+      var result;
+      if (typeof data === "object") {
+        if (data.buffer instanceof ArrayBuffer) {
+          return data;
+        }
+        if (Array.isArray(data)) {
+          result = data.map(function(data) {
+            return _unpack(data);
+          });
+        } else {
+          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
+            result = eval.call(null, "new (function " + data.klassName + "(){})");
+            delete data.klassName;
+          } else {
+            result = {};
+          }
+          Object.keys(data).forEach(function(key) {
+            result[key] = _unpack(data[key]);
+          });
+        }
+      } else {
+        result = data;
+      }
+      return result;
+    };
+    return function(data) {
+      return _unpack(data);
+    };
+  })();
+  
+  module.exports = {
+    pack  : pack,
+    unpack: unpack
+  };
+
+});
+define('cc/common/console', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var unpack = require("./pack").unpack;
+  
+  var bind = function(commands) {
+    commands["/console/log"] = function(msg) {
+      console.log.apply(console, unpack(msg[1]));
+    };
+    commands["/console/debug"] = function(msg) {
+      console.debug.apply(console, unpack(msg[1]));
+    };
+    commands["/console/info"] = function(msg) {
+      console.info.apply(console, unpack(msg[1]));
+    };
+    commands["/console/warn"] = function(msg) {
+      console.warn.apply(console, unpack(msg[1]));
+    };
+    commands["/console/error"] = function(msg) {
+      console.error.apply(console, unpack(msg[1]));
+    };
+  };
+  
+  module.exports = {
+    bind: bind,
+    use : function() {
+      cc.console = {
+        log: function() {
+          global.console.log.apply(global.console, arguments);
+        },
+        info: function() {
+          global.console.info.apply(global.console, arguments);
+        },
+        warn: function() {
+          global.console.warn.apply(global.console, arguments);
+        },
+        error: function() {
+          global.console.error.apply(global.console, arguments);
+        }
+      };
+    }
+  };
+
+  module.exports.use();
+
+});
+define('cc/client/client-worker', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../common/extend");
+
+  var SynthClientWorkerImpl = (function() {
+    function SynthClientWorkerImpl(exports, opts) {
+      cc.opmode = "worker";
+      this.strmLength = 1024;
+      this.bufLength  = 64;
+      
+      cc.SynthClientImpl.call(this, exports, opts);
+      
+      var that = this;
+      this.lang = cc.createWebWorker(cc.coffeeColliderPath);
+      this.lang.onmessage = function(e) {
+        that.recvFromLang(e.data);
+      };
+    }
+    extend(SynthClientWorkerImpl, cc.SynthClientImpl);
+    
+    return SynthClientWorkerImpl;
+  })();
+  
+  module.exports = {
+    use: function() {
+      cc.createSynthClientWorkerImpl = function(exports, opts) {
+        return new SynthClientWorkerImpl(exports, opts);
+      };
+    }
+  };
+  
+  module.exports.use();
+  
+});
+define('cc/common/extend', function(require, exports, module) {
+  
+  var extend = function(child, parent) {
+    for (var key in parent) {
+      if (parent.hasOwnProperty(key)) {
+        child[key] = parent[key];
+      }
+    }
+    /*jshint validthis:true */
+    function ctor() {
+      this.constructor = child;
+    }
+    /*jshint validthis:false */
+    ctor.prototype = parent.prototype;
+    /*jshint newcap:false */
+    child.prototype = new ctor();
+    /*jshint newcap:true */
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  
+  module.exports = extend;
+
+});
+define('cc/client/client-nodejs', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../common/extend");
+  
+  var SynthClientNodeJSImpl = (function() {
+    function SynthClientNodeJSImpl(exports, opts) {
+      cc.opmode = "nodejs";
+      this.strmLength = 4096;
+      this.bufLength  = 64;
+      
+      cc.SynthClientImpl.call(this, exports, opts);
+      
+      this.api = null;
+    }
+    extend(SynthClientNodeJSImpl, cc.SynthClientImpl);
+    
+    return SynthClientNodeJSImpl;
+  })();
+  
+  module.exports = {
+    use: function() {
+      cc.createSynthClientNodeJSImpl = function(exports, opts) {
+        return new SynthClientNodeJSImpl(exports, opts);
+      };
+    }
+  };
+
+  module.exports.use();
+
+});
+define('cc/client/client-socket', function(require, exports, module) {
+
+  var cc = require("../cc");
+  var extend = require("../common/extend");
+
+  var SynthClientSocketImpl = (function() {
+    function SynthClientSocketImpl(exports, opts) {
+      cc.opmode = "socket";
+      this.strmLength = 4096;
+      this.bufLength  = 128;
+      
+      cc.SynthClientImpl.call(this, exports, opts);
+      
+      var that = this;
+      this.lang = cc.createWebWorker(cc.coffeeColliderPath + "#socket");
+      this.lang.onmessage = function(e) {
+        that.recvFromLang(e.data);
+      };
+      
+      exports.socket = {
+        open: function() {
+          that.sendToLang([ "/socket/open", opts.socket ]);
+        },
+        close: function() {
+          that.sendToLang([ "/socket/close" ]);
+        },
+        send: function(msg) {
+          that.sendToLang([ "/socket/sendToServer", msg ]);
+        }
+      };
+    }
+    extend(SynthClientSocketImpl, cc.SynthClientImpl);
+    
+    return SynthClientSocketImpl;
+  })();
+  
+  module.exports = {
+    use: function() {
+      cc.createSynthClientSocketImpl = function(exports, opts) {
+        return new SynthClientSocketImpl(exports, opts);
+      };
+    }
+  };
+  
+  module.exports.use();
+  
+});
+define('cc/common/browser', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  module.exports = {
+    use: function() {
+      cc.createWebWorker = function(path) {
+        return new Worker(path);
+      };
+      cc.createWebSocket = function(path) {
+        return new WebSocket(path);
+      };
+      cc.createXMLHttpRequest = function() {
+        return new XMLHttpRequest();
+      };
+    }
+  };
+
+  module.exports.use();
+
+});
+define('cc/common/audioapi', function(require, exports, module) {
+  
+  var cc = require("../cc");
+  
+  require("./audioapi-webaudio");
+  require("./audioapi-audiodata");
+  require("./audioapi-flashfallback");
+  require("./audioapi-nodeaudio");
+  
+  module.exports = {
+    use: function() {
+      cc.createAudioAPI = function(sys, opts) {
+        return cc.createWebAudioAPI(sys, opts) ||
+          cc.createAudioDataAPI(sys, opts) ||
+          cc.createFlashAudioAPI(sys, opts) ||
+          cc.createNodeAudioAPI(sys, opts);
+      };
+    }
+  };
+  
+  module.exports.use();
+
+});
+define('cc/common/audioapi-webaudio', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var AudioAPI;
+  
+  if (typeof document !== "undefined") {
+    var AudioContext = global.AudioContext || global.webkitAudioContext;
+    if (AudioContext) {
+      AudioAPI = (function() {
+        function WebAudioAPI(sys, opts) {
+          this.sys = sys;
+          this.context = opts.AudioContext || new AudioContext();
+          this.sampleRate = this.context.sampleRate;
+          this.channels   = 2;
+          this.type = "Web Audio API";
+          this.delegate = !!opts.AudioContext;
+        }
+        WebAudioAPI.prototype.init = function() {
+          var sys = this.sys;
+          var onaudioprocess;
+          var strm = sys.strm;
+          var strmLength = sys.strmLength;
+          if (this.sys.speaker) {
+            if (this.sys.sampleRate === this.sampleRate) {
+              onaudioprocess = function(e) {
+                var outs = e.outputBuffer;
+                var outL = outs.getChannelData(0);
+                var outR = outs.getChannelData(1);
+                var i = strmLength, j = strmLength << 1;
+                sys.process();
+                while (j--, i--) {
+                  outL[i] = strm[i] * 0.000030517578125;
+                  outR[i] = strm[j] * 0.000030517578125;
+                }
+              };
+            }
+          } else {
+            onaudioprocess = function() {
+              sys.process();
+            };
+          }
+          this.bufSrc = this.context.createBufferSource();
+          if (this.context.createScriptProcessor) {
+            this.jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
+          } else {
+            this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
+          }
+          this.jsNode.onaudioprocess = onaudioprocess;
+        };
+        WebAudioAPI.prototype.play = function() {
+          if (!this.bufSrc) {
+            return; // TODO: throw an error
+          }
+          if (this.bufSrc.noteOn) {
+            this.bufSrc.noteOn(0);
+            this.bufSrc.connect(this.jsNode);
+          }
+          if (!this.delegate) {
+            this.jsNode.connect(this.context.destination);
+          }
+        };
+        WebAudioAPI.prototype.pause = function() {
+          if (!this.bufSrc) {
+            return; // TODO: throw an error
+          }
+          this.bufSrc.disconnect();
+          if (!this.delegate) {
+            this.jsNode.disconnect();
+          }
+        };
+        WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
+          buffer = this.context.createBuffer(buffer, false);
+          var bufLength   = buffer.length;
+          var numChannels = buffer.numberOfChannels;
+          var numSamples  = bufLength * numChannels;
+          var samples = new Float32Array(numSamples);
+          var i, j, k = 0;
+          var channelData = new Array(numChannels);
+          for (j = 0; j < numChannels; ++j) {
+            channelData[j] = buffer.getChannelData(j);
+          }
+          for (i = 0; i < bufLength; ++i) {
+            for (j = 0; j < numChannels; ++j) {
+              samples[k++] = channelData[j][i];
+            }
+          }
+          callback(null, {
+            sampleRate : buffer.sampleRate,
+            numChannels: buffer.numberOfChannels,
+            numFrames  : buffer.length,
+            samples    : samples,
+          });
+        };
+        return WebAudioAPI;
+      })();
+    }
+  }
+  
+  module.exports = {
+    use: function() {
+      cc.createWebAudioAPI = function(sys, opts) {
+        if (AudioAPI) {
+          return new AudioAPI(sys, opts);
+        }
+      };
+    }
+  };
+  
+  module.exports.use();
+  
+});
+define('cc/common/audioapi-audiodata', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var AudioAPI;
+  
+  if (typeof document !== "undefined") {
+    if (typeof Audio === "function" && typeof new Audio().mozSetup === "function") {
+      AudioAPI = (function() {
+        /*global URL:true */
+        var timer = (function() {
+          var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
+          var blob = new Blob([source], {type:"text/javascript"});
+          var path = URL.createObjectURL(blob);
+          return new Worker(path);
+        })();
+        /*global URL:false */
+        function AudioDataAPI(sys) {
+          this.sys = sys;
+          this.sampleRate = 44100;
+          this.channels   = 2;
+          this.type = "Audio Data API";
+        }
+        AudioDataAPI.prototype.init = function() {
+          this.audio = new Audio();
+          this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
+        };
+        AudioDataAPI.prototype.play = function() {
+          if (!this.audio) {
+            return; // TODO: throw an error
+          }
+          var sys = this.sys;
+          var audio = this.audio;
+          var interleaved = this.interleaved;
+          var msec = (sys.strmLength / sys.sampleRate) * 1000;
+          var written = 0;
+          var start = Date.now();
+          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
+          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
+
+          var onaudioprocess = function() {
+            if (written - 20 > Date.now() - start) {
+              return;
+            }
+            var i = interleaved.length;
+            var j = inL.length;
+            sys.process();
+            while (j--) {
+              interleaved[--i] = inR[j] * 0.000030517578125;
+              interleaved[--i] = inL[j] * 0.000030517578125;
+            }
+            audio.mozWriteAudio(interleaved);
+            written += msec;
+          };
+
+          audio.mozSetup(sys.channels, sys.sampleRate);
+          timer.onmessage = onaudioprocess;
+          timer.postMessage(msec * 0.8);
+        };
+        AudioDataAPI.prototype.pause = function() {
+          if (!this.audio) {
+            return; // TODO: throw an error
+          }
+          timer.postMessage(0);
+        };
+        return AudioDataAPI;
+      })();
+    }
+  }
+  
+  module.exports = {
+    use: function() {
+      cc.createAudioDataAPI = function(sys, opts) {
+        if (AudioAPI) {
+          return new AudioAPI(sys, opts);
+        }
+      };
+    }
+  };
+  
+  module.exports.use();
+
+});
+define('cc/common/audioapi-flashfallback', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var AudioAPI;
+
+  if (typeof document !== "undefined") {
+    AudioAPI = (function() {
+      function FallbackAudioAPI(sys) {
+        this.sys = sys;
+        this.sampleRate = 44100;
+        this.channels   = 2;
+        this.strmLength = Math.max(2048, sys.strmLength);
+        this.type = "Fallback";
+      }
+      FallbackAudioAPI.prototype.init = function() {
+      };
+      FallbackAudioAPI.prototype.play = function() {
+        if (fallback.play) {
+          this.play = fallback.play;
+          this.play();
+        }
+      };
+      FallbackAudioAPI.prototype.pause = function() {
+        if (fallback.pause) {
+          this.pause = fallback.pause;
+          this.pause();
+        }
+      };
+      
+      var fallback = {};
+      window.addEventListener("load", function() {
+        var swfSrc  = cc.rootPath + "coffee-collider-fallback.swf";
+        var swfName = swfSrc + "?" + Date.now();
+        var swfId   = "coffee-collider-fallback";
+        var div = document.createElement("div");
+        div.style.display = "inline";
+        div.width  = 1;
+        div.height = 1;
+        /*jshint quotmark:single */
+        div.innerHTML = '<object id="'+swfId+'" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="1" height="1"><param name="movie" value="'+swfName+'"/><param name="bgcolor" value="#FFFFFF"/><param name="quality" value="high"/><param name="allowScriptAccess" value="always"/></object>';
+        /*jshint quotmark:double */
+        document.body.appendChild(div);
+        
+        window.coffeecollider_flashfallback_init = function() {
+          var swf = document.getElementById(swfId);
+          var timerId = 0;
+          fallback.play = function() {
+            if (timerId === 0) {
+              var sys = this.sys;
+              var msec = (sys.strmLength / sys.sampleRate) * 1000;
+              var written = 0;
+              var start = Date.now();
+              var out   = new Array(sys.strmLength * sys.channels);
+              var len   = out.length;
+              
+              var onaudioprocess = function() {
+                if (written > Date.now() - start) {
+                  return;
+                }
+                sys.process();
+                var _in = sys.strm;
+                for (var i = 0; i < len; ++i) {
+                  out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
+                }
+                swf.writeAudio(out.join(""));
+                written += msec;
+              };
+
+              timerId = setInterval(onaudioprocess, msec * 0.8);
+              swf.play();
+            }
+          };
+          fallback.pause = function() {
+            if (timerId !== 0) {
+              swf.pause();
+              clearInterval(timerId);
+              timerId = 0;
+            }
+          };
+        };
+      });
+      return FallbackAudioAPI;
+    })();
+  }
+  
+  module.exports = {
+    use: function() {
+      cc.createFlashAudioAPI = function(sys, opts) {
+        if (AudioAPI) {
+          return new AudioAPI(sys, opts);
+        }
+      };
+    }
+  };
+
+  module.exports.use();
+  
+});
+define('cc/common/audioapi-nodeaudio', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var AudioAPI;
+  
+  if (typeof global.GLOBAL !== "undefined") {
+    AudioAPI = (function() {
+      var Readable = global.require("stream").Readable;
+      var Speaker  = global.require("speaker");
+      if (!Readable) {
+        Readable = global.require("readable-stream/readable");
+      }
+      function NodeAudioAPI(sys) {
+        this.sys = sys;
+        this.sampleRate = 44100;
+        this.channels   = 2;
+        this.node = null;
+        this.isPlaying = false;
+      }
+      NodeAudioAPI.prototype.init = function() {
+      };
+      NodeAudioAPI.prototype.play = function() {
+        var sys = this.sys;
+        this.isPlaying = true;
+        this.node = new Readable();
+        this.node._read = function(n) {
+          var strm = sys._strm;
+          var strmLength = sys.strmLength;
+          var buf  = new Buffer(n);
+          var x, i, j, k = 0;
+          n = (n >> 2) / sys.strmLength;
+          x = strm;
+          while (n--) {
+            sys._process();
+            for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
+              buf.writeInt16LE(strm[i], k);
+              k += 2;
+              buf.writeInt16LE(strm[j], k);
+              k += 2;
+            }
+          }
+          this.push(buf);
+        };
+        this.node.pipe(new Speaker({sampleRate:this.sampleRate}));
+      };
+      NodeAudioAPI.prototype.pause = function() {
+        if (this.node) {
+          process.nextTick(this.node.emit.bind(this.node, "end"));
+        }
+        this.node = null;
+        this.isPlaying = false;
+      };
+      return NodeAudioAPI;
+    })();
+  }
+  
+  module.exports = {
+    use: function() {
+      cc.createNodeAudioAPI = function(sys, opts) {
+        if (AudioAPI) {
+          return new AudioAPI(sys, opts);
+        }
+      };
+    }
+  };
+
+  module.exports.use();
+
+});
+define('cc/client/compiler/compiler', function(require, exports, module) {
+
+  var cc = require("../../cc");
+  
+  var use = function() {
+    require("./coffee");
+    
+    cc.createCompiler = function(lang) {
+      if (lang === "coffee") {
+        return cc.createCoffeeCompiler();
+      }
+      throw new TypeError("Compiler: '" + lang + "' not supported");
+    };
+  };
+  
+  module.exports = {
+    use:use
+  };
+
+  module.exports.use();
+
+});
+define('cc/client/compiler/coffee', function(require, exports, module) {
+
+  var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
+  
+  var cc = require("../../cc");
+  var timevalue = require("../../common/timevalue").calc;
+  
+  // CoffeeScript tags
+  // IDENTIFIER
+  // NUMBER
+  // STRING
+  // REGEX
+  // BOOL
+  // NULL
+  // UNDEFINED
+  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
+  // UNARY           !, ~, new, typeof, delete, do
+  // LOGIC           &&, ||, &, |, ^
+  // SHIFT           <<, >>, >>>
+  // COMPARE         ==, !=, <, >, <=, >=
+  // MATH            *, div, %, 
+  // RELATION        in, of, instanceof
+  // =
+  // +
+  // -
+  // ..
+  // ...
+  // ++
+  // --
+  // (
+  // )
+  // [
+  // ]
+  // {
+  // }
+  // ?
+  // ::
+  // @
+  // IF
+  // ELSE
+  // WHILE
+  // LOOP
+  // SWITCH
+  // LEADING_WHEN
+  // THIS
+  // SUPER
+  // INDENT
+  // OUTDENT
+  // RETURN
+  // TERMINATOR
+  // HERECOMMENT
+
+  var TAG   = 0;
+  var VALUE = 1;
+  var _     = {}; // empty location
+
+  // utility functions
+  var isDot = function(token) {
+    return !!token && (token[TAG] === "." || token[TAG] === "@");
+  };
+  
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    return val;
+  };
+  
+  var getLine = function(tokens, index) {
+    var depth = 0;
+    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "(": case "{": case "[":
+      case "CALL_START": case "PARAM_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case "]": case "}": case ")":
+      case "CALL_END": case "PARAM_END": case "INDEX_END":
+        depth -= 1;
+        break;
+      case "TERMINATOR":
+        if (depth === 0) {
+          result.end = i;
+        }
+        break;
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        depth -= 1;
+        if (depth === -1) {
+          result.end = i - 1;
+          result.isLastLine = true;
+        }
+        break;
+      }
+      if (result.end !== -1) {
+        break;
+      }
+    }
+    if (result.end === -1) {
+      result.end = tokens.length - 1;
+    }
+    result.len = result.end - result.begin + 1;
+    return result;
+  };
+  var indexOfParamEnd = function(tokens, index) {
+    var bracket = 0;
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "PARAM_START":
+        bracket += 1;
+        break;
+      case "PARAM_END":
+        bracket -= 1;
+        if (bracket === 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  };
+  var indexOfFunctionStart = function(tokens, index) {
+    var depth = 0;
+    for (var i = index, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "TERMINATOR":
+        if (depth === 0) {
+          return -1;
+        }
+        break;
+      case "PARAM_START":
+        if (depth === 0) {
+          return i;
+        }
+        depth += 1;
+        break;
+      case "PARAM_END":
+        depth -= 1;
+        break;
+      case "->": case "=>":
+        if (depth === 0) {
+          return i;
+        }
+        break;
+      case "[": case "{": case "(":
+      case "CALL_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case ")": case "}": case "]":
+      case "CALL_END": case "INDEX_END": case "PARAM_END":
+        depth -= 1;
+        break;
+      }
+      if (depth < 0) {
+        break;
+      }
+    }
+    return -1;
+  };
+  var formatArgument = function(op) {
+    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
+        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
+      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
+        return "\"" + token[VALUE] + "\"";
+      }
+      return token[VALUE];
+    }).join("");
+  };
+  
+  
+  
+  
+  var detectPlusMinusOperator = function(tokens) {
+    if (tokens.cc_plusminus) {
+      return tokens;
+    }
+    var prevTag = "";
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var tag = tokens[i][TAG];
+      if (tag === "+" || tag === "-") {
+        switch (prevTag) {
+        case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
+        case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
+        case "CALL_END": case "INDEX_END":
+          tokens[i][TAG] = "MATH";
+          break;
+        default:
+          tokens[i][TAG] = "UNARY";
+        }
+      }
+      prevTag = tag;
+    }
+    tokens.cc_plusminus = true;
+    return tokens;
+  };
+  
+  var revertPlusMinusOperator = function(tokens) {
+    if (!tokens.cc_plusminus) {
+      for (var i = 0, imax = tokens.length; i < imax; ++i) {
+        var val = tokens[i][VALUE];
+        if (val === "+" || val === "-") {
+          tokens[i][TAG] = val;
+        }
+      }
+      return tokens;
+    }
+    delete tokens.cc_plusminus;
+    return tokens;
+  };
+  
+  var getPrevOperand = function(tokens, index) {
+    tokens = detectPlusMinusOperator(tokens);
+    
+    var bracket = 0;
+    var indent  = 0;
+    var end = index;
+    while (1 < index) {
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{":
+      case "PARAM_START": case "CALL_START": case "INDEX_START":
+        bracket -= 1;
+        break;
+      case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
+        bracket += 1;
+        break;
+      case "OUTDENT":
+        indent += 1;
+        break;
+      case "INDENT":
+        indent -= 1;
+        break;
+      }
+      switch (tokens[index - 1][TAG]) {
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
+      case ".": case "@":
+        index -= 1;
+        continue;
+      }
+      switch (tokens[index][TAG]) {
+      case "(": case "[": case "{": case "PARAM_START":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
+      case "->": case "=>":
+        if (bracket === 0 && indent === 0) {
+          var prev;
+          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
+            index -= 1;
+          }
+          return {tokens:tokens, begin:index, end:end};
+        }
+        break;
+      }
+      index -= 1;
+    }
+    return {tokens:tokens, begin:0, end:end};
+  };
+  
+  var getNextOperand = function(tokens, index) {
+    tokens = detectPlusMinusOperator(tokens);
+    var bracket = 0;
+    var indent  = 0;
+    var begin = index;
+    var imax = tokens.length - 2;
+
+    if (tokens[index] && tokens[index][TAG] === "@") {
+      if (tokens[index+1][TAG] !== "IDENTIFIER") {
+        return {tokens:tokens, begin:index, end:index};
+      }
+    }
+    
+    while (index < imax) {
+      var tag = tokens[index][TAG];
+      
+      switch (tag) {
+      case "(": case "[": case "{":
+      case "PARAM_START":
+        bracket += 1;
+        break;
+      case "}": case "]": case ")":
+      case "PARAM_END": case "CALL_END": case "INDEX_END":
+        bracket -= 1;
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        break;
+      }
+      
+      switch (tokens[index + 1][TAG]) {
+      case "CALL_START": case "INDEX_START":
+        bracket += 1;
+        index += 1;
+        continue;
+      case ".": case "@": case "ELSE":
+        index += 1;
+        continue;
+      }
+      
+      switch (tag) {
+      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
+      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
+      case "UNDEFINED": case "NULL": case "OUTDENT":
+        if (bracket === 0 && indent === 0) {
+          return {tokens:tokens, begin:begin, end:index};
+        }
+        break;
+      }
+      index += 1;
+    }
+    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
+  };
+  
+  var func = {};
+  var detectFunctionParameters = function(tokens) {
+    if (tokens.cc_funcParams) {
+      return tokens;
+    }
+    var stack = [
+      { declared:[], args:[], local:[], outer:[] }
+    ];
+    stack.setVariables = func.setVariables(stack);
+    
+    var indent = 0;
+    var args = [];
+    var vars = [];
+    for (var i = 0, imax = tokens.length - 1; i < imax; ++i) {
+      var op, token = tokens[i];
+      stack.peek = stack[stack.length-1];
+      switch (token[TAG]) {
+      case "PARAM_START":
+        args = func.getInfoOfArguments(tokens, i);
+        i    = args.end + 1;
+        vars = args.vars;
+        args = args.args;
+        /* falls through */
+      case "->": case "=>":
+        var scope = {
+          declared: stack.peek.declared.concat(stack.peek.local),
+          args:vars.splice(0), local:[], outer:[], indent:indent
+        };
+        tokens[i].cc_funcParams = {
+          args:args.splice(0), local:scope.local, outer:scope.outer
+        };
+        token.cc_funcRef = tokens[i];
+        stack.push(scope);
+        break;
+      case "FOR":
+        do {
+          op = getNextOperand(tokens, i+1);
+          func.getVariables(op).forEach(stack.setVariables);
+          i = op.end + 1;
+        } while (i < imax && tokens[i][TAG] === ",");
+        break;
+      case "INDENT":
+        indent += 1;
+        break;
+      case "OUTDENT":
+        indent -= 1;
+        if (stack.peek.indent === indent) {
+          stack.pop();
+        }
+        break;
+      case "[":
+        op = getNextOperand(tokens, i);
+        func.getVariables(op).forEach(stack.setVariables);
+        break;
+      case "IDENTIFIER":
+        if (tokens[i+1][TAG] === "CALL_START" || /^[A-Z]/.test(token[VALUE])) {
+          break;
+        }
+        op = getNextOperand(tokens, i);
+        if ((op.begin === op.end && tokens[op.end+1][TAG] !== ":") || tokens[op.begin+1][TAG] === ".") {
+          func.getVariables(op).forEach(stack.setVariables);
+        }
+      }
+    }
+    tokens.cc_funcParams = {
+      local: stack[0].local
+    };
+    return tokens;
+  };
+
+  func.setVariables = function(stack) {
+    var ignored = [
+      "cc", "global", "console",
+      "setInterval", "setTimeout", "clearInterval", "clearTimeout"
+    ];
+    return function(name) {
+      if (ignored.indexOf(name) !== -1) {
+        return;
+      }
+      if (stack.peek.declared.indexOf(name) === -1) {  // not declared yet
+        if (stack.peek.args.indexOf(name) === -1) {    // not function parameters
+          if (stack.peek.local.indexOf(name) === -1) { //   when a local variable (set)
+            stack.peek.local.push(name);
+          }
+        }
+        return;
+      }
+      
+      // when not a local variable
+      if (stack.peek.outer.indexOf(name) !== -1) {
+        return;
+      }
+      
+      // outer variable
+      stack.peek.outer.push(name);
+      for (var i = stack.length - 2; i >= 0; i--) {
+        if (stack[i].local.indexOf(name) !== -1) {
+          return;
+        }
+        if (stack[i].outer.indexOf(name) === -1) {
+          stack[i].outer.push(name);
+        }
+      }
+    };
+  };
+  
+  func.getInfoOfArguments = function(tokens, index) {
+    var begin = index;
+    var end  = indexOfParamEnd(tokens, index);
+    var vars = [];
+    var args = [];
+    for (var i = begin+1; i < end; ++i) {
+      var op = getNextOperand(tokens, i);
+      args.push(formatArgument(op));
+      vars = func.getVariables(op, vars);
+      i += op.end - op.begin + 1;
+      if (tokens[i][TAG] === "=") {
+        op = getNextOperand(tokens, i+1);
+        args.push(formatArgument(op));
+        i += op.end - op.begin + 1;
+      } else {
+        args.push(null);
+      }
+      if (tokens[i][TAG] !== ",") {
+        i += 1;
+      }
+    }
+    return {vars:vars, args:args, end:end};
+  };
+  func.getVariables = function(op, list) {
+    var tokens = op.tokens;
+    list = list || [];
+    if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
+      for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
+        var _op = getNextOperand(tokens, i);
+        list = func.getVariables(_op, list);
+        i += _op.end - _op.begin + 1;
+        if (tokens[i][TAG] !== ",") {
+          i += 1;
+        }
+      }
+    } else {
+      if (!isDot(tokens[op.begin-1])) {
+        if (/^[a-z][a-zA-Z0-9_$]*$/.test(tokens[op.begin][VALUE])) {
+          list.push(tokens[op.begin][VALUE]);
+        }
+      }
+    }
+    return list;
+  };
+  
+  
+  var replaceFixedTimeValue = function(tokens) {
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      var token = tokens[i];
+      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
+        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
+        if (typeof time === "number") {
+          token[TAG] = "NUMBER";
+          token[VALUE] = time.toString();
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  var replaceStrictlyPrecedence = function(tokens) {
+    tokens = detectPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i > 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+        tokens.splice(next.end + 1, 0, [")", ")" , _]);
+        tokens.splice(prev.begin  , 0, ["(", "(" , _]);
+      }
+    }
+    return tokens;
+  };
+
+  var uop = {
+    operatorDict: {
+      "+": "__plus__", "-": "__minus__"
+    }
+  };
+  var replaceUnaryOperator = function(tokens) {
+    tokens = detectPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "UNARY" && uop.operatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = uop.operatorDict[token[VALUE]];
+        var next = getNextOperand(tokens, i);
+        tokens.splice(
+          next.end+1, 0,
+          ["."         , "."     , _],
+          ["IDENTIFIER", selector, _],
+          ["CALL_START", "("     , _],
+          ["CALL_END"  , ")"     , _]
+        );
+        tokens.splice(i, 1);
+      }
+    }
+    return tokens;
+  };
+  
+  var bop = {
+    operatorDict: {
+      "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
+    },
+    adverbs: {
+      W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
+      WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
+    }
+  };
+  var replaceTextBinaryAdverb = function(code) {
+    Object.keys(bop.adverbs).forEach(function(key) {
+      var a = new RegExp("([+\\-*/%])(" + key + ")\\1", "g");
+      var b = "$1 " + "\"#!" + key.charAt(0) + "\"" + " $1";
+      code = code.replace(a, b);
+    });
+    return code;
+  };
+  var replaceBinaryOperator = function(tokens) {
+    tokens = detectPlusMinusOperator(tokens);
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = bop.operatorDict[token[VALUE]];
+        var adverb   = bop.checkAdvarb(tokens, i);
+        var next = getNextOperand(tokens, i);
+        if (adverb) {
+          i -= 2;
+          tokens.splice(
+            i, 3,
+            ["."         , "."     , _],
+            ["IDENTIFIER", selector, _],
+            ["CALL_START", "("     , _]
+          );
+          tokens.splice(
+            next.end+1, 0,
+            [","         , ","   , _],
+            ["IDENTIFIER", adverb, _],
+            ["CALL_END"  , ")"   , _]
+          );
+        } else {
+          tokens.splice(
+            i, 1,
+            ["."         , "."     , _],
+            ["IDENTIFIER", selector, _],
+            ["CALL_START", "("     , _]
+          );
+          tokens.splice(
+            next.end+3, 0,
+            ["CALL_END", ")", _]
+          );
+        }
+      }
+    }
+    return tokens;
+  };
+  bop.checkAdvarb = function(tokens, index) {
+    var t0 = tokens[index  ];
+    var t1 = tokens[index-1];
+    var t2 = tokens[index-2];
+    if (t0 && t1 && t2) {
+      if (/^"#![WSCFTX]"$/.test(t1[VALUE])) {
+        var key = t1[VALUE].charAt(3);
+        if (t0[VALUE] === t2[VALUE] && bop.adverbs.hasOwnProperty(key)) {
+          return bop.adverbs[key];
+        }
+      }
+    }
+  };
+  
+  
+  var compound = {
+    operatorDict: {
+      "+=": "__add__",
+      "-=": "__sub__",
+      "*=": "__mul__",
+      "/=": "__div__",
+      "%=": "__mod__",
+    }
+  };
+  var replaceCompoundAssign = function(tokens) {
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (compound.operatorDict.hasOwnProperty(token[VALUE])) {
+        var selector = compound.operatorDict[token[VALUE]];
+        var prev = getPrevOperand(tokens, i);
+        var next = getNextOperand(tokens, i);
+
+        tokens.splice(
+          i, 1,
+          ["="         , "="     , _],
+          ["."         , "."     , _],
+          ["IDENTIFIER", selector, _],
+          ["CALL_START", "("     , _]
+        );
+        tokens.splice(
+          next.end+4, 0,
+          ["CALL_END", ")", _]
+        );
+        var subtokens = [ i+1, 0 ];
+        for (var j = prev.begin; j < i; ++j) {
+          subtokens.push(tokens[j]);
+        }
+        tokens.splice.apply(tokens, subtokens);
+      }
+    }
+    return tokens;
+  };
+
+  var logic = {
+    operatorDict: {
+      "&&": "__and__", "||": "__or__"
+    }
+  };
+  var replaceLogicOperator = function(tokens) {
+    var replaceable = false;
+    for (var i = 1; i < tokens.length; ++i) {
+      var token = tokens[i];
+      if (token[VALUE] === "wait" && tokens[i-1][TAG] === "@") {
+        replaceable = true;
+        continue;
+      }
+      if (token[TAG] === ",") {
+        replaceable = false;
+        continue;
+      }
+      if (replaceable) {
+        if (token[TAG] === "LOGIC" && logic.operatorDict.hasOwnProperty(token[VALUE])) {
+          var selector = logic.operatorDict[token[VALUE]];
+          var next = getNextOperand(tokens, i);
+          tokens.splice(
+            i, 1,
+            ["."         , "."     , _],
+            ["IDENTIFIER", selector, _],
+            ["CALL_START", "("     , _]
+          );
+          tokens.splice(
+            next.end + 3, 0,
+            ["CALL_END", ")", _]
+          );
+          i = next.end+3; // skip
+        }
+      }
+    }
+    return tokens;
+  };
+  
+  
+  var synthdef = {};
+  var replaceSynthDefinition = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 5; i >= 0; i--) {
+      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
+        continue;
+      }
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
+      if (index === -1) {
+        continue;
+      }
+      var args;
+      if (tokens[index].cc_funcRef) {
+        args = tokens[index].cc_funcRef.cc_funcParams.args;
+      } else {
+        args = [];
+      }
+      synthdef.replaceSynthDefDefaultArguments(tokens, index, args);
+      
+      index = getNextOperand(tokens, index).end + 1;
+      synthdef.insertSynthDefArgumentsToAfterFunction(tokens, index, args);
+    }
+    return tokens;
+  };
+  synthdef.replaceSynthDefDefaultArguments = function(tokens, index, args) {
+    if (args.length) {
+      var remove = indexOfParamEnd(tokens, index) - index + 1;
+      var subtokens = [ index, remove ];
+      
+      subtokens.push(["PARAM_START", "(", _]);
+      for (var i = 0, imax = args.length; i < imax; i += 2) {
+        if (i) {
+          subtokens.push([",", ",", _]);
+        }
+        subtokens.push(["IDENTIFIER", args[i], _]);
+      }
+      subtokens.push(["PARAM_END"  , ")", _]);
+      
+      tokens.splice.apply(tokens, subtokens);
+    }
+  };
+  synthdef.insertSynthDefArgumentsToAfterFunction = function(tokens, index, args) {
+    var subtokens = [ index, 0 ];
+    
+    subtokens.push([",", ",", _],
+                   ["[", "[", _]);
+    for (var j = 0, jmax = args.length; j < jmax; ++j) {
+      if (j) {
+        subtokens.push([",", ",", _]);
+      }
+      subtokens.push(["STRING", "'" + (args[j]||0) + "'", _]);
+    }
+    subtokens.push(["]", "]", _]);
+    
+    tokens.splice.apply(tokens, subtokens);
+  };
+  
+
+  var task = {
+    contextMethods: ["wait", "break", "continue", "redo", "recursive", "return"]
+  };
+  var replaceTaskFunction = function(tokens) {
+    tokens = detectFunctionParameters(tokens);
+    for (var i = tokens.length - 5; i >= 0; i--) {
+      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
+        continue;
+      }
+      var index = i;
+      while (index < tokens.length) {
+        if (tokens[index][TAG] === "CALL_START") {
+          break;
+        }
+        index += 1;
+      }
+      index = indexOfFunctionStart(tokens, index+1);
+      if (index === -1) {
+        continue;
+      }
+      task.makeSegmentedFunction(getNextOperand(tokens, index), task.contextMethods);
+    }
+    return tokens;
+  };
+  
+  task.makeSegmentedFunction = function(op, contextMethods) {
+    var tokens = op.tokens;
+    var body   = tokens.splice(op.begin, op.end-op.begin+1);
+    var after  = tokens.splice(op.begin);
+    var localVars, outerVars, args;
+    
+    var ref = body[0].cc_funcRef;
+    
+    if (ref) {
+      localVars = ref.cc_funcParams.local;
+      outerVars = ref.cc_funcParams.outer;
+      args = ref.cc_funcParams.args.filter(function(name, i) {
+        return !(i & 1);
+      });
+    } else {
+      localVars = outerVars = args = [];
+    }
+    
+    if (args.length) {
+      // remove default args
+      body.splice(0, indexOfParamEnd(body, 0) + 1);
+    }
+    body.splice(0, 2); // remove ->, INDENT
+    body.pop();        // remove OUTDENT
+    
+    var replaced = [];
+    task.beginOfSegmentedFunction(replaced, outerVars);
+    {
+      task.insertLocalVariables(replaced, localVars);
+      replaced.push(["["      , "[" , _],
+                    ["INDENT" , 2   , _]);
+      var numOfSegments = 0;
+      while (body.length) {
+        if (numOfSegments++) {
+          replaced.push(["TERMINATOR", "\n", _]);
+        }
+        task.beginOfSegment(replaced, args);
+        task.insertSegment(replaced, body, contextMethods);
+        task.endOfSegment(replaced, args);
+      }
+      replaced.push(["OUTDENT", 2  , _],
+                    ["]"      , "]", _]);
+    }
+    task.endOfSegmentedFunction(replaced, outerVars);
+
+    for (var i = replaced.length; i--; ) {
+      replaced[i].cc_tasked = true;
+    }
+    tokens.push.apply(tokens, replaced);
+    tokens.push.apply(tokens, after);
+  };
+  
+  task.beginOfSegmentedFunction = function(tokens, outerVars) {
+    if (outerVars.length) {
+      tokens.push(["UNARY"      , "do", _],
+                  ["PARAM_START", "(" , _]);
+      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.push([",", ",", _]);
+        }
+        tokens.push(["IDENTIFIER", outerVars[i], _]);
+      }
+      tokens.push(["PARAM_END"  , ")" , _],
+                  ["->"         , "->", _],
+                  ["INDENT"     , 2   , _]);
+    }
+    tokens.push(["->"     , "->", _],
+                ["INDENT" , 2   , _]);
+  };
+  
+  task.endOfSegmentedFunction = function(tokens, outerVars) {
+    tokens.push(["OUTDENT", 2  , _]);
+    if (outerVars.length) {
+      tokens.push(["OUTDENT", 2  , _]);
+    }
+  };
+  
+  task.insertLocalVariables = function(tokens, localVars) {
+    if (localVars.length) {
+      for (var i = 0, imax = localVars.length; i < imax; i++) {
+        tokens.push(["IDENTIFIER", localVars[i], _],
+                    ["="         , "="         , _]);
+      }
+      tokens.push(["UNDEFINED" , "undefined", _],
+                  ["TERMINATOR", "\n", _]);
+    }
+  };
+  
+  task.beginOfSegment = function(tokens, args) {
+    if (args.length) {
+      tokens.push(["PARAM_START", "(", _]);
+      for (var i = 0, imax = args.length; i < imax; ++i) {
+        if (i) {
+          tokens.push([",", ",", _]);
+        }
+        tokens.push(["IDENTIFIER", args[i], _]);
+      }
+      tokens.push(["PARAM_END"  , ")", _]);
+    }
+    tokens.push(["->"    , "->", _],
+                ["INDENT", 2   , _]);
+  };
+  
+  task.endOfSegment = function(tokens) {
+    tokens.push(["OUTDENT", 2, _]);
+  };
+  
+  task.insertSegment = function(tokens, body, contextMethods) {
+    var contextMethodCalled = false;
+    
+    while (!contextMethodCalled && body.length) {
+      var line = getLine(body, 0);
+      var closureVars = task.getClosureVariables(line);
+      
+      task.beginOfLine(tokens, line, closureVars);
+      for (var i = line.len-1; i >= 0; i--) {
+        if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
+          if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
+            contextMethodCalled = true;
+          }
+        }
+        tokens.push(body.shift());
+      }
+      task.endOfLine(tokens, line, closureVars);
+    }
+  };
+  
+  task.getClosureVariables = function(line) {
+    var tokens = line.tokens;
+    var list = [];
+    for (var i = 0, imax = line.len; i < imax; ++i) {
+      if (!tokens[i].cc_tasked && (tokens[i][TAG] === "->" || tokens[i][TAG] === "=>")) {
+        list.push.apply(list, tokens[i].cc_funcParams.outer);
+      }
+    }
+    var set = {};
+    return list.filter(function(name) {
+      return set[name] ? false : !!(set[name] = true);
+    });
+  };
+  
+  task.beginOfLine = function(tokens, line, closureVars) {
+    var i, imax;
+    if (closureVars.length) {
+      task.insertAssignment(tokens, line);
+      tokens.push(["UNARY" , "do", _],
+                  ["PARAM_START", "(", _]);
+      for (i = 0, imax = closureVars.length; i < imax; ++i) {
+        if (i) {
+          tokens.push([",", ",", _]);
+        }
+        tokens.push(["IDENTIFIER", closureVars[i], _]);
+      }
+      tokens.push(["PARAM_END", ")" , _],
+                  ["->"       , "->", _],
+                  ["INDENT"   , 2   , _]);
+    }
+  };
+  
+  task.endOfLine = function(tokens, line, closureVars) {
+    if (closureVars.length) {
+      tokens.push(["OUTDENT"   , 2   , _],
+                  ["TERMINATOR", "\n", _]);
+    }
+  };
+  
+  // TODO: fix it ( destructuring assginment? )
+  task.insertAssignment = function(tokens, line) {
+    var list = [];
+    var line_tokens = line.tokens;
+    if (line_tokens[0][TAG] === "IDENTIFIER") {
+      var op = getNextOperand(line_tokens, 0);
+      if (line_tokens[op.end+1] && line_tokens[op.end+1][TAG] === "=") {
+        list = line_tokens.slice(0, op.end + 2);
+      }
+    }
+    tokens.push.apply(tokens, list);
+  };
+  
+  
+  var replaceGlobalVariables = function(tokens) {
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue; // { NotGlobal:"dict key is not global" }
+        }
+        if (isDot(tokens[i-1])) {
+          continue; // this.is.NotGlobal, @isNotGlobal
+        }
+        tokens.splice(
+          i, 1,
+          ["IDENTIFIER", "global", _],
+          ["."         , "."     , _],
+          ["IDENTIFIER", token[VALUE].substr(1), _]
+        );
+      }
+    }
+    return tokens;
+  };
+  
+  var replaceCCVariables = function(tokens) {
+    for (var i = tokens.length-1; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
+        continue;
+      }
+      if (cc.global.hasOwnProperty(token[VALUE])) {
+        if (tokens[i+1][TAG] === ":") {
+          continue;
+        }
+        if (isDot(tokens[i-1])) {
+          continue;
+        }
+        tokens.splice(
+          i, 0,
+          ["IDENTIFIER", "cc", _],
+          ["."         , "." , _]
+        );
+      }
+    }
+    return tokens;
+  };
+  
+  var finalize = function(tokens) {
+    tokens.unshift(["("          , "("        , _],
+                   ["PARAM_START", "("        , _],
+                   ["IDENTIFIER" , "global"   , _],
+                   ["PARAM_END"  , ")"        , _],
+                   ["->"         , "->"       , _],
+                   ["INDENT"     , 2          , _]);
+    
+    tokens.push(["OUTDENT"   , 2            , _],
+                [")"         , ")"          , _],
+                ["."         , "."          , _],
+                ["IDENTIFIER", "call"       , _],
+                ["CALL_START", "("          , _],
+                ["IDENTIFIER", "cc"         , _],
+                ["."         , "."          , _],
+                ["IDENTIFIER", "__context__", _],
+                [","         , ","          , _],
+                ["THIS"      , "this"       , _],
+                ["."         , "."          , _],
+                ["IDENTIFIER", "self"       , _],
+                ["LOGIC"     , "||"         , _],
+                ["IDENTIFIER", "global"     , _],
+                ["CALL_END"  , ")"          , _]);
+    return tokens;
+  };
+  
+  var tab = function(n) {
+    var t = "";
+    for (var i = 0; i < n; ++i) {
+      t += "  ";
+    }
+    return t;
+  };
+  var prettyPrint = function(tokens) {
+    var indent = 0;
+    tokens = detectPlusMinusOperator(tokens);
+    return tokens.map(function(token) {
+      switch (token[TAG]) {
+      case "TERMINATOR":
+        return "\n" + tab(indent);
+      case "INDENT":
+        indent += 1;
+        return "\n" + tab(indent);
+      case "OUTDENT":
+        indent -= 1;
+        return "\n" + tab(indent);
+      case "RETURN":
+        return "return ";
+      case "UNARY":
+        return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
+      case "{":
+        return "{";
+      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
+        return token[VALUE] + " ";
+      case "=": case "COMPARE": case "MATH": case "LOGIC":
+        return " " + token[VALUE] + " ";
+      case "HERECOMMENT":
+        return "/* " + token[VALUE] + " */";
+      default:
+        return token[VALUE];
+      }
+    }).join("").split("\n").filter(function(line) {
+      return !(/^\s*$/.test(line));
+    }).join("\n").trim();
+  };
+  
+  var CoffeeCompiler = (function() {
+    function CoffeeCompiler() {
+    }
+    CoffeeCompiler.prototype.tokens = function(code) {
+      var data = [];
+      code = replaceTextBinaryAdverb(code);
+      var tokens = CoffeeScript.tokens(code);
+      if (tokens.length) {
+        tokens.forEach(function(token) {
+          if (token[TAG] === "HERECOMMENT") {
+            data.push(token[VALUE].trim());
+          }
+        });
+        tokens = replaceGlobalVariables(tokens);
+        tokens = replaceFixedTimeValue(tokens);
+        tokens = replaceStrictlyPrecedence(tokens);
+        tokens = replaceUnaryOperator(tokens);
+        tokens = replaceBinaryOperator(tokens);
+        tokens = replaceCompoundAssign(tokens);
+        tokens = replaceLogicOperator(tokens);
+        tokens = replaceSynthDefinition(tokens);
+        tokens = replaceTaskFunction(tokens);
+        tokens = replaceCCVariables(tokens);
+        tokens = finalize(tokens);
+      }
+      this.code = code;
+      this.data = data;
+      return tokens;
+    };
+    CoffeeCompiler.prototype.compile = function(code) {
+      var tokens = this.tokens(code);
+      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
+    };
+    CoffeeCompiler.prototype.toString = function(tokens) {
+      if (typeof tokens === "string") {
+        tokens = this.tokens(tokens);
+      }
+      return prettyPrint(tokens);
+    };
+    return CoffeeCompiler;
+  })();
+  
+  var use = function() {
+    cc.createCoffeeCompiler = function() {
+      return new CoffeeCompiler();
+    };
+  };
+  
+  module.exports = {
+    CoffeeCompiler: CoffeeCompiler,
+    
+    detectPlusMinusOperator : detectPlusMinusOperator,
+    revertPlusMinusOperator : revertPlusMinusOperator,
+    getPrevOperand          : getPrevOperand,
+    getNextOperand          : getNextOperand,
+    detectFunctionParameters: detectFunctionParameters,
+
+    replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
+    replaceFixedTimeValue    : replaceFixedTimeValue,
+    replaceStrictlyPrecedence: replaceStrictlyPrecedence,
+    replaceUnaryOperator     : replaceUnaryOperator,
+    replaceBinaryOperator    : replaceBinaryOperator,
+    replaceCompoundAssign    : replaceCompoundAssign,
+    replaceLogicOperator     : replaceLogicOperator,
+    replaceSynthDefinition   : replaceSynthDefinition,
+    replaceTaskFunction      : replaceTaskFunction,
+    replaceGlobalVariables   : replaceGlobalVariables,
+    replaceCCVariables       : replaceCCVariables,
+    finalize                 : finalize,
+    prettyPrint              : prettyPrint,
+    
+    use: use,
+  };
+
+  module.exports.use();
+
+});
+define('cc/common/timevalue', function(require, exports, module) {
+
+  var cc = require("../cc");
+  
+  var calc = function(str) {
+    var result = null;
+    var freq;
+    if (str.charAt(0) === "~") {
+      freq = true;
+      str  = str.substr(1);
+    }
+    do {
+      result = hz(str);
+      if (result !== null) {
+        break;
+      }
+      result = time(str);
+      if (result !== null) {
+        break;
+      }
+      result = hhmmss(str);
+      if (result !== null) {
+        break;
+      }
+      result = samples(str);
+      if (result !== null) {
+        break;
+      }
+      result = note(str);
+      if (result !== null) {
+        break;
+      }
+      result = beat(str);
+      if (result !== null) {
+        break;
+      }
+      result = ticks(str);
+    } while (false);
+    
+    if (result !== null) {
+      if (!freq) {
+        return result;
+      }
+      if (result !== 0) {
+        return 1 / result;
+      }
+    }
+    return str;
+  };
+  
+  var hz = function(str) {
+    var m = /^(\d+(?:\.\d+)?)hz$/i.exec(str);
+    if (m) {
+      return +m[1] === 0 ? 0 : 1 / +m[1];
+    }
+    return null;
+  };
+  var time = function(str) {
+    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
+    if (m) {
+      switch (m[2]) {
+      case "min": return +(m[1]||0) * 60;
+      case "sec": return +(m[1]||0);
+      case "m"  : return +(m[1]||0) / 1000;
+      }
+    }
+    return null;
+  };
+
+  var hhmmss = function(str) {
+    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
+    if (m) {
+      var x = 0;
+      x += (m[1]|0) * 3600;
+      x += (m[2]|0) * 60;
+      x += (m[3]|0);
+      x += (((m[4]||"")+"00").substr(0, 3)|0) / 1000;
+      return x;
+    }
+    return null;
+  };
+
+  var samples = function(str) {
+    var m = /^(\d+)samples(?:\/(\d+)hz)?$/i.exec(str);
+    if (m) {
+      return m[1] / ((m[2]|0) || cc.sampleRate);
+    }
+    return null;
+  };
+
+  var calcNote = function(bpm, len, dot) {
+    var x = (60 / bpm) * (4 / len);
+    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
+    return x;
+  };
+  var note = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*l([1-9]\d*)(\.*)$/i.exec(str);
+    if (m) {
+      return calcNote(+m[1], +m[2], m[3].length);
+    }
+    return null;
+  };
+
+  var calcBeat = function(bpm, measure, beat, ticks) {
+    var x = (measure * 4 + beat) * 480 + ticks;
+    return (60 / bpm) * (x / 480);
+  };
+  var beat = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)\.(\d+).(\d{1,3})$/i.exec(str);
+    if (m) {
+      return calcBeat(+m[1], +m[2], +m[3], +m[4]);
+    }
+    return null;
+  };
+
+  var calcTicks = function(bpm, ticks) {
+    return 60 / bpm * ticks / 480;
+  };
+  var ticks = function(str) {
+    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)ticks$/i.exec(str);
+    if (m) {
+      return calcTicks(+m[1], +m[2]);
+    }
+    return null;
+  };
+  
+  module.exports = {
+    hz     : hz,
+    time   : time,
+    hhmmss : hhmmss,
+    samples: samples,
+    note   : note,
+    beat   : beat,
+    ticks  : ticks,
+    calcNote : calcNote,
+    calcBeat : calcBeat,
+    calcTicks: calcTicks,
+    calc: calc,
   };
 
 });
@@ -161,7 +2534,7 @@ define('cc/lang/lang', function(require, exports, module) {
     }
     
     SynthLang.prototype.sendToClient = function() {
-      throw "SynthLang#sendToClient: should be overridden";
+      throw "SynthLang#sendToClient: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromClient = function(msg) {
       if (msg) {
@@ -172,7 +2545,7 @@ define('cc/lang/lang', function(require, exports, module) {
       }
     };
     SynthLang.prototype.sendToServer = function() {
-      throw "SynthLang#sendToServer: should be overridden";
+      throw "SynthLang#sendToServer: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromServer = function(msg) {
       if (msg instanceof Int16Array) {
@@ -329,7 +2702,6 @@ define('cc/lang/lang', function(require, exports, module) {
       require("./synthdef");
       require("./ugen/ugen");
       require("./lang-worker");
-      require("./lang-iframe");
       require("./lang-nodejs");
       require("./lang-socket");
       
@@ -346,8 +2718,6 @@ define('cc/lang/lang', function(require, exports, module) {
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthLang();
-        case "iframe":
-          return cc.createIFrameSynthLang();
         case "nodejs":
           return cc.createNodeJSSynthLang();
         case "socket":
@@ -365,96 +2735,6 @@ define('cc/lang/lang', function(require, exports, module) {
 define('cc/lang/cc', function(require, exports, module) {
   
   module.exports = require("../cc");
-
-});
-define('cc/common/pack', function(require, exports, module) {
-  
-  var pack = (function() {
-    var _pack = function(data, stack) {
-      if (!data) {
-        return data;
-      }
-      if (stack.indexOf(data) !== -1) {
-        return { klassName:"Circular" };
-      }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        stack.push(data);
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _pack(data, stack);
-          });
-        } else {
-          result = {};
-          Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
-              result[key] = _pack(data[key], stack);
-            }
-          });
-        }
-        stack.pop();
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _pack(data, []);
-    };
-  })();
-
-  var unpack = (function() {
-    var func = function() {};
-    var _unpack = function(data) {
-      if (!data) {
-        return data;
-      }
-      if (typeof data === "string") {
-        if (data === "[Function]") {
-          return func;
-        }
-        return data;
-      }
-      var result;
-      if (typeof data === "object") {
-        if (data.buffer instanceof ArrayBuffer) {
-          return data;
-        }
-        if (Array.isArray(data)) {
-          result = data.map(function(data) {
-            return _unpack(data);
-          });
-        } else {
-          if (data.klassName && /^[_a-z$][_a-z0-9$]*$/i.test(data.klassName)) {
-            result = eval.call(null, "new (function " + data.klassName + "(){})");
-            delete data.klassName;
-          } else {
-            result = {};
-          }
-          Object.keys(data).forEach(function(key) {
-            result[key] = _unpack(data[key]);
-          });
-        }
-      } else {
-        result = data;
-      }
-      return result;
-    };
-    return function(data) {
-      return _unpack(data);
-    };
-  })();
-  
-  module.exports = {
-    pack  : pack,
-    unpack: unpack
-  };
 
 });
 define('cc/common/timer', function(require, exports, module) {
@@ -590,52 +2870,6 @@ define('cc/common/timer', function(require, exports, module) {
       cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
       cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
       cc.resetNativeTimers = resetNativeTimers;
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/common/console', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var unpack = require("./pack").unpack;
-  
-  var bind = function(commands) {
-    commands["/console/log"] = function(msg) {
-      console.log.apply(console, unpack(msg[1]));
-    };
-    commands["/console/debug"] = function(msg) {
-      console.debug.apply(console, unpack(msg[1]));
-    };
-    commands["/console/info"] = function(msg) {
-      console.info.apply(console, unpack(msg[1]));
-    };
-    commands["/console/warn"] = function(msg) {
-      console.warn.apply(console, unpack(msg[1]));
-    };
-    commands["/console/error"] = function(msg) {
-      console.error.apply(console, unpack(msg[1]));
-    };
-  };
-  
-  module.exports = {
-    bind: bind,
-    use : function() {
-      cc.console = {
-        log: function() {
-          global.console.log.apply(global.console, arguments);
-        },
-        info: function() {
-          global.console.info.apply(global.console, arguments);
-        },
-        warn: function() {
-          global.console.warn.apply(global.console, arguments);
-        },
-        error: function() {
-          global.console.error.apply(global.console, arguments);
-        }
-      };
     }
   };
 
@@ -1009,111 +3243,6 @@ define('cc/common/ops', function(require, exports, module) {
     BINARY_OP_UGEN_MAP: BINARY_OP_UGEN_MAP,
     UGEN_OP_ALIASES   : UGEN_OP_ALIASES,
     COMMON_FUNCTIONS  : COMMON_FUNCTIONS,
-  };
-
-});
-define('cc/common/extend', function(require, exports, module) {
-  
-  var extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
-    /*jshint validthis:true */
-    function ctor() {
-      this.constructor = child;
-    }
-    /*jshint validthis:false */
-    ctor.prototype = parent.prototype;
-    /*jshint newcap:false */
-    child.prototype = new ctor();
-    /*jshint newcap:true */
-    child.__super__ = parent.prototype;
-    return child;
-  };
-  
-  module.exports = extend;
-
-});
-define('cc/common/emitter', function(require, exports, module) {
-
-  var Emitter = (function() {
-    function Emitter(context) {
-      this.__context   = context || this;
-      this.__callbacks = {};
-    }
-    Emitter.prototype.getListeners = function(event) {
-      return this.__callbacks[event] || (this.__callbacks[event] = []);
-    };
-    Emitter.prototype.hasListeners = function(event) {
-      return this.getListeners(event).length > 0;
-    };
-    Emitter.prototype.on = function(event, callback) {
-      var __callbacks = this.getListeners(event);
-      if (__callbacks.indexOf(callback) === -1) {
-        __callbacks.push(callback);
-      }
-      return this;
-    };
-    Emitter.prototype.once = function(event, callback) {
-      var that = this;
-      function wrapper() {
-        that.off(event, wrapper);
-        callback.apply(that.__context, arguments);
-      }
-      wrapper.callback = callback;
-      this.on(event, wrapper);
-      return this;
-    };
-    Emitter.prototype.off = function(event, callback) {
-      if (arguments.length === 0) {
-        this.__callbacks = {};
-        return this;
-      }
-      var __callbacks = this.getListeners(event);
-      if (arguments.length === 1) {
-        __callbacks.splice(0);
-        return this;
-      }
-      var index = __callbacks.indexOf(callback);
-      if (index === -1) {
-        for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-          if (__callbacks[i].callback === callback) {
-            index = i;
-            break;
-          }
-        }
-      }
-      if (index !== -1) {
-        __callbacks.splice(index, 1);
-      }
-      return this;
-    };
-    Emitter.prototype.emit = function(event) {
-      var args = Array.prototype.slice.call(arguments, 1);
-      var __callbacks = this.getListeners(event).slice(0);
-      for (var i = 0, imax = __callbacks.length; i < imax; ++i) {
-        __callbacks[i].apply(this.__context, args);
-      }
-      return this;
-    };
-    return Emitter;
-  })();
-  
-  var mixin = function(obj) {
-    ["getListeners", "hasListeners", "on", "once", "off", "emit"].forEach(function(method) {
-      if (!obj[method]) {
-        obj[method] = Emitter.prototype[method];
-      }
-    });
-    Emitter.call(obj);
-    return obj;
-  };
-  
-  module.exports = {
-    Emitter: Emitter,
-    mixin: mixin
   };
 
 });
@@ -3611,15 +5740,15 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
   
   
   var registerUGen = function(name, spec) {
-    var BaseClass = (spec._Klass === null) ? null : (spec._Klass || UGen);
-    var multiCall   = spec._multiCall;
-    var checkInputs = spec._checkInputs;
+    var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
+    var multiCall   = spec.multiCall;
+    var checkInputs = spec.checkInputs;
     if (multiCall === undefined) {
       multiCall = true;
     }
 
     var klass;
-    if (spec["new"]) {
+    if (spec.$new) {
       klass = function() {
         return cc.global[name]["new"].apply(null, slice.call(arguments));
       };
@@ -3638,12 +5767,13 @@ define('cc/lang/ugen/ugen', function(require, exports, module) {
     cc.global[name] = klass;
     
     Object.keys(spec).forEach(function(key) {
-      if (key.charAt(0) === "_") {
+      if (key.charAt(0) !== "$") {
         return;
       }
       var setting   = spec[key];
       var defaults  = setting.defaults + ",tag";
       var ctor      = setting.ctor;
+      key = key.substr(1);
       if (BaseClass !== null) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
@@ -4151,8 +6281,8 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   })();
   
   cc.ugen.specs.In = {
-    _Klass: cc.MultiOutUGen,
-    ar: {
+    Klass: cc.MultiOutUGen,
+    $ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
         this.init.call(this, 2);
@@ -4160,7 +6290,7 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
         return this.initOutputs(numChannels, this.rate);
       },
     },
-    kr: {
+    $kr: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
         this.init.call(this, 1);
@@ -4181,16 +6311,10 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   
   var out_ctor = function(rate) {
     function ctor(bus, channelsArray) {
-      if (!(cc.instanceOfUGen(bus) || typeof bus === "number")) {
-        throw new TypeError("Out: arguments[0] should be an UGen or a number.");
-      }
       if (!Array.isArray(channelsArray)) {
         channelsArray = [ channelsArray ];
       }
       channelsArray = utils.flatten(channelsArray);
-      channelsArray = channelsArray.filter(function(x) {
-        return x !== 0;
-      });
       if (channelsArray.length) {
         cc.UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
       }
@@ -4208,20 +6332,20 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   };
   
   cc.ugen.specs.Out = {
-    _Klass    : null,
-    _multiCall: false,
-    ar: {
+    Klass    : null,
+    multiCall: false,
+    $ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(2),
     },
-    kr: {
+    $kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(1),
     }
   };
-
+  
   cc.ugen.specs.A2K = {
-    kr: {
+    $kr: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(1, _in);
@@ -4230,7 +6354,7 @@ define('cc/lang/ugen/inout', function(require, exports, module) {
   };
   
   cc.ugen.specs.K2A = {
-    ar: {
+    $ar: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(2, _in);
@@ -4313,14 +6437,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.OnePole = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,coef=0.5,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
         return this.init(2, _in, coef).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,coef=0.5,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
         return this.init(1, _in, coef).madd(mul, add);
@@ -4331,14 +6455,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.OneZero = cc.ugen.specs.OnePole;
 
   cc.ugen.specs.TwoPole = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
         return this.init(2, _in, freq, radius).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
         return this.init(1, _in, freq, radius).madd(mul, add);
@@ -4350,14 +6474,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.APF     = cc.ugen.specs.TwoPole;
   
   cc.ugen.specs.LPF = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,freq=440,mul=1,add=0",
       ctor: function(_in, freq, mul, add) {
         return this.init(2, _in, freq).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,freq=440,mul=1,add=0",
       ctor: function(_in, freq, mul, add) {
         return this.init(1, _in, freq).madd(mul, add);
@@ -4368,14 +6492,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.HPF = cc.ugen.specs.LPF;
 
   cc.ugen.specs.BPF = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
         return this.init(2, _in, freq, rq).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
         return this.init(1, _in, freq, rq).madd(mul, add);
@@ -4386,14 +6510,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.BRF = cc.ugen.specs.BPF;
   
   cc.ugen.specs.RLPF = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
         return this.init(2, _in, freq, rq).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
         return this.init(1, _in, freq, rq).madd(mul, add);
@@ -4404,14 +6528,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
 
   cc.ugen.specs.Lag = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,lagTime=0.1,mul=1,add=0",
       ctor: function(_in, lagTime, mul, add) {
         return this.init(2, _in, lagTime).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,lagTime=0.1,mul=1,add=0",
       ctor: function(_in, lagTime, mul, add) {
         return this.init(1, _in, lagTime).madd(mul, add);
@@ -4424,14 +6548,14 @@ define('cc/lang/ugen/filter', function(require, exports, module) {
   cc.ugen.specs.Ramp = cc.ugen.specs.Lag;
 
   cc.ugen.specs.LagUD = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
       ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
         return this.init(2, _in, lagTimeU, lagTimeD).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
       ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
         return this.init(1, _in, lagTimeU, lagTimeD).madd(mul, add);
@@ -4467,12 +6591,12 @@ define('cc/lang/ugen/bufio', function(require, exports, module) {
   };
   
   cc.ugen.specs.PlayBuf = {
-    _Klass: cc.MultiOutUGen,
-    ar: {
+    Klass: cc.MultiOutUGen,
+    $ar: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
       ctor: playbuf_ctor(2)
     },
-    kr: {
+    $kr: {
       defaults: "numChannels=0,buffer,rate=1,trigger=1,startPos=0,loop=0,doneAction=0",
       ctor: playbuf_ctor(1)
     }
@@ -4486,13 +6610,13 @@ define('cc/lang/ugen/debug', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.Debug = {
-    ar: {
+    $ar: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(2, _in);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0",
       ctor: function(_in) {
         return this.init(1, _in);
@@ -4508,14 +6632,14 @@ define('cc/lang/ugen/decay', function(require, exports, module) {
   var cc = require("../cc");
   
   cc.ugen.specs.Integrator = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
         return this.init(2, _in, coef).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
         return this.init(1, _in, coef).madd(mul, add);
@@ -4524,14 +6648,14 @@ define('cc/lang/ugen/decay', function(require, exports, module) {
   };
 
   cc.ugen.specs.Decay = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
         return this.init(2, _in, decayTime).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
         return this.init(1, _in, decayTime).madd(mul, add);
@@ -4540,14 +6664,14 @@ define('cc/lang/ugen/decay', function(require, exports, module) {
   };
   
   cc.ugen.specs.Decay2 = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
         return this.init(2, _in, attackTime, decayTime).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
         return this.init(1, _in, attackTime, decayTime).madd(mul, add);
@@ -4563,14 +6687,14 @@ define('cc/lang/ugen/delay', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.Delay1 = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,mul=1,add=0",
       ctor: function(_in, mul, add) {
         return this.init(2, _in).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,mul=1,add=0",
       ctor: function(_in, mul, add) {
         return this.init(1, _in).madd(mul, add);
@@ -4581,14 +6705,14 @@ define('cc/lang/ugen/delay', function(require, exports, module) {
   cc.ugen.specs.Delay2 = cc.ugen.specs.Delay1;
 
   cc.ugen.specs.DelayN = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, mul, add) {
         return this.init(2, _in, maxdelaytime, delaytime).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, mul, add) {
         return this.init(1, _in, maxdelaytime, delaytime).madd(mul, add);
@@ -4600,14 +6724,14 @@ define('cc/lang/ugen/delay', function(require, exports, module) {
   cc.ugen.specs.DelayC = cc.ugen.specs.DelayN;
   
   cc.ugen.specs.CombN = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
         return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,maxdelaytime=0.2,delaytime=0.2,decaytime=1,mul=1,add=0",
       ctor: function(_in, maxdelaytime, delaytime, decaytime, mul, add) {
         return this.init(2, _in, maxdelaytime, delaytime, decaytime).madd(mul, add);
@@ -4629,13 +6753,13 @@ define('cc/lang/ugen/line', function(require, exports, module) {
   var cc = require("../cc");
   
   cc.ugen.specs.Line = {
-    ar: {
+    $ar: {
       defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
         return this.init(2, start, end, dur, doneAction).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "start=0,end=1,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
         return this.init(1, start, end, dur, doneAction).madd(mul, add);
@@ -4644,13 +6768,13 @@ define('cc/lang/ugen/line', function(require, exports, module) {
   };
 
   cc.ugen.specs.XLine = {
-    ar: {
+    $ar: {
       defaults: "start=1,end=2,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
         return this.init(2, start, end, dur, doneAction).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "start=1,end=2,dur=1,mul=1,add=0,doneAction=0",
       ctor: function(start, end, dur, mul, add, doneAction) {
         return this.init(1, start, end, dur, doneAction).madd(mul, add);
@@ -4666,13 +6790,13 @@ define('cc/lang/ugen/noise', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.WhiteNoise = {
-    ar: {
+    $ar: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
         return this.init(2).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
         return this.init(1).madd(mul, add);
@@ -4684,13 +6808,13 @@ define('cc/lang/ugen/noise', function(require, exports, module) {
   cc.ugen.specs.ClipNoise = cc.ugen.specs.WhiteNoise;
   
   cc.ugen.specs.Dust = {
-    ar: {
+    $ar: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
         return this.init(2, density).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
         return this.init(1, density).madd(mul, add);
@@ -4701,13 +6825,13 @@ define('cc/lang/ugen/noise', function(require, exports, module) {
   cc.ugen.specs.Dust2 = cc.ugen.specs.Dust;
 
   cc.ugen.specs.LFNoise0 = {
-    ar: {
+    $ar: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(2, freq).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(1, freq).madd(mul, add);
@@ -4727,13 +6851,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.FSinOsc = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(2, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(1, freq, phase).madd(mul, add);
@@ -4742,13 +6866,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
   
   cc.ugen.specs.SinOsc = {
-    ar: {
+    $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(2, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(1, freq, phase).madd(mul, add);
@@ -4757,13 +6881,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
 
   cc.ugen.specs.SinOscFB = {
-    ar: {
+    $ar: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
         return this.init(2, freq, feedback).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
         return this.init(1, freq, feedback).madd(mul, add);
@@ -4772,13 +6896,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
   
   cc.ugen.specs.LFSaw = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(2, freq, iphase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
         return this.init(1, freq, iphase).madd(mul, add);
@@ -4791,13 +6915,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   cc.ugen.specs.LFTri = cc.ugen.specs.LFSaw;
 
   cc.ugen.specs.LFPulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
         return this.init(2, freq, iphase, width).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
         return this.init(1, freq, iphase, width).madd(mul, add);
@@ -4806,7 +6930,7 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
 
   cc.ugen.specs.Blip = {
-    ar: {
+    $ar: {
       defaults: "freq=440,numharm=200,mul=1,add=0",
       ctor: function(freq, numharm, mul, add) {
         return this.init(2, freq, numharm).madd(mul, add);
@@ -4815,7 +6939,7 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
   
   cc.ugen.specs.Saw = {
-    ar: {
+    $ar: {
       defaults: "freq=440,mul=1,add=0",
       ctor: function(freq, mul, add) {
         return this.init(2, freq).madd(mul, add);
@@ -4824,7 +6948,7 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
   
   cc.ugen.specs.Pulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,width=0.5,mul=1,add=0",
       ctor: function(freq, width, mul, add) {
         return this.init(2, freq, width).madd(mul, add);
@@ -4833,13 +6957,13 @@ define('cc/lang/ugen/osc', function(require, exports, module) {
   };
 
   cc.ugen.specs.Impulse = {
-    ar: {
+    $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(2, freq, phase).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
         return this.init(1, freq, phase).madd(mul, add);
@@ -4867,13 +6991,13 @@ define('cc/lang/ugen/pan', function(require, exports, module) {
   };
   
   cc.ugen.specs.Pan2 = {
-    _Klass: cc.MultiOutUGen,
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    Klass: cc.MultiOutUGen,
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(2)
     },
-    kr: {
+    $kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(1),
     }
@@ -4887,7 +7011,7 @@ define('cc/lang/ugen/random', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.Rand = {
-    "new": {
+    $new: {
       defaults: "lo=0,hi=1",
       ctor: function(lo, hi) {
         return this.init(0, lo, hi);
@@ -4903,19 +7027,19 @@ define('cc/lang/ugen/range', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.InRange = {
-    ar: {
+    $ar: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(2, _in, lo, hi);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(1, _in, lo, hi);
       }
     },
-    ir: {
+    $ir: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
         return this.init(0, _in, lo, hi);
@@ -4934,11 +7058,15 @@ define('cc/lang/ugen/range', function(require, exports, module) {
   };
   
   cc.ugen.specs.LinLin = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     },
-    kr: {
+    $kr: {
+      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
+      ctor: linlin_ctor
+    },
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linlin_ctor
     }
@@ -4952,15 +7080,15 @@ define('cc/lang/ugen/range', function(require, exports, module) {
   };
   
   cc.ugen.specs.LinExp = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: linexp_ctor
     }
@@ -4976,15 +7104,15 @@ define('cc/lang/ugen/range', function(require, exports, module) {
   };
   
   cc.ugen.specs.ExpLin = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: explin_ctor
     }
@@ -5000,15 +7128,15 @@ define('cc/lang/ugen/range', function(require, exports, module) {
   };
   
   cc.ugen.specs.ExpExp = {
-    ar: {
+    $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
-    kr: {
+    $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     },
-    ir: {
+    $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
       ctor: expexp_ctor
     }
@@ -5022,14 +7150,14 @@ define('cc/lang/ugen/reverb', function(require, exports, module) {
   var cc = require("../cc");
 
   cc.ugen.specs.FreeVerb = {
-    _checkInputs: cc.ugen.checkSameRateAsFirstInput,
-    ar: {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
       defaults: "in=0,mix=0.33,room=0.5,damp=0.5,mul=1,add=0",
       ctor: function(_in, mix, room, damp, mul, add) {
         return this.init(2, _in, mix, room, damp).madd(mul, add);
       }
     },
-    kr: {
+    $kr: {
       defaults: "in=0,mix=0.33,room=0.5,damp=0.5,mul=1,add=0",
       ctor: function(_in, mix, room, damp, mul, add) {
         return this.init(1, _in, mix, room, damp).madd(mul, add);
@@ -5045,7 +7173,7 @@ define('cc/lang/ugen/ui', function(require, exports, module) {
   var cc = require("../cc");
   
   var MouseXY = {
-    kr: {
+    $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
         if (warp === "exponential") {
@@ -5061,7 +7189,7 @@ define('cc/lang/ugen/ui', function(require, exports, module) {
   cc.ugen.specs.MouseY = MouseXY;
   
   cc.ugen.specs.MouseButton = {
-    kr: {
+    $kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
         return this.init(1, minval, maxval, lag);
@@ -5112,107 +7240,6 @@ define('cc/lang/lang-worker', function(require, exports, module) {
     }
   };
   
-  module.exports.use();
-
-});
-define('cc/lang/lang-iframe', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var extend = require("../common/extend");
-  var onmessage = require("./utils").lang_onmessage;
-  
-  var IFrameSynthLang = (function() {
-    function IFrameSynthLang() {
-      cc.opmode = "iframe";
-      require("../common/browser");
-      
-      cc.SynthLang.call(this);
-      
-      var that = this;
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.strmLength = 2048;
-      this.bufLength  = 128;
-      this.server = cc.createWebWorker(cc.coffeeColliderPath);
-      this.server.onmessage = function(e) {
-        that.recvFromServer(e.data);
-      };
-    }
-    extend(IFrameSynthLang, cc.SynthLang);
-    
-    IFrameSynthLang.prototype.sendToServer = function(msg) {
-      this.server.postMessage(msg);
-    };
-    IFrameSynthLang.prototype.process = function() {
-      var taskManager = this.taskManager;
-      var n = this.strmLength / this.bufLength;
-      var timelineResult = [];
-      while (n--) {
-        taskManager.process();
-        timelineResult = timelineResult.concat(
-          this.timelineResult.splice(0), 0
-        );
-      }
-      this.sendToServer(["/processed", timelineResult]);
-    };
-
-    IFrameSynthLang.prototype.extendCommands = function(commands) {
-      require("../common/console").bind(commands);
-    };
-    
-    return IFrameSynthLang;
-  })();
-
-  module.exports = {
-    use: function() {
-      cc.createIFrameSynthLang = function() {
-        var lang = new IFrameSynthLang();
-        if (typeof window !== "undefined") {
-          window.onmessage = function(e) {
-            e.ports[0].onmessage = onmessage;
-            lang.sendToClient = function(msg) {
-              e.ports[0].postMessage(msg);
-            };
-            window.onmessage = null;
-          };
-        }
-        return lang;
-      };
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/common/browser', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  module.exports = {
-    use: function() {
-      cc.createWebWorker = function(path) {
-        return new Worker(path);
-      };
-      cc.createWebSocket = function(path) {
-        return new WebSocket(path);
-      };
-      cc.createXMLHttpRequest = function() {
-        return new XMLHttpRequest();
-      };
-      cc.createMessageChannel = function() {
-        return new MessageChannel();
-      };
-      cc.createHTMLIFrameElement = function() {
-        var iframe = document.createElement("iframe");
-        iframe.style.width  = 0;
-        iframe.style.height = 0;
-        iframe.style.border = 0;
-        document.body.appendChild(iframe);
-        return iframe;
-      };
-    }
-  };
-
   module.exports.use();
 
 });
@@ -5276,7 +7303,12 @@ define('cc/lang/lang-socket', function(require, exports, module) {
       this.socketPath = null;
     }
     extend(SocketSynthLang, cc.SynthLang);
-    
+
+    SocketSynthLang.prototype.sendToClient = function(msg) {
+      postMessage(msg);
+    };
+    SocketSynthLang.prototype.sendToServer = function() {
+    };
     SocketSynthLang.prototype.process = function() {
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
@@ -5340,7 +7372,8 @@ define('cc/lang/lang-socket', function(require, exports, module) {
     };
 
     SocketSynthLang.prototype.extendCommands = function(commands) {
-      commands["/socket/open"] = function() {
+      commands["/socket/open"] = function(msg) {
+        this.socketPath = msg[1];
         this.openSocket();
       };
       commands["/socket/close"] = function() {
@@ -5363,16 +7396,7 @@ define('cc/lang/lang-socket', function(require, exports, module) {
     use: function() {
       cc.createSocketSynthLang = function() {
         var lang = new SocketSynthLang();
-        if (typeof window !== "undefined") {
-          window.onmessage = function(e) {
-            e.ports[0].onmessage = onmessage;
-            lang.sendToClient = function(msg) {
-              e.ports[0].postMessage(msg);
-            };
-            lang.socketPath = e.data;
-            window.onmessage = null;
-          };
-        }
+        global.onmessage = onmessage;
         cc.opmode = "socket";
         return lang;
       };
@@ -6847,2183 +8871,6 @@ define('cc/lang/string', function(require, exports, module) {
   module.exports = {};
 
 });
-define('cc/client/client', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var emitter  = require("../common/emitter");
-  var unpack   = require("../common/pack").unpack;
-  var commands = {};
-  var slice    = [].slice;
-  
-  var SynthClient = (function() {
-    function SynthClient(opts) {
-      emitter.mixin(this);
-      opts = opts || {};
-      this.version = cc.version;
-      if (opts.socket) {
-        this.impl = cc.createSynthClientSocketImpl(this, opts);
-      } else if (opts.iframe) {
-        this.impl = cc.createSynthClientIFrameImpl(this, opts);
-      } else if (opts.nodejs) {
-        this.impl = cc.createSynthClientNodeJSImpl(this, opts);
-      } else {
-        this.impl = cc.createSynthClientWorkerImpl(this, opts);
-      }
-      this.sampleRate = this.impl.sampleRate;
-      this.channels   = this.impl.channels;
-    }
-    
-    SynthClient.prototype.play = function() {
-      this.impl.play();
-      return this;
-    };
-    SynthClient.prototype.pause = function() {
-      this.impl.pause();
-      return this;
-    };
-    SynthClient.prototype.reset = function() {
-      this.impl.reset();
-      return this;
-    };
-    SynthClient.prototype.execute = function() {
-      this.impl.execute.apply(this.impl, arguments);
-      return this;
-    };
-    SynthClient.prototype.getStream = function() {
-      return this.impl.getStream();
-    };
-    SynthClient.prototype.importScripts = function() {
-      this.impl.importScripts(slice.call(arguments));
-      return this;
-    };
-    SynthClient.prototype.getWebAudioComponents = function() {
-      return this.impl.getWebAudioComponents();
-    };
-    
-    return SynthClient;
-  })();
-
-  var SynthClientImpl = (function() {
-    function SynthClientImpl(exports, opts) {
-      this.exports  = exports;
-      this.compiler = cc.createCompiler("coffee");
-      
-      this.isPlaying = false;
-      this.execId = 0;
-      this.execCallbacks = {};
-
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.api = cc.createAudioAPI(this, opts);
-      this.sampleRate = this.api.sampleRate;
-      this.channels   = this.api.channels;
-      if (this.api.strmLength) {
-        this.strmLength = this.api.strmLength;
-      }
-      this.strm  = new Int16Array(this.strmLength * this.channels);
-      this.clear = new Int16Array(this.strmLength * this.channels);
-      this.strmList = new Array(16);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.syncCount = 0;
-      this.speaker = opts.speaker !== false;
-      this.api.init();
-      
-      var syncItems = new Uint8Array(20);
-      if (typeof window !== "undefined" && opts.mouse !== false) {
-        var f32_syncItems = new Float32Array(syncItems.buffer);
-        window.addEventListener("mousemove", function(e) {
-          f32_syncItems[2] = e.pageX / window.innerWidth;
-          f32_syncItems[3] = e.pageY / window.innerHeight;
-        }, true);
-        window.addEventListener("mousedown", function() {
-          f32_syncItems[4] = 1;
-        }, true);
-        window.addEventListener("mouseup", function() {
-          f32_syncItems[4] = 0;
-        }, true);
-      }
-      this.syncItems = syncItems;
-      this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
-    }
-    
-    SynthClientImpl.prototype.play = function() {
-      if (!this.isPlaying) {
-        this.isPlaying = true;
-        this.sendToLang(["/play"]);
-        if (this.api) {
-          this.api.play();
-        }
-      }
-    };
-    SynthClientImpl.prototype._played = function(syncCount) {
-      if (this.api) {
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
-        }
-        this.strmList.splice(0);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.syncCount = syncCount;
-      }
-      this.exports.emit("play");
-    };
-    SynthClientImpl.prototype.pause = function() {
-      if (this.isPlaying) {
-        this.isPlaying = false;
-        this.sendToLang(["/pause"]);
-      }
-    };
-    SynthClientImpl.prototype._paused = function() {
-      if (this.api) {
-        this.api.pause();
-      }
-      this.exports.emit("pause");
-    };
-    SynthClientImpl.prototype.reset = function() {
-      this.execId = 0;
-      this.execCallbacks = {};
-      var strm = this.strm;
-      for (var i = 0, imax = strm.length; i < imax; ++i) {
-        strm[i] = 0;
-      }
-      this.strmList.splice(0);
-      this.strmListReadIndex  = 0;
-      this.strmListWriteIndex = 0;
-      this.sendToLang(["/reset"]);
-      this.exports.emit("reset");
-    };
-    SynthClientImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex & 15];
-      if (strm) {
-        this.strmListReadIndex += 1;
-        this.strm.set(strm);
-      }
-      this.syncCount += 1;
-      this.syncItemsUInt32[1] = this.syncCount;
-      this.sendToLang(this.syncItems);
-    };
-    SynthClientImpl.prototype.execute = function(code) {
-      var append, callback;
-      var i = 1;
-      if (typeof arguments[i] === "boolean") {
-        append = arguments[i++];
-      } else {
-        append = false;
-      }
-      if (typeof arguments[i] === "function") {
-        callback = arguments[i++];
-      }
-      if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
-        if (callback) {
-          this.execCallbacks[this.execId] = callback;
-        }
-        this.sendToLang([
-          "/execute", this.execId, code, append, this.compiler.data, !!callback
-        ]);
-        this.execId += 1;
-      }
-    };
-    SynthClientImpl.prototype.getStream = function() {
-      var f32 = new Float32Array(this.strm);
-      for (var i = f32.length; i--; ) {
-        f32[i] *= 0.000030517578125;
-      }
-      var strmLength = this.strmLength;
-      return {
-        getChannelData: function(channel) {
-          if (channel === 0) {
-            return new Float32Array(f32.buffer, 0, strmLength);
-          } else if (channel === 1) {
-            return new Float32Array(f32.buffer, strmLength * 4);
-          }
-        }
-      };
-    };
-    SynthClientImpl.prototype.importScripts = function(list) {
-      this.sendToLang(["/importScripts", list]);
-    };
-    SynthClientImpl.prototype.sendToLang = function(msg) {
-      if (this.lang) {
-        this.lang.postMessage(msg);
-      }
-    };
-    SynthClientImpl.prototype.recvFromLang = function(msg) {
-      if (msg instanceof Int16Array) {
-        this.strmList[this.strmListWriteIndex & 15] = msg;
-        this.strmListWriteIndex += 1;
-      } else {
-        var func = commands[msg[0]];
-        if (func) {
-          func.call(this, msg);
-        } else {
-          throw new Error("Unknown command: " + msg[0]);
-        }
-      }
-    };
-    SynthClientImpl.prototype.readAudioFile = function(path, callback) {
-      var api = this.api;
-      if (this.api) {
-        if (typeof path !== "string") {
-          throw new TypeError("readAudioFile: first argument must be a String.");
-        }
-        if (typeof callback !== "function") {
-          throw new TypeError("readAudioFile: second argument must be a Function.");
-        }
-        if (!api.decodeAudioFile) {
-          callback("Audio decoding not supported", null);
-          return;
-        }
-        var xhr = cc.createXMLHttpRequest();
-        xhr.open("GET", path);
-        xhr.responseType = "arraybuffer";
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4) {
-            if (xhr.status === 200 && xhr.response) {
-              api.decodeAudioFile(xhr.response, function(err, buffer) {
-                callback(err, buffer);
-              });
-            } else {
-              callback("error", null);
-            }
-          }
-        };
-        xhr.send();
-      }
-    };
-    SynthClientImpl.prototype.getWebAudioComponents = function() {
-      if (this.api && this.api.type === "Web Audio API") {
-        return [ this.api.context, this.api.jsNode ];
-      }
-      return [];
-    };
-    
-    return SynthClientImpl;
-  })();
-  
-  
-  
-    
-  commands["/connected"] = function(msg) {
-    var globalIds = msg[3];
-    if (globalIds) {
-      globalIds.forEach(function(key) {
-        cc.global[key] = true;
-      });
-    }
-    this.sendToLang([
-      "/init", this.sampleRate, this.channels, this.strmLength
-    ]);
-    this.exports.emit("connected");
-  };
-  commands["/played"] = function(msg) {
-    var syncCount = msg[1];
-    this._played(syncCount);
-  };
-  commands["/paused"] = function(msg) {
-    var syncCount = msg[1];
-    this._paused(syncCount);
-  };
-  commands["/executed"] = function(msg) {
-    var execId = msg[1];
-    var result = msg[2];
-    var callback = this.execCallbacks[execId];
-    if (callback) {
-      if (result !== undefined) {
-        result = unpack(result);
-      }
-      callback(result);
-      delete this.execCallbacks[execId];
-    }
-  };
-  commands["/buffer/request"] = function(msg) {
-    var that = this;
-    var requestId = msg[2];
-    this.readAudioFile(msg[1], function(err, buffer) {
-      if (!err) {
-        that.sendToLang(["/buffer/response", buffer, requestId]);
-      }
-    });
-  };
-  commands["/socket/sendToClient"] = function(msg) {
-    this.exports.emit("message", msg[1]);
-  };
-  require("../common/console").bind(commands);
-  
-  cc.SynthClientImpl = SynthClientImpl;
-  
-  module.exports = {
-    SynthClient    : SynthClient,
-    SynthClientImpl: SynthClientImpl,
-    
-    use: function() {
-      require("./client-worker");
-      require("./client-iframe");
-      require("./client-nodejs");
-      require("./client-socket");
-      require("../common/browser");
-      require("../common/audioapi");
-      require("./compiler/compiler");
-      
-      cc.createSynthClient = function(opts) {
-        return new SynthClient(opts);
-      };
-      cc.createSynthClientImpl = function(exports, opts) {
-        return new SynthClientImpl(exports, opts);
-      };
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/client/client-worker', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../common/extend");
-
-  var SynthClientWorkerImpl = (function() {
-    function SynthClientWorkerImpl(exports, opts) {
-      cc.opmode = "worker";
-      this.strmLength = 1024;
-      this.bufLength  = 64;
-      
-      cc.SynthClientImpl.call(this, exports, opts);
-      
-      var that = this;
-      this.lang = cc.createWebWorker(cc.coffeeColliderPath);
-      this.lang.onmessage = function(e) {
-        that.recvFromLang(e.data);
-      };
-    }
-    extend(SynthClientWorkerImpl, cc.SynthClientImpl);
-    
-    return SynthClientWorkerImpl;
-  })();
-  
-  module.exports = {
-    use: function() {
-      cc.createSynthClientWorkerImpl = function(exports, opts) {
-        return new SynthClientWorkerImpl(exports, opts);
-      };
-    }
-  };
-  
-  module.exports.use();
-  
-});
-define('cc/client/client-iframe', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../common/extend");
-  
-  var SynthClientIFrameImpl = (function() {
-    function SynthClientIFrameImpl(exports, opts) {
-      cc.opmode = "iframe";
-      this.strmLength = 2048;
-      this.bufLength  = 128;
-      
-      cc.SynthClientImpl.call(this, exports, opts);
-      
-      var that = this;
-      var iframe = this.iframe = cc.createHTMLIFrameElement();
-      // TODO: want to remove 'allow-same-origin'
-      iframe.sandbox = "allow-scripts allow-same-origin";
-      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#iframe'></script>";
-      var channel = cc.createMessageChannel();
-      iframe.onload = function() {
-        iframe.contentWindow.postMessage(null, [channel.port2], "*");
-      };
-      channel.port1.onmessage = function(e) {
-        that.recvFromLang(e.data);
-      };
-      this.lang = channel.port1;
-    }
-    extend(SynthClientIFrameImpl, cc.SynthClientImpl);
-    
-    return SynthClientIFrameImpl;
-  })();
-  
-  module.exports = {
-    use: function() {
-      cc.createSynthClientIFrameImpl = function(exports, opts) {
-        return new SynthClientIFrameImpl(exports, opts);
-      };
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/client/client-nodejs', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../common/extend");
-  
-  var SynthClientNodeJSImpl = (function() {
-    function SynthClientNodeJSImpl(exports, opts) {
-      cc.opmode = "nodejs";
-      this.strmLength = 4096;
-      this.bufLength  = 64;
-      
-      cc.SynthClientImpl.call(this, exports, opts);
-      
-      this.api = null;
-    }
-    extend(SynthClientNodeJSImpl, cc.SynthClientImpl);
-    
-    return SynthClientNodeJSImpl;
-  })();
-  
-  module.exports = {
-    use: function() {
-      cc.createSynthClientNodeJSImpl = function(exports, opts) {
-        return new SynthClientNodeJSImpl(exports, opts);
-      };
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/client/client-socket', function(require, exports, module) {
-
-  var cc = require("../cc");
-  var extend = require("../common/extend");
-
-  var SynthClientSocketImpl = (function() {
-    function SynthClientSocketImpl(exports, opts) {
-      cc.opmode = "socket";
-      this.strmLength = 4096;
-      this.bufLength  = 128;
-      
-      cc.SynthClientImpl.call(this, exports, opts);
-      
-      var that = this;
-      var iframe = this.iframe = cc.createHTMLIFrameElement();
-      iframe.sandbox = "allow-scripts";
-      iframe.srcdoc = "<script src='" + cc.coffeeColliderPath + "#socket'></script>";
-      var channel = cc.createMessageChannel();
-      iframe.onload = function() {
-        iframe.contentWindow.postMessage(opts.socket, [channel.port2], "*");
-      };
-      channel.port1.onmessage = function(e) {
-        that.recvFromLang(e.data);
-      };
-      this.lang = channel.port1;
-      
-      exports.socket = {
-        open: function() {
-          that.sendToLang([ "/socket/open" ]);
-        },
-        close: function() {
-          that.sendToLang([ "/socket/close" ]);
-        },
-        send: function(msg) {
-          that.sendToLang([ "/socket/sendToServer", msg ]);
-        }
-      };
-    }
-    extend(SynthClientSocketImpl, cc.SynthClientImpl);
-    
-    return SynthClientSocketImpl;
-  })();
-  
-  module.exports = {
-    use: function() {
-      cc.createSynthClientSocketImpl = function(exports, opts) {
-        return new SynthClientSocketImpl(exports, opts);
-      };
-    }
-  };
-  
-  module.exports.use();
-  
-});
-define('cc/common/audioapi', function(require, exports, module) {
-  
-  var cc = require("../cc");
-  
-  require("./audioapi-webaudio");
-  require("./audioapi-audiodata");
-  require("./audioapi-flashfallback");
-  require("./audioapi-nodeaudio");
-  
-  module.exports = {
-    use: function() {
-      cc.createAudioAPI = function(sys, opts) {
-        return cc.createWebAudioAPI(sys, opts) ||
-          cc.createAudioDataAPI(sys, opts) ||
-          cc.createFlashAudioAPI(sys, opts) ||
-          cc.createNodeAudioAPI(sys, opts);
-      };
-    }
-  };
-  
-  module.exports.use();
-
-});
-define('cc/common/audioapi-webaudio', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var AudioAPI;
-  
-  if (typeof document !== "undefined") {
-    var AudioContext = global.AudioContext || global.webkitAudioContext;
-    if (AudioContext) {
-      AudioAPI = (function() {
-        function WebAudioAPI(sys, opts) {
-          this.sys = sys;
-          this.context = opts.AudioContext || new AudioContext();
-          this.sampleRate = this.context.sampleRate;
-          this.channels   = 2;
-          this.type = "Web Audio API";
-          this.delegate = !!opts.AudioContext;
-        }
-        WebAudioAPI.prototype.init = function() {
-          var sys = this.sys;
-          var onaudioprocess;
-          var strm = sys.strm;
-          var strmLength = sys.strmLength;
-          if (this.sys.speaker) {
-            if (this.sys.sampleRate === this.sampleRate) {
-              onaudioprocess = function(e) {
-                var outs = e.outputBuffer;
-                var outL = outs.getChannelData(0);
-                var outR = outs.getChannelData(1);
-                var i = strmLength, j = strmLength << 1;
-                sys.process();
-                while (j--, i--) {
-                  outL[i] = strm[i] * 0.000030517578125;
-                  outR[i] = strm[j] * 0.000030517578125;
-                }
-              };
-            }
-          } else {
-            onaudioprocess = function() {
-              sys.process();
-            };
-          }
-          this.bufSrc = this.context.createBufferSource();
-          if (this.context.createScriptProcessor) {
-            this.jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
-          } else {
-            this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
-          }
-          this.jsNode.onaudioprocess = onaudioprocess;
-        };
-        WebAudioAPI.prototype.play = function() {
-          if (!this.bufSrc) {
-            return; // TODO: throw an error
-          }
-          if (this.bufSrc.noteOn) {
-            this.bufSrc.noteOn(0);
-            this.bufSrc.connect(this.jsNode);
-          }
-          if (!this.delegate) {
-            this.jsNode.connect(this.context.destination);
-          }
-        };
-        WebAudioAPI.prototype.pause = function() {
-          if (!this.bufSrc) {
-            return; // TODO: throw an error
-          }
-          this.bufSrc.disconnect();
-          if (!this.delegate) {
-            this.jsNode.disconnect();
-          }
-        };
-        WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
-          buffer = this.context.createBuffer(buffer, false);
-          var bufLength   = buffer.length;
-          var numChannels = buffer.numberOfChannels;
-          var numSamples  = bufLength * numChannels;
-          var samples = new Float32Array(numSamples);
-          var i, j, k = 0;
-          var channelData = new Array(numChannels);
-          for (j = 0; j < numChannels; ++j) {
-            channelData[j] = buffer.getChannelData(j);
-          }
-          for (i = 0; i < bufLength; ++i) {
-            for (j = 0; j < numChannels; ++j) {
-              samples[k++] = channelData[j][i];
-            }
-          }
-          callback(null, {
-            sampleRate : buffer.sampleRate,
-            numChannels: buffer.numberOfChannels,
-            numFrames  : buffer.length,
-            samples    : samples,
-          });
-        };
-        return WebAudioAPI;
-      })();
-    }
-  }
-  
-  module.exports = {
-    use: function() {
-      cc.createWebAudioAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
-    }
-  };
-  
-  module.exports.use();
-  
-});
-define('cc/common/audioapi-audiodata', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var AudioAPI;
-  
-  if (typeof document !== "undefined") {
-    if (typeof Audio === "function" && typeof new Audio().mozSetup === "function") {
-      AudioAPI = (function() {
-        /*global URL:true */
-        var timer = (function() {
-          var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
-          var blob = new Blob([source], {type:"text/javascript"});
-          var path = URL.createObjectURL(blob);
-          return new Worker(path);
-        })();
-        /*global URL:false */
-        function AudioDataAPI(sys) {
-          this.sys = sys;
-          this.sampleRate = 44100;
-          this.channels   = 2;
-          this.type = "Audio Data API";
-        }
-        AudioDataAPI.prototype.init = function() {
-          this.audio = new Audio();
-          this.interleaved = new Float32Array(this.sys.strmLength * this.sys.channels);
-        };
-        AudioDataAPI.prototype.play = function() {
-          if (!this.audio) {
-            return; // TODO: throw an error
-          }
-          var sys = this.sys;
-          var audio = this.audio;
-          var interleaved = this.interleaved;
-          var msec = (sys.strmLength / sys.sampleRate) * 1000;
-          var written = 0;
-          var start = Date.now();
-          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
-          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
-
-          var onaudioprocess = function() {
-            if (written - 20 > Date.now() - start) {
-              return;
-            }
-            var i = interleaved.length;
-            var j = inL.length;
-            sys.process();
-            while (j--) {
-              interleaved[--i] = inR[j] * 0.000030517578125;
-              interleaved[--i] = inL[j] * 0.000030517578125;
-            }
-            audio.mozWriteAudio(interleaved);
-            written += msec;
-          };
-
-          audio.mozSetup(sys.channels, sys.sampleRate);
-          timer.onmessage = onaudioprocess;
-          timer.postMessage(msec * 0.8);
-        };
-        AudioDataAPI.prototype.pause = function() {
-          if (!this.audio) {
-            return; // TODO: throw an error
-          }
-          timer.postMessage(0);
-        };
-        return AudioDataAPI;
-      })();
-    }
-  }
-  
-  module.exports = {
-    use: function() {
-      cc.createAudioDataAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
-    }
-  };
-  
-  module.exports.use();
-
-});
-define('cc/common/audioapi-flashfallback', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var AudioAPI;
-
-  if (typeof document !== "undefined") {
-    AudioAPI = (function() {
-      function FallbackAudioAPI(sys) {
-        this.sys = sys;
-        this.sampleRate = 44100;
-        this.channels   = 2;
-        this.strmLength = Math.max(2048, sys.strmLength);
-        this.type = "Fallback";
-      }
-      FallbackAudioAPI.prototype.init = function() {
-      };
-      FallbackAudioAPI.prototype.play = function() {
-        if (fallback.play) {
-          this.play = fallback.play;
-          this.play();
-        }
-      };
-      FallbackAudioAPI.prototype.pause = function() {
-        if (fallback.pause) {
-          this.pause = fallback.pause;
-          this.pause();
-        }
-      };
-      
-      var fallback = {};
-      window.addEventListener("load", function() {
-        var swfSrc  = cc.rootPath + "coffee-collider-fallback.swf";
-        var swfName = swfSrc + "?" + Date.now();
-        var swfId   = "coffee-collider-fallback";
-        var div = document.createElement("div");
-        div.style.display = "inline";
-        div.width  = 1;
-        div.height = 1;
-        /*jshint quotmark:single */
-        div.innerHTML = '<object id="'+swfId+'" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="1" height="1"><param name="movie" value="'+swfName+'"/><param name="bgcolor" value="#FFFFFF"/><param name="quality" value="high"/><param name="allowScriptAccess" value="always"/></object>';
-        /*jshint quotmark:double */
-        document.body.appendChild(div);
-        
-        window.coffeecollider_flashfallback_init = function() {
-          var swf = document.getElementById(swfId);
-          var timerId = 0;
-          fallback.play = function() {
-            if (timerId === 0) {
-              var sys = this.sys;
-              var msec = (sys.strmLength / sys.sampleRate) * 1000;
-              var written = 0;
-              var start = Date.now();
-              var out   = new Array(sys.strmLength * sys.channels);
-              var len   = out.length;
-              
-              var onaudioprocess = function() {
-                if (written > Date.now() - start) {
-                  return;
-                }
-                sys.process();
-                var _in = sys.strm;
-                for (var i = 0; i < len; ++i) {
-                  out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
-                }
-                swf.writeAudio(out.join(""));
-                written += msec;
-              };
-
-              timerId = setInterval(onaudioprocess, msec * 0.8);
-              swf.play();
-            }
-          };
-          fallback.pause = function() {
-            if (timerId !== 0) {
-              swf.pause();
-              clearInterval(timerId);
-              timerId = 0;
-            }
-          };
-        };
-      });
-      return FallbackAudioAPI;
-    })();
-  }
-  
-  module.exports = {
-    use: function() {
-      cc.createFlashAudioAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
-    }
-  };
-
-  module.exports.use();
-  
-});
-define('cc/common/audioapi-nodeaudio', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var AudioAPI;
-  
-  if (typeof global.GLOBAL !== "undefined") {
-    AudioAPI = (function() {
-      var Readable = global.require("stream").Readable;
-      var Speaker  = global.require("speaker");
-      if (!Readable) {
-        Readable = global.require("readable-stream/readable");
-      }
-      function NodeAudioAPI(sys) {
-        this.sys = sys;
-        this.sampleRate = 44100;
-        this.channels   = 2;
-        this.node = null;
-        this.isPlaying = false;
-      }
-      NodeAudioAPI.prototype.init = function() {
-      };
-      NodeAudioAPI.prototype.play = function() {
-        var sys = this.sys;
-        this.isPlaying = true;
-        this.node = new Readable();
-        this.node._read = function(n) {
-          var strm = sys._strm;
-          var strmLength = sys.strmLength;
-          var buf  = new Buffer(n);
-          var x, i, j, k = 0;
-          n = (n >> 2) / sys.strmLength;
-          x = strm;
-          while (n--) {
-            sys._process();
-            for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
-              buf.writeInt16LE(strm[i], k);
-              k += 2;
-              buf.writeInt16LE(strm[j], k);
-              k += 2;
-            }
-          }
-          this.push(buf);
-        };
-        this.node.pipe(new Speaker({sampleRate:this.sampleRate}));
-      };
-      NodeAudioAPI.prototype.pause = function() {
-        if (this.node) {
-          process.nextTick(this.node.emit.bind(this.node, "end"));
-        }
-        this.node = null;
-        this.isPlaying = false;
-      };
-      return NodeAudioAPI;
-    })();
-  }
-  
-  module.exports = {
-    use: function() {
-      cc.createNodeAudioAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
-    }
-  };
-
-  module.exports.use();
-
-});
-define('cc/client/compiler/compiler', function(require, exports, module) {
-
-  var cc = require("../../cc");
-  
-  var use = function() {
-    require("./coffee");
-    
-    cc.createCompiler = function(lang) {
-      if (lang === "coffee") {
-        return cc.createCoffeeCompiler();
-      }
-      throw new TypeError("Compiler: '" + lang + "' not supported");
-    };
-  };
-  
-  module.exports = {
-    use:use
-  };
-
-  module.exports.use();
-
-});
-define('cc/client/compiler/coffee', function(require, exports, module) {
-
-  var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
-  
-  var cc = require("../../cc");
-  var timevalue = require("../../common/timevalue").calc;
-  
-  // CoffeeScript tags
-  // IDENTIFIER
-  // NUMBER
-  // STRING
-  // REGEX
-  // BOOL
-  // NULL
-  // UNDEFINED
-  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
-  // UNARY           !, ~, new, typeof, delete, do
-  // LOGIC           &&, ||, &, |, ^
-  // SHIFT           <<, >>, >>>
-  // COMPARE         ==, !=, <, >, <=, >=
-  // MATH            *, div, %, 
-  // RELATION        in, of, instanceof
-  // =
-  // +
-  // -
-  // ..
-  // ...
-  // ++
-  // --
-  // (
-  // )
-  // [
-  // ]
-  // {
-  // }
-  // ?
-  // ::
-  // @
-  // IF
-  // ELSE
-  // WHILE
-  // LOOP
-  // SWITCH
-  // LEADING_WHEN
-  // THIS
-  // SUPER
-  // INDENT
-  // OUTDENT
-  // RETURN
-  // TERMINATOR
-  // HERECOMMENT
-
-  var TAG   = 0;
-  var VALUE = 1;
-  var _     = {}; // empty location
-
-  // utility functions
-  var isDot = function(token) {
-    return !!token && (token[TAG] === "." || token[TAG] === "@");
-  };
-  
-  var getIdentifier = function(token) {
-    var val = token[VALUE];
-    if (val.reserved) {
-      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
-        (val[5]||"") + (val[6]||"") + (val[7]||"");
-    }
-    return val;
-  };
-  
-  var getLine = function(tokens, index) {
-    var depth = 0;
-    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "(": case "{": case "[":
-      case "CALL_START": case "PARAM_START": case "INDEX_START":
-        depth += 1;
-        break;
-      case "]": case "}": case ")":
-      case "CALL_END": case "PARAM_END": case "INDEX_END":
-        depth -= 1;
-        break;
-      case "TERMINATOR":
-        if (depth === 0) {
-          result.end = i;
-        }
-        break;
-      case "INDENT":
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        if (depth === -1) {
-          result.end = i - 1;
-          result.isLastLine = true;
-        }
-        break;
-      }
-      if (result.end !== -1) {
-        break;
-      }
-    }
-    if (result.end === -1) {
-      result.end = tokens.length - 1;
-    }
-    result.len = result.end - result.begin + 1;
-    return result;
-  };
-  var indexOfParamEnd = function(tokens, index) {
-    var bracket = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "PARAM_START":
-        bracket += 1;
-        break;
-      case "PARAM_END":
-        bracket -= 1;
-        if (bracket === 0) {
-          return i;
-        }
-      }
-    }
-    return -1;
-  };
-  var indexOfFunctionStart = function(tokens, index) {
-    var depth = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "TERMINATOR":
-        if (depth === 0) {
-          return -1;
-        }
-        break;
-      case "PARAM_START":
-        if (depth === 0) {
-          return i;
-        }
-        depth += 1;
-        break;
-      case "PARAM_END":
-        depth -= 1;
-        break;
-      case "->": case "=>":
-        if (depth === 0) {
-          return i;
-        }
-        break;
-      case "[": case "{": case "(":
-      case "CALL_START": case "INDEX_START":
-        depth += 1;
-        break;
-      case ")": case "}": case "]":
-      case "CALL_END": case "INDEX_END": case "PARAM_END":
-        depth -= 1;
-        break;
-      }
-      if (depth < 0) {
-        break;
-      }
-    }
-    return -1;
-  };
-  var formatArgument = function(op) {
-    return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
-      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
-        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
-      } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
-        return "\"" + token[VALUE] + "\"";
-      }
-      return token[VALUE];
-    }).join("");
-  };
-  
-  
-  
-  
-  var detectPlusMinusOperator = function(tokens) {
-    if (tokens.cc_plusminus) {
-      return tokens;
-    }
-    var prevTag = "";
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      var tag = tokens[i][TAG];
-      if (tag === "+" || tag === "-") {
-        switch (prevTag) {
-        case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
-        case "REGEX": case "NULL": case "UNDEFINED": case "]": case "}": case ")":
-        case "CALL_END": case "INDEX_END":
-          tokens[i][TAG] = "MATH";
-          break;
-        default:
-          tokens[i][TAG] = "UNARY";
-        }
-      }
-      prevTag = tag;
-    }
-    tokens.cc_plusminus = true;
-    return tokens;
-  };
-  
-  var revertPlusMinusOperator = function(tokens) {
-    if (!tokens.cc_plusminus) {
-      for (var i = 0, imax = tokens.length; i < imax; ++i) {
-        var val = tokens[i][VALUE];
-        if (val === "+" || val === "-") {
-          tokens[i][TAG] = val;
-        }
-      }
-      return tokens;
-    }
-    delete tokens.cc_plusminus;
-    return tokens;
-  };
-  
-  var getPrevOperand = function(tokens, index) {
-    tokens = detectPlusMinusOperator(tokens);
-    
-    var bracket = 0;
-    var indent  = 0;
-    var end = index;
-    while (1 < index) {
-      switch (tokens[index][TAG]) {
-      case "(": case "[": case "{":
-      case "PARAM_START": case "CALL_START": case "INDEX_START":
-        bracket -= 1;
-        break;
-      case "}": case "]": case ")":
-      case "PARAM_END": case "CALL_END": case "INDEX_END":
-        bracket += 1;
-        break;
-      case "OUTDENT":
-        indent += 1;
-        break;
-      case "INDENT":
-        indent -= 1;
-        break;
-      }
-      switch (tokens[index - 1][TAG]) {
-      case "PARAM_END": case "CALL_END": case "INDEX_END":
-      case ".": case "@":
-        index -= 1;
-        continue;
-      }
-      switch (tokens[index][TAG]) {
-      case "(": case "[": case "{": case "PARAM_START":
-      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
-      case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
-      case "->": case "=>":
-        if (bracket === 0 && indent === 0) {
-          var prev;
-          while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
-            index -= 1;
-          }
-          return {tokens:tokens, begin:index, end:end};
-        }
-        break;
-      }
-      index -= 1;
-    }
-    return {tokens:tokens, begin:0, end:end};
-  };
-  
-  var getNextOperand = function(tokens, index) {
-    tokens = detectPlusMinusOperator(tokens);
-    var bracket = 0;
-    var indent  = 0;
-    var begin = index;
-    var imax = tokens.length - 2;
-
-    if (tokens[index] && tokens[index][TAG] === "@") {
-      if (tokens[index+1][TAG] !== "IDENTIFIER") {
-        return {tokens:tokens, begin:index, end:index};
-      }
-    }
-    
-    while (index < imax) {
-      var tag = tokens[index][TAG];
-      
-      switch (tag) {
-      case "(": case "[": case "{":
-      case "PARAM_START":
-        bracket += 1;
-        break;
-      case "}": case "]": case ")":
-      case "PARAM_END": case "CALL_END": case "INDEX_END":
-        bracket -= 1;
-        break;
-      case "INDENT":
-        indent += 1;
-        break;
-      case "OUTDENT":
-        indent -= 1;
-        break;
-      }
-      
-      switch (tokens[index + 1][TAG]) {
-      case "CALL_START": case "INDEX_START":
-        bracket += 1;
-        index += 1;
-        continue;
-      case ".": case "@": case "ELSE":
-        index += 1;
-        continue;
-      }
-      
-      switch (tag) {
-      case "}": case "]": case ")": case "CALL_END": case "INDEX_END":
-      case "IDENTIFIER": case "NUMBER": case "BOOL": case "STRING": case "REGEX":
-      case "UNDEFINED": case "NULL": case "OUTDENT":
-        if (bracket === 0 && indent === 0) {
-          return {tokens:tokens, begin:begin, end:index};
-        }
-        break;
-      }
-      index += 1;
-    }
-    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
-  };
-  
-  var func = {};
-  var detectFunctionParameters = function(tokens) {
-    if (tokens.cc_funcParams) {
-      return tokens;
-    }
-    var stack = [
-      { declared:[], args:[], local:[], outer:[] }
-    ];
-    stack.setVariables = func.setVariables(stack);
-    
-    var indent = 0;
-    var args = [];
-    var vars = [];
-    for (var i = 0, imax = tokens.length - 1; i < imax; ++i) {
-      var op, token = tokens[i];
-      stack.peek = stack[stack.length-1];
-      switch (token[TAG]) {
-      case "PARAM_START":
-        args = func.getInfoOfArguments(tokens, i);
-        i    = args.end + 1;
-        vars = args.vars;
-        args = args.args;
-        /* falls through */
-      case "->": case "=>":
-        var scope = {
-          declared: stack.peek.declared.concat(stack.peek.local),
-          args:vars.splice(0), local:[], outer:[], indent:indent
-        };
-        tokens[i].cc_funcParams = {
-          args:args.splice(0), local:scope.local, outer:scope.outer
-        };
-        token.cc_funcRef = tokens[i];
-        stack.push(scope);
-        break;
-      case "FOR":
-        do {
-          op = getNextOperand(tokens, i+1);
-          func.getVariables(op).forEach(stack.setVariables);
-          i = op.end + 1;
-        } while (i < imax && tokens[i][TAG] === ",");
-        break;
-      case "INDENT":
-        indent += 1;
-        break;
-      case "OUTDENT":
-        indent -= 1;
-        if (stack.peek.indent === indent) {
-          stack.pop();
-        }
-        break;
-      case "[":
-        op = getNextOperand(tokens, i);
-        func.getVariables(op).forEach(stack.setVariables);
-        break;
-      case "IDENTIFIER":
-        if (tokens[i+1][TAG] === "CALL_START" || /^[A-Z]/.test(token[VALUE])) {
-          break;
-        }
-        op = getNextOperand(tokens, i);
-        if ((op.begin === op.end && tokens[op.end+1][TAG] !== ":") || tokens[op.begin+1][TAG] === ".") {
-          func.getVariables(op).forEach(stack.setVariables);
-        }
-      }
-    }
-    tokens.cc_funcParams = {
-      local: stack[0].local
-    };
-    return tokens;
-  };
-
-  func.setVariables = function(stack) {
-    var ignored = [
-      "cc", "global", "console",
-      "setInterval", "setTimeout", "clearInterval", "clearTimeout"
-    ];
-    return function(name) {
-      if (ignored.indexOf(name) !== -1) {
-        return;
-      }
-      if (stack.peek.declared.indexOf(name) === -1) {  // not declared yet
-        if (stack.peek.args.indexOf(name) === -1) {    // not function parameters
-          if (stack.peek.local.indexOf(name) === -1) { //   when a local variable (set)
-            stack.peek.local.push(name);
-          }
-        }
-        return;
-      }
-      
-      // when not a local variable
-      if (stack.peek.outer.indexOf(name) !== -1) {
-        return;
-      }
-      
-      // outer variable
-      stack.peek.outer.push(name);
-      for (var i = stack.length - 2; i >= 0; i--) {
-        if (stack[i].local.indexOf(name) !== -1) {
-          return;
-        }
-        if (stack[i].outer.indexOf(name) === -1) {
-          stack[i].outer.push(name);
-        }
-      }
-    };
-  };
-  
-  func.getInfoOfArguments = function(tokens, index) {
-    var begin = index;
-    var end  = indexOfParamEnd(tokens, index);
-    var vars = [];
-    var args = [];
-    for (var i = begin+1; i < end; ++i) {
-      var op = getNextOperand(tokens, i);
-      args.push(formatArgument(op));
-      vars = func.getVariables(op, vars);
-      i += op.end - op.begin + 1;
-      if (tokens[i][TAG] === "=") {
-        op = getNextOperand(tokens, i+1);
-        args.push(formatArgument(op));
-        i += op.end - op.begin + 1;
-      } else {
-        args.push(null);
-      }
-      if (tokens[i][TAG] !== ",") {
-        i += 1;
-      }
-    }
-    return {vars:vars, args:args, end:end};
-  };
-  func.getVariables = function(op, list) {
-    var tokens = op.tokens;
-    list = list || [];
-    if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
-      for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
-        var _op = getNextOperand(tokens, i);
-        list = func.getVariables(_op, list);
-        i += _op.end - _op.begin + 1;
-        if (tokens[i][TAG] !== ",") {
-          i += 1;
-        }
-      }
-    } else {
-      if (!isDot(tokens[op.begin-1])) {
-        if (/^[a-z][a-zA-Z0-9_$]*$/.test(tokens[op.begin][VALUE])) {
-          list.push(tokens[op.begin][VALUE]);
-        }
-      }
-    }
-    return list;
-  };
-  
-  
-  var replaceFixedTimeValue = function(tokens) {
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      var token = tokens[i];
-      if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
-        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
-        if (typeof time === "number") {
-          token[TAG] = "NUMBER";
-          token[VALUE] = time.toString();
-        }
-      }
-    }
-    return tokens;
-  };
-  
-  var replaceStrictlyPrecedence = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i > 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
-        var prev = getPrevOperand(tokens, i);
-        var next = getNextOperand(tokens, i);
-        tokens.splice(next.end + 1, 0, [")", ")" , _]);
-        tokens.splice(prev.begin  , 0, ["(", "(" , _]);
-      }
-    }
-    return tokens;
-  };
-
-  var uop = {
-    operatorDict: {
-      "+": "__plus__", "-": "__minus__"
-    }
-  };
-  var replaceUnaryOperator = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "UNARY" && uop.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = uop.operatorDict[token[VALUE]];
-        var next = getNextOperand(tokens, i);
-        tokens.splice(
-          next.end+1, 0,
-          ["."         , "."     , _],
-          ["IDENTIFIER", selector, _],
-          ["CALL_START", "("     , _],
-          ["CALL_END"  , ")"     , _]
-        );
-        tokens.splice(i, 1);
-      }
-    }
-    return tokens;
-  };
-  
-  var bop = {
-    operatorDict: {
-      "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
-    },
-    adverbs: {
-      W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
-      WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
-    }
-  };
-  var replaceTextBinaryAdverb = function(code) {
-    Object.keys(bop.adverbs).forEach(function(key) {
-      var a = new RegExp("([+\\-*/%])(" + key + ")\\1", "g");
-      var b = "$1 " + "\"#!" + key.charAt(0) + "\"" + " $1";
-      code = code.replace(a, b);
-    });
-    return code;
-  };
-  var replaceBinaryOperator = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = bop.operatorDict[token[VALUE]];
-        var adverb   = bop.checkAdvarb(tokens, i);
-        var next = getNextOperand(tokens, i);
-        if (adverb) {
-          i -= 2;
-          tokens.splice(
-            i, 3,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
-          tokens.splice(
-            next.end+1, 0,
-            [","         , ","   , _],
-            ["IDENTIFIER", adverb, _],
-            ["CALL_END"  , ")"   , _]
-          );
-        } else {
-          tokens.splice(
-            i, 1,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
-          tokens.splice(
-            next.end+3, 0,
-            ["CALL_END", ")", _]
-          );
-        }
-      }
-    }
-    return tokens;
-  };
-  bop.checkAdvarb = function(tokens, index) {
-    var t0 = tokens[index  ];
-    var t1 = tokens[index-1];
-    var t2 = tokens[index-2];
-    if (t0 && t1 && t2) {
-      if (/^"#![WSCFTX]"$/.test(t1[VALUE])) {
-        var key = t1[VALUE].charAt(3);
-        if (t0[VALUE] === t2[VALUE] && bop.adverbs.hasOwnProperty(key)) {
-          return bop.adverbs[key];
-        }
-      }
-    }
-  };
-  
-  
-  var compound = {
-    operatorDict: {
-      "+=": "__add__",
-      "-=": "__sub__",
-      "*=": "__mul__",
-      "/=": "__div__",
-      "%=": "__mod__",
-    }
-  };
-  var replaceCompoundAssign = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (compound.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = compound.operatorDict[token[VALUE]];
-        var prev = getPrevOperand(tokens, i);
-        var next = getNextOperand(tokens, i);
-
-        tokens.splice(
-          i, 1,
-          ["="         , "="     , _],
-          ["."         , "."     , _],
-          ["IDENTIFIER", selector, _],
-          ["CALL_START", "("     , _]
-        );
-        tokens.splice(
-          next.end+4, 0,
-          ["CALL_END", ")", _]
-        );
-        var subtokens = [ i+1, 0 ];
-        for (var j = prev.begin; j < i; ++j) {
-          subtokens.push(tokens[j]);
-        }
-        tokens.splice.apply(tokens, subtokens);
-      }
-    }
-    return tokens;
-  };
-
-  var logic = {
-    operatorDict: {
-      "&&": "__and__", "||": "__or__"
-    }
-  };
-  var replaceLogicOperator = function(tokens) {
-    var replaceable = false;
-    for (var i = 1; i < tokens.length; ++i) {
-      var token = tokens[i];
-      if (token[VALUE] === "wait" && tokens[i-1][TAG] === "@") {
-        replaceable = true;
-        continue;
-      }
-      if (token[TAG] === ",") {
-        replaceable = false;
-        continue;
-      }
-      if (replaceable) {
-        if (token[TAG] === "LOGIC" && logic.operatorDict.hasOwnProperty(token[VALUE])) {
-          var selector = logic.operatorDict[token[VALUE]];
-          var next = getNextOperand(tokens, i);
-          tokens.splice(
-            i, 1,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
-          tokens.splice(
-            next.end + 3, 0,
-            ["CALL_END", ")", _]
-          );
-          i = next.end+3; // skip
-        }
-      }
-    }
-    return tokens;
-  };
-  
-  
-  var synthdef = {};
-  var replaceSynthDefinition = function(tokens) {
-    tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 5; i >= 0; i--) {
-      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
-        continue;
-      }
-      var index = i;
-      while (index < tokens.length) {
-        if (tokens[index][TAG] === "CALL_START") {
-          break;
-        }
-        index += 1;
-      }
-      index = indexOfFunctionStart(tokens, index+1);
-      if (index === -1) {
-        continue;
-      }
-      var args;
-      if (tokens[index].cc_funcRef) {
-        args = tokens[index].cc_funcRef.cc_funcParams.args;
-      } else {
-        args = [];
-      }
-      synthdef.replaceSynthDefDefaultArguments(tokens, index, args);
-      
-      index = getNextOperand(tokens, index).end + 1;
-      synthdef.insertSynthDefArgumentsToAfterFunction(tokens, index, args);
-    }
-    return tokens;
-  };
-  synthdef.replaceSynthDefDefaultArguments = function(tokens, index, args) {
-    if (args.length) {
-      var remove = indexOfParamEnd(tokens, index) - index + 1;
-      var subtokens = [ index, remove ];
-      
-      subtokens.push(["PARAM_START", "(", _]);
-      for (var i = 0, imax = args.length; i < imax; i += 2) {
-        if (i) {
-          subtokens.push([",", ",", _]);
-        }
-        subtokens.push(["IDENTIFIER", args[i], _]);
-      }
-      subtokens.push(["PARAM_END"  , ")", _]);
-      
-      tokens.splice.apply(tokens, subtokens);
-    }
-  };
-  synthdef.insertSynthDefArgumentsToAfterFunction = function(tokens, index, args) {
-    var subtokens = [ index, 0 ];
-    
-    subtokens.push([",", ",", _],
-                   ["[", "[", _]);
-    for (var j = 0, jmax = args.length; j < jmax; ++j) {
-      if (j) {
-        subtokens.push([",", ",", _]);
-      }
-      subtokens.push(["STRING", "'" + (args[j]||0) + "'", _]);
-    }
-    subtokens.push(["]", "]", _]);
-    
-    tokens.splice.apply(tokens, subtokens);
-  };
-  
-
-  var task = {
-    contextMethods: ["wait", "break", "continue", "redo", "recursive", "return"]
-  };
-  var replaceTaskFunction = function(tokens) {
-    tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 5; i >= 0; i--) {
-      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
-        continue;
-      }
-      var index = i;
-      while (index < tokens.length) {
-        if (tokens[index][TAG] === "CALL_START") {
-          break;
-        }
-        index += 1;
-      }
-      index = indexOfFunctionStart(tokens, index+1);
-      if (index === -1) {
-        continue;
-      }
-      task.makeSegmentedFunction(getNextOperand(tokens, index), task.contextMethods);
-    }
-    return tokens;
-  };
-  
-  task.makeSegmentedFunction = function(op, contextMethods) {
-    var tokens = op.tokens;
-    var body   = tokens.splice(op.begin, op.end-op.begin+1);
-    var after  = tokens.splice(op.begin);
-    var localVars, outerVars, args;
-    
-    var ref = body[0].cc_funcRef;
-    
-    if (ref) {
-      localVars = ref.cc_funcParams.local;
-      outerVars = ref.cc_funcParams.outer;
-      args = ref.cc_funcParams.args.filter(function(name, i) {
-        return !(i & 1);
-      });
-    } else {
-      localVars = outerVars = args = [];
-    }
-    
-    if (args.length) {
-      // remove default args
-      body.splice(0, indexOfParamEnd(body, 0) + 1);
-    }
-    body.splice(0, 2); // remove ->, INDENT
-    body.pop();        // remove OUTDENT
-    
-    var replaced = [];
-    task.beginOfSegmentedFunction(replaced, outerVars);
-    {
-      task.insertLocalVariables(replaced, localVars);
-      replaced.push(["["      , "[" , _],
-                    ["INDENT" , 2   , _]);
-      var numOfSegments = 0;
-      while (body.length) {
-        if (numOfSegments++) {
-          replaced.push(["TERMINATOR", "\n", _]);
-        }
-        task.beginOfSegment(replaced, args);
-        task.insertSegment(replaced, body, contextMethods);
-        task.endOfSegment(replaced, args);
-      }
-      replaced.push(["OUTDENT", 2  , _],
-                    ["]"      , "]", _]);
-    }
-    task.endOfSegmentedFunction(replaced, outerVars);
-
-    for (var i = replaced.length; i--; ) {
-      replaced[i].cc_tasked = true;
-    }
-    tokens.push.apply(tokens, replaced);
-    tokens.push.apply(tokens, after);
-  };
-  
-  task.beginOfSegmentedFunction = function(tokens, outerVars) {
-    if (outerVars.length) {
-      tokens.push(["UNARY"      , "do", _],
-                  ["PARAM_START", "(" , _]);
-      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
-        }
-        tokens.push(["IDENTIFIER", outerVars[i], _]);
-      }
-      tokens.push(["PARAM_END"  , ")" , _],
-                  ["->"         , "->", _],
-                  ["INDENT"     , 2   , _]);
-    }
-    tokens.push(["->"     , "->", _],
-                ["INDENT" , 2   , _]);
-  };
-  
-  task.endOfSegmentedFunction = function(tokens, outerVars) {
-    tokens.push(["OUTDENT", 2  , _]);
-    if (outerVars.length) {
-      tokens.push(["OUTDENT", 2  , _]);
-    }
-  };
-  
-  task.insertLocalVariables = function(tokens, localVars) {
-    if (localVars.length) {
-      for (var i = 0, imax = localVars.length; i < imax; i++) {
-        tokens.push(["IDENTIFIER", localVars[i], _],
-                    ["="         , "="         , _]);
-      }
-      tokens.push(["UNDEFINED" , "undefined", _],
-                  ["TERMINATOR", "\n", _]);
-    }
-  };
-  
-  task.beginOfSegment = function(tokens, args) {
-    if (args.length) {
-      tokens.push(["PARAM_START", "(", _]);
-      for (var i = 0, imax = args.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
-        }
-        tokens.push(["IDENTIFIER", args[i], _]);
-      }
-      tokens.push(["PARAM_END"  , ")", _]);
-    }
-    tokens.push(["->"    , "->", _],
-                ["INDENT", 2   , _]);
-  };
-  
-  task.endOfSegment = function(tokens) {
-    tokens.push(["OUTDENT", 2, _]);
-  };
-  
-  task.insertSegment = function(tokens, body, contextMethods) {
-    var contextMethodCalled = false;
-    
-    while (!contextMethodCalled && body.length) {
-      var line = getLine(body, 0);
-      var closureVars = task.getClosureVariables(line);
-      
-      task.beginOfLine(tokens, line, closureVars);
-      for (var i = line.len-1; i >= 0; i--) {
-        if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
-          if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
-            contextMethodCalled = true;
-          }
-        }
-        tokens.push(body.shift());
-      }
-      task.endOfLine(tokens, line, closureVars);
-    }
-  };
-  
-  task.getClosureVariables = function(line) {
-    var tokens = line.tokens;
-    var list = [];
-    for (var i = 0, imax = line.len; i < imax; ++i) {
-      if (!tokens[i].cc_tasked && (tokens[i][TAG] === "->" || tokens[i][TAG] === "=>")) {
-        list.push.apply(list, tokens[i].cc_funcParams.outer);
-      }
-    }
-    var set = {};
-    return list.filter(function(name) {
-      return set[name] ? false : !!(set[name] = true);
-    });
-  };
-  
-  task.beginOfLine = function(tokens, line, closureVars) {
-    var i, imax;
-    if (closureVars.length) {
-      task.insertAssignment(tokens, line);
-      tokens.push(["UNARY" , "do", _],
-                  ["PARAM_START", "(", _]);
-      for (i = 0, imax = closureVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
-        }
-        tokens.push(["IDENTIFIER", closureVars[i], _]);
-      }
-      tokens.push(["PARAM_END", ")" , _],
-                  ["->"       , "->", _],
-                  ["INDENT"   , 2   , _]);
-    }
-  };
-  
-  task.endOfLine = function(tokens, line, closureVars) {
-    if (closureVars.length) {
-      tokens.push(["OUTDENT"   , 2   , _],
-                  ["TERMINATOR", "\n", _]);
-    }
-  };
-  
-  // TODO: fix it ( destructuring assginment? )
-  task.insertAssignment = function(tokens, line) {
-    var list = [];
-    var line_tokens = line.tokens;
-    if (line_tokens[0][TAG] === "IDENTIFIER") {
-      var op = getNextOperand(line_tokens, 0);
-      if (line_tokens[op.end+1] && line_tokens[op.end+1][TAG] === "=") {
-        list = line_tokens.slice(0, op.end + 2);
-      }
-    }
-    tokens.push.apply(tokens, list);
-  };
-  
-  
-  var replaceGlobalVariables = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] !== "IDENTIFIER") {
-        continue;
-      }
-      if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
-        if (tokens[i+1][TAG] === ":") {
-          continue; // { NotGlobal:"dict key is not global" }
-        }
-        if (isDot(tokens[i-1])) {
-          continue; // this.is.NotGlobal, @isNotGlobal
-        }
-        tokens.splice(
-          i, 1,
-          ["IDENTIFIER", "global", _],
-          ["."         , "."     , _],
-          ["IDENTIFIER", token[VALUE].substr(1), _]
-        );
-      }
-    }
-    return tokens;
-  };
-  
-  var replaceCCVariables = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] !== "IDENTIFIER") {
-        continue;
-      }
-      if (cc.global.hasOwnProperty(token[VALUE])) {
-        if (tokens[i+1][TAG] === ":") {
-          continue;
-        }
-        if (isDot(tokens[i-1])) {
-          continue;
-        }
-        tokens.splice(
-          i, 0,
-          ["IDENTIFIER", "cc", _],
-          ["."         , "." , _]
-        );
-      }
-    }
-    return tokens;
-  };
-  
-  var finalize = function(tokens) {
-    tokens.unshift(["("          , "("        , _],
-                   ["PARAM_START", "("        , _],
-                   ["IDENTIFIER" , "global"   , _],
-                   ["PARAM_END"  , ")"        , _],
-                   ["->"         , "->"       , _],
-                   ["INDENT"     , 2          , _]);
-    
-    tokens.push(["OUTDENT"   , 2            , _],
-                [")"         , ")"          , _],
-                ["."         , "."          , _],
-                ["IDENTIFIER", "call"       , _],
-                ["CALL_START", "("          , _],
-                ["IDENTIFIER", "cc"         , _],
-                ["."         , "."          , _],
-                ["IDENTIFIER", "__context__", _],
-                [","         , ","          , _],
-                ["THIS"      , "this"       , _],
-                ["."         , "."          , _],
-                ["IDENTIFIER", "self"       , _],
-                ["LOGIC"     , "||"         , _],
-                ["IDENTIFIER", "global"     , _],
-                ["CALL_END"  , ")"          , _]);
-    return tokens;
-  };
-  
-  var tab = function(n) {
-    var t = "";
-    for (var i = 0; i < n; ++i) {
-      t += "  ";
-    }
-    return t;
-  };
-  var prettyPrint = function(tokens) {
-    var indent = 0;
-    tokens = detectPlusMinusOperator(tokens);
-    return tokens.map(function(token) {
-      switch (token[TAG]) {
-      case "TERMINATOR":
-        return "\n" + tab(indent);
-      case "INDENT":
-        indent += 1;
-        return "\n" + tab(indent);
-      case "OUTDENT":
-        indent -= 1;
-        return "\n" + tab(indent);
-      case "RETURN":
-        return "return ";
-      case "UNARY":
-        return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
-      case "{":
-        return "{";
-      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
-        return token[VALUE] + " ";
-      case "=": case "COMPARE": case "MATH": case "LOGIC":
-        return " " + token[VALUE] + " ";
-      case "HERECOMMENT":
-        return "/* " + token[VALUE] + " */";
-      default:
-        return token[VALUE];
-      }
-    }).join("").split("\n").filter(function(line) {
-      return !(/^\s*$/.test(line));
-    }).join("\n").trim();
-  };
-  
-  var CoffeeCompiler = (function() {
-    function CoffeeCompiler() {
-    }
-    CoffeeCompiler.prototype.tokens = function(code) {
-      var data = [];
-      code = replaceTextBinaryAdverb(code);
-      var tokens = CoffeeScript.tokens(code);
-      if (tokens.length) {
-        tokens.forEach(function(token) {
-          if (token[TAG] === "HERECOMMENT") {
-            data.push(token[VALUE].trim());
-          }
-        });
-        tokens = replaceGlobalVariables(tokens);
-        tokens = replaceFixedTimeValue(tokens);
-        tokens = replaceStrictlyPrecedence(tokens);
-        tokens = replaceUnaryOperator(tokens);
-        tokens = replaceBinaryOperator(tokens);
-        tokens = replaceCompoundAssign(tokens);
-        tokens = replaceLogicOperator(tokens);
-        tokens = replaceSynthDefinition(tokens);
-        tokens = replaceTaskFunction(tokens);
-        tokens = replaceCCVariables(tokens);
-        tokens = finalize(tokens);
-      }
-      this.code = code;
-      this.data = data;
-      return tokens;
-    };
-    CoffeeCompiler.prototype.compile = function(code) {
-      var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
-    };
-    CoffeeCompiler.prototype.toString = function(tokens) {
-      if (typeof tokens === "string") {
-        tokens = this.tokens(tokens);
-      }
-      return prettyPrint(tokens);
-    };
-    return CoffeeCompiler;
-  })();
-  
-  var use = function() {
-    cc.createCoffeeCompiler = function() {
-      return new CoffeeCompiler();
-    };
-  };
-  
-  module.exports = {
-    CoffeeCompiler: CoffeeCompiler,
-    
-    detectPlusMinusOperator : detectPlusMinusOperator,
-    revertPlusMinusOperator : revertPlusMinusOperator,
-    getPrevOperand          : getPrevOperand,
-    getNextOperand          : getNextOperand,
-    detectFunctionParameters: detectFunctionParameters,
-
-    replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
-    replaceFixedTimeValue    : replaceFixedTimeValue,
-    replaceStrictlyPrecedence: replaceStrictlyPrecedence,
-    replaceUnaryOperator     : replaceUnaryOperator,
-    replaceBinaryOperator    : replaceBinaryOperator,
-    replaceCompoundAssign    : replaceCompoundAssign,
-    replaceLogicOperator     : replaceLogicOperator,
-    replaceSynthDefinition   : replaceSynthDefinition,
-    replaceTaskFunction      : replaceTaskFunction,
-    replaceGlobalVariables   : replaceGlobalVariables,
-    replaceCCVariables       : replaceCCVariables,
-    finalize                 : finalize,
-    prettyPrint              : prettyPrint,
-    
-    use: use,
-  };
-
-  module.exports.use();
-
-});
-define('cc/common/timevalue', function(require, exports, module) {
-
-  var cc = require("../cc");
-  
-  var calc = function(str) {
-    var result = null;
-    var freq;
-    if (str.charAt(0) === "~") {
-      freq = true;
-      str  = str.substr(1);
-    }
-    do {
-      result = hz(str);
-      if (result !== null) {
-        break;
-      }
-      result = time(str);
-      if (result !== null) {
-        break;
-      }
-      result = hhmmss(str);
-      if (result !== null) {
-        break;
-      }
-      result = samples(str);
-      if (result !== null) {
-        break;
-      }
-      result = note(str);
-      if (result !== null) {
-        break;
-      }
-      result = beat(str);
-      if (result !== null) {
-        break;
-      }
-      result = ticks(str);
-    } while (false);
-    
-    if (result !== null) {
-      if (!freq) {
-        return result;
-      }
-      if (result !== 0) {
-        return 1 / result;
-      }
-    }
-    return str;
-  };
-  
-  var hz = function(str) {
-    var m = /^(\d+(?:\.\d+)?)hz$/i.exec(str);
-    if (m) {
-      return +m[1] === 0 ? 0 : 1 / +m[1];
-    }
-    return null;
-  };
-  var time = function(str) {
-    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
-    if (m) {
-      switch (m[2]) {
-      case "min": return +(m[1]||0) * 60;
-      case "sec": return +(m[1]||0);
-      case "m"  : return +(m[1]||0) / 1000;
-      }
-    }
-    return null;
-  };
-
-  var hhmmss = function(str) {
-    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
-    if (m) {
-      var x = 0;
-      x += (m[1]|0) * 3600;
-      x += (m[2]|0) * 60;
-      x += (m[3]|0);
-      x += (((m[4]||"")+"00").substr(0, 3)|0) / 1000;
-      return x;
-    }
-    return null;
-  };
-
-  var samples = function(str) {
-    var m = /^(\d+)samples(?:\/(\d+)hz)?$/i.exec(str);
-    if (m) {
-      return m[1] / ((m[2]|0) || cc.sampleRate);
-    }
-    return null;
-  };
-
-  var calcNote = function(bpm, len, dot) {
-    var x = (60 / bpm) * (4 / len);
-    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
-    return x;
-  };
-  var note = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*l([1-9]\d*)(\.*)$/i.exec(str);
-    if (m) {
-      return calcNote(+m[1], +m[2], m[3].length);
-    }
-    return null;
-  };
-
-  var calcBeat = function(bpm, measure, beat, ticks) {
-    var x = (measure * 4 + beat) * 480 + ticks;
-    return (60 / bpm) * (x / 480);
-  };
-  var beat = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)\.(\d+).(\d{1,3})$/i.exec(str);
-    if (m) {
-      return calcBeat(+m[1], +m[2], +m[3], +m[4]);
-    }
-    return null;
-  };
-
-  var calcTicks = function(bpm, ticks) {
-    return 60 / bpm * ticks / 480;
-  };
-  var ticks = function(str) {
-    var m = /^bpm([1-9]\d+(?:\.\d+)?)\s*(\d+)ticks$/i.exec(str);
-    if (m) {
-      return calcTicks(+m[1], +m[2]);
-    }
-    return null;
-  };
-  
-  module.exports = {
-    hz     : hz,
-    time   : time,
-    hhmmss : hhmmss,
-    samples: samples,
-    note   : note,
-    beat   : beat,
-    ticks  : ticks,
-    calcNote : calcNote,
-    calcBeat : calcBeat,
-    calcTicks: calcTicks,
-    calc: calc,
-  };
-
-});
 define('cc/server/server', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -9149,7 +8996,6 @@ define('cc/server/server', function(require, exports, module) {
       require("./rate");
       require("./unit/unit");
       require("./server-worker");
-      require("./server-iframe");
       require("./server-nodejs");
       require("./server-socket");
       
@@ -9157,8 +9003,6 @@ define('cc/server/server', function(require, exports, module) {
         switch (cc.opmode) {
         case "worker":
           return cc.createWorkerSynthServer();
-        case "iframe":
-          return cc.createIFrameSynthServer();
         case "nodejs":
           return cc.createNodeJSSynthServer();
         case "socket":
@@ -16652,74 +16496,6 @@ define('cc/server/server-worker', function(require, exports, module) {
       cc.createWorkerSynthServer = function() {
         var server = new WorkerSynthServer();
         cc.opmode = "worker";
-        return server;
-      };
-    }
-  };
-  
-  module.exports.use();
-
-});
-define('cc/server/server-iframe', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var extend = require("../common/extend");
-  
-  var IFrameSynthServer = (function() {
-    function IFrameSynthServer() {
-      cc.SynthServer.call(this);
-      
-      this.sampleRate = 44100;
-      this.channels   = 2;
-      this.strmLength = 2048;
-      this.bufLength  = 128;
-    }
-    extend(IFrameSynthServer, cc.SynthServer);
-    
-    IFrameSynthServer.prototype.sendToLang = function(msg) {
-      postMessage(msg);
-    };
-    IFrameSynthServer.prototype.connect = function() {
-      this.sendToLang([
-        "/connected", this.sampleRate, this.channels
-      ]);
-    };
-    IFrameSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - 4) {
-        return;
-      }
-      var strm = this.strm;
-      var instanceManager = this.instanceManager;
-      var strmLength = this.strmLength;
-      var bufLength  = this.bufLength;
-      var busOutL = instanceManager.busOutL;
-      var busOutR = instanceManager.busOutR;
-      var offset = 0;
-      for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        instanceManager.process(bufLength);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
-      }
-      this.sendToLang(strm);
-      this.sendToLang(["/process"]);
-      this.syncCount += 1;
-    };
-    
-    return IFrameSynthServer;
-  })();
-  
-  module.exports = {
-    use: function() {
-      cc.createIFrameSynthServer = function() {
-        var server = new IFrameSynthServer();
-        global.onmessage = function(e) {
-          server.recvFromLang(e.data, 0);
-        };
-        cc.opmode = "iframe";
         return server;
       };
     }
