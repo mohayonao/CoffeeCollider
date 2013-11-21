@@ -118,7 +118,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131118174700",
+    version: "0.0.0+20131121173100",
     global : {},
     Object : function CCObject() {}
   };
@@ -9777,7 +9777,7 @@ define('cc/server/unit/unit', function(require, exports, module) {
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
-        cc.console.warn(this.name + "'s ctor is not found.");
+        throw new Error(this.name + "'s ctor is not found.");
       }
       this.tag = tag || "";
       return this;
@@ -10623,7 +10623,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
       var i;
       if (b1 === 1) {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + y1) || 0;
+          out[i] = y1 = (inIn[i] + y1);
         }
       } else if (b1 === 0) {
         for (i = 0; i < inNumSamples; ++i) {
@@ -10631,7 +10631,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         }
       } else {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       }
       this._y1 = y1;
@@ -10645,7 +10645,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
       if (this._b1 === b1) {
         if (b1 === 1) {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + y1) || 0;
+            out[i] = y1 = (inIn[i] + y1);
           }
         } else if (b1 === 0) {
           for (i = 0; i < inNumSamples; ++i) {
@@ -10653,13 +10653,13 @@ define('cc/server/unit/decay', function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+            out[i] = y1 = (inIn[i] + b1 * y1);
           }
         }
       } else {
         var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
         this._b1 = b1;
@@ -10691,7 +10691,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+            out[i] = y1 = (inIn[i] + b1 * y1);
           }
         }
       } else {
@@ -10699,7 +10699,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         this._decayTime = decayTime;
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
       }
@@ -10729,11 +10729,11 @@ define('cc/server/unit/decay', function(require, exports, module) {
       var y1a = this._y1a;
       var y1b = this._y1b;
       var i;
-      if (attackTime === this._attackTime && this.decayTime === this._decayTime) {
+      if (attackTime === this._attackTime && decayTime === this._decayTime) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = (y1a - y1b) || 0;
+          out[i] = (y1a - y1b);
         }
       } else {
         this._decayTime  = decayTime;
@@ -10745,7 +10745,7 @@ define('cc/server/unit/decay', function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = (y1a - y1b) || 0;
+          out[i] = (y1a - y1b);
           b1a += b1a_slope;
           b1b += b1b_slope;
         }
@@ -11072,9 +11072,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -11085,9 +11082,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           for (i = 0; i < inNumSamples; ++i) {
             value = dlybuf[irdphase & mask];
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11105,9 +11099,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           irdphase = iwrphase - (dsamp|0);
           value = dlybuf[irdphase & mask];
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11152,9 +11143,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -11167,9 +11155,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d2 = dlybuf[(irdphase-1)&mask];
             value = d1 + frac * (d2 - d1);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11189,9 +11174,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d2 = dlybuf[(irdphase-1)&mask];
           value = d1 + frac * (d2 - d1);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11238,9 +11220,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             irdphase++;
             iwrphase++;
@@ -11255,9 +11234,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             d3 = dlybuf[(irdphase-2)&mask];
             value = cubicinterp(frac, d0, d1, d2, d3);
             dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11279,9 +11255,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           d3 = dlybuf[(irdphase-2)&mask];
           value = cubicinterp(frac, d0, d1, d2, d3);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11327,9 +11300,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = dlybuf[irdphase & mask];
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             irdphase++;
             iwrphase++;
@@ -11341,9 +11311,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = dlybuf[irdphase & mask];
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11362,9 +11329,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           value = dlybuf[irdphase & mask];
           dwr = value * feedbk + inIn[i];
           dlybuf[iwrphase & mask] = dwr;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value - feedbk * dwr;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11409,9 +11373,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = d1 + frac * (d2 - d1);
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             irdphase++;
             iwrphase++;
@@ -11425,9 +11386,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = d1 + frac * (d2 - d1);
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11449,9 +11407,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           value = d1 + frac * (d2 - d1);
           dwr = value * feedbk + inIn[i];
           dlybuf[iwrphase & mask] = dwr;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value - feedbk * dwr;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11498,9 +11453,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = cubicinterp(frac, d0, d1, d2, d3);
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             irdphase++;
             iwrphase++;
@@ -11516,9 +11468,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
             value = cubicinterp(frac, d0, d1, d2, d3);
             dwr = value * feedbk + inIn[i];
             dlybuf[iwrphase & mask] = dwr;
-            if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-              dlybuf[iwrphase & mask] = 0;
-            }
             out[i] = value - feedbk * dwr;
             feedbk += feedbk_slope;
             irdphase++;
@@ -11542,9 +11491,6 @@ define('cc/server/unit/delay', function(require, exports, module) {
           value = cubicinterp(frac, d0, d1, d2, d3);
           dwr = value * feedbk + inIn[i];
           dlybuf[iwrphase & mask] = dwr;
-          if (Math.abs(dlybuf[iwrphase & mask]) === Infinity) {
-            dlybuf[iwrphase & mask] = 0;
-          }
           out[i] = value - feedbk * dwr;
           dsamp  += dsamp_slope;
           feedbk += feedbk_slope;
@@ -11919,7 +11865,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
     var next = function() {
       var out = this.outputs[0];
       var inIn = this.inputs[0];
-      var freq = this.inputs[1][0];
+      var freq = Math.max(0.001, this.inputs[1][0]);
       var y0;
       var y1 = this._y1;
       var y2 = this._y2;
@@ -11930,7 +11876,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       
       if (freq !== this._freq) {
         var pfreq = freq * this.rate.radiansPerSample * 0.5;
-        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var C = 1 / Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
         var next_a0 = 1 / (1 + sqrt2C + C2);
@@ -11976,7 +11922,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
     var next_1 = function() {
       var out = this.outputs[0];
       var inIn = this.inputs[0];
-      var freq = this.inputs[1][0];
+      var freq = Math.max(0.001, this.inputs[1][0]);
       var y0;
       var y1 = this._y1;
       var y2 = this._y2;
@@ -11984,8 +11930,8 @@ define('cc/server/unit/filter', function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.5;
-        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
+        var C = 1 / Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
         a0 = 1 / (1 + sqrt2C + C2);
@@ -12096,7 +12042,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
         var C = Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
@@ -12212,7 +12158,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       var b2 = this._b2;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.5;
+        var pbw   = bw * pfreq * 0.0078125;
         var C = pbw ? 1 / Math.tan(pbw) : 0;
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);
@@ -12335,7 +12281,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       var ay;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.5;
+        var pbw   = bw * pfreq * 0.0078125;
         var C = Math.tan(pbw);
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);
@@ -12611,7 +12557,7 @@ define('cc/server/unit/filter', function(require, exports, module) {
       this._lag = undefined;
       this._b1 = 0;
       this._y1 = this.inputs[0][0];
-      next.call(this, 1);
+      next_1.call(this, 1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -15411,40 +15357,40 @@ define('cc/server/unit/pan', function(require, exports, module) {
     };
     var next_ak = function(inNumSamples) {
       inNumSamples = inNumSamples|0;
-      // var leftOut  = this.outputs[0];
-      // var rightOut = this.outputs[1];
-      // var inIn  = this.inputs[0];
-      // var pos   = this.inputs[1][0];
-      // var level = this.inputs[2][0];
-      // var leftAmp  = this._leftAmp;
-      // var rightAmp = this._rightAmp;
-      // var i, _in;
-      // if (pos !== this._pos || level !== this._level) {
-      //   var ipos = (1024 * pos + 1024 + 0.5)|0;
-      //   ipos = Math.max(0, Math.min(ipos, 2048));
-      //   var nextLeftAmp  = level * gSine[2048 - ipos];
-      //   var nextRightAmp = level * gSine[ipos];
-      //   var slopeFactor = this.rate.slopeFactor;
-      //   var leftAmp_slope  = (nextLeftAmp  - leftAmp ) * slopeFactor;
-      //   var rightAmp_slope = (nextRightAmp - rightAmp) * slopeFactor;
-      //   for (i = 0; i < inNumSamples; ++i) {
-      //     _in = inIn[i];
-      //     leftOut[i]  = _in * leftAmp;
-      //     rightOut[i] = _in * rightAmp;
-      //     leftAmp  += leftAmp_slope;
-      //     rightAmp += rightAmp_slope;
-      //   }
-      //   this._pos = pos;
-      //   this._level = level;
-      //   this._leftAmp  = nextLeftAmp;
-      //   this._rightAmp = nextRightAmp;
-      // } else {
-      //   for (i = 0; i < inNumSamples; ++i) {
-      //     _in = inIn[i];
-      //     leftOut[i]  = _in * leftAmp;
-      //     rightOut[i] = _in * rightAmp;
-      //   }
-      // }
+      var leftOut  = this.outputs[0];
+      var rightOut = this.outputs[1];
+      var inIn  = this.inputs[0];
+      var pos   = this.inputs[1][0];
+      var level = this.inputs[2][0];
+      var leftAmp  = this._leftAmp;
+      var rightAmp = this._rightAmp;
+      var i, _in;
+      if (pos !== this._pos || level !== this._level) {
+        var ipos = (1024 * pos + 1024 + 0.5)|0;
+        ipos = Math.max(0, Math.min(ipos, 2048));
+        var nextLeftAmp  = level * gSine[2048 - ipos];
+        var nextRightAmp = level * gSine[ipos];
+        var slopeFactor = this.rate.slopeFactor;
+        var leftAmp_slope  = (nextLeftAmp  - leftAmp ) * slopeFactor;
+        var rightAmp_slope = (nextRightAmp - rightAmp) * slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+          leftAmp  += leftAmp_slope;
+          rightAmp += rightAmp_slope;
+        }
+        this._pos = pos;
+        this._level = level;
+        this._leftAmp  = nextLeftAmp;
+        this._rightAmp = nextRightAmp;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i];
+          leftOut[i]  = _in * leftAmp;
+          rightOut[i] = _in * rightAmp;
+        }
+      }
     };
     var next_aa = function(inNumSamples) {
       inNumSamples = inNumSamples|0;

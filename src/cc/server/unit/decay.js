@@ -23,7 +23,7 @@ define(function(require, exports, module) {
       var i;
       if (b1 === 1) {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + y1) || 0;
+          out[i] = y1 = (inIn[i] + y1);
         }
       } else if (b1 === 0) {
         for (i = 0; i < inNumSamples; ++i) {
@@ -31,7 +31,7 @@ define(function(require, exports, module) {
         }
       } else {
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       }
       this._y1 = y1;
@@ -45,7 +45,7 @@ define(function(require, exports, module) {
       if (this._b1 === b1) {
         if (b1 === 1) {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + y1) || 0;
+            out[i] = y1 = (inIn[i] + y1);
           }
         } else if (b1 === 0) {
           for (i = 0; i < inNumSamples; ++i) {
@@ -53,13 +53,13 @@ define(function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+            out[i] = y1 = (inIn[i] + b1 * y1);
           }
         }
       } else {
         var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
         this._b1 = b1;
@@ -91,7 +91,7 @@ define(function(require, exports, module) {
           }
         } else {
           for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+            out[i] = y1 = (inIn[i] + b1 * y1);
           }
         }
       } else {
@@ -99,7 +99,7 @@ define(function(require, exports, module) {
         this._decayTime = decayTime;
         var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1) || 0;
+          out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
       }
@@ -129,11 +129,11 @@ define(function(require, exports, module) {
       var y1a = this._y1a;
       var y1b = this._y1b;
       var i;
-      if (attackTime === this._attackTime && this.decayTime === this._decayTime) {
+      if (attackTime === this._attackTime && decayTime === this._decayTime) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = (y1a - y1b) || 0;
+          out[i] = (y1a - y1b);
         }
       } else {
         this._decayTime  = decayTime;
@@ -145,7 +145,7 @@ define(function(require, exports, module) {
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
-          out[i] = (y1a - y1b) || 0;
+          out[i] = (y1a - y1b);
           b1a += b1a_slope;
           b1b += b1b_slope;
         }

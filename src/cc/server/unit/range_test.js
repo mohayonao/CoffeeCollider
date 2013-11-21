@@ -5,14 +5,24 @@ define(function(require, exports, module) {
 
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var range = require("./range");
-
-  unitTestSuite("unit/range.js", [
-    [ "InRange", ["ar", "kr", "ir"], 3, 1 ],
-    [ "Clip"   , ["ar", "kr", "ir"], 3, 1 ],
-    [ "Fold"   , ["ar", "kr", "ir"], 3, 1 ],
-    [ "Wrap"   , ["ar", "kr", "ir"], 3, 1 ],
-  ], {
-    filter: unitTestSuite.filterUGen
-  });
+  
+  unitTestSuite.desc = "unit/range.js";
+  
+  unitTestSuite(["InRange", "Clip", "Fold", "Wrap"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"lo", rate:C.AUDIO, value:unitTestSuite.in1 },
+        { name:"hi", rate:C.AUDIO, value:unitTestSuite.in2 },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in", rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"lo", rate:C.CONTROL, value:unitTestSuite.in1 },
+        { name:"hi", rate:C.CONTROL, value:unitTestSuite.in2 },
+      ]
+    }
+  ]);
 
 });

@@ -6,27 +6,105 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var filter = require("./filter");
 
-  unitTestSuite("unit/filter.js", [
-    [ "OnePole", ["ar", "kr"], 2, 1 ],
-    [ "OneZero", ["ar", "kr"], 2, 1 ],
-    [ "TwoPole", ["ar", "kr"], 3, 1 ],
-    [ "TwoZero", ["ar", "kr"], 3, 1 ],
-    [ "APF"    , ["ar", "kr"], 3, 1 ],
-    [ "LPF", ["ar", "kr"], 2, 1 ],
-    [ "HPF", ["ar", "kr"], 2, 1 ],
-    [ "BPF", ["ar", "kr"], 3, 1 ],
-    [ "BRF", ["ar", "kr"], 3, 1 ],
-    [ "RLPF", ["ar", "kr"], 3, 1 ],
-    [ "RHPF", ["ar", "kr"], 3, 1 ],
-    [ "Lag" , ["ar", "kr"], 2, 1 ],
-    [ "Lag2", ["ar", "kr"], 2, 1 ],
-    [ "Lag3", ["ar", "kr"], 2, 1 ],
-    [ "Ramp", ["ar", "kr"], 2, 1 ],
-    [ "LagUD" , ["ar", "kr"], 3, 1 ],
-    [ "Lag2UD", ["ar", "kr"], 3, 1 ],
-    [ "Lag3UD", ["ar", "kr"], 3, 1 ],
-  ], {
-    filter: unitTestSuite.filterUGen
-  });
+  unitTestSuite.desc = "unit/filter.js";
+
+  unitTestSuite(["OnePole", "OneZero"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"coef", rate:C.CONTROL, value:[ 1, 0.5, 0.5, 0, -0, -0.5, -0.5, -1 ] },
+      ]
+    }
+  ]);
+  
+  unitTestSuite(["TwoPole", "TwoZero", "APF"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"    , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"freq"  , rate:C.AUDIO  , value:unitTestSuite.freq1 },
+        { name:"radius", rate:C.CONTROL, value:[ 1, 0.5, 0.5, 0, -0, -0.5, -0.5, -1 ] },
+      ]
+    }
+  ]);
+
+  unitTestSuite(["LPF", "HPF"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq1 },
+      ]
+    },
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq1 },
+      ]
+    }
+  ]);
+
+  unitTestSuite(["BPF", "BRF"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq0 },
+        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5 ] },
+      ]
+    },
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.CONTROL, value:[ 220, 220, 440 ] }, // TODO: check
+        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+      ]
+    }
+  ]);
+
+  unitTestSuite(["RLPF", "RHPF"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq0 },
+        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+      ]
+    },
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq0 },
+        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+      ]
+    }
+  ]);
+
+  unitTestSuite(["Lag", "Lag2", "Lag3", "Ramp"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"     , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"lagTime", rate:C.AUDIO, value:unitTestSuite.time1 },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"     , rate:C.AUDIO , value:unitTestSuite.in0 },
+        { name:"lagTime", rate:C.SCALAR, value:0.5 },
+      ]
+    },
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"in"     , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"lagTime", rate:C.SCALAR , value:0.5 },
+      ]
+    }
+  ]);
+
+  unitTestSuite(["LagUD", "Lag2UD", "Lag3UD"], [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"      , rate:C.AUDIO , value:unitTestSuite.in0 },
+        { name:"lagTimeU", rate:C.CONTROL, value:unitTestSuite.time1 },
+        { name:"lagTimeD", rate:C.CONTROL, value:unitTestSuite.time1 },
+      ]
+    }
+  ]);
 
 });

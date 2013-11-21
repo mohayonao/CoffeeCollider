@@ -20,11 +20,6 @@ define(function(require, exports, module) {
           bufLength: 64
         };
       };
-      cc.console = {
-        warn: function(str) {
-          cc.console.warn.result = str;
-        }
-      };
       cc.unit.specs.TestUnit = function() {
         cc.unit.specs.TestUnit.called = true;
       };
@@ -60,9 +55,9 @@ define(function(require, exports, module) {
       var specs = [
         "TestUnit(not exist)", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
       ];
-      cc.console.warn.result = null;
-      var u = cc.createUnit(parent, specs).init("tag");
-      assert.isString(cc.console.warn.result);
+      assert.throws(function() {
+        cc.createUnit(parent, specs).init("tag");
+      }, "TestUnit(not exist)'s ctor is not found.");
     });
     it("doneAction", function() {
       var specs = [
@@ -119,15 +114,25 @@ define(function(require, exports, module) {
   };
   
   var signal = function(offset) {
-    var index = offset || 0;
-    var pattern = [
-      +100, 10, 1, 1, 0.5, 0.5, 0, 0, 0, -0.5, -0.5, -1, -1, -10, -100
-    ];
-    return function(_in) {
-      var value = pattern[(index++) % pattern.length];
-      writeScalarValue(_in, value);
-      return _in;
-    };
+    if (Array.isArray(offset)) {
+      index   = 0;
+      pattern = offset;
+      return function(_in) {
+        var value = pattern[(index++) % pattern.length];
+        writeScalarValue(_in, value);
+        return _in;
+      };
+    } else {
+      var index = offset || 0;
+      var pattern = [
+          +100, 10, 1, 1, 0.5, 0.5, 0, 0, 0, -0.5, -0.5, -1, -1, -10, -100
+      ];
+      return function(_in) {
+        var value = pattern[(index++) % pattern.length];
+        writeScalarValue(_in, value);
+        return _in;
+      };
+    }
   };
   
   var inputSpec = function(opts) {
@@ -183,6 +188,9 @@ define(function(require, exports, module) {
           if (isNaN(x)) {
             throw new Error("NaN");
           }
+          if (Math.abs(x) === Infinity) {
+            throw new Error("Infinity");
+          }
         }
       }
       if (opts.postProcess) {
@@ -191,30 +199,16 @@ define(function(require, exports, module) {
     }
     assert.ok(true);
   };
-
-  var ratesCombination = function(n) {
-    var m = Math.pow(3, n);
-    var result = new Array(m);
-    for (var i = 0; i < m; ++i) {
-      result[i] = new Array(n);
-      for (var j = 0; j < n; ++j) {
-        result[i][j] = ((i / Math.pow(3, j))|0) % 3;
-      }
-    }
-    return result;
-  };
   
-  var unitTestSuite = function(name, suites, opts) {
+  var unitTestSuite = function(name, specs, opts) {
     opts = opts || {};
-    describe(name, function() {
-      suites.forEach(function(items) {
-        var name = items[0];
-        var rates = items[1].map(function(rate) {
-          return {"ar":C.AUDIO,"kr":C.CONTROL,"ir":C.SCALAR}[rate];
-        });
-        var numOfInputs  = items[2];
-        var numOfOutputs = items[3];
-        
+    var desc = unitTestSuite.desc || "test";
+    describe(desc, function() {
+      specs.forEach(function(items) {
+        var rate = items.rate;
+        var numOfInputs  = items.inputs.length;
+        var numOfOutputs = items.outputs || 1;
+
         unitTestSuite.instance = {};
         
         if (opts.before) {
@@ -230,46 +224,36 @@ define(function(require, exports, module) {
           afterEach(opts.afterEach);
         }
         
-        var list = ratesCombination(numOfInputs+1).filter(function(items) {
-          return rates.indexOf(items[0]) !== -1;
-        });
-        if (opts.filter) {
-          list = list.map(function(items) {
-            return { rate:items[0], inRates:items.slice(1) };
-          }).filter(opts.filter).map(function(obj) {
-            return [ obj.rate ].concat(obj.inRates);
-          });
+        var inputs = [], outputs = [];
+        var i;
+        for (i = numOfInputs; i--; ) {
+          inputs.push(0, 0);
         }
-        
-        list.forEach(function(rates) {
-          var inputs = [], outputs = [];
-          var i;
-          for (i = numOfInputs; i--; ) {
-            inputs.push(0, 0);
-          }
-          for (i = numOfOutputs; i--; ) {
-            outputs.push(rates[0]);
-          }
-          var spec = [ name, rates[0], 0, inputs, outputs ];
-          var rateStr = ["ir","kr","ar"][rates[0]];
-          
-          items = rates.slice(1);
-          var caseName = items.map(function(rate) {
-            return ["ir","kr","ar"][rate];
-          }).join(", ");
-          var testName = name + "." + rateStr + "(" + caseName + ")";
+        for (i = numOfOutputs; i--; ) {
+          outputs.push(rate);
+        }
+        if (!Array.isArray(name)) {
+          name = [name];
+        }
+        name.forEach(function(name) {
+          var unitSpec = [ name, rate, 0, inputs, outputs ];
+          var testName = name + "." + ["ir","kr","ar"][rate];
+          testName += "(" + items.inputs.map(function(_in) {
+            return ["ir","kr","ar"][_in.rate];
+          }).join(", ") + ")";
           if (opts.verbose) {
             console.log(testName);
           }
           it(testName, (function(items) {
             return function() {
-              var inputSpecs = items.map(function(rate, i) {
+              var inputSpecs = items.inputs.map(function(items) {
                 return inputSpec({
-                  rate   : rate,
-                  process: signal(i * 3),
+                  rate   : items.rate,
+                  process: signal(items.value),
+                  value  : items.value
                 });
               });
-              unitTest(spec, inputSpecs, opts);
+              unitTest(unitSpec, inputSpecs, opts);
             };
           })(items));
         });
@@ -277,26 +261,13 @@ define(function(require, exports, module) {
     });
   };
 
-  unitTestSuite.filterUGen = function(obj) {
-    var rate    = obj.rate;
-    var inRates = obj.inRates;
-    if (inRates[0] === C.SCALAR) {
-      return false;
-    }
-    if (rate !== inRates[0]) {
-      return false;
-    }
-    return true;
-  };
-  
-  cc.checkInvalidValue = function(out) {
-    for (var i = out.length; i--; ) {
-      if (isNaN(out[i]) || Math.abs(out[i]) === Infinity) {
-        return true;
-      }
-    }
-    return false;
-  };
+  unitTestSuite.in0   = [ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ];
+  unitTestSuite.in1   = [ -0, -0.25, -0.5, -1, 1, 0.5, 0.25, 0 ];
+  unitTestSuite.in2   = [ -0, -0.25, -0.5, -1, 1, 0.5, 0.25    ];
+  unitTestSuite.time0 = [ 0, 0, 0.5, 0.5, 1, 1 ];
+  unitTestSuite.time1 = [ 0, 0, 0.5, 0.5, 1, 1, -0, -0.5, -1 ];
+  unitTestSuite.freq0 = [ 220, 220, 440, 660, 880, 1760, 3520 ];
+  unitTestSuite.freq1 = [ 220, 220, 440, 660, 880, 1760, 44100, 0, -44100 ];
   
   module.exports = {
     unitTestSuite: unitTestSuite,

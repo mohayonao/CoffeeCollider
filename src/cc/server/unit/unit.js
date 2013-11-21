@@ -39,7 +39,7 @@ define(function(require, exports, module) {
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
-        cc.console.warn(this.name + "'s ctor is not found.");
+        throw new Error(this.name + "'s ctor is not found.");
       }
       this.tag = tag || "";
       return this;

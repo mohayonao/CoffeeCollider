@@ -354,7 +354,7 @@ define(function(require, exports, module) {
     var next = function() {
       var out = this.outputs[0];
       var inIn = this.inputs[0];
-      var freq = this.inputs[1][0];
+      var freq = Math.max(0.001, this.inputs[1][0]);
       var y0;
       var y1 = this._y1;
       var y2 = this._y2;
@@ -365,7 +365,7 @@ define(function(require, exports, module) {
       
       if (freq !== this._freq) {
         var pfreq = freq * this.rate.radiansPerSample * 0.5;
-        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var C = 1 / Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
         var next_a0 = 1 / (1 + sqrt2C + C2);
@@ -411,7 +411,7 @@ define(function(require, exports, module) {
     var next_1 = function() {
       var out = this.outputs[0];
       var inIn = this.inputs[0];
-      var freq = this.inputs[1][0];
+      var freq = Math.max(0.001, this.inputs[1][0]);
       var y0;
       var y1 = this._y1;
       var y2 = this._y2;
@@ -419,8 +419,8 @@ define(function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.5;
-        var C = pfreq === 0 ? 0 : (1 / Math.tan(pfreq));
+        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
+        var C = 1 / Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
         a0 = 1 / (1 + sqrt2C + C2);
@@ -531,7 +531,7 @@ define(function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.5;
+        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
         var C = Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
@@ -647,7 +647,7 @@ define(function(require, exports, module) {
       var b2 = this._b2;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.5;
+        var pbw   = bw * pfreq * 0.0078125;
         var C = pbw ? 1 / Math.tan(pbw) : 0;
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);
@@ -770,7 +770,7 @@ define(function(require, exports, module) {
       var ay;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.5;
+        var pbw   = bw * pfreq * 0.0078125;
         var C = Math.tan(pbw);
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);
@@ -1046,7 +1046,7 @@ define(function(require, exports, module) {
       this._lag = undefined;
       this._b1 = 0;
       this._y1 = this.inputs[0][0];
-      next.call(this, 1);
+      next_1.call(this, 1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];

@@ -5,11 +5,18 @@ define(function(require, exports, module) {
 
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var reverb = require("./reverb");
-  
-  unitTestSuite("unit/reverb.js", [
-    [ "FreeVerb", ["ar", "kr"], 4, 1 ],
-  ], {
-    filter: unitTestSuite.filterUGen
-  });
+
+  unitTestSuite.desc = "unit/reverb.js";
+
+  unitTestSuite("FreeVerb", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO  , value:[ 220,440,440,220,0,-220,-440,-440,-220 ] },
+        { name:"mix" , rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+        { name:"room", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+        { name:"damp", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+      ]
+    }
+  ]);
 
 });

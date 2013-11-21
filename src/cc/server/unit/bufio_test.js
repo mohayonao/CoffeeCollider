@@ -6,25 +6,20 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var bufio = require("./bufio");
 
-  unitTestSuite("unit/bufio", [
-    [ "PlayBuf", ["ar", "kr"], 6, 1 ]
-  ], {
-    filter: function(obj) {
-      var inRates = obj.inRates;
-      if (inRates[3] !== C.CONTROL) {
-        // phase
-        return false;
-      }
-      if (inRates[4] !== C.CONTROL) {
-        // loop
-        return false;
-      }
-      if (inRates[5] !== C.SCALAR) {
-        // doneAction
-        return false;
-      }
-      return true;
+  unitTestSuite.desc = "unit/bufio.js";
+
+  unitTestSuite("PlayBuf", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"bufnum"    , rate:C.SCALAR, value:0 },
+        { name:"rate"      , rate:C.SCALAR, value:1 },
+        { name:"trigger"   , rate:C.SCALAR, value:0 },
+        { name:"startPos"  , rate:C.SCALAR, value:0 },
+        { name:"loop"      , rate:C.SCALAR, value:0 },
+        { name:"doneAction", rate:C.SCALAR, value:0 },
+      ]
     },
+  ], {
     beforeEach: function() {
       unitTestSuite.instance = {
         buffers: [ null ]

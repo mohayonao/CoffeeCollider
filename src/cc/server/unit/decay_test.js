@@ -4,14 +4,54 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   var unitTestSuite = require("./unit_test").unitTestSuite;
-  var delay = require("./decay");
+  var decay = require("./decay");
+
+  unitTestSuite.desc = "unit/decay.js";
   
-  unitTestSuite("unit/decay.js", [
-    [ "Integrator", ["ar", "kr"], 2, 1 ],
-    [ "Decay"     , ["ar", "kr"], 2, 1 ],
-    [ "Decay2"    , ["ar", "kr"], 3, 1 ],
-  ], {
-    filter: unitTestSuite.filterUGen
-  });
+  unitTestSuite("Integrator", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO  , value:[ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ] },
+        { name:"coef", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO , value:[ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ] },
+        { name:"coef", rate:C.SCALAR, value:0 },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO , value:[ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ] },
+        { name:"coef", rate:C.SCALAR, value:0.5 },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO , value:[ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ] },
+        { name:"coef", rate:C.SCALAR, value:1 },
+      ]
+    }
+  ]);
+
+  unitTestSuite("Decay", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"       , rate:C.AUDIO  , value:unitTestSuite.in0   },
+        { name:"decayTime", rate:C.CONTROL, value:unitTestSuite.time0 },
+      ]
+    },
+  ]);
+
+  unitTestSuite("Decay2", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"        , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"attackTime", rate:C.CONTROL, value:unitTestSuite.time0 },
+        { name:"decayTime" , rate:C.CONTROL, value:unitTestSuite.time0 },
+      ]
+    },
+  ]);
 
 });

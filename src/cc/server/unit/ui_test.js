@@ -6,18 +6,18 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var ui = require("./ui");
 
-  var instance;
-  
-  unitTestSuite("unit/ui.js", [
-    [ "MouseX"     , ["kr"], 4, 1],
-    [ "MouseY"     , ["kr"], 4, 1],
-    [ "MouseButton", ["kr"], 3, 1],
-  ], {
-    filter: function(obj) {
-      return obj.inRates.every(function(rate) {
-        return rate !== C.AUDIO;
-      });
+  unitTestSuite.desc = "unit/ui.js";
+
+  unitTestSuite(["MouseX", "MouseY"], [
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"minval", rate:C.CONTROL, value:[0, 0, 0.5, 0.50, 1, 1] },
+        { name:"maxval", rate:C.CONTROL, value:[1, 1, 0.5, 0.25, 0, 0] },
+        { name:"warp"  , rate:C.CONTROL, value:[1, 1, 0.5, 0.25, 0, 0] },
+        { name:"lag"   , rate:C.CONTROL, value:[1, 1, 0.5, 0.50, 0, 0] },
+      ]
     },
+  ], {
     beforeEach: function() {
       unitTestSuite.instance = {
         syncItems    : new Uint8Array(C.BUTTON + 1),
@@ -28,6 +28,27 @@ define(function(require, exports, module) {
       if (i % 64 === 0) {
         unitTestSuite.instance.f32_syncItems[C.POS_X ] = (i / imax);
         unitTestSuite.instance.f32_syncItems[C.POS_Y ] = (i / imax);
+      }
+    }
+  });
+
+  unitTestSuite(["MouseButton"], [
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"minval", rate:C.CONTROL, value:[0, 0, 0.5, 0.50, 1, 1] },
+        { name:"maxval", rate:C.CONTROL, value:[1, 1, 0.5, 0.25, 0, 0] },
+        { name:"lag"   , rate:C.CONTROL, value:[1, 1, 0.5, 0.50, 0, 0] },
+      ]
+    },
+  ], {
+    beforeEach: function() {
+      unitTestSuite.instance = {
+        syncItems    : new Uint8Array(C.BUTTON + 1),
+        f32_syncItems: new Float32Array(C.POS_Y + 1),
+      };
+    },
+    preProcess: function(i, imax) {
+      if (i % 64 === 0) {
         unitTestSuite.instance.f32_syncItems[C.BUTTON] = (i / imax) < 0.5 ? 0 : 1;
       }
     }
