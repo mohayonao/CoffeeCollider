@@ -168,7 +168,10 @@ define(function(require, exports, module) {
         });
       });
       describe("others", function() {
-        var list = [ 1, -2, 3, -5, 8, -13 ];
+        var list;
+        beforeEach(function() {
+          list  = [ 1, -2, 3, -5, 8, -13 ];
+        });
         it("size", function() {
           assert.equal(list.size(), list.length);
         });
@@ -185,32 +188,171 @@ define(function(require, exports, module) {
           assert.equal(list.maxValue(), 8);
         });
         it("at", function() {
-          assert.isUndefined(list.at(-9));
-          assert.isUndefined(list.at(-2));
-          assert.equal(list.at(3), -5);
-          assert.isUndefined(list.at( 7));
-          assert.isUndefined(list.at(12));
+          actual   = list.at([-9, -2, 3, 7, 12]);
+          expected = [ undefined, undefined, -5, undefined, undefined ];
+          assert.deepEqual(actual, expected);
         });
         it("clipAt", function() {
-          assert.equal(list.clipAt(-9),  1);
-          assert.equal(list.clipAt(-2),  1);
-          assert.equal(list.clipAt( 3), -5);
-          assert.equal(list.clipAt( 7), -13);
-          assert.equal(list.clipAt(12), -13);
+          actual   = list.clipAt([-9, -2, 3, 7, 12]);
+          expected = [ 1, 1, -5, -13, -13 ];
+          assert.deepEqual(actual, expected);
         });
         it("wrapAt", function() {
-          assert.equal(list.wrapAt(-9), -5);
-          assert.equal(list.wrapAt(-2),  8);
-          assert.equal(list.wrapAt( 3), -5);
-          assert.equal(list.wrapAt( 7), -2);
-          assert.equal(list.wrapAt(12), 1);
+          actual   = list.wrapAt([-9, -2, 3, 7, 12]);
+          expected = [ -5, 8, -5, -2, 1 ];
+          assert.deepEqual(actual, expected);
         });
         it("foldAt", function() {
-          assert.equal(list.foldAt(-9), -2);
-          assert.equal(list.foldAt(-2),  3);
-          assert.equal(list.foldAt( 3), -5);
-          assert.equal(list.foldAt( 7), -5);
-          assert.equal(list.foldAt(12),  3);
+          actual   = list.foldAt([-9, -2, 3, 7, 12]);
+          expected = [ -2, 3, -5, -5, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("put", function() {
+          actual   = list.put([-9, -2, 3, 7, 12], [0]);
+          expected = [ 1, -2, 3, [0], 8, -13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("clipPut", function() {
+          actual   = list.clipPut([-9, -2, 3, 7, 12], [0]);
+          expected = [ [0], -2, 3, [0], 8, [0] ];
+          assert.deepEqual(actual, expected);
+        });
+        it("wrapPut", function() {
+          actual   = list.wrapPut([-9, -2, 3, 7, 12], [0]);
+          expected = [ [0], [0], 3, [0], [0], -13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("foldPut", function() {
+          actual   = list.foldPut([-9, -2, 3, 7, 12], [0]);
+          expected = [ 1, [0], [0], [0], 8, -13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("insert", function() {
+          actual   = list.insert(-1, [0]);
+          expected = [ [0], 1, -2, 3, -5, 8, -13 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.insert(2, [0]);
+          expected = [ [0], 1, [0], -2, 3, -5, 8, -13 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.insert(100, [0]);
+          expected = [ [0], 1, [0], -2, 3, -5, 8, -13, [0] ];
+          assert.deepEqual(actual, expected);
+        });
+        it("swap", function() {
+          actual   = list.swap(2, 5);
+          expected = [ 1, -2, -13, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.swap(-9, 12);
+          expected = [ 1, -2, -13, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("clipSwap", function() {
+          actual   = list.clipSwap(2, 5);
+          expected = [ 1, -2, -13, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.clipSwap(-9, 12);
+          expected = [ 3, -2, -13, -5, 8, 1 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("wrapSwap", function() {
+          actual   = list.wrapSwap(2, 5);
+          expected = [ 1, -2, -13, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.wrapSwap(-9, 12);
+          expected = [ -5, -2, -13, 1, 8, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("foldSwap", function() {
+          actual   = list.foldSwap(2, 5);
+          expected = [ 1, -2, -13, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.foldSwap(-9, 12);
+          expected = [ 1, -13, -2, -5, 8, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("sum", function() {
+          actual   = list.sum();
+          expected = list.reduce(function(a, b) {
+            return a + b;
+          }, 0);
+          assert.equal(actual, expected);
+        });
+        it.skip("normalize", function() {
+          actual   = list.normalize();
+          expected = [ 0.66666666666667, 0.52380952380952, 0.76190476190476, 0.38095238095238, 1, 0 ];
+          assert.deepCloseTo(actual, expected, 1e-6);
+        });
+        it("normalizeSum", function() {
+          actual   = list.normalizeSum();
+          expected = [ -0.125, 0.25, -0.375, 0.625, -1, 1.625 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("mirror", function() {
+          actual   = list.mirror();
+          expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2, 1 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("mirror1", function() {
+          actual   = list.mirror1();
+          expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("mirror2", function() {
+          actual   = list.mirror2();
+          expected = [ 1, -2, 3, -5, 8, -13, -13, 8, -5, 3, -2, 1 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("stutter", function() {
+          actual   = list.stutter(3);
+          expected = [ 1,1,1, -2,-2,-2, 3,3,3, -5,-5,-5, 8,8,8, -13,-13,-13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("rotate", function() {
+          actual   = list.rotate(10);
+          expected = [ 3, -5, 8, -13, 1, -2 ];
+          assert.deepEqual(actual, expected);
+        });
+        it.skip("sputter", function() {
+        });
+        it("clipExtend", function() {
+          actual   = list.clipExtend(10);
+          expected = [ 1, -2, 3, -5, 8, -13, -13, -13, -13, -13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("wrapExtend", function() {
+          actual   = list.wrapExtend(10);
+          expected = [ 1, -2, 3, -5, 8, -13, 1, -2, 3, -5 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("foldExtend", function() {
+          actual   = list.foldExtend(10);
+          expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("resamp0", function() {
+          actual   = list.resamp0(10);
+          expected = [ 1, -2, -2, 3, 3, -5, -5, 8, 8, -13 ];
+          assert.deepEqual(actual, expected);
+        });
+        it.skip("resamp1", function() {
+          actual   = list.resamp1(10);
+          expected = [ 1, -0.66666666666667, -1.4444444444444, 1.3333333333333, 1.2222222222222, -3.2222222222222, -0.66666666666666, 6.5555555555556, -1.3333333333333, -13 ];
+          assert.deepCloseTo(actual, expected, 1e-6);
+        });
+        it.skip("scramble", function() {
+        });
+        it.skip("shuffle", function() {
+        });
+        it("choose", function() {
+          actual   = list.choose();
+          expected = list.indexOf(actual) !== -1;
+          assert.isTrue(expected);
         });
       });
     });

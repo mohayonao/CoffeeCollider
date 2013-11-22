@@ -393,7 +393,11 @@ define(function(require, exports, module) {
         this.wrapPut(index, item);
       }, this);
     } else {
-      this[(index|0) % this.length] = item;
+      index = (index|0) % this.length;
+      if (index < 0) {
+        index += this.length;
+      }
+      this[index] = item;
     }
     return this;
   });
@@ -410,19 +414,18 @@ define(function(require, exports, module) {
   });
 
   fn.definePrototypeProperty(Array, "insert", function(index, item) {
-    if (Array.isArray(index)) {
-      index.forEach(function(index) {
-        this.insert(index, item);
-      }, this);
-    }
-    this.splice(index, 0, item);
+    this.splice(Math.max(0, index), 0, item);
     return this;
   });
-
+  
   fn.definePrototypeProperty(Array, "swap", function(i, j) {
-    var t = this[i|0];
-    this[i|0] = this[j|0];
-    this[j|0] = t;
+    i |= 0;
+    j |= 0;
+    if (0 <= i && i < this.length && 0 <= j && j < this.length) {
+      var t = this[i];
+      this[i] = this[j];
+      this[j] = t;
+    }
     return this;
   });
 
@@ -434,7 +437,13 @@ define(function(require, exports, module) {
   
   fn.definePrototypeProperty(Array, "wrapSwap", function(i, j) {
     i = (i|0) % this.length;
+    if (i < 0) {
+      i += this.length;
+    }
     j = (j|0) % this.length;
+    if (j < 0) {
+      j += this.length;
+    }
     return this.swap(i, j);
   });
   
