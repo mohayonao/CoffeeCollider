@@ -7,11 +7,11 @@ define(function(require, exports, module) {
   var ugen  = require("./ugen");
   var UGen  = ugen.UGen;
   
-  describe("lang/ugen/ugen.js", function() {
+  describe.skip("lang/ugen/ugen.js", function() {
     before(function() {
       ugen.use();
       
-      cc.registerUGen("Test", {
+      ugen.register("Test", {
         $ar: {
           defaults: "val1=1,val2=2",
           ctor: function(val1, val2) {

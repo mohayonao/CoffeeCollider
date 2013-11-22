@@ -301,7 +301,7 @@ define(function(require, exports, module) {
   };
   
   
-  var registerUGen = function(name, spec) {
+  var register = function(name, spec) {
     var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
     var multiCall   = spec.multiCall;
     var checkInputs = spec.checkInputs;
@@ -358,12 +358,12 @@ define(function(require, exports, module) {
   // exports for prototype extending
   cc.UGen = UGen;
   cc.MultiOutUGen = MultiOutUGen;
-  cc.registerUGen = registerUGen;
   
   module.exports = {
     UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
     OutputProxy : OutputProxy,
+    register    : register,
     
     use: function() {
       cc.createUGen = function() {
@@ -388,38 +388,11 @@ define(function(require, exports, module) {
         addToSynthDef = func;
       };
       
-      require("./uop");
-      require("./bop");
-      require("./madd");
-      require("./inout");
-      require("./mix");
-      require("./filter");
-      
       // redefinition for tests
       cc.UGen = UGen;
       cc.MultiOutUGen = MultiOutUGen;
-      cc.registerUGen = registerUGen;
     }
   };
-  
-  require("./bufio");
-  require("./debug");
-  require("./decay");
-  require("./delay");
-  require("./filter");
-  require("./inout");
-  require("./line");
-  require("./noise");
-  require("./osc");
-  require("./pan");
-  require("./random");
-  require("./range");
-  require("./reverb");
-  require("./ui");
-  
-  Object.keys(specs).forEach(function(name) {
-    registerUGen(name, specs[name]);
-  });
   
   module.exports.use();
 

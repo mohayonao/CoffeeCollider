@@ -188,7 +188,7 @@ define(function(require, exports, module) {
       require("./scale");
       require("./task");
       require("./synthdef");
-      require("./ugen/ugen");
+      require("./ugen/installer");
       require("./lang-worker");
       require("./lang-nodejs");
       require("./lang-socket");
