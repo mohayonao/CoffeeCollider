@@ -5,6 +5,10 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var ops = require("../common/ops");
   
+  var drand = function() {
+    return cc.lang.random.next();
+  };
+  
   // unary operator methods
   fn.defineProperty(Number.prototype, "__plus__", function() {
     return +this;
@@ -117,19 +121,19 @@ define(function(require, exports, module) {
     return this.sinh() / this.cosh();
   });
   fn.defineProperty(Number.prototype, "rand", function() {
-    return Math.random() * this;
+    return drand() * this;
   });
   fn.defineProperty(Number.prototype, "rand2", function() {
-    return (Math.random() * 2 - 1) * this;
+    return (drand() *  2 - 1) * this;
   });
   fn.defineProperty(Number.prototype, "linrand", function() {
-    return Math.min(Math.random(), Math.random()) * this;
+    return Math.min(drand(), drand()) * this;
   });
   fn.defineProperty(Number.prototype, "bilinrand", function() {
-    return (Math.random() - Math.random()) * this;
+    return (drand() - drand()) * this;
   });
   fn.defineProperty(Number.prototype, "sum3rand", function() {
-    return (Math.random() + Math.random() + Math.random() - 1.5) * 0.666666667 * this;
+    return (drand() + drand() + drand() - 1.5) * 0.666666667 * this;
   });
   fn.defineProperty(Number.prototype, "distort", function() {
     return this / (1 + Math.abs(this));
@@ -139,7 +143,7 @@ define(function(require, exports, module) {
     return absa <= 0.5 ? this : (absa - 0.25) / this;
   });
   fn.defineProperty(Number.prototype, "coin", function() {
-    return Math.random() < this;
+    return drand() < this;
   });
   fn.defineProperty(Number.prototype, "num", function() {
     return +this;
@@ -383,19 +387,15 @@ define(function(require, exports, module) {
 
   fn.defineProperty(Number.prototype, "rrand", fn(function(num) {
     var a = this, b = num;
-    return a > b ?
-      Math.random() * (b - a) + a :
-      Math.random() * (a - b) + b;
+    return a + drand() * (b - a);
   }).defaults("num=0").multiCall().build());
-
+  
   fn.defineProperty(Number.prototype, "exprand", fn(function(num) {
     var a = this, b = num;
-    if (a === 0 && b === 0) {
+    if (a === 0) {
       return 0;
     }
-    return a > b ?
-      b * Math.exp(Math.log(a / b) * Math.random()) :
-      a * Math.exp(Math.log(b / a) * Math.random());
+    return a * Math.exp(Math.log(b / a) * drand());
   }).defaults("num=0").multiCall().build());
   
   // others
