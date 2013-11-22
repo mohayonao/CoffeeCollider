@@ -25,6 +25,10 @@ define(function(require, exports, module) {
     lagud : "lagTimeU=0.1,lagTimeD=0.1",
     lag2ud: "lagTimeU=0.1,lagTimeD=0.1",
     lag3ud: "lagTimeU=0.1,lagTimeD=0.1",
+    linlin: "inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"",
+    linexp: "inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"",
+    explin: "inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"",
+    expexp: "inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"",
   };
   
   module.exports = {

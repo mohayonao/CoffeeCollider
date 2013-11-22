@@ -124,31 +124,6 @@ define(function(require, exports, module) {
       });
     }).defaults(COMMON_FUNCTIONS[selector]).multiCall().build());
   });
-
-  
-  fn.definePrototypeProperty(Array, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
-    return this.map(function(a) {
-      return a.linlin(inMin, inMax, outMin, outMax, clip);
-    });
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
-    return this.map(function(a) {
-      return a.linexp(inMin, inMax, outMin, outMax, clip);
-    });
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-
-  fn.definePrototypeProperty(Array, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
-    return this.map(function(a) {
-      return a.explin(inMin, inMax, outMin, outMax, clip);
-    });
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-  
-  fn.definePrototypeProperty(Array, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
-    return this.map(function(a) {
-      return a.expexp(inMin, inMax, outMin, outMax, clip);
-    });
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
   
   cc.global.SHORT = C.SHORT;
   cc.global.FOLD  = C.FOLD;
@@ -280,7 +255,7 @@ define(function(require, exports, module) {
       a[i] = minVal.exprand(maxVal);
     }
     return a;
-  }).defaults("size=0,minVal=0,maxVal=1").build();
+  }).defaults("size=0,minVal=0.001,maxVal=1").build();
   
   Array.interpolation = fn(function(size, start, end) {
     if (size === 1) {
@@ -299,6 +274,9 @@ define(function(require, exports, module) {
   var ifold = function(index, len) {
     var len2 = len * 2 - 2;
     index = (index|0) % len2;
+    if (index < 0) {
+      index += len2;
+    }
     if (len <= index) {
       index = len2 - index;
     }
@@ -372,7 +350,11 @@ define(function(require, exports, module) {
   }).multiCall().build());
 
   fn.definePrototypeProperty(Array, "wrapAt", fn(function(index) {
-    return this[(index|0) % this.length];
+    index = (index|0) % this.length;
+    if (index < 0) {
+      index += this.length;
+    }
+    return this[index];
   }).multiCall().build());
 
   fn.definePrototypeProperty(Array, "foldAt", fn(function(index) {
