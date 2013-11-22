@@ -419,7 +419,7 @@ define(function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
         var C = 1 / Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
@@ -531,7 +531,7 @@ define(function(require, exports, module) {
       var b1 = this._b1;
       var b2 = this._b2;
       if (freq !== this._freq) {
-        var pfreq = freq * this.rate.radiansPerSample * 0.0078125;
+        var pfreq = freq * this.rate.radiansPerSample * 0.5;
         var C = Math.tan(pfreq);
         var C2 = C * C;
         var sqrt2C = C * sqrt2;
@@ -647,7 +647,7 @@ define(function(require, exports, module) {
       var b2 = this._b2;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.0078125;
+        var pbw   = bw * pfreq * 0.5;
         var C = pbw ? 1 / Math.tan(pbw) : 0;
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);
@@ -770,7 +770,7 @@ define(function(require, exports, module) {
       var ay;
       if (freq !== this._freq || bw !== this._bw) {
         var pfreq = freq * this.rate.radiansPerSample;
-        var pbw   = bw * pfreq * 0.0078125;
+        var pbw   = bw * pfreq * 0.5;
         var C = Math.tan(pbw);
         var D = 2 * Math.cos(pfreq);
         a0 = 1 / (1 + C);

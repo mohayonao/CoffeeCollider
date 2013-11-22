@@ -37,7 +37,7 @@ define(function(require, exports, module) {
     { rate  : C.CONTROL,
       inputs: [
         { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
-        { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq1 },
+        { name:"freq", rate:C.CONTROL, value:[0, 0, 25, 25, 50, 100] },
       ]
     }
   ]);
@@ -47,14 +47,14 @@ define(function(require, exports, module) {
       inputs: [
         { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
         { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq0 },
-        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5 ] },
+        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5, 1, 2 ] },
       ]
     },
     { rate  : C.CONTROL,
       inputs: [
         { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
-        { name:"freq", rate:C.CONTROL, value:[ 220, 220, 440 ] }, // TODO: check
-        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+        { name:"freq", rate:C.CONTROL, value:[0, 0, 25, 25, 50, 100] },
+        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2 ] },
       ]
     }
   ]);
@@ -64,14 +64,14 @@ define(function(require, exports, module) {
       inputs: [
         { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
         { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq0 },
-        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5, 1, 2 ] },
       ]
     },
     { rate  : C.CONTROL,
       inputs: [
         { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0 },
         { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq0 },
-        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2, -0, -0.5, -0.5, -1, -2 ] },
+        { name:"rq"  , rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1, 2 ] },
       ]
     }
   ]);
