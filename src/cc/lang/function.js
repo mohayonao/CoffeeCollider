@@ -48,11 +48,11 @@ define(function(require, exports, module) {
     var func = this;
     return cc.createSynthDef(
       function() {
-        cc.createOut(C.AUDIO, 0, func());
+        cc.global.Out(C.AUDIO, 0, func());
       }, []
     ).play();
   });
-
+  
   fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);
@@ -99,14 +99,6 @@ define(function(require, exports, module) {
       };
     }
   });
-  
-  fn.defineProperty(Function.prototype, "dup", fn(function(n) {
-    var a = new Array(n|0);
-    for (var i = 0, imax = a.length; i < imax; ++i) {
-      a[i] = this(i);
-    }
-    return a;
-  }).defaults("n=2").build());
   
   module.exports = {};
 
