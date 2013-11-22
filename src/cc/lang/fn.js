@@ -10,14 +10,14 @@ define(function(require, exports, module) {
     function Fn(func) {
       this.func  = func;
       this.def   = null;
-      this.multi = false;
+      this.multi = 0;
     }
     Fn.prototype.defaults = function(def) {
       this.def = def;
       return this;
     };
-    Fn.prototype.multiCall = function(flag) {
-      this.multi = flag === undefined ? true : !!flag;
+    Fn.prototype.multiCall = function(num) {
+      this.multi = num === undefined ? Infinity : num;
       return this;
     };
     Fn.prototype.build = function() {
@@ -36,7 +36,8 @@ define(function(require, exports, module) {
         });
       }
       var ret = func;
-      if (this.multi) {
+      var multi = this.multi;
+      if (multi === Infinity) {
         if (this.def) {
           ret = function() {
             var args = slice.call(arguments);
@@ -59,11 +60,62 @@ define(function(require, exports, module) {
             return func.apply(this, args);
           };
         }
+      } else if (multi > 0) {
+        if (this.def) {
+          ret = function() {
+            var args = slice.call(arguments);
+            args = resolve_args(keys, vals, slice.call(arguments));
+            var args0 = slice.call(args, 0, multi);
+            if (containsArray(args0)) {
+              var args1 = slice.call(args, multi);
+              return utils.flop(args0).map(function(items) {
+                return ret.apply(this, items.concat(args1));
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        } else {
+          ret = function() {
+            var args0 = slice.call(arguments, 0, multi);
+            
+            if (containsArray(args0)) {
+              var args1 = slice.call(arguments, multi);
+              return utils.flop(args0).map(function(items) {
+                return ret.apply(this, items.concat(args1));
+              }, this);
+            }
+            return func.apply(this, arguments);
+          };
+        }
+      } else if (multi < 0) {
+        if (this.def) {
+          ret = function() {
+            var args = slice.call(arguments);
+            args = resolve_args(keys, vals, slice.call(arguments));
+            var args1 = slice.call(args, multi);
+            if (containsArray(args1)) {
+              var args0 = slice.call(args, 0, multi);
+              return utils.flop(args1).map(function(items) {
+                return ret.apply(this, args0.concat(items));
+              }, this);
+            }
+            return func.apply(this, args);
+          };
+        } else {
+          ret = function() {
+            var args1 = slice.call(arguments, multi);
+            if (containsArray(args1)) {
+              var args0 = slice.call(arguments, 0, multi);
+              return utils.flop(args1).map(function(items) {
+                return ret.apply(this, args0.concat(items));
+              }, this);
+            }
+            return func.apply(this, arguments);
+          };
+        }
       } else if (this.def) {
         ret = function() {
-          var args = slice.call(arguments);
-          args = resolve_args(keys, vals, slice.call(arguments));
-          return func.apply(this, args);
+          return func.apply(this, resolve_args(keys, vals, slice.call(arguments)));
         };
       }
       return ret;
