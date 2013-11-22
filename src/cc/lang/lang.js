@@ -3,6 +3,7 @@ define(function(require, exports, module) {
   
   var cc = require("./cc");
   var pack   = require("../common/pack").pack;
+  var random = require("../common/random");
   var commands = {};
   
   var SynthLang = (function() {
@@ -18,6 +19,7 @@ define(function(require, exports, module) {
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
       this.phase = 0;
+      this.random = new random.Random();
 
       this.extendCommands(commands);
     }
@@ -116,12 +118,10 @@ define(function(require, exports, module) {
     var execId   = msg[1];
     var code     = msg[2];
     var append   = msg[3];
-    var data     = msg[4];
     var callback = msg[5];
     if (!append) {
       this.reset(["/reset"]);
     }
-    cc.DATA = data;
     if (cc.global !== global) {
       global.cc = cc.global;
     }
@@ -185,7 +185,6 @@ define(function(require, exports, module) {
       require("./buffer");
       require("./node");
       require("./pattern");
-      require("./random");
       require("./scale");
       require("./task");
       require("./synthdef");
@@ -197,7 +196,6 @@ define(function(require, exports, module) {
       cc.createSynthLang = function() {
         require("./array");
         require("./boolean");
-        require("./data");
         require("./date");
         require("./function");
         require("./number");
