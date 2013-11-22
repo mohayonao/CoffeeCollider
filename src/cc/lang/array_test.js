@@ -5,7 +5,8 @@ define(function(require, exports, module) {
   
   var cc  = require("./cc");
   var ops = require("../common/ops");
-  var array = require("./array");
+  var random = require("../common/random");
+  var array  = require("./array");
   
   var NumberHacker = (function() {
     function NumberHacker(selector, func) {
@@ -37,8 +38,7 @@ define(function(require, exports, module) {
     var actual, expected;
     before(function() {
       ops.UNARY_OP_UGEN_MAP.push("??array_test??");
-      // require("./number");
-  
+      cc.lang = {};
     });
     describe("instance methods", function() {
       describe("common", function() {
@@ -171,6 +171,7 @@ define(function(require, exports, module) {
         var list;
         beforeEach(function() {
           list  = [ 1, -2, 3, -5, 8, -13 ];
+          cc.lang.random = new random.Random(1923);
         });
         it("size", function() {
           assert.equal(list.size(), list.length);
@@ -294,10 +295,14 @@ define(function(require, exports, module) {
           }, 0);
           assert.equal(actual, expected);
         });
-        it.skip("normalize", function() {
+        it("normalize", function() {
+          var h = new NumberHacker("linlin", function(inMin, inMax, outMin, outMax) {
+            return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
+          });
           actual   = list.normalize();
           expected = [ 0.66666666666667, 0.52380952380952, 0.76190476190476, 0.38095238095238, 1, 0 ];
           assert.deepCloseTo(actual, expected, 1e-6);
+          h.revert();
         });
         it("normalizeSum", function() {
           actual   = list.normalizeSum();
@@ -361,7 +366,10 @@ define(function(require, exports, module) {
           expected = [ 8, -13, 1, -2, 3, -5 ];
           assert.deepEqual(actual, expected);
         });
-        it.skip("sputter", function() {
+        it("sputter", function() {
+          actual   = list.sputter(0.5, 10);
+          expected = [ 1, -2, -2, -2, 3, -5, 8, -13 ];
+          assert.deepEqual(actual, expected);
         });
         it("clipExtend", function() {
           actual   = list.clipExtend(10);
@@ -403,14 +411,18 @@ define(function(require, exports, module) {
           expected = [ 1, -0.66666666666667, -1.4444444444444, 1.3333333333333, 1.2222222222222, -3.2222222222222, -0.66666666666666, 6.5555555555556, -1.3333333333333, -13 ];
           assert.deepCloseTo(actual, expected, 1e-6);
         });
-        it.skip("scramble", function() {
-        });
-        it.skip("shuffle", function() {
+        it("scramble", function() {
+          actual   = [ 1, -2, 3, -5, 8, -13 ].scramble();
+          expected = [ 3, -13, 8, 1, -5, -2 ];
+          assert.deepEqual(actual, expected);
         });
         it("choose", function() {
-          actual   = list.choose();
-          expected = list.indexOf(actual) !== -1;
-          assert.isTrue(expected);
+          assert.equal(list.choose(),   3);
+          assert.equal(list.choose(), -13);
+          assert.equal(list.choose(),   8);
+          assert.equal(list.choose(),   3);
+          assert.equal(list.choose(),   3);
+          assert.equal(list.choose(),   3);
         });
         it("dup", function() {
           actual   = list.dup();

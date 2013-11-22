@@ -139,6 +139,12 @@ define(function(require, exports, module) {
       return func;
     };
   };
+  var drand = function() {
+    return cc.lang.random.next();
+  };
+  var irand = function(n) {
+    return ((cc.lang.random.next() * n)|0);
+  };
   
   // array class methods
   fn.defineProperty(Array, "series", fn(function(size, start, step) {
@@ -567,13 +573,13 @@ define(function(require, exports, module) {
     var a = [], i = 0, j = 0, size = this.length;
     while (i < size && j < maxlen) {
       a[j++] = this[i];
-      if (probability < Math.random()) {
+      if (drand() < probability) {
         i += 1;
       }
     }
     return a;
   }).defaults("probability=0.25,maxlen=100").build());
-
+  
   fn.defineProperty(Array.prototype, "clipExtend", function(size) {
     size = Math.max(0, size|0);
     if (this.length < size) {
@@ -633,21 +639,24 @@ define(function(require, exports, module) {
     }
     return a;
   });
-
-  var scramble = function() {
-    return Math.random() - 0.5;
-  };
+  
   fn.defineProperty(Array.prototype, "scramble", function() {
-    return this.sort(scramble);
-  });
-  fn.defineProperty(Array.prototype, "shuffle", function() {
-    return this.sort(scramble);
+    var a = this.slice();
+    var i, j, k, m, temp;
+    k = a.length;
+    for (i = 0, m = k; i < k - 1; ++i, --m) {
+      j = i + irand(m);
+      temp = a[i];
+      a[i] = a[j];
+      a[j] = temp;
+    }
+    return a;
   });
   
   fn.defineProperty(Array.prototype, "choose", function() {
-    return this[(Math.random() * this.length)|0];
+    return this[irand(this.length)];
   });
-
+  
   fn.defineProperty(Array.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
