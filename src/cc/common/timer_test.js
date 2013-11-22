@@ -14,28 +14,47 @@ define(function(require, exports, module) {
       var t = cc.createTimer();
       var passed = 0;
       t.start(function() {
+        throw "should be cancelled";
+      }, 10);
+      t.start(function() {
+        assert.isTrue(t.isRunning());
         passed += 1;
         if (passed === 2) {
           t.stop();
+          t.stop();
           done();
         } else if (passed > 2) {
-          assert.fail("timer should be stopped.");
+          assert.fail("timer should be cancelled.");
         }
       }, 10);
     });
-    it("native hack", function(done) {
-      cc.replaceNativeTimerFunctions();
-      var passed = 0;
-      setInterval(function() {
-        passed += 1;
-        if (passed === 2) {
-          cc.resetNativeTimers();
-          cc.restoreNativeTimerFunctions();
+    describe("native hack", function(done) {
+      beforeEach(function() {
+        cc.replaceNativeTimerFunctions();
+      });
+      afterEach(function() {
+        cc.restoreNativeTimerFunctions();
+      });
+      it("setInterval", function(done) {
+        var t = setInterval(function() {
+          clearInterval(t);
           done();
-        } else if (passed > 2) {
-          assert.fail("timer should be stopped.");
-        }
-      }, 10);
+        }, 10);
+      });
+      it("setTimeout", function(done) {
+        var t = setTimeout(function() {
+          done();
+        }, 10);
+      });
+      it("reset", function() {
+        setInterval(function() {
+          assert.fail("timer should be cancelled.");
+        }, 10);
+        setTimeout(function() {
+          assert.fail("timer should be cancelled.");
+        }, 10);
+        cc.resetNativeTimers();
+      });
     });
   });
 

@@ -17,10 +17,7 @@ define(function(require, exports, module) {
       if (this._timerId) {
         _clearInterval(this._timerId);
       }
-      this._timerId = 0;
-      if (typeof callback === "function" && typeof interval === "number") {
-        this._timerId = _setInterval(callback, interval);
-      }
+      this._timerId = _setInterval(callback, interval);
     };
     NativeTimer.prototype.stop = function() {
       if (this._timerId) {
@@ -60,11 +57,8 @@ define(function(require, exports, module) {
       if (this._worker.onmessage) {
         this._worker.postMessage(0);
       }
-      this._worker.onmessage = null;
-      if (typeof callback === "function" && typeof interval === "number") {
-        this._worker.onmessage = callback;
-        this._worker.postMessage(interval);
-      }
+      this._worker.onmessage = callback;
+      this._worker.postMessage(interval);
     };
     WorkerTimer.prototype.stop = function() {
       if (this._worker.onmessage) {

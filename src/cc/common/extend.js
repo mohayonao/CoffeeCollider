@@ -2,11 +2,6 @@ define(function(require, exports, module) {
   "use strict";
   
   var extend = function(child, parent) {
-    for (var key in parent) {
-      if (parent.hasOwnProperty(key)) {
-        child[key] = parent[key];
-      }
-    }
     /*jshint validthis:true */
     function ctor() {
       this.constructor = child;
@@ -16,7 +11,6 @@ define(function(require, exports, module) {
     /*jshint newcap:false */
     child.prototype = new ctor();
     /*jshint newcap:true */
-    child.__super__ = parent.prototype;
     return child;
   };
   
