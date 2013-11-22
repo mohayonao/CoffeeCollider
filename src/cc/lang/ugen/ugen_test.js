@@ -5,13 +5,12 @@ define(function(require, exports, module) {
 
   var cc    = require("../cc");
   var ugen  = require("./ugen");
-  var inout = require("./inout");
+  var UGen  = ugen.UGen;
   
   describe("lang/ugen/ugen.js", function() {
     before(function() {
       ugen.use();
-      inout.use();
-
+      
       cc.registerUGen("Test", {
         $ar: {
           defaults: "val1=1,val2=2",
@@ -30,7 +29,7 @@ define(function(require, exports, module) {
     describe("UGen", function() {
       it("create", function() {
         var instance = cc.global.Test.ar();
-        assert.instanceOf(instance, ugen.UGen);
+        assert.instanceOf(instance, UGen);
         assert.equal("Test", instance.klassName);
       });
       it("inputs", function() {

@@ -72,14 +72,30 @@ define(function(require, exports, module) {
     UGen.prototype.range = fn(function(lo, hi) {
       var mul, add;
       if (this.signalRange === C.BIPOLAR) {
-        mul = (hi - lo) * 0.5;
-        add = mul + lo;
+        mul = (hi.__sub__(lo)).__mul__(0.5);
+        add = mul.__add__(lo);
       } else {
-        mul = (hi - lo);
+        mul = hi.__sub__(lo);
         add = lo;
       }
       return cc.createMulAdd(this, mul, add);
     }).defaults("lo=0,hi=1").multiCall().build();
+    
+    UGen.prototype.exprange = fn(function(lo, hi) {
+      if (this.signalRange === C.BIPOLAR) {
+        return this.linexp(-1, 1, lo, hi);
+      } else {
+        return this.linexp( 0, 1, lo, hi);
+      }
+    }).defaults("lo=0.01,hi=1").multiCall().build();
+
+    UGen.prototype.curverange = fn(function(lo, hi, curve) {
+      if (this.signalRange === C.BIPOLAR) {
+        return this.lincurve(-1, 1, lo, hi, curve);
+      } else {
+        return this.lincurve( 0, 1, lo, hi, curve);
+      }
+    }).defaults("lo=0.01,hi=1,curve=-4").multiCall().build();
     
     UGen.prototype.unipolar = fn(function(mul) {
       return this.range(0, mul);
@@ -133,19 +149,31 @@ define(function(require, exports, module) {
     UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
-
+    
+    UGen.prototype.prune = function(min, max, type) {
+      switch (type) {
+      case "minmax":
+        return this.clip(min, max);
+      case "min":
+        return this.max(min);
+      case "max":
+        return this.min(max);
+      }
+      return this;
+    };
+    
     UGen.prototype.linlin = fn(function(inMin, inMax, outMin, outMax, clip) {
       return cc.global.LinLin(
         this.rate,
-        prune.call(this, inMin, inMax, clip),
+        this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
-
+    
     UGen.prototype.linexp = fn(function(inMin, inMax, outMin, outMax, clip) {
       return cc.global.LinExp(
         this.rate,
-        prune.call(this, inMin, inMax, clip),
+        this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
@@ -153,14 +181,36 @@ define(function(require, exports, module) {
     UGen.prototype.explin = fn(function(inMin, inMax, outMin, outMax, clip) {
       return cc.global.ExpLin(
         this.rate,
-        prune.call(this, inMin, inMax, clip),
+        this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
     
     UGen.prototype.expexp = fn(function(inMin, inMax, outMin, outMax, clip) {
-      return outMax.__div__(outMin).pow(prune.call(this, inMin, inMax, clip).__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
+      return outMax.__div__(outMin).pow(this.prune(inMin, inMax, clip).__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
     }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    
+    UGen.prototype.lincurve = fn(function(inMin, inMax, outMin, outMax, curve, clip) {
+      if (typeof curve === "number" && Math.abs(curve) < 0.25) {
+        return this.linlin(inMin, inMax, outMin, outMax, clip);
+      }
+      var grow = curve.exp();
+      var a = outMax.__sub__(outMin).__div__((1).__sub__(grow));
+      var b = outMin.__add__(a);
+      var scaled = (this.prune(inMin, inMax, clip).__sub__(inMin)).__div__(inMax.__sub__(inMin));
+      return b.__sub__(a.__mul__(grow.pow(scaled)));
+    }).defaults("inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"").multiCall().build();
+    
+    UGen.prototype.curvelin = fn(function(inMin, inMax, outMin, outMax, curve, clip) {
+      if (typeof curve === "number" && Math.abs(curve) < 0.25) {
+        return this.linlin(inMin, inMax, outMin, outMax, clip);
+      }
+      var grow = curve.exp();
+      var a = outMax.__sub__(outMin).__div__((1).__sub__(grow));
+      var b = outMin.__add__(a);
+      var scaled = (this.prune(inMin, inMax, clip).__sub__(inMin)).__div__(inMax.__sub__(inMin));
+      return ((b.__sub__(scaled)).__div__(a)).log().__div__(curve);
+    }).defaults("inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"").multiCall().build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
@@ -177,18 +227,6 @@ define(function(require, exports, module) {
         });
       }
     });
-
-    var prune = function(min, max, type) {
-      switch (type) {
-      case "minmax":
-        return this.clip(min, max);
-      case "min":
-        return this.max(min);
-      case "max":
-        return this.min(max);
-      }
-      return this;
-    };
     
     return UGen;
   })();
