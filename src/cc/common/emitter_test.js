@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var emitter = require("./emitter");
 
-  describe("emitter.js", function() {
+  describe("common/emitter.js", function() {
     var e;
     beforeEach(function() {
       e = emitter.mixin({});

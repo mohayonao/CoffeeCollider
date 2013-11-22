@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var extend = require("./extend");
 
-  describe("extend.js", function() {
+  describe("common/extend.js", function() {
     it("extend", function() {
       var Foo = (function() {
         function Foo() {}

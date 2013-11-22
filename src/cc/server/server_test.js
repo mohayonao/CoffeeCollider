@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var nop = function() { return {}; };
   
-  describe("server.js", function() {
+  describe("server/server.js", function() {
     var called;
     beforeEach(function() {
       require("./server").use();

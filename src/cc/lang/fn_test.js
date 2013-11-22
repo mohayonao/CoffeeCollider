@@ -7,7 +7,7 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var ops = require("../common/ops");
 
-  describe("fn.js", function() {
+  describe("lang/fn.js", function() {
     describe("Fn", function() {
       it("none", function() {
         var calc = fn(function(val, mul, add) {

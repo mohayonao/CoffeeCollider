@@ -8,7 +8,7 @@ define(function(require, exports, module) {
   var bop  = require("./bop");
   var ops  = require("../../common/ops");
   
-  describe("bop.js", function() {
+  describe("server/unit/bop.js", function() {
     describe("calcFunc", function() {
       Object.keys(bop.calcFunc).forEach(function(selector) {
         var specialIndex = ops.BINARY_OP_UGEN_MAP.indexOf(selector);

@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var line = require("./line");
 
-  unitTestSuite.desc = "unit/line.js";
+  unitTestSuite.desc = "server/unit/line.js";
 
   unitTestSuite(["Line", "XLine"], [
     { rate  : C.CONTROL,

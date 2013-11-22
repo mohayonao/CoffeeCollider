@@ -42,7 +42,7 @@ define(function(require, exports, module) {
     });
   };
   
-  describe("coffee.js", function() {
+  describe("client/compiler/coffee.js", function() {
     var testSuite;
     before(function() {
       testSuite = function(func, code, expected, show) {

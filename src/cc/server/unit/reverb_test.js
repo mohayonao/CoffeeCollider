@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var reverb = require("./reverb");
 
-  unitTestSuite.desc = "unit/reverb.js";
+  unitTestSuite.desc = "server/unit/reverb.js";
 
   unitTestSuite("FreeVerb", [
     { rate  : C.AUDIO,

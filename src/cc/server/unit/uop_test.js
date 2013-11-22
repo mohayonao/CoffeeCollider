@@ -8,7 +8,7 @@ define(function(require, exports, module) {
   var uop  = require("./uop");
   var ops  = require("../../common/ops");
    
-  describe("uop.js", function() {
+  describe("server/unit/uop.js", function() {
     describe("calcFunc", function() {
       Object.keys(uop.calcFunc).forEach(function(selector) {
         var specialIndex = ops.UNARY_OP_UGEN_MAP.indexOf(selector);

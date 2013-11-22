@@ -3,7 +3,9 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  describe("instance.js", function() {
+  var instance = require("./instance");
+
+  describe("server/instance.js", function() {
     // TODO: write tests
   });
 

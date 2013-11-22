@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var filter = require("./filter");
 
-  unitTestSuite.desc = "unit/filter.js";
+  unitTestSuite.desc = "server/unit/filter.js";
 
   unitTestSuite(["OnePole", "OneZero"], [
     { rate  : C.AUDIO,

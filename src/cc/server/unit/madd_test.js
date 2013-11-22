@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var madd = require("./madd");
 
-  unitTestSuite.desc = "unit/madd.js";
+  unitTestSuite.desc = "server/unit/madd.js";
 
   unitTestSuite(["MulAdd"], [
     { rate  : C.AUDIO,

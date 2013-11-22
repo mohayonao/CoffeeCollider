@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var unit = require("./unit");
   
-  describe("unit/unit.js", function() {
+  describe("server/unit/unit.js", function() {
     var parent;
     before(function() {
       unit.use();

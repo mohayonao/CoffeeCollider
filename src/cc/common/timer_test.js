@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var timer = require("./timer");
 
-  describe("timer.js", function() {
+  describe("common/timer.js", function() {
     before(function() {
       timer.use();
     });

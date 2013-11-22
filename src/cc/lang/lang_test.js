@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var nop = function() { return {}; };
   
-  describe("lang.js", function() {
+  describe("lang/lang.js", function() {
     var called;
     before(function() {
       require("./lang").use();

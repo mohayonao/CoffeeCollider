@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var cc = require("../../cc");
 
-  describe("compiler.js", function() {
+  describe("client/compiler/compiler.js", function() {
     before(function() {
       require("./compiler").use();
     });

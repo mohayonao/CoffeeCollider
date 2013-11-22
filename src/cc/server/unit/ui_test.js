@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var ui = require("./ui");
 
-  unitTestSuite.desc = "unit/ui.js";
+  unitTestSuite.desc = "server/unit/ui.js";
 
   unitTestSuite(["MouseX", "MouseY"], [
     { rate  : C.CONTROL,

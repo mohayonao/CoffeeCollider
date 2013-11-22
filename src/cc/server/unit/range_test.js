@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var range = require("./range");
   
-  unitTestSuite.desc = "unit/range.js";
+  unitTestSuite.desc = "server/unit/range.js";
   
   unitTestSuite(["InRange", "Clip", "Fold", "Wrap"], [
     { rate  : C.AUDIO,

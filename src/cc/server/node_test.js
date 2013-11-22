@@ -30,7 +30,7 @@ define(function(require, exports, module) {
     }
   })();
   
-  describe("node.js", function() {
+  describe("server/node.js", function() {
     var nodeId, rootNode, nodes;
     beforeEach(function() {
       nodeId = 0;

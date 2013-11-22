@@ -7,7 +7,7 @@ define(function(require, exports, module) {
   var rate = require("./rate");
   var twopi = 2 * Math.PI;
   
-  describe("rate.js", function() {
+  describe("server/rate.js", function() {
     beforeEach(function() {
       rate.use();
     });

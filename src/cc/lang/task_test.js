@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var nop = function() {};
   var nil;
   
-  describe("task.js", function() {
+  describe("lang/task.js", function() {
     var func, cmd, actual;
     before(function() {
       task.use();

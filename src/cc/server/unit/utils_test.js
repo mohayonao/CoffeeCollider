@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var utils = require("./utils");
   
-  describe("utils.js", function() {
+  describe("server/unit/utils.js", function() {
     describe("utility methods", function() {
       it("avoidzero", function() {
         assert.equal(utils.avoidzero(-1e-2), -1e-2);

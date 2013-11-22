@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var buffer = require("./buffer");
   
-  describe("buffer.js", function() {
+  describe("lang/buffer.js", function() {
     // TODO: write tests
   });
 

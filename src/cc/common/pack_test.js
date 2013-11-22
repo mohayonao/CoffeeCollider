@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var pack = require("./pack");
   
-  describe("pack.js", function() {
+  describe("common/pack.js", function() {
     it("pack/unpack", function() {
       var object = {
         list: [ 1, 2, 3, 4, 5 ],

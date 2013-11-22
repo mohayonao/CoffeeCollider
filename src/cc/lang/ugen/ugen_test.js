@@ -7,7 +7,7 @@ define(function(require, exports, module) {
   var ugen  = require("./ugen");
   var inout = require("./inout");
   
-  describe("ugen.js", function() {
+  describe("lang/ugen/ugen.js", function() {
     before(function() {
       ugen.use();
       inout.use();

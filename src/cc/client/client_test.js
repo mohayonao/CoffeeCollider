@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var nop = function() { return {}; };
   
-  describe("client.js", function() {
+  describe("client/client.js", function() {
     before(function() {
       cc.createSynthClientWorkerImpl = function() {
         cc.opmode = "worker";

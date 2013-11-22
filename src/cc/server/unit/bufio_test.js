@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var bufio = require("./bufio");
 
-  unitTestSuite.desc = "unit/bufio.js";
+  unitTestSuite.desc = "server/unit/bufio.js";
 
   unitTestSuite("PlayBuf", [
     { rate  : C.AUDIO,

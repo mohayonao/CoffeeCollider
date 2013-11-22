@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc  = require("./cc");
   var ops = require("../common/ops");
   
-  describe("array.js", function() {
+  describe("lang/array.js", function() {
     before(function() {
       ops.UNARY_OP_UGEN_MAP.push("??array_test??");
       require("./number");

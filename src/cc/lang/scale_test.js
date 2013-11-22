@@ -7,7 +7,7 @@ define(function(require, exports, module) {
   var _Scale  = scale.Scale;
   var _Tuning = scale.Tuning;
   
-  describe("scale.js", function() {
+  describe("lang/scale.js", function() {
     describe("Tuning", function() {
       var et12, just, expected, actual;
       before(function() {

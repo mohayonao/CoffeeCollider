@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
 
-  describe("date.js", function() {
+  describe("lang/date.js", function() {
     var d = new Date();
     before(function() {
       require("./date");

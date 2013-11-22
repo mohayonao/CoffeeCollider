@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   
   var cc = require("./cc");
   
-  describe("pattern.js", function() {
+  describe("lang/pattern.js", function() {
     var emitted;
     before(function() {
       require("./number");

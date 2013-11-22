@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var delay = require("./delay");
   
-  unitTestSuite.desc = "unit/delay.js";
+  unitTestSuite.desc = "server/unit/delay.js";
   
   unitTestSuite(["Delay1", "Delay2"], [
     { rate  : C.AUDIO,

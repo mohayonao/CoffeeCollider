@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
 
-  describe("boolean.js", function() {
+  describe("labg/boolean.js", function() {
     before(function() {
       require("./boolean");
     });

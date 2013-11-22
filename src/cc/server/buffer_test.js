@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var buffer = require("./buffer");
 
-  describe("buffer.js", function() {
+  describe("server/buffer.js", function() {
     // TODO: write tests
   });
 

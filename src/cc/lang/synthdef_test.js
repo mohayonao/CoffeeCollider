@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var synthdef = require("./synthdef");
 
-  describe("synthdef.js", function() {
+  describe("lang/synthdef.js", function() {
     var actual, expected, tl, addToSynth;
     before(function() {
       synthdef.use();

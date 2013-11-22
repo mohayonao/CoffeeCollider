@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var pan = require("./pan");
   
-  unitTestSuite.desc = "unit/pan.js";
+  unitTestSuite.desc = "server/unit/pan.js";
   
   unitTestSuite("Pan2", [
     { rate  : C.AUDIO,

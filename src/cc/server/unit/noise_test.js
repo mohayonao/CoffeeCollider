@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var noise = require("./noise");
 
-  unitTestSuite.desc = "unit/noise.js";
+  unitTestSuite.desc = "server/unit/noise.js";
 
   unitTestSuite(["WhiteNoise", "PinkNoise", "ClipNoise"], [
     { rate  : C.AUDIO,

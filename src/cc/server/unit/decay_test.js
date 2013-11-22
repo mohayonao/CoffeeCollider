@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var decay = require("./decay");
 
-  unitTestSuite.desc = "unit/decay.js";
+  unitTestSuite.desc = "server/unit/decay.js";
   
   unitTestSuite("Integrator", [
     { rate  : C.AUDIO,

@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var unitTestSuite = require("./unit_test").unitTestSuite;
   var osc = require("./osc");
   
-  unitTestSuite.desc = "unit/osc.js";
+  unitTestSuite.desc = "server/unit/osc.js";
 
   unitTestSuite("FSinOsc", [
     { rate  : C.AUDIO,

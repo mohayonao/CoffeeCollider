@@ -6,7 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var data = require("./data");
 
-  describe("data.js", function() {
+  describe("lang/data.js", function() {
     before(function() {
       cc.DATA = [ "1", "2" ];
     });

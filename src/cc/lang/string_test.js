@@ -5,7 +5,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
 
-  describe("string.js", function() {
+  describe("lang/string.js", function() {
     before(function() {
       require("./string");
     });

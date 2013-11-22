@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var calcBeat  = timevalue.calcBeat;
   var calcTicks = timevalue.calcTicks;
   
-  describe("timevlaue.js", function() {
+  describe("common/timevlaue.js", function() {
     before(function() {
       cc.sampleRate = 44100;    
     });

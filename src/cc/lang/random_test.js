@@ -5,7 +5,7 @@ define(function(require, exports, module) {
   
   var cc = require("./cc");
   
-  describe("random.js", function() {
+  describe("lang/random.js", function() {
     before(function() {
       require("./random").use();
     });
