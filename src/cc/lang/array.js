@@ -536,7 +536,7 @@ define(function(require, exports, module) {
   });
 
   fn.defineProperty(Array.prototype, "stutter", fn(function(n) {
-    n = Math.max(0, n)|0;
+    n = Math.max(0, n|0);
     var a = new Array(this.length * n);
     for (var i = 0, j = 0, imax = this.length; i < imax; ++i) {
       for (var k = 0; k < n; ++k, ++j) {
@@ -547,12 +547,12 @@ define(function(require, exports, module) {
   }).defaults("n=2").build());
 
   fn.defineProperty(Array.prototype, "rotate", fn(function(n) {
-    n = Math.max(0, n)|0;
+    n |= 0;
     var a = new Array(this.length);
     var size = a.length;
     n %= size;
     if (n < 0) {
-      n = size + n;
+      n += size;
     }
     for (var i = 0, j = n; i < size; ++i) {
       a[j] = this[i];

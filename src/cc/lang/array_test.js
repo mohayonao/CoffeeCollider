@@ -177,12 +177,18 @@ define(function(require, exports, module) {
         });
         it("minItem", function() {
           assert.equal(list.minItem(), -13);
+          assert.equal(list.minItem(function(x) {
+            return Math.abs(x) % 3;
+          }), 3);
         });
         it("minValue", function() {
           assert.equal(list.minValue(), -13);
         });
         it("maxItem", function() {
           assert.equal(list.maxItem(), 8);
+          assert.equal(list.maxItem(function(x) {
+            return Math.abs(x) % 3;
+          }), -2);
         });
         it("maxValue", function() {
           assert.equal(list.maxValue(), 8);
@@ -302,25 +308,57 @@ define(function(require, exports, module) {
           actual   = list.mirror();
           expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2, 1 ];
           assert.deepEqual(actual, expected);
+
+          actual   = [ 1 ].mirror();
+          expected = [ 1 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = [].mirror();
+          expected = [];
+          assert.deepEqual(actual, expected);
         });
         it("mirror1", function() {
           actual   = list.mirror1();
           expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = [ 1 ].mirror1();
+          expected = [ 1 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = [].mirror1();
+          expected = [];
           assert.deepEqual(actual, expected);
         });
         it("mirror2", function() {
           actual   = list.mirror2();
           expected = [ 1, -2, 3, -5, 8, -13, -13, 8, -5, 3, -2, 1 ];
           assert.deepEqual(actual, expected);
+
+          actual   = [ 1 ].mirror2();
+          expected = [ 1, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = [].mirror2();
+          expected = [];
+          assert.deepEqual(actual, expected);
         });
         it("stutter", function() {
           actual   = list.stutter(3);
           expected = [ 1,1,1, -2,-2,-2, 3,3,3, -5,-5,-5, 8,8,8, -13,-13,-13 ];
           assert.deepEqual(actual, expected);
+
+          actual   = list.stutter(-1);
+          expected = [ ];
+          assert.deepEqual(actual, expected);
         });
         it("rotate", function() {
           actual   = list.rotate(10);
           expected = [ 3, -5, 8, -13, 1, -2 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = list.rotate(-10);
+          expected = [ 8, -13, 1, -2, 3, -5 ];
           assert.deepEqual(actual, expected);
         });
         it.skip("sputter", function() {
@@ -329,15 +367,30 @@ define(function(require, exports, module) {
           actual   = list.clipExtend(10);
           expected = [ 1, -2, 3, -5, 8, -13, -13, -13, -13, -13 ];
           assert.deepEqual(actual, expected);
+          
+          actual   = list.clipExtend(list.length);
+          expected = list;
+          assert.notEqual(actual, expected);
+          assert.deepEqual(actual, expected);
         });
         it("wrapExtend", function() {
           actual   = list.wrapExtend(10);
           expected = [ 1, -2, 3, -5, 8, -13, 1, -2, 3, -5 ];
           assert.deepEqual(actual, expected);
+          
+          actual   = list.wrapExtend(list.length);
+          expected = list;
+          assert.notEqual(actual, expected);
+          assert.deepEqual(actual, expected);
         });
         it("foldExtend", function() {
           actual   = list.foldExtend(10);
           expected = [ 1, -2, 3, -5, 8, -13, 8, -5, 3, -2 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = list.foldExtend(list.length);
+          expected = list;
+          assert.notEqual(actual, expected);
           assert.deepEqual(actual, expected);
         });
         it("resamp0", function() {

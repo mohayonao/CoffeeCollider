@@ -4,7 +4,7 @@ define(function(require, exports, module) {
   module.exports = {
     version: "#{VERSION}",
     global : {},
-    Object : function CCObject() {}
+    Object : function() {}
   };
 
 });
