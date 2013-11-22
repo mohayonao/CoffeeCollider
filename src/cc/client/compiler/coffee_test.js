@@ -836,18 +836,15 @@ define(function(require, exports, module) {
       it("compile", function() {
         var code, c, actual;
         code = [
-          "###comment###",
           "[1,2,3]"
         ].join("\n");
         
         c = cc.createCoffeeCompiler();
         actual = eval(c.compile(code));
         assert.deepEqual(actual, [1,2,3]);
-        assert.deepEqual(c.data, ["comment"]);
         
         actual = eval(c.compile(""));
         assert.isUndefined(actual);
-        assert.deepEqual(c.data, []);
       });
       it("toString", function() {
         var code, c;

@@ -118,7 +118,7 @@ define(function(require, exports, module) {
     var execId   = msg[1];
     var code     = msg[2];
     var append   = msg[3];
-    var callback = msg[5];
+    var callback = msg[4];
     if (!append) {
       this.reset(["/reset"]);
     }

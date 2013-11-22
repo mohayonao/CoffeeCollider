@@ -1058,15 +1058,9 @@ define(function(require, exports, module) {
     function CoffeeCompiler() {
     }
     CoffeeCompiler.prototype.tokens = function(code) {
-      var data = [];
       code = replaceTextBinaryAdverb(code);
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
-        tokens.forEach(function(token) {
-          if (token[TAG] === "HERECOMMENT") {
-            data.push(token[VALUE].trim());
-          }
-        });
         tokens = replaceGlobalVariables(tokens);
         tokens = replaceFixedTimeValue(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
@@ -1079,8 +1073,6 @@ define(function(require, exports, module) {
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
-      this.code = code;
-      this.data = data;
       return tokens;
     };
     CoffeeCompiler.prototype.compile = function(code) {

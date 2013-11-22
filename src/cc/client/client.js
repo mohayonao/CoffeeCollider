@@ -171,7 +171,7 @@ define(function(require, exports, module) {
           this.execCallbacks[this.execId] = callback;
         }
         this.sendToLang([
-          "/execute", this.execId, code, append, this.compiler.data, !!callback
+          "/execute", this.execId, code, append, !!callback
         ]);
         this.execId += 1;
       }

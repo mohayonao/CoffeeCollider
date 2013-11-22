@@ -135,28 +135,28 @@ define(function(require, exports, module) {
         describe("/execute", function() {
           it("not append, without callback", function() {
             var code = "global.result = 10";
-            instance.recvFromClient(["/execute", 0, code, false, "", false]);
+            instance.recvFromClient(["/execute", 0, code, false, false]);
             assert.equal(global.result, 10);
             assert.deepEqual(sendToClient, [""]);
             assert.deepEqual(sendToServer, ["/reset"]);
           });
           it("append, without callback", function() {
             var code = "global.result = 20";
-            instance.recvFromClient(["/execute", 0, code, true, "", false]);
+            instance.recvFromClient(["/execute", 0, code, true, false]);
             assert.equal(global.result, 20);
             assert.deepEqual(sendToClient, [""]);
             assert.deepEqual(sendToServer, [""]);
           });
           it("not append, with callback", function() {
             var code = "global.result = 30";
-            instance.recvFromClient(["/execute", 0, code, false, "", true]);
+            instance.recvFromClient(["/execute", 0, code, false, true]);
             assert.equal(global.result, 30);
             assert.deepEqual(sendToClient, ["/executed", 0, 30]);
             assert.deepEqual(sendToServer, ["/reset"]);
           });
           it("append, with callback", function() {
             var code = "global.result = 40";
-            instance.recvFromClient(["/execute", 0, code, true, "", true]);
+            instance.recvFromClient(["/execute", 0, code, true, true]);
             assert.equal(global.result, 40);
             assert.deepEqual(sendToClient, ["/executed", 0, 40]);
             assert.deepEqual(sendToServer, [""]);

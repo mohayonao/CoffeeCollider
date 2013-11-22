@@ -125,8 +125,7 @@ define(function(require, exports, module) {
         };
         cc.createCompiler = function() {
           return {
-            compile: function(code) { return code; },
-            data   : []
+            compile: function(code) { return code; }
           };
         };
         instance = cc.createSynthClientImpl({ emit:function(e) {
@@ -167,19 +166,19 @@ define(function(require, exports, module) {
         describe("#execute", function() {
           it("not append, without callback", function() {
             instance.execute("10");
-            assert.deepEqual(posted, [ "/execute", 0, "10", false, [], false ]);
+            assert.deepEqual(posted, [ "/execute", 0, "10", false, false ]);
           });
           it("append, without callback", function() {
             instance.execute("10", true);
-            assert.deepEqual(posted, [ "/execute", 0, "10", true, [], false ]);
+            assert.deepEqual(posted, [ "/execute", 0, "10", true, false ]);
           });
           it("not append, callback", function() {
             instance.execute("10", nop);
-            assert.deepEqual(posted, [ "/execute", 0, "10", false, [], true ]);
+            assert.deepEqual(posted, [ "/execute", 0, "10", false, true ]);
           });
           it("append, with callback", function() {
             instance.execute("10", true, nop);
-            assert.deepEqual(posted, [ "/execute", 0, "10", true, [], true ]);
+            assert.deepEqual(posted, [ "/execute", 0, "10", true, true ]);
           });
         });
         it("#getStream", function() {
