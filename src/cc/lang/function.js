@@ -100,6 +100,14 @@ define(function(require, exports, module) {
     }
   });
   
+  fn.defineProperty(Function.prototype, "dup", fn(function(n) {
+    var a = new Array(n|0);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = this(i);
+    }
+    return a;
+  }).defaults("n=2").build());
+  
   module.exports = {};
 
 });

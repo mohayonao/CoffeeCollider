@@ -4,11 +4,12 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   var cc = require("./cc");
+  var date = require("./date");
 
   describe("lang/date.js", function() {
-    var d = new Date();
+    var d, actual, expected;
     before(function() {
-      require("./date");
+      d = new Date();
     });
     describe("uop", function() {
       it("__plus__", function() {
@@ -52,6 +53,11 @@ define(function(require, exports, module) {
       });
       it("__or__", function() {
         assert.deepEqual(d.__or__(d), ["or", d, d]);
+      });
+      it("dup", function() {
+        actual   = d.dup();
+        expected = [d, d];
+        assert.deepEqual(actual, expected);
       });
     });
   });

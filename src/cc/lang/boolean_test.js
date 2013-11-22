@@ -6,6 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
 
   describe("labg/boolean.js", function() {
+    var actual, expected;
     before(function() {
       require("./boolean");
     });
@@ -53,6 +54,11 @@ define(function(require, exports, module) {
       });
       it("__or__", function() {
         assert.deepEqual(true.__or__(false), ["or", true, false]);
+      });
+      it("dup", function() {
+        actual   = true.dup();
+        expected = [true, true];
+        assert.deepEqual(actual, expected);
       });
     });
   });

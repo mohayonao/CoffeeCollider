@@ -647,6 +647,14 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "choose", function() {
     return this[(Math.random() * this.length)|0];
   });
+
+  fn.defineProperty(Array.prototype, "dup", fn(function(n) {
+    var a = new Array(n|0);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = this.slice();
+    }
+    return a;
+  }).defaults("n=2").build());
   
   module.exports = {};
 

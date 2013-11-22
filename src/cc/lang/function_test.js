@@ -4,12 +4,11 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   var cc = require("./cc");
+  var func = require("./function");
   var nop = function() {};
   
   describe("lang/function.js", function() {
-    before(function() {
-      require("./function");
-    });
+    var actual, expected;
     describe("uop", function() {
       it("__plus__", function() {
         assert.equal(nop.__plus__(), 0); // avoid NaN
@@ -53,6 +52,13 @@ define(function(require, exports, module) {
       });
       it("__or__", function() {
         assert.deepEqual(nop.__or__(nop), ["or", nop, nop]);
+      });
+      it("dup", function() {
+        actual   = function(i) {
+          return i;
+        }.dup();
+        expected = [0, 1];
+        assert.deepEqual(actual, expected);
       });
     });
   });

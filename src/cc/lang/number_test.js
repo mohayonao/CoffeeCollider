@@ -4,11 +4,10 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   
   var cc = require("./cc");
+  var number = require("./number");
   
   describe("lang/number.js", function() {
-    before(function() {
-      require("./number");
-    });
+    var actual, expected;
     describe("uop", function() {
       it("__plus__", function() {
         assert.equal(( 2.2).__plus__(), + 2.2);
@@ -747,6 +746,11 @@ define(function(require, exports, module) {
       });
       it("madd", function() {
         assert.equal((5).madd(2, 3), 5 * 2 + 3);
+      });
+      it("dup", function() {
+        actual   = (10).dup();
+        expected = [10, 10];
+        assert.deepEqual(actual, expected);
       });
     });
   });

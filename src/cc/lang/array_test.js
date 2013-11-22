@@ -359,6 +359,11 @@ define(function(require, exports, module) {
           expected = list.indexOf(actual) !== -1;
           assert.isTrue(expected);
         });
+        it("dup", function() {
+          actual   = list.dup();
+          expected = [ [ 1, -2, 3, -5, 8, -13 ], [ 1, -2, 3, -5, 8, -13 ] ];
+          assert.deepEqual(actual, expected);
+        });
       });
     });
     describe("class methods", function() {
