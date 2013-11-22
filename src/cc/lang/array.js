@@ -360,8 +360,21 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "foldAt", fn(function(index) {
     return this[ifold(index, this.length)];
   }).multiCall().build());
-  
 
+  fn.defineProperty(Array.prototype, "blendAt", fn(function(index, method) {
+    switch (method) {
+    case "clipAt": case "wrapAt": case "foldAt":
+      break;
+    default:
+      method = "clipAt";
+    }
+    var i  = index|0;
+    var x0 = this[method](i  );
+    var x1 = this[method](i+1);
+    return x0 + Math.abs(index - i) * (x1 - x0);
+  }).multiCall().build());
+  
+  
   fn.defineProperty(Array.prototype, "put", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {

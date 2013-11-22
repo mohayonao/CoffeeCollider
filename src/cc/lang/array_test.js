@@ -207,6 +207,11 @@ define(function(require, exports, module) {
           expected = [ -2, 3, -5, -5, 3 ];
           assert.deepEqual(actual, expected);
         });
+        it("blendAt", function() {
+          actual   = list.blendAt([1.1, 2.2, 3.3, 4.4, 5.5]);
+          expected = [ -1.5, 1.4, -1.1, -0.40000000000001, -13 ];
+          assert.deepCloseTo(actual, expected, 1e-6);
+        });
         it("put", function() {
           actual   = list.put([-9, -2, 3, 7, 12], [0]);
           expected = [ 1, -2, 3, [0], 8, -13 ];
@@ -340,7 +345,7 @@ define(function(require, exports, module) {
           expected = [ 1, -2, -2, 3, 3, -5, -5, 8, 8, -13 ];
           assert.deepEqual(actual, expected);
         });
-        it.skip("resamp1", function() {
+        it("resamp1", function() {
           actual   = list.resamp1(10);
           expected = [ 1, -0.66666666666667, -1.4444444444444, 1.3333333333333, 1.2222222222222, -3.2222222222222, -0.66666666666666, 6.5555555555556, -1.3333333333333, -13 ];
           assert.deepCloseTo(actual, expected, 1e-6);
