@@ -5,39 +5,39 @@ define(function(require, exports, module) {
   var fn = require("./fn");
 
   // unary operator methods
-  fn.definePrototypeProperty(Boolean, "__plus__", function() {
+  fn.defineProperty(Boolean.prototype, "__plus__", function() {
     return +this;
   });
-  fn.definePrototypeProperty(Boolean, "__minus__", function() {
+  fn.defineProperty(Boolean.prototype, "__minus__", function() {
     return -this;
   });
 
   // binary operator methods
-  fn.definePrototypeProperty(Boolean, "__add__", function(b) {
+  fn.defineProperty(Boolean.prototype, "__add__", function(b) {
     return this + b;
   });
-  fn.definePrototypeProperty(Boolean, "__sub__", function(b) {
+  fn.defineProperty(Boolean.prototype, "__sub__", function(b) {
     var num = this - b;
     if (isNaN(num)) {
       return 0; // avoid NaN
     }
     return num;
   });
-  fn.definePrototypeProperty(Boolean, "__mul__", function(b) {
+  fn.defineProperty(Boolean.prototype, "__mul__", function(b) {
     var num = this * b;
     if (isNaN(num)) {
       return 0; // avoid NaN
     }
     return num;
   });
-  fn.definePrototypeProperty(Boolean, "__div__", function(b) {
+  fn.defineProperty(Boolean.prototype, "__div__", function(b) {
     var num = this / b;
     if (isNaN(num)) {
       return 0; // avoid NaN
     }
     return num;
   });
-  fn.definePrototypeProperty(Boolean, "__mod__", function(b) {
+  fn.defineProperty(Boolean.prototype, "__mod__", function(b) {
     var num = this % b;
     if (isNaN(num)) {
       return 0; // avoid NaN

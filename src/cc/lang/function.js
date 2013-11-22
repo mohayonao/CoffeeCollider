@@ -7,21 +7,21 @@ define(function(require, exports, module) {
   var slice = [].slice;
 
   // unary operator methods
-  fn.definePrototypeProperty(Function, "__plus__", function() {
+  fn.defineProperty(Function.prototype, "__plus__", function() {
     return 0; // avoid NaN
   });
-  fn.definePrototypeProperty(Function, "__minus__", function() {
+  fn.defineProperty(Function.prototype, "__minus__", function() {
     return 0; // avoid NaN
   });
 
   // binary operator methods
-  fn.definePrototypeProperty(Function, "__add__", function(b) {
+  fn.defineProperty(Function.prototype, "__add__", function(b) {
     return this.toString() + b;
   });
-  fn.definePrototypeProperty(Function, "__sub__", function() {
+  fn.defineProperty(Function.prototype, "__sub__", function() {
     return 0; // avoid NaN
   });
-  fn.definePrototypeProperty(Function, "__mul__", function(b) {
+  fn.defineProperty(Function.prototype, "__mul__", function(b) {
     if (typeof b === "function") {
       var f = this, g = b;
       return function() {
@@ -30,10 +30,10 @@ define(function(require, exports, module) {
     }
     return 0; // avoid NaN
   });
-  fn.definePrototypeProperty(Function, "__div__", function() {
+  fn.defineProperty(Function.prototype, "__div__", function() {
     return 0; // avoid NaN
   });
-  fn.definePrototypeProperty(Function, "__mod__", function() {
+  fn.defineProperty(Function.prototype, "__mod__", function() {
     return 0; // avoid NaN
   });
   fn.setupBinaryOp(Function, "__and__", function(b) {
@@ -44,7 +44,7 @@ define(function(require, exports, module) {
   });
 
   // others
-  fn.definePrototypeProperty(Function, "play", function() {
+  fn.defineProperty(Function.prototype, "play", function() {
     var func = this;
     return cc.createSynthDef(
       function() {
@@ -53,7 +53,7 @@ define(function(require, exports, module) {
     ).play();
   });
 
-  fn.definePrototypeProperty(Function, "dup", fn(function(n) {
+  fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);
     for (var i = 0; i < n; ++i) {

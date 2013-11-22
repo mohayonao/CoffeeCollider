@@ -6,34 +6,34 @@ define(function(require, exports, module) {
   var ops = require("../common/ops");
   
   // unary operator methods
-  fn.definePrototypeProperty(Number, "__plus__", function() {
+  fn.defineProperty(Number.prototype, "__plus__", function() {
     return +this;
   });
-  fn.definePrototypeProperty(Number, "__minus__", function() {
+  fn.defineProperty(Number.prototype, "__minus__", function() {
     return -this;
   });
-  fn.definePrototypeProperty(Number, "neg", function() {
+  fn.defineProperty(Number.prototype, "neg", function() {
     return -this;
   });
-  fn.definePrototypeProperty(Number, "not", function() {
+  fn.defineProperty(Number.prototype, "not", function() {
     return this === 0 ? 1 : 0;
   });
-  fn.definePrototypeProperty(Number, "abs", function() {
+  fn.defineProperty(Number.prototype, "abs", function() {
     return Math.abs(this);
   });
-  fn.definePrototypeProperty(Number, "ceil", function() {
+  fn.defineProperty(Number.prototype, "ceil", function() {
     return Math.ceil(this);
   });
-  fn.definePrototypeProperty(Number, "floor", function() {
+  fn.defineProperty(Number.prototype, "floor", function() {
     return Math.floor(this);
   });
-  fn.definePrototypeProperty(Number, "frac", function() {
+  fn.defineProperty(Number.prototype, "frac", function() {
     if (this < 0) {
       return 1 + (this - (this|0));
     }
     return this - (this|0);
   });
-  fn.definePrototypeProperty(Number, "sign", function() {
+  fn.defineProperty(Number.prototype, "sign", function() {
     if (this === 0) {
       return 0;
     } else if (this > 0) {
@@ -41,116 +41,116 @@ define(function(require, exports, module) {
     }
     return -1;
   });
-  fn.definePrototypeProperty(Number, "squared", function() {
+  fn.defineProperty(Number.prototype, "squared", function() {
     return this * this;
   });
-  fn.definePrototypeProperty(Number, "cubed", function() {
+  fn.defineProperty(Number.prototype, "cubed", function() {
     return this * this * this;
   });
-  fn.definePrototypeProperty(Number, "sqrt", function() {
+  fn.defineProperty(Number.prototype, "sqrt", function() {
     return Math.sqrt(Math.abs(this));
   });
-  fn.definePrototypeProperty(Number, "exp", function() {
+  fn.defineProperty(Number.prototype, "exp", function() {
     return Math.exp(this);
   });
-  fn.definePrototypeProperty(Number, "reciprocal", function() {
+  fn.defineProperty(Number.prototype, "reciprocal", function() {
     return 1 / this;
   });
-  fn.definePrototypeProperty(Number, "midicps", function() {
+  fn.defineProperty(Number.prototype, "midicps", function() {
     return 440 * Math.pow(2, (this - 69) * 1/12);
   });
-  fn.definePrototypeProperty(Number, "cpsmidi", function() {
+  fn.defineProperty(Number.prototype, "cpsmidi", function() {
     return Math.log(Math.abs(this) * 1/440) * Math.LOG2E * 12 + 69;
   });
-  fn.definePrototypeProperty(Number, "midiratio", function() {
+  fn.defineProperty(Number.prototype, "midiratio", function() {
     return Math.pow(2, this * 1/12);
   });
-  fn.definePrototypeProperty(Number, "ratiomidi", function() {
+  fn.defineProperty(Number.prototype, "ratiomidi", function() {
     return Math.log(Math.abs(this)) * Math.LOG2E * 12;
   });
-  fn.definePrototypeProperty(Number, "dbamp", function() {
+  fn.defineProperty(Number.prototype, "dbamp", function() {
     return Math.pow(10, this * 0.05);
   });
-  fn.definePrototypeProperty(Number, "ampdb", function() {
+  fn.defineProperty(Number.prototype, "ampdb", function() {
     return Math.log(Math.abs(this)) * Math.LOG10E * 20;
   });
-  fn.definePrototypeProperty(Number, "octcps", function() {
+  fn.defineProperty(Number.prototype, "octcps", function() {
     return 440 * Math.pow(2, this - 4.75);
   });
-  fn.definePrototypeProperty(Number, "cpsoct", function() {
+  fn.defineProperty(Number.prototype, "cpsoct", function() {
     return Math.log(Math.abs(this) * 1/440) * Math.LOG2E + 4.75;
   });
-  fn.definePrototypeProperty(Number, "log", function() {
+  fn.defineProperty(Number.prototype, "log", function() {
     return Math.log(Math.abs(this));
   });
-  fn.definePrototypeProperty(Number, "log2", function() {
+  fn.defineProperty(Number.prototype, "log2", function() {
     return Math.log(Math.abs(this)) * Math.LOG2E;
   });
-  fn.definePrototypeProperty(Number, "log10", function() {
+  fn.defineProperty(Number.prototype, "log10", function() {
     return Math.log(Math.abs(this)) * Math.LOG10E;
   });
-  fn.definePrototypeProperty(Number, "sin", function() {
+  fn.defineProperty(Number.prototype, "sin", function() {
     return Math.sin(this);
   });
-  fn.definePrototypeProperty(Number, "cos", function() {
+  fn.defineProperty(Number.prototype, "cos", function() {
     return Math.cos(this);
   });
-  fn.definePrototypeProperty(Number, "tan", function() {
+  fn.defineProperty(Number.prototype, "tan", function() {
     return Math.tan(this);
   });
-  fn.definePrototypeProperty(Number, "asin", function() {
+  fn.defineProperty(Number.prototype, "asin", function() {
     return Math.asin(Math.max(-1, Math.min(this, 1)));
   });
-  fn.definePrototypeProperty(Number, "acos", function() {
+  fn.defineProperty(Number.prototype, "acos", function() {
     return Math.acos(Math.max(-1, Math.min(this, 1)));
   });
-  fn.definePrototypeProperty(Number, "atan", function() {
+  fn.defineProperty(Number.prototype, "atan", function() {
     return Math.atan(this);
   });
-  fn.definePrototypeProperty(Number, "sinh", function() {
+  fn.defineProperty(Number.prototype, "sinh", function() {
     return (Math.pow(Math.E, this) - Math.pow(Math.E, -this)) * 0.5;
   });
-  fn.definePrototypeProperty(Number, "cosh", function() {
+  fn.defineProperty(Number.prototype, "cosh", function() {
     return (Math.pow(Math.E, this) + Math.pow(Math.E, -this)) * 0.5;
   });
-  fn.definePrototypeProperty(Number, "tanh", function() {
+  fn.defineProperty(Number.prototype, "tanh", function() {
     return this.sinh() / this.cosh();
   });
-  fn.definePrototypeProperty(Number, "rand", function() {
+  fn.defineProperty(Number.prototype, "rand", function() {
     return Math.random() * this;
   });
-  fn.definePrototypeProperty(Number, "rand2", function() {
+  fn.defineProperty(Number.prototype, "rand2", function() {
     return (Math.random() * 2 - 1) * this;
   });
-  fn.definePrototypeProperty(Number, "linrand", function() {
+  fn.defineProperty(Number.prototype, "linrand", function() {
     return Math.min(Math.random(), Math.random()) * this;
   });
-  fn.definePrototypeProperty(Number, "bilinrand", function() {
+  fn.defineProperty(Number.prototype, "bilinrand", function() {
     return (Math.random() - Math.random()) * this;
   });
-  fn.definePrototypeProperty(Number, "sum3rand", function() {
+  fn.defineProperty(Number.prototype, "sum3rand", function() {
     return (Math.random() + Math.random() + Math.random() - 1.5) * 0.666666667 * this;
   });
-  fn.definePrototypeProperty(Number, "distort", function() {
+  fn.defineProperty(Number.prototype, "distort", function() {
     return this / (1 + Math.abs(this));
   });
-  fn.definePrototypeProperty(Number, "softclip", function() {
+  fn.defineProperty(Number.prototype, "softclip", function() {
     var absa = Math.abs(this);
     return absa <= 0.5 ? this : (absa - 0.25) / this;
   });
-  fn.definePrototypeProperty(Number, "coin", function() {
+  fn.defineProperty(Number.prototype, "coin", function() {
     return Math.random() < this;
   });
-  fn.definePrototypeProperty(Number, "num", function() {
+  fn.defineProperty(Number.prototype, "num", function() {
     return +this;
   });
-  fn.definePrototypeProperty(Number, "tilde", function() {
+  fn.defineProperty(Number.prototype, "tilde", function() {
     return ~this;
   });
-  fn.definePrototypeProperty(Number, "pi", function() {
+  fn.defineProperty(Number.prototype, "pi", function() {
     return this * Math.PI;
   });
-  fn.definePrototypeProperty(Number, "to_i", function() {
+  fn.defineProperty(Number.prototype, "to_i", function() {
     return this|0;
   });
   
@@ -381,14 +381,14 @@ define(function(require, exports, module) {
     return _in - range * Math.floor((_in + b) / range);
   });
 
-  fn.definePrototypeProperty(Number, "rrand", fn(function(num) {
+  fn.defineProperty(Number.prototype, "rrand", fn(function(num) {
     var a = this, b = num;
     return a > b ?
       Math.random() * (b - a) + a :
       Math.random() * (a - b) + b;
   }).defaults("num=0").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "exprand", fn(function(num) {
+  fn.defineProperty(Number.prototype, "exprand", fn(function(num) {
     var a = this, b = num;
     if (a === 0 && b === 0) {
       return 0;
@@ -399,11 +399,11 @@ define(function(require, exports, module) {
   }).defaults("num=0").multiCall().build());
   
   // others
-  fn.definePrototypeProperty(Number, "madd", fn(function(mul, add) {
+  fn.defineProperty(Number.prototype, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
   }).defaults("mul=1,add=0").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
+  fn.defineProperty(Number.prototype, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
     switch (clip) {
     case "min":
       if (this <= inMin) {
@@ -429,7 +429,7 @@ define(function(require, exports, module) {
     return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
   }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+  fn.defineProperty(Number.prototype, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
     switch (clip) {
     case "min":
       if (this <= inMin) { return outMin; }
@@ -447,7 +447,7 @@ define(function(require, exports, module) {
     return Math.pow(outMax/outMin, (this-inMin)/(inMax-inMin)) * outMin;
   }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
+  fn.defineProperty(Number.prototype, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
     switch (clip) {
     case "min":
       if (this <= inMin) { return outMin; }
@@ -465,7 +465,7 @@ define(function(require, exports, module) {
     return (Math.log(this/inMin)) / (Math.log(inMax/inMin)) * (outMax-outMin) + outMin;
   }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
 
-  fn.definePrototypeProperty(Number, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+  fn.defineProperty(Number.prototype, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
     switch (clip) {
     case "min":
       if (this <= inMin) { return outMin; }
@@ -488,7 +488,7 @@ define(function(require, exports, module) {
     if (Number.prototype[selector]) {
       return;
     }
-    fn.definePrototypeProperty(Number, selector, function() {
+    fn.defineProperty(Number.prototype, selector, function() {
       return this;
     });
   });

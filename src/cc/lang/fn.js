@@ -154,9 +154,9 @@ define(function(require, exports, module) {
       return new Fn(func);
     };
   })();
-  
-  fn.definePrototypeProperty = function(Klass, key, func) {
-    Object.defineProperty(Klass.prototype, key, {
+
+  fn.defineProperty = function(Klass, key, func) {
+    Object.defineProperty(Klass, key, {
       configurable: true,
       enumerable  : false,
       writable    : true,
@@ -171,7 +171,7 @@ define(function(require, exports, module) {
     } else {
       ugenSelector = selector;
     }
-    fn.definePrototypeProperty(Klass, selector, function(b) {
+    fn.defineProperty(Klass.prototype, selector, function(b) {
       var a = this;
       if (Array.isArray(b)) {
         return b.map(function(b) {

@@ -8,7 +8,7 @@ define(function(require, exports, module) {
   var slice = [].slice;
 
   var setupUnaryOp = function(selector) {
-    fn.definePrototypeProperty(Array, selector, function() {
+    fn.defineProperty(Array.prototype, selector, function() {
       return this.map(function(x) { return x[selector](); });
     });
   };
@@ -81,7 +81,7 @@ define(function(require, exports, module) {
     } else {
       ugenSelector = selector;
     }
-    fn.definePrototypeProperty(Array, selector, function(b, adverb) {
+    fn.defineProperty(Array.prototype, selector, function(b, adverb) {
       if (Array.isArray(b)) {
         return calc_with_adverb(selector, this, b, adverb);
       } else if (cc.instanceOfUGen(b)) {
@@ -100,10 +100,10 @@ define(function(require, exports, module) {
   setupBinaryOp("__mul__");
   setupBinaryOp("__div__");
   setupBinaryOp("__mod__");
-  fn.definePrototypeProperty(Array, "__and__", function(b) {
+  fn.defineProperty(Array.prototype, "__and__", function(b) {
     return cc.createTaskWaitLogic("and", this.concat(b));
   });
-  fn.definePrototypeProperty(Array, "__or__", function(b) {
+  fn.defineProperty(Array.prototype, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", this.concat(b));
   });
   ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
@@ -114,7 +114,7 @@ define(function(require, exports, module) {
 
   var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
   Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
-    fn.definePrototypeProperty(Array, selector, fn(function() {
+    fn.defineProperty(Array.prototype, selector, fn(function() {
       var args = slice.call(arguments);
       return this.map(function(_in) {
         if (_in[selector]) {
@@ -141,7 +141,7 @@ define(function(require, exports, module) {
   };
   
   // array class methods
-  Array.series = fn(function(size, start, step) {
+  fn.defineProperty(Array, "series", fn(function(size, start, step) {
     size |= 0;
     var a = new Array(size);
     var value = start;
@@ -150,9 +150,9 @@ define(function(require, exports, module) {
       value += step;
     }
     return a;
-  }).defaults("size=0,start=0,step=1").build();
+  }).defaults("size=0,start=0,step=1").build());
 
-  Array.geom = fn(function(size, start, grow) {
+  fn.defineProperty(Array, "geom", fn(function(size, start, grow) {
     size |= 0;
     var a = new Array(size);
     var value = start;
@@ -161,9 +161,9 @@ define(function(require, exports, module) {
       value *= grow;
     }
     return a;
-  }).defaults("size=0,start=1,grow=2").build();
+  }).defaults("size=0,start=1,grow=2").build());
 
-  Array.fill = fn(function(size, func) {
+  fn.defineProperty(Array, "fill", fn(function(size, func) {
     size |= 0;
     var a = new Array(size);
     func  = cc_func(func);
@@ -171,9 +171,9 @@ define(function(require, exports, module) {
       a[i] = func(i);
     }
     return a;
-  }).defaults("size=0,func=0").build();
+  }).defaults("size=0,func=0").build());
 
-  Array.fill2D = fn(function(rows, cols, func) {
+  fn.defineProperty(Array, "fill2D", fn(function(rows, cols, func) {
     rows |= 0;
     cols |= 0;
     func = cc_func(func);
@@ -186,9 +186,9 @@ define(function(require, exports, module) {
       }
     }
     return a;
-  }).defaults("rows=0,cols=0,func=0").build();
+  }).defaults("rows=0,cols=0,func=0").build());
 
-  Array.fillND = (function() {
+  fn.defineProperty(Array, "fillND", (function() {
     var fillND = function(dimensions, func, args) {
       var n, a, argIndex, i;
       n = dimensions[0];
@@ -212,9 +212,9 @@ define(function(require, exports, module) {
     return fn(function(dimensions, func) {
       return fillND(dimensions, cc_func(func), []);
     }).defaults("dimensions=[],func=0").build();
-  })();
+  })());
 
-  Array.fib = fn(function(size, x, y) {
+  fn.defineProperty(Array, "fib", fn(function(size, x, y) {
     var a = new Array(size|0);
     for (var t, i = 0, imax = a.length; i < imax; i++) {
       a[i] = y;
@@ -223,41 +223,41 @@ define(function(require, exports, module) {
       x = t;
     }
     return a;
-  }).defaults("size=0,a=0,b=1").build();
+  }).defaults("size=0,a=0,b=1").build());
 
-  Array.rand = fn(function(size, minVal, maxVal) {
+  fn.defineProperty(Array, "rand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
       a[i] = minVal.rrand(maxVal);
     }
     return a;
-  }).defaults("size=0,minVal=0,maxVal=1").build();
-
-  Array.rand2 = fn(function(size, val) {
+  }).defaults("size=0,minVal=0,maxVal=1").build());
+  
+  fn.defineProperty(Array, "rand2", fn(function(size, val) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
       a[i] = val.rand2();
     }
     return a;
-  }).defaults("size=0,val=1").build();
+  }).defaults("size=0,val=1").build());
 
-  Array.linrand = fn(function(size, minVal, maxVal) {
+  fn.defineProperty(Array, "linrand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
       a[i] = minVal.linrand(maxVal);
     }
     return a;
-  }).defaults("size=0,minVal=0,maxVal=1").build();
+  }).defaults("size=0,minVal=0,maxVal=1").build());
 
-  Array.exprand = fn(function(size, minVal, maxVal) {
+  fn.defineProperty(Array, "exprand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
       a[i] = minVal.exprand(maxVal);
     }
     return a;
-  }).defaults("size=0,minVal=0.001,maxVal=1").build();
+  }).defaults("size=0,minVal=0.001,maxVal=1").build());
   
-  Array.interpolation = fn(function(size, start, end) {
+  fn.defineProperty(Array, "interpolation", fn(function(size, start, end) {
     if (size === 1) {
       return [start];
     }
@@ -267,7 +267,7 @@ define(function(require, exports, module) {
       a[i] = start + (i * step);
     }
     return a;
-  }).defaults("size=0,start=0,end=1").build();
+  }).defaults("size=0,start=0,end=1").build());
   
   
   // array instance methods
@@ -283,7 +283,7 @@ define(function(require, exports, module) {
     return index;
   };
   
-  fn.definePrototypeProperty(Array, "size", function() {
+  fn.defineProperty(Array.prototype, "size", function() {
     return this.length;
   });
   
@@ -311,8 +311,8 @@ define(function(require, exports, module) {
     return minItem;
   };
   
-  fn.definePrototypeProperty(Array, "minItem" , minItem);
-  fn.definePrototypeProperty(Array, "minValue", minItem);
+  fn.defineProperty(Array.prototype, "minItem" , minItem);
+  fn.defineProperty(Array.prototype, "minValue", minItem);
   
   var maxItem = function(func) {
     var i, imax, val, maxVal, maxItem;
@@ -338,18 +338,18 @@ define(function(require, exports, module) {
     return maxItem;
   };
   
-  fn.definePrototypeProperty(Array, "maxItem" , maxItem);
-  fn.definePrototypeProperty(Array, "maxValue", maxItem);
+  fn.defineProperty(Array.prototype, "maxItem" , maxItem);
+  fn.defineProperty(Array.prototype, "maxValue", maxItem);
   
-  fn.definePrototypeProperty(Array, "at", fn(function(index) {
+  fn.defineProperty(Array.prototype, "at", fn(function(index) {
     return this[index|0];
   }).multiCall().build());
 
-  fn.definePrototypeProperty(Array, "clipAt", fn(function(index) {
+  fn.defineProperty(Array.prototype, "clipAt", fn(function(index) {
     return this[Math.max(0, Math.min(index, this.length-1))|0];
   }).multiCall().build());
 
-  fn.definePrototypeProperty(Array, "wrapAt", fn(function(index) {
+  fn.defineProperty(Array.prototype, "wrapAt", fn(function(index) {
     index = (index|0) % this.length;
     if (index < 0) {
       index += this.length;
@@ -357,12 +357,12 @@ define(function(require, exports, module) {
     return this[index];
   }).multiCall().build());
 
-  fn.definePrototypeProperty(Array, "foldAt", fn(function(index) {
+  fn.defineProperty(Array.prototype, "foldAt", fn(function(index) {
     return this[ifold(index, this.length)];
   }).multiCall().build());
   
 
-  fn.definePrototypeProperty(Array, "put", function(index, item) {
+  fn.defineProperty(Array.prototype, "put", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
         this.put(index, item);
@@ -376,7 +376,7 @@ define(function(require, exports, module) {
     return this;
   });
 
-  fn.definePrototypeProperty(Array, "clipPut", function(index, item) {
+  fn.defineProperty(Array.prototype, "clipPut", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
         this.clipPut(index, item);
@@ -387,7 +387,7 @@ define(function(require, exports, module) {
     return this;
   });
 
-  fn.definePrototypeProperty(Array, "wrapPut", function(index, item) {
+  fn.defineProperty(Array.prototype, "wrapPut", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
         this.wrapPut(index, item);
@@ -402,7 +402,7 @@ define(function(require, exports, module) {
     return this;
   });
   
-  fn.definePrototypeProperty(Array, "foldPut", function(index, item) {
+  fn.defineProperty(Array.prototype, "foldPut", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
         this.foldPut(index, item);
@@ -413,12 +413,12 @@ define(function(require, exports, module) {
     return this;
   });
 
-  fn.definePrototypeProperty(Array, "insert", function(index, item) {
+  fn.defineProperty(Array.prototype, "insert", function(index, item) {
     this.splice(Math.max(0, index), 0, item);
     return this;
   });
   
-  fn.definePrototypeProperty(Array, "swap", function(i, j) {
+  fn.defineProperty(Array.prototype, "swap", function(i, j) {
     i |= 0;
     j |= 0;
     if (0 <= i && i < this.length && 0 <= j && j < this.length) {
@@ -429,13 +429,13 @@ define(function(require, exports, module) {
     return this;
   });
 
-  fn.definePrototypeProperty(Array, "clipSwap", function(i, j) {
+  fn.defineProperty(Array.prototype, "clipSwap", function(i, j) {
     i = Math.max(0, Math.min(i, this.length-1))|0;
     j = Math.max(0, Math.min(j, this.length-1))|0;
     return this.swap(i, j);
   });
   
-  fn.definePrototypeProperty(Array, "wrapSwap", function(i, j) {
+  fn.defineProperty(Array.prototype, "wrapSwap", function(i, j) {
     i = (i|0) % this.length;
     if (i < 0) {
       i += this.length;
@@ -447,13 +447,13 @@ define(function(require, exports, module) {
     return this.swap(i, j);
   });
   
-  fn.definePrototypeProperty(Array, "foldSwap", function(i, j) {
+  fn.defineProperty(Array.prototype, "foldSwap", function(i, j) {
     i = ifold(i, this.length);
     j = ifold(j, this.length);
     return this.swap(i, j);
   });
 
-  fn.definePrototypeProperty(Array, "sum", function() {
+  fn.defineProperty(Array.prototype, "sum", function() {
     var value = 0;
     for (var i = 0, imax = this.length; i < imax; ++i) {
       value += this[i];
@@ -461,7 +461,7 @@ define(function(require, exports, module) {
     return value;
   });
   
-  fn.definePrototypeProperty(Array, "normalize", fn(function(min, max) {
+  fn.defineProperty(Array.prototype, "normalize", fn(function(min, max) {
     var minItem = this.minItem();
     var maxItem = this.maxItem();
     return this.map(function(item) {
@@ -469,7 +469,7 @@ define(function(require, exports, module) {
     });
   }).defaults("min=0,max=1").build());
 
-  fn.definePrototypeProperty(Array, "normalizeSum", function() {
+  fn.defineProperty(Array.prototype, "normalizeSum", function() {
     var sum = this.sum();
     return this.map(function(item) {
       return item / sum;
@@ -477,7 +477,7 @@ define(function(require, exports, module) {
   });
   
   
-  fn.definePrototypeProperty(Array, "mirror", function() {
+  fn.defineProperty(Array.prototype, "mirror", function() {
     var size = this.length * 2 - 1;
     if (size < 2) {
       return this.slice(0);
@@ -492,7 +492,7 @@ define(function(require, exports, module) {
     return a;
   });
 
-  fn.definePrototypeProperty(Array, "mirror1", function() {
+  fn.defineProperty(Array.prototype, "mirror1", function() {
     var size = this.length * 2 - 2;
     if (size < 2) {
       return this.slice(0);
@@ -507,7 +507,7 @@ define(function(require, exports, module) {
     return a;
   });
 
-  fn.definePrototypeProperty(Array, "mirror2", function() {
+  fn.defineProperty(Array.prototype, "mirror2", function() {
     var size = this.length * 2;
     if (size < 2) {
       return this.slice(0);
@@ -522,7 +522,7 @@ define(function(require, exports, module) {
     return a;
   });
 
-  fn.definePrototypeProperty(Array, "stutter", fn(function(n) {
+  fn.defineProperty(Array.prototype, "stutter", fn(function(n) {
     n = Math.max(0, n)|0;
     var a = new Array(this.length * n);
     for (var i = 0, j = 0, imax = this.length; i < imax; ++i) {
@@ -533,7 +533,7 @@ define(function(require, exports, module) {
     return a;
   }).defaults("n=2").build());
 
-  fn.definePrototypeProperty(Array, "rotate", fn(function(n) {
+  fn.defineProperty(Array.prototype, "rotate", fn(function(n) {
     n = Math.max(0, n)|0;
     var a = new Array(this.length);
     var size = a.length;
@@ -550,7 +550,7 @@ define(function(require, exports, module) {
     return a;
   }).defaults("n=1").build());
 
-  fn.definePrototypeProperty(Array, "sputter", fn(function(probability, maxlen) {
+  fn.defineProperty(Array.prototype, "sputter", fn(function(probability, maxlen) {
     var a = [], i = 0, j = 0, size = this.length;
     while (i < size && j < maxlen) {
       a[j++] = this[i];
@@ -561,7 +561,7 @@ define(function(require, exports, module) {
     return a;
   }).defaults("probability=0.25,maxlen=100").build());
 
-  fn.definePrototypeProperty(Array, "clipExtend", function(size) {
+  fn.defineProperty(Array.prototype, "clipExtend", function(size) {
     size = Math.max(0, size|0);
     if (this.length < size) {
       var a = new Array(size);
@@ -577,7 +577,7 @@ define(function(require, exports, module) {
     }
   });
 
-  fn.definePrototypeProperty(Array, "wrapExtend", function(size) {
+  fn.defineProperty(Array.prototype, "wrapExtend", function(size) {
     size = Math.max(0, size|0);
     if (this.length < size) {
       var a = new Array(size);
@@ -590,7 +590,7 @@ define(function(require, exports, module) {
     }
   });
 
-  fn.definePrototypeProperty(Array, "foldExtend", function(size) {
+  fn.defineProperty(Array.prototype, "foldExtend", function(size) {
     size = Math.max(0, size|0);
     if (this.length < size) {
       var a = new Array(size);
@@ -603,7 +603,7 @@ define(function(require, exports, module) {
     }
   });
 
-  fn.definePrototypeProperty(Array, "resamp0", function(newSize) {
+  fn.defineProperty(Array.prototype, "resamp0", function(newSize) {
     var factor = (this.length - 1) / (newSize - 1);
     var a = new Array(newSize);
     for (var i = 0; i < newSize; ++i) {
@@ -612,7 +612,7 @@ define(function(require, exports, module) {
     return a;
   });
 
-  fn.definePrototypeProperty(Array, "resamp1", function(newSize) {
+  fn.defineProperty(Array.prototype, "resamp1", function(newSize) {
     var factor = (this.length - 1) / (newSize - 1);
     var a = new Array(newSize);
     for (var i = 0; i < newSize; ++i) {
@@ -624,14 +624,14 @@ define(function(require, exports, module) {
   var scramble = function() {
     return Math.random() - 0.5;
   };
-  fn.definePrototypeProperty(Array, "scramble", function() {
+  fn.defineProperty(Array.prototype, "scramble", function() {
     return this.sort(scramble);
   });
-  fn.definePrototypeProperty(Array, "shuffle", function() {
+  fn.defineProperty(Array.prototype, "shuffle", function() {
     return this.sort(scramble);
   });
   
-  fn.definePrototypeProperty(Array, "choose", function() {
+  fn.defineProperty(Array.prototype, "choose", function() {
     return this[(Math.random() * this.length)|0];
   });
   

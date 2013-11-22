@@ -210,8 +210,8 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
-    it("definePrototypeProperty", function() {
-      fn.definePrototypeProperty(Array, "fn_test", function() {
+    it("defineProperty", function() {
+      fn.defineProperty(Array.prototype, "fn_test", function() {
         return "fn_test";
       });
       assert.equal([10].fn_test(), "fn_test");

@@ -5,14 +5,14 @@ define(function(require, exports, module) {
   var utils = require("./utils");
   
   // unary operator methods
-  fn.definePrototypeProperty(String, "__plus__", function() {
+  fn.defineProperty(String.prototype, "__plus__", function() {
     var num = +this;
     if (isNaN(num)) {
       return 0; // avoid NaN
     }
     return num;
   });
-  fn.definePrototypeProperty(String, "__minus__", function() {
+  fn.defineProperty(String.prototype, "__minus__", function() {
     var num = -this;
     if (isNaN(num)) {
       return 0; // avoid NaN
