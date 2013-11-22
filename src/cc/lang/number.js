@@ -157,6 +157,12 @@ define(function(require, exports, module) {
   fn.defineProperty(Number.prototype, "to_i", function() {
     return this|0;
   });
+  fn.defineProperty(Number.prototype, "half", function() {
+    return this * 0.5;
+  });
+  fn.defineProperty(Number.prototype, "twice", function() {
+    return this * 2;
+  });
   
   // binary operator methods
   fn.setupBinaryOp(Number, "__add__", function(b) {

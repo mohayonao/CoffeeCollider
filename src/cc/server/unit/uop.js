@@ -196,6 +196,12 @@ define(function(require, exports, module) {
   calcFunc.to_i = function(a) {
     return a|0;
   };
+  calcFunc.half = function(a) {
+    return a * 0.5;
+  };
+  calcFunc.twice = function(a) {
+    return a * 2;
+  };
   
   Object.keys(calcFunc).forEach(function(key) {
     var func = calcFunc[key];

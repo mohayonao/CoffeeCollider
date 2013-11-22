@@ -254,6 +254,16 @@ define(function(require, exports, module) {
           assert.closeTo((  0).pi(),   0, 1e-6);
           assert.closeTo((-10).pi(), -31.415926535898, 1e-6);
         });
+        it("to_i", function() {
+          assert.equal(( 10.5).to_i(),  10);
+          assert.equal((-10.5).to_i(), -10);
+        });
+        it("half", function() {
+          assert.equal((10).half(), 5);
+        });
+        it("twice", function() {
+          assert.equal((10).twice(), 20);
+        });
       });
       describe("bop", function() {
         before(function() {
