@@ -67,13 +67,13 @@ define(function(require, exports, module) {
       } else {
         ctor(bus, channelsArray);
       }
-      return 0; // Out has no output
+      return 1; // Out has no output
     };
   };
   
   cc.ugen.specs.Out = {
     Klass    : null,
-    multiCall: false,
+    multiCall: 0,
     $ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: out_ctor(C.AUDIO),

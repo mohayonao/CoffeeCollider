@@ -327,10 +327,7 @@ define(function(require, exports, module) {
     var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
     var multiCall   = spec.multiCall;
     var checkInputs = spec.checkInputs;
-    if (multiCall === undefined) {
-      multiCall = true;
-    }
-
+    
     var klass;
     if (spec.$new) {
       klass = function() {
