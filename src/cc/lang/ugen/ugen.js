@@ -4,11 +4,12 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var fn = require("../fn");
   var extend = require("../../common/extend");
-  var ops = require("../../common/ops");
+  var ops    = require("../../common/ops");
   var slice  = [].slice;
   
   var addToSynthDef = null;
   var specs = {};
+  
   cc.ugen = {
     specs:specs,
     checkSameRateAsFirstInput: function(ugen) {
@@ -53,13 +54,30 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
-
+    
+    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        UGen.prototype[selector] = function() {
+          return cc.createUnaryOpUGen(selector, this);
+        };
+      }
+    });
+    
     UGen.prototype.__plus__ = function() {
       return this;
     };
     UGen.prototype.__minus__ = function() {
       return this.neg();
     };
+    
+    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
+      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+        fn.setupBinaryOp(UGen, selector, function(b) {
+          return cc.createBinaryOpUGen(selector, this, b);
+        });
+      }
+    });
+    
     fn.setupBinaryOp(UGen, "__add__", function(b) {
       return cc.createBinaryOpUGen("+", this, b);
     });
@@ -75,6 +93,10 @@ define(function(require, exports, module) {
     fn.setupBinaryOp(UGen, "__mod__", function(b) {
       return cc.createBinaryOpUGen("%", this, b);
     });
+
+    UGen.prototype.copy = function() {
+      return this;
+    };
     
     UGen.prototype.madd = fn(function(mul, add) {
       return cc.createMulAdd(this, mul, add);
@@ -171,6 +193,14 @@ define(function(require, exports, module) {
     UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
     }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+
+    UGen.prototype.varlag = fn(function(time, curvature, warp, start) {
+      return cc.global.VarLag(this.rate, this, time, curvature, warp, start);
+    }).defaults("time=0.1,curvature=0,warp=5,start=0").multiCall().build();
+    
+    UGen.prototype.slew = fn(function(up, down) {
+      return cc.global.Slew(this.rate, this, up, down);
+    }).defaults("up=1,down=1").multiCall().build();
     
     UGen.prototype.prune = function(min, max, type) {
       switch (type) {
@@ -241,22 +271,6 @@ define(function(require, exports, module) {
       ]);
     }).defaults("inCenter=0.5,inMin=0,inMax=1,outCenter=0.5,outMin=0,outMax=1,clip=\"minmax\"").build();
     
-    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        UGen.prototype[selector] = function() {
-          return cc.createUnaryOpUGen(selector, this);
-        };
-      }
-    });
-    
-    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        fn.setupBinaryOp(UGen, selector, function(b) {
-          return cc.createBinaryOpUGen(selector, this, b);
-        });
-      }
-    });
-    
     return UGen;
   })();
   
@@ -266,6 +280,7 @@ define(function(require, exports, module) {
       this.channels = null;
     }
     extend(MultiOutUGen, UGen);
+    
     MultiOutUGen.prototype.initOutputs = function(numChannels, rate) {
       var channels = new Array(numChannels);
       for (var i = 0; i < numChannels; ++i) {
@@ -285,6 +300,7 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;
     };
+    
     return MultiOutUGen;
   })();
   
@@ -297,9 +313,10 @@ define(function(require, exports, module) {
       this.outputIndex  = index;
     }
     extend(OutputProxy, UGen);
+    
     return OutputProxy;
   })();
-
+  
   var checkBadInput = function(ugen) {
     ugen.inputs.forEach(function(_in, i) {
       if (!(typeof _in === "number" || _in instanceof UGen)) {
@@ -379,7 +396,6 @@ define(function(require, exports, module) {
       }
     });
   };
-  
   
   cc.createUGen = function() {
     return new UGen();
