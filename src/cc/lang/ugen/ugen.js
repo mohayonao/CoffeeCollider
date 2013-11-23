@@ -14,8 +14,19 @@ define(function(require, exports, module) {
     checkSameRateAsFirstInput: function(ugen) {
       if (ugen.rate !== ugen.inputs[0].rate) {
         var strRate = ["ir","kr","ar"][ugen.rate];
-        throw new TypeError("first input is not " + strRate + " rate");
+        throw new Error("first input is not " + strRate + " rate");
       }
+    },
+    checkNInputs: function(n) {
+      return function(ugen) {
+        if (ugen.rate === C.AUDIO) {
+          for (var i = 0; i < n; ++i) {
+            if (ugen.inputs[i].rate !== C.AUDIO) {
+              throw new Error("input[" + i + "] is not AUDIO rate");
+            }
+          }
+        }
+      };
     }
   };
   
@@ -116,6 +127,17 @@ define(function(require, exports, module) {
     UGen.prototype.wrap = fn(function(lo, hi) {
       return cc.global.Wrap(this.rate, this, lo, hi);
     }).defaults("lo=1,hi=1").multiCall().build();
+
+    UGen.prototype.blend = fn(function(that, blendFrac) {
+      var pan = blendFrac.linlin(0.0, 1.0, -1, 1);
+      if (this.rate === C.AUDIO) {
+        return cc.global.XFade2.ar(this, that, pan);
+      }
+      if (that.rate === C.AUDIO) {
+        return cc.global.XFade2.ar(that, this, pan.neg());
+      }
+      return cc.global.LinXFade2(this.rate, this, that, pan);
+    }).defaults("that=0,blendFrac=0.5").multiCall().build();
     
     UGen.prototype.lag = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {

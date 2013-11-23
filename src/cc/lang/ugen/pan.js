@@ -17,7 +17,7 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.Pan2 = {
     Klass: cc.MultiOutUGen,
-    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    checkInputs: cc.ugen.checkNInputs(1),
     $ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.AUDIO)
@@ -25,6 +25,38 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: pan2_ctor(C.CONTROL),
+    }
+  };
+
+  cc.ugen.specs.XFade2 = {
+    checkInputs: cc.ugen.checkNInputs(2),
+    $ar: {
+      defaults: "inA=0,inB=0,pan=0,level=1",
+      ctor: function(inA, inB, pan, level) {
+        return this.init(C.AUDIO, inA, inB, pan, level);
+      }
+    },
+    $kr: {
+      defaults: "inA=0,inB=0,pan=0,level=1",
+      ctor: function(inA, inB, pan, level) {
+        return this.init(C.CONTROL, inA, inB, pan, level);
+      }
+    }
+  };
+
+  cc.ugen.specs.LinXFade2 = {
+    checkInputs: cc.ugen.checkNInputs(2),
+    $ar: {
+      defaults: "inA=0,inB=0,pan=0,level=1",
+      ctor: function(inA, inB, pan, level) {
+        return this.init(C.AUDIO, inA, inB, pan).__mul__(level);
+      }
+    },
+    $kr: {
+      defaults: "inA=0,inB=0,pan=0,level=1",
+      ctor: function(inA, inB, pan, level) {
+        return this.init(C.CONTROL, inA, inB, pan).__mul__(level);
+      }
     }
   };
   

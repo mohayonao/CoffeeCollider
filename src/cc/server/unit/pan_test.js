@@ -28,4 +28,40 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite("XFade2", [
+    { rate: C.AUDIO,
+      inputs: [
+        { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
+        { name:"pos"  , rate:C.AUDIO  , value:unitTestSuite.in2 },
+        { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+      ]
+    },
+    { rate: C.AUDIO,
+      inputs: [
+        { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
+        { name:"pos"  , rate:C.CONTROL, value:unitTestSuite.in2 },
+        { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+      ]
+    }
+  ]);
+  
+  unitTestSuite("LinXFade2", [
+    { rate: C.AUDIO,
+      inputs: [
+        { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
+        { name:"pos"  , rate:C.AUDIO  , value:unitTestSuite.in2 },
+      ]
+    },
+    { rate: C.AUDIO,
+      inputs: [
+        { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
+        { name:"pos"  , rate:C.CONTROL, value:unitTestSuite.in2 },
+      ]
+    }
+  ]);
+
 });
