@@ -123,6 +123,28 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Select = {
+    multiCall: 1,
+    $ar: {
+      defaults: "which=0,array=[]",
+      ctor: function(which, array) {
+        if (!Array.isArray(array)) {
+          array = [ array ];
+        }
+        return this.init.apply(this, [C.AUDIO, which].concat(array));
+      }
+    },
+    $kr: {
+      defaults: "which=0,array=[]",
+      ctor: function(which, array) {
+        if (!Array.isArray(array)) {
+          array = [ array ];
+        }
+        return this.init.apply(this, [C.CONTROL, which].concat(array));
+      }
+    },
+  };
   
   module.exports = {};
 

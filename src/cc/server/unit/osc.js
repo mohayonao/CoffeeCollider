@@ -1174,6 +1174,40 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.Select = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._maxIndex = this.inputs.length - 1;
+      next_1.call(this);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inputs  = this.inputs;
+      var whichIn = inputs[0];
+      var maxIndex = this._maxIndex;
+      var index;
+      for (var i = 0; i < inNumSamples; ++i) {
+        index = Math.max(1, Math.min((whichIn[i]|0) + 1, maxIndex));
+        out[i] = inputs[index][i];
+      }
+    };
+    var next_k = function() {
+      var index = Math.max(1, Math.min((this.inputs[0][0]|0) + 1, this._maxIndex));
+      this.outputs[0].set(this.inputs[index]);
+    };
+    var next_1 = function() {
+      var index = Math.max(1, Math.min((this.inputs[0][0]|0) + 1, this._maxIndex));
+      this.outputs[0][0] = this.inputs[index][0];
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

@@ -190,4 +190,31 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite("Select", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"which", rate:C.AUDIO, value:[0,1,2,3] },
+        { name:"in0"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"in1"  , rate:C.AUDIO, value:unitTestSuite.in1 },
+        { name:"in2"  , rate:C.AUDIO, value:unitTestSuite.in2 },
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"which", rate:C.CONTROL, value:[0,1,2,3] },
+        { name:"in0"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"in1"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
+        { name:"in2"  , rate:C.AUDIO  , value:unitTestSuite.in2 },
+      ]
+    },
+    { rate  : C.CONTROL,
+      inputs: [
+        { name:"which", rate:C.CONTROL, value:[0,1,2,3] },
+        { name:"in0"  , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"in1"  , rate:C.CONTROL, value:unitTestSuite.in1 },
+        { name:"in2"  , rate:C.CONTROL, value:unitTestSuite.in2 },
+      ]
+    },
+  ]);
+
 });
