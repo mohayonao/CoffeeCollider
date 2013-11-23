@@ -13,7 +13,7 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.rootNode   = cc.createGroup();
+      this.rootNode   = cc.createRootNode();
       this.taskManager   = cc.createTaskManager();
       this.timelineResult  = [];
       this.bufferRequestId = 0;
@@ -178,44 +178,40 @@ define(function(require, exports, module) {
   
   cc.SynthLang = SynthLang;
   
-  module.exports = {
-    use: function() {
-      require("../common/timer");
-      require("../common/console");
-      require("./buffer");
-      require("./node");
-      require("./pattern");
-      require("./scale");
-      require("./task");
-      require("./synthdef");
-      require("./ugen/installer");
-      require("./lang-worker");
-      require("./lang-nodejs");
-      require("./lang-socket");
-      
-      cc.createSynthLang = function() {
-        require("./array");
-        require("./boolean");
-        require("./date");
-        require("./function");
-        require("./number");
-        require("./object");
-        require("./string");
-        
-        switch (cc.opmode) {
-        case "worker":
-          return cc.createWorkerSynthLang();
-        case "nodejs":
-          return cc.createNodeJSSynthLang();
-        case "socket":
-          return cc.createSocketSynthLang();
-        }
-        throw new Error("A SynthLang is not defined for: " + cc.opmode);
-      };
-      cc.replaceNativeTimerFunctions();
+  cc.createSynthLang = function() {
+    cc.replaceNativeTimerFunctions();
+    switch (cc.opmode) {
+    case "worker":
+      return cc.createWorkerSynthLang();
+    case "nodejs":
+      return cc.createNodeJSSynthLang();
+    case "socket":
+      return cc.createSocketSynthLang();
     }
+    throw new Error("A SynthLang is not defined for: " + cc.opmode);
   };
-
-  module.exports.use();
+  
+  // TODO: moved
+  require("../common/timer");
+  require("../common/console");
+  require("./array");
+  require("./boolean");
+  require("./buffer");
+  require("./date");
+  require("./function");
+  require("./node");
+  require("./number");
+  require("./object");
+  require("./pattern");
+  require("./scale");
+  require("./string");
+  require("./synthdef");
+  require("./task");
+  require("./ugen/installer");
+  require("./lang-worker");
+  require("./lang-nodejs");
+  require("./lang-socket");
+  
+  module.exports = {};
 
 });

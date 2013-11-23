@@ -355,7 +355,28 @@ define(function(require, exports, module) {
   };
   
   
-  // exports for prototype extending
+  cc.createUGen = function() {
+    return new UGen();
+  };
+  cc.createOutputProxy = function(rate, source, index) {
+    return new OutputProxy(rate, source, index);
+  };
+  cc.instanceOfUGen = function(obj) {
+    return obj instanceof UGen;
+  };
+  cc.instanceOfMultiOutUGen = function(obj) {
+    return obj instanceof MultiOutUGen;
+  };
+  cc.instanceOfOutputProxy = function(obj) {
+    return obj instanceof OutputProxy;
+  };
+  cc.setSynthDef = function(func) {
+    if (func && addToSynthDef !== null) {
+      throw new Error("nested Synth.def");
+    }
+    addToSynthDef = func;
+  };
+  
   cc.UGen = UGen;
   cc.MultiOutUGen = MultiOutUGen;
   
@@ -364,36 +385,6 @@ define(function(require, exports, module) {
     MultiOutUGen: MultiOutUGen,
     OutputProxy : OutputProxy,
     register    : register,
-    
-    use: function() {
-      cc.createUGen = function() {
-        return new UGen();
-      };
-      cc.createOutputProxy = function(rate, source, index) {
-        return new OutputProxy(rate, source, index);
-      };
-      cc.instanceOfUGen = function(obj) {
-        return obj instanceof UGen;
-      };
-      cc.instanceOfMultiOutUGen = function(obj) {
-        return obj instanceof MultiOutUGen;
-      };
-      cc.instanceOfOutputProxy = function(obj) {
-        return obj instanceof OutputProxy;
-      };
-      cc.setSynthDef = function(func) {
-        if (func && addToSynthDef !== null) {
-          throw new Error("nested Synth.def");
-        }
-        addToSynthDef = func;
-      };
-      
-      // redefinition for tests
-      cc.UGen = UGen;
-      cc.MultiOutUGen = MultiOutUGen;
-    }
   };
-  
-  module.exports.use();
 
 });

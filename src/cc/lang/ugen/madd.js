@@ -131,30 +131,25 @@ define(function(require, exports, module) {
     return Sum4;
   })();
   
-  
-  module.exports = {
-    use: function() {
-      cc.createMulAdd = fn(function(_in, mul, add) {
-        return new MulAdd().init(_in, mul, add);
-      }).multiCall().build();
-      cc.createSum3 = fn(function(in0, in1, in2) {
-        return new Sum3().init(in0, in1, in2);
-      }).multiCall().build();
-      cc.createSum4 = fn(function(in0, in1, in2, in3) {
-        return new Sum4().init(in0, in1, in2, in3);
-      }).multiCall().build();
-      cc.instanceOfMulAdd = function(obj) {
-        return obj instanceof MulAdd;
-      };
-      cc.instanceOfSum3 = function(obj) {
-        return obj instanceof Sum3;
-      };
-      cc.instanceOfSum4 = function(obj) {
-        return obj instanceof Sum4;
-      };
-    }
+  cc.createMulAdd = fn(function(_in, mul, add) {
+    return new MulAdd().init(_in, mul, add);
+  }).multiCall().build();
+  cc.createSum3 = fn(function(in0, in1, in2) {
+    return new Sum3().init(in0, in1, in2);
+  }).multiCall().build();
+  cc.createSum4 = fn(function(in0, in1, in2, in3) {
+    return new Sum4().init(in0, in1, in2, in3);
+  }).multiCall().build();
+  cc.instanceOfMulAdd = function(obj) {
+    return obj instanceof MulAdd;
   };
-
-  module.exports.use();
+  cc.instanceOfSum3 = function(obj) {
+    return obj instanceof Sum3;
+  };
+  cc.instanceOfSum4 = function(obj) {
+    return obj instanceof Sum4;
+  };
+  
+  module.exports = {};
 
 });

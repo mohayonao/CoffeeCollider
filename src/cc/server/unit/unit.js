@@ -54,34 +54,12 @@ define(function(require, exports, module) {
     return Unit;
   })();
   
+  cc.createUnit = function(parent, specs) {
+    return new Unit(parent, specs);
+  };
+  
   module.exports = {
     Unit : Unit,
-    
-    use: function() {
-      cc.createUnit = function(parent, specs) {
-        return new Unit(parent, specs);
-      };
-    }
   };
-
-  require("./bop");
-  require("./bufio");
-  require("./debug");
-  require("./decay");
-  require("./delay");
-  require("./filter");
-  require("./inout");
-  require("./line");
-  require("./madd");
-  require("./noise");
-  require("./osc");
-  require("./pan");
-  require("./random");
-  require("./range");
-  require("./reverb");
-  require("./ui");
-  require("./uop");
-  
-  module.exports.use();
 
 });

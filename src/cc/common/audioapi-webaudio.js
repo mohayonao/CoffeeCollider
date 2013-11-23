@@ -97,17 +97,13 @@ define(function(require, exports, module) {
       })();
     }
   }
-  
-  module.exports = {
-    use: function() {
-      cc.createWebAudioAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
+
+  cc.createWebAudioAPI = function(sys, opts) {
+    if (AudioAPI) {
+      return new AudioAPI(sys, opts);
     }
   };
   
-  module.exports.use();
+  module.exports = {};
   
 });

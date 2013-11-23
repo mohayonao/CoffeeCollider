@@ -2,43 +2,36 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
+
+  require("./array");
   
   var cc  = require("./cc");
   var ops = require("../common/ops");
   var random = require("../common/random");
-  var array  = require("./array");
-  
-  var NumberHacker = (function() {
-    function NumberHacker(selector, func) {
-      this.selector  = selector;
-      this.saved = Number.prototype[selector];
-      Object.defineProperty(Number.prototype, selector, {
-        configurable: true,
-        enumerable  : false,
-        writable    : true,
-        value       : func
-      });
-    };
-    NumberHacker.prototype.revert = function() {
-      if (this.saved) {
-        Object.defineProperty(Number.prototype, this.selector, {
-          configurable: true,
-          enumerable  : false,
-          writable    : true,
-          value       : this.saved
-        });
-      } else {
-        delete Number.prototype[this.selector];
-      }
-    };
-    return NumberHacker;
-  })();
   
   describe("lang/array.js", function() {
     var actual, expected;
+    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createBinaryOpUGen;
     before(function() {
-      ops.UNARY_OP_UGEN_MAP.push("??array_test??");
+      _lang = cc.lang;
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createTaskWaitLogic = cc.createTaskWaitLogic;
+      _createBinaryOpUGen = cc.createBinaryOpUGen;
+      
       cc.lang = {};
+      cc.createTaskWaitLogic = function(logic, list) {
+        return [logic].concat(list);
+      };
+      cc.createBinaryOpUGen = function(selector, a, b) {
+        return [selector, a, b];
+      };
+    });
+    after(function() {
+      cc.lang = _lang;
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createTaskWaitLogic = _createTaskWaitLogic;
+      cc.createBinaryOpUGen  = _createBinaryOpUGen;
     });
     describe("instance methods", function() {
       describe("common", function() {
@@ -57,25 +50,24 @@ define(function(require, exports, module) {
             }
             var a = [ 1, 2, 3, 4, 5 ];
             var passed = 0;
-            var h = new NumberHacker(selector, function() {
+            testTools.replaceTempNumberPrototype(selector, function() {
               passed += 1;
               return this;
+            }, function() {
+              var b = a[selector]();
+              assert.deepEqual(a, b);
+              assert.equal(passed, a.length);
             });
-            var b = a[selector]();
-            assert.deepEqual(a, b);
-            assert.equal(passed, a.length);
-            h.revert();
           });
         });
         describe("adverb", function() {
-          var h;
           before(function() {
-            h = new NumberHacker("max", function(b) {
+            testTools.replaceTempNumberPrototype("max", function(b) {
               return Math.max(this, b);
             });
           });
           after(function() {
-            h.revert();
+            testTools.restoreTempNumberPrototype("max");
           });
           it("scalar", function() {
             actual   = [ -2, -1,  0, +1, +2 ].max(0);
@@ -140,11 +132,6 @@ define(function(require, exports, module) {
         });
       });
       describe("logic", function() {
-        before(function() {
-          cc.createTaskWaitLogic = function(logic, list) {
-            return [logic].concat(list);
-          };
-        });
         it("__and__", function() {
           assert.deepEqual([1,2].__and__(3), ["and", 1, 2, 3]);
         });
@@ -153,15 +140,10 @@ define(function(require, exports, module) {
         });
       });
       describe("ugen", function() {
-        before(function() {
+        it("ugen", function() {
           cc.instanceOfUGen = function() {
             return true;
           };
-          cc.createBinaryOpUGen = function(selector, a, b) {
-            return [selector, a, b];
-          };
-        });
-        it("ugen", function() {
           actual   = [1, 2].max(0);
           expected = [ [ "max", 1, 0 ], [ "max", 2, 0 ] ];
           assert.deepEqual(actual, expected);
@@ -296,13 +278,13 @@ define(function(require, exports, module) {
           assert.equal(actual, expected);
         });
         it("normalize", function() {
-          var h = new NumberHacker("linlin", function(inMin, inMax, outMin, outMax) {
+          testTools.replaceTempNumberPrototype("linlin", function(inMin, inMax, outMin, outMax) {
             return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
+          }, function() {
+            actual   = list.normalize();
+            expected = [ 0.66666666666667, 0.52380952380952, 0.76190476190476, 0.38095238095238, 1, 0 ];
+            assert.deepCloseTo(actual, expected, 1e-6);
           });
-          actual   = list.normalize();
-          expected = [ 0.66666666666667, 0.52380952380952, 0.76190476190476, 0.38095238095238, 1, 0 ];
-          assert.deepCloseTo(actual, expected, 1e-6);
-          h.revert();
         });
         it("normalizeSum", function() {
           actual   = list.normalizeSum();
@@ -502,71 +484,71 @@ define(function(require, exports, module) {
       });
       it(".rand", function() {
         var args = [];
-        var h = new NumberHacker("rrand", function(b) {
+        testTools.replaceTempNumberPrototype("rrand", function(b) {
           args = [ this, b ];
           return "rand";
-        });
-        actual   = Array.rand(5);
-        expected = [ "rand", "rand", "rand", "rand", "rand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [0, 1]);
+        }, function() {
+          actual   = Array.rand(5);
+          expected = [ "rand", "rand", "rand", "rand", "rand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0, 1]);
 
-        actual   = Array.rand(5, 10, 100);
-        expected = [ "rand", "rand", "rand", "rand", "rand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [10, 100]);
-        h.revert();
+          actual   = Array.rand(5, 10, 100);
+          expected = [ "rand", "rand", "rand", "rand", "rand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
       });
       it(".rand2", function() {
         var args = [];
-        var h = new NumberHacker("rand2", function(b) {
+        testTools.replaceTempNumberPrototype("rand2", function(b) {
           args = [ this ];
           return "rand2";
-        });
-        actual   = Array.rand2(5);
-        expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [1]);
+        }, function() {
+          actual   = Array.rand2(5);
+          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [1]);
 
-        actual   = Array.rand2(5, 10);
-        expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [10]);
-        h.revert();
+          actual   = Array.rand2(5, 10);
+          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10]);
+        });
       });
       it(".linrand", function() {
         var args = [];
-        var h = new NumberHacker("linrand", function(b) {
+        testTools.replaceTempNumberPrototype("linrand", function(b) {
           args = [ this, b ];
           return "linrand";
-        });
-        actual   = Array.linrand(5);
-        expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [0, 1]);
+        }, function() {
+          actual   = Array.linrand(5);
+          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0, 1]);
 
-        actual   = Array.linrand(5, 10, 100);
-        expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [10, 100]);
-        h.revert();
+          actual   = Array.linrand(5, 10, 100);
+          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
       });
       it(".exprand", function() {
         var args = [];
-        var h = new NumberHacker("exprand", function(b) {
+        testTools.replaceTempNumberPrototype("exprand", function(b) {
           args = [ this, b ];
           return "exprand";
-        });
-        actual   = Array.exprand(5);
-        expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [0.001, 1]);
+        }, function() {
+          actual   = Array.exprand(5);
+          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0.001, 1]);
 
-        actual   = Array.exprand(5, 10, 100);
-        expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
-        assert.deepEqual(actual, expected);
-        assert.deepEqual(args, [10, 100]);
-        h.revert();
+          actual   = Array.exprand(5, 10, 100);
+          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
       });
       it("interpolation", function() {
         actual   = Array.interpolation(1, 0, 5);

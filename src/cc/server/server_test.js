@@ -2,16 +2,20 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+
+  require("./server");
   
   var cc = require("./cc");
   var nop = function() { return {}; };
   
   describe("server/server.js", function() {
     var called;
-    beforeEach(function() {
-      require("./server").use();
+    var _lang, _createTimer, _createInstanceManager;
+    before(function() {
+      _lang = cc.lang;
+      _createTimer = cc.createTimer;
+      _createInstanceManager = cc.createInstanceManager;
       
-      called = [];
       cc.lang = { process: nop };
       cc.createTimer = function() {
         return {
@@ -49,6 +53,14 @@ define(function(require, exports, module) {
           },
         };
       };
+    });
+    after(function() {
+      cc.lang = _lang;
+      cc.createTimer = _createTimer;
+      cc.createInstanceManager = _createInstanceManager;
+    });
+    beforeEach(function() {
+      called = [];
     });
     describe("SynthServer", function() {
       describe("createSynthServer", function() {

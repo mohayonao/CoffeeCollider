@@ -146,22 +146,18 @@ define(function(require, exports, module) {
     return SocketSynthServerExports;
   })();
   
-  module.exports = {
-    use: function() {
-      cc.createSocketSynthServer = function() {
-        var server = new SocketSynthServer();
-        server.exports = {
-          createServer: function(opts) {
-            return new SocketSynthServerExports(server, opts);
-          }
-        };
-        cc.opmode = "socket";
-        return server;
-      };
-    }
+  cc.createSocketSynthServer = function() {
+    var server = new SocketSynthServer();
+    server.exports = {
+      createServer: function(opts) {
+        return new SocketSynthServerExports(server, opts);
+      }
+    };
+    cc.opmode = "socket";
+    return server;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });
   

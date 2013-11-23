@@ -23,14 +23,10 @@ define(function(require, exports, module) {
     return SynthClientWorkerImpl;
   })();
   
-  module.exports = {
-    use: function() {
-      cc.createSynthClientWorkerImpl = function(exports, opts) {
-        return new SynthClientWorkerImpl(exports, opts);
-      };
-    }
+  cc.createSynthClientWorkerImpl = function(exports, opts) {
+    return new SynthClientWorkerImpl(exports, opts);
   };
   
-  module.exports.use();
-  
+  module.exports = {};
+
 });

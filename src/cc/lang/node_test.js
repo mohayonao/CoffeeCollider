@@ -2,46 +2,48 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
-  var cc   = require("./cc");
+  
   var node = require("./node");
+  var cc   = require("./cc");
   
   describe("lang/node.js", function() {
     var tl, actual, expected;
+    var _lang, _instanceOfSynthDef;
     before(function() {
-      node.use();
+      _lang = cc.lang;
+      _instanceOfSynthDef = cc.instanceOfSynthDef;
       cc.lang = {
         pushToTimeline: function(cmd) {
           tl = cmd;
-        },
-        rootNode: cc.createGroup(),
+        }
       };
+      cc.lang.rootNode = cc.global.Group();
       cc.instanceOfSynthDef = function() {
         return true;
       };
+    });
+    after(function() {
+      cc.lang = _lang;
+      cc.instanceOfSynthDef = _instanceOfSynthDef;
     });
     beforeEach(function() {
       tl = null;
     });
     describe("node", function() {
-      it("create", function() {
-        var n = cc.createNode();
-        assert.isTrue(cc.instanceOfNode(n));
-      });
       it("#play", function() {
-        var n = cc.createNode().play();
+        var n = new node.Node().play();
         assert.deepEqual(tl, ["/n_run", n.nodeId, true]);
       });
       it("#pause", function() {
-        var n = cc.createNode().pause();
+        var n = new node.Node().pause();
         assert.deepEqual(tl, ["/n_run", n.nodeId, false]);
       });
       it("#stop", function() {
-        var n = cc.createNode().stop();
+        var n = new node.Node().stop();
         assert.deepEqual(tl, ["/n_free", n.nodeId]);
       });
       it("#performWait", function() {
-        var n = cc.createNode();
+        var n = new node.Node();
         assert.isTrue(n.performWait());
         n.stop();
         assert.isFalse(n.performWait());
@@ -49,10 +51,15 @@ define(function(require, exports, module) {
     });
     describe("group", function() {
       it("create", function() {
-        var g0 = cc.createGroup(cc.lang.rootNode, 1);
+        var g0 = cc.global.Group(cc.lang.rootNode, C.ADD_TO_TAIL);
         assert.isTrue(cc.instanceOfNode(g0));
         assert.isTrue(cc.instanceOfGroup(g0));
-        assert.deepEqual(tl, ["/g_new", g0.nodeId, 1, cc.lang.rootNode.nodeId]);
+        assert.deepEqual(tl, ["/g_new", g0.nodeId, C.ADD_TO_TAIL, cc.lang.rootNode.nodeId]);
+        
+        g0 = cc.global.Group(cc.lang.rootNode, "addAfter");
+        assert.isTrue(cc.instanceOfNode(g0));
+        assert.isTrue(cc.instanceOfGroup(g0));
+        assert.deepEqual(tl, ["/g_new", g0.nodeId, C.ADD_AFTER, cc.lang.rootNode.nodeId]);
       });
     });
     describe("synth", function() {
@@ -69,18 +76,20 @@ define(function(require, exports, module) {
         };
       });
       it("create", function() {
-        var s0 = cc.createSynth(cc.lang.rootNode, 1, def, {f:100});
+        var s0 = cc.global.Synth(def, {f:100}, cc.lang.rootNode, C.ADD_TO_TAIL);
         assert.isTrue(cc.instanceOfNode(s0));
         assert.isTrue(cc.instanceOfSynth(s0));
-        assert.deepEqual(tl, ["/s_new", s0.nodeId, 1, cc.lang.rootNode.nodeId, def._defId, [0, 100]]);
+        assert.deepEqual(tl, ["/s_new", s0.nodeId, C.ADD_TO_TAIL, cc.lang.rootNode.nodeId, def._defId, [0, 100]]);
+        
+        s0 = cc.global.Synth(def, {f:100}, cc.lang.rootNode, "addAfter");
+        assert.isTrue(cc.instanceOfNode(s0));
+        assert.isTrue(cc.instanceOfSynth(s0));
+        assert.deepEqual(tl, ["/s_new", s0.nodeId, C.ADD_AFTER, cc.lang.rootNode.nodeId, def._defId, [0, 100]]);
       });
       it("#set", function() {
-        var s0 = cc.createSynth(0, 0, def);
-        s0.set();
-        assert.isNull(tl);
-        
+        var s0 = cc.global.Synth(def);
         s0.set({f:200});
-        // assert.deepEqual(tl, ["/n_set", s0.nodeId, [0, 200]]);
+        assert.deepEqual(tl, ["/n_set", s0.nodeId, [0, 200]]);
       });
     });
     describe("interface", function() {

@@ -2,9 +2,10 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
-  var cc   = require("./cc");
+  
   var task = require("./task");
+  
+  var cc   = require("./cc");
   var slice = [].slice;
   var nop = function() {};
   var nil;
@@ -12,7 +13,6 @@ define(function(require, exports, module) {
   describe("lang/task.js", function() {
     var func, cmd, actual;
     before(function() {
-      task.use();
       func = function() {
         return [
           function() {

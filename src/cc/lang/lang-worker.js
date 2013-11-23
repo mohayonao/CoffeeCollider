@@ -28,17 +28,13 @@ define(function(require, exports, module) {
     
     return WorkerSynthLang;
   })();
-  
-  module.exports = {
-    use: function() {
-      cc.createWorkerSynthLang = function() {
-        var lang = new WorkerSynthLang();
-        global.onmessage = onmessage;
-        return lang;
-      };
-    }
+
+  cc.createWorkerSynthLang = function() {
+    var lang = new WorkerSynthLang();
+    global.onmessage = onmessage;
+    return lang;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

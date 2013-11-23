@@ -4,8 +4,8 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var coffee = require("coffee-script");
 
-  var cc = require("../../cc");
-  var compiler = require("./coffee");
+  var cc = require("../cc");
+  var compiler = require("./compiler");
   var TAG   = 0;
   var VALUE = 1;
   
@@ -830,16 +830,13 @@ define(function(require, exports, module) {
       });
     });
     describe("Compiler", function() {
-      before(function() {
-        compiler.use();
-      });
       it("compile", function() {
         var code, c, actual;
         code = [
           "[1,2,3]"
         ].join("\n");
         
-        c = cc.createCoffeeCompiler();
+        c = cc.createCompiler();
         actual = eval(c.compile(code));
         assert.deepEqual(actual, [1,2,3]);
         
@@ -854,7 +851,7 @@ define(function(require, exports, module) {
           "  a += ~1",
           "  return {typeof:typeof 2}",
         ].join("\n");
-        c = cc.createCoffeeCompiler();
+        c = cc.createCompiler();
         assert.doesNotThrow(function() {
           c.toString(code);
           var out = c.toString(c.tokens(code));

@@ -131,8 +131,8 @@ define(function(require, exports, module) {
     return [node, def, args];
   };
   
-  var GroupInterface = cc.global.Group = function() {
-    var target, addAction;
+  cc.global.Group = function() {
+    var target, addAction = C.ADD_TO_HEAD;
     var i = 0;
     if (cc.instanceOfNode(arguments[i])) {
       target = arguments[i++];
@@ -143,29 +143,31 @@ define(function(require, exports, module) {
       addAction = {
         addToHead:C.ADD_TO_HEAD, addToTail:C.ADD_TO_TAIL, addBefore:C.ADD_BEFORE, addAfter:C.ADD_AFTER, replace:C.REPLACE
       }[arguments[i++]] || C.ADD_TO_HEAD;
-    } else {
-      addAction = C.ADD_TO_HEAD;
+    } else if (typeof arguments[i] === "number") {
+      if (0 <= arguments[i] && arguments[i] <= 4) {
+        addAction = arguments[i++];
+      }
     }
     return new Group(target, addAction);
   };
-  GroupInterface.after = function(node) {
+  cc.global.Group.after = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_AFTER);
   };
-  GroupInterface.before = function(node) {
+  cc.global.Group.before = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_BEFORE);
   };
-  GroupInterface.head = function(node) {
+  cc.global.Group.head = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_TO_HEAD);
   };
-  GroupInterface.tail = function(node) {
+  cc.global.Group.tail = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_TO_TAIL);
   };
-  GroupInterface.replace = function(node) {
+  cc.global.Group.replace = function(node) {
     return new Group(node, C.REPLACE);
   };
   
-  var SynthInterface = cc.global.Synth = function(def) {
-    var args, target, addAction;
+  cc.global.Synth = function(def) {
+    var args, target, addAction = C.ADD_TO_HEAD;
     var i = 1;
     if (utils.isDict(arguments[i])) {
       args = arguments[i++];
@@ -181,68 +183,57 @@ define(function(require, exports, module) {
       addAction = {
         addToHead:C.ADD_TO_HEAD, addToTail:C.ADD_TO_TAIL, addBefore:C.ADD_BEFORE, addAfter:C.ADD_AFTER, replace:C.REPLACE
       }[arguments[i++]] || C.ADD_TO_HEAD;
-    } else {
-      addAction = C.ADD_TO_HEAD;
+    } else if (typeof arguments[i] === "number") {
+      if (0 <= arguments[i] && arguments[i] <= 4) {
+        addAction = arguments[i++];
+      }
     }
     return new Synth(target, addAction, def, args);
   };
-  SynthInterface.after = function() {
+  cc.global.Synth.after = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_AFTER, list[1], list[2]);
   };
-  SynthInterface.before = function() {
+  cc.global.Synth.before = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_BEFORE, list[1], list[2]);
   };
-  SynthInterface.head = function() {
+  cc.global.Synth.head = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_TO_HEAD, list[1], list[2]);
   };
-  SynthInterface.tail = function() {
+  cc.global.Synth.tail = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_TO_TAIL, list[1], list[2]);
   };
-  SynthInterface.replace = function(node, def, args) {
+  cc.global.Synth.replace = function(node, def, args) {
     return new Synth(node, C.REPLACE, def, args);
   };
   
+  cc.createRootNode = function() {
+    return new Group();
+  };
+  cc.instanceOfNode = function(obj) {
+    return obj instanceof Node;
+  };
+  cc.instanceOfGroup = function(obj) {
+    return obj instanceof Group;
+  };
+  cc.instanceOfSynth = function(obj) {
+    return obj instanceof Synth;
+  };
+  cc.getNode   = function(nodeId) {
+    return nodes[nodeId];
+  };
+  cc.resetNode = function() {
+    nodes = {};
+  };
   
   module.exports = {
     Node : Node,
     Group: Group,
     Synth: Synth,
-
-    // private methods
-    args2controls : args2controls,
-    
-    use: function() {
-      cc.createNode = function() {
-        return new Node();
-      };
-      cc.createGroup = function(target, addAction) {
-        return new Group(target, addAction);
-      };
-      cc.createSynth = function(target, addAction, def, args) {
-        return new Synth(target, addAction, def, args);
-      };
-      cc.instanceOfNode = function(obj) {
-        return obj instanceof Node;
-      };
-      cc.instanceOfGroup = function(obj) {
-        return obj instanceof Group;
-      };
-      cc.instanceOfSynth = function(obj) {
-        return obj instanceof Synth;
-      };
-      cc.getNode   = function(nodeId) {
-        return nodes[nodeId];
-      };
-      cc.resetNode = function() {
-        nodes = {};
-      };
-    }
+    args2controls: args2controls,
   };
-
-  module.exports.use();
 
 });

@@ -8,9 +8,6 @@ define(function(require, exports, module) {
   var twopi = 2 * Math.PI;
   
   describe("server/rate.js", function() {
-    beforeEach(function() {
-      rate.use();
-    });
     it("create", function() {
       var r = cc.createRate(44100, 64);
       assert.equal(r.sampleRate, 44100  , "sampleRate");

@@ -3,14 +3,24 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
+  require("./lang");
+  
   var cc = require("./cc");
   var nop = function() { return {}; };
   
   describe("lang/lang.js", function() {
     var called;
+    var _exports, _createWebWorker, _createTaskManager, _resetBuffer, _resetNode, _resetNativeTimers;
     before(function() {
-      require("./lang").use();
+      _exports = cc.exports;
+      _createWebWorker = cc.createWebWorker;
+      _createTaskManager = cc.createTaskManager;
+      _resetBuffer = cc.resetBuffer;
+      _resetNode   = cc.resetNode;
+      _resetNativeTimers = cc.resetNativeTimers;
+      
       cc.exports = nop;
+      cc.createWebWorker = nop;
       cc.createTaskManager = function() {
         return {
           play: function() {
@@ -34,14 +44,19 @@ define(function(require, exports, module) {
         called.push("resetNativeTimers");
       };
     });
+    after(function() {
+      cc.exports = _exports;
+      cc.createWebWorker = _createWebWorker;
+      cc.createTaskManager = _createTaskManager;
+      cc.resetBuffer = _resetBuffer;
+      cc.resetNode   = _resetNode;
+      cc.resetNativeTimers = _resetNativeTimers;
+    });
     beforeEach(function() {
       called = [];
     });
     describe("SynthLang", function() {
       describe("createSynthLang", function() {
-        beforeEach(function() {
-          cc.createWebWorker = nop;
-        });
         it("WebWorker", function() {
           cc.opmode = "worker";
           cc.createSynthLang();

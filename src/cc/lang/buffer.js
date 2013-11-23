@@ -97,27 +97,21 @@ define(function(require, exports, module) {
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
   
-  var resetBuffer = function() {
+  cc.global.Buffer = BufferInterface;
+  
+  cc.createAudioBuffer = function() {
+    return new AudioBuffer();
+  };
+  cc.instanceOfAudioBuffer = function(obj) {
+    return obj instanceof AudioBuffer;
+  };
+  cc.resetBuffer = function() {
     bufferSrcCache = {};
     bufSrcId = 0;
   };
   
-  cc.global.Buffer = BufferInterface;
-  
   module.exports = {
     AudioBuffer: AudioBuffer,
-    
-    use: function() {
-      cc.createAudioBuffer = function() {
-        return new AudioBuffer();
-      };
-      cc.instanceOfAudioBuffer = function(obj) {
-        return obj instanceof AudioBuffer;
-      };
-      cc.resetBuffer = resetBuffer;
-    }
   };
-
-  module.exports.use();
 
 });

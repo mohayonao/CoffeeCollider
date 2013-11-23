@@ -108,18 +108,14 @@ define(function(require, exports, module) {
     
     return SocketSynthLang;
   })();
-  
-  module.exports = {
-    use: function() {
-      cc.createSocketSynthLang = function() {
-        var lang = new SocketSynthLang();
-        global.onmessage = onmessage;
-        cc.opmode = "socket";
-        return lang;
-      };
-    }
-  };
 
-  module.exports.use();
+  cc.createSocketSynthLang = function() {
+    var lang = new SocketSynthLang();
+    global.onmessage = onmessage;
+    cc.opmode = "socket";
+    return lang;
+  };
+  
+  module.exports = {};
 
 });

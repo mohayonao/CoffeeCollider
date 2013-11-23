@@ -3,20 +3,16 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   
-  module.exports = {
-    use: function() {
-      cc.createWebWorker = function(path) {
-        return new Worker(path);
-      };
-      cc.createWebSocket = function(path) {
-        return new WebSocket(path);
-      };
-      cc.createXMLHttpRequest = function() {
-        return new XMLHttpRequest();
-      };
-    }
+  cc.createWebWorker = function(path) {
+    return new Worker(path);
   };
-
-  module.exports.use();
+  cc.createWebSocket = function(path) {
+    return new WebSocket(path);
+  };
+  cc.createXMLHttpRequest = function() {
+    return new XMLHttpRequest();
+  };
+  
+  module.exports = {};
 
 });

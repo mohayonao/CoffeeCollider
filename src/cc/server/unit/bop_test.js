@@ -321,7 +321,6 @@ define(function(require, exports, module) {
     describe("unit", function() {
       var specialIndex;
       before(function() {
-        unit.use();
         specialIndex = ops.BINARY_OP_UGEN_MAP.length;
         ops.BINARY_OP_UGEN_MAP[specialIndex] = "bopTest";
         cc.getRateInstance = function() {

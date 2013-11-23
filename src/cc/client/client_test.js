@@ -4,24 +4,53 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   var cc = require("../cc");
+  var client = require("./client");
   var nop = function() { return {}; };
   
   describe("client/client.js", function() {
+    var actual, expected;
+    var _createSynthClientWorkerImpl, _createCompiler;
+    var _createWebWorker, _createAudioAPI, _createXMLHttpRequest;
     before(function() {
+      _createSynthClientWorkerImpl = cc.createSynthClientWorkerImpl;
+      _createCompiler  = cc.createCompiler;
+      _createWebWorker = cc.createWebWorker;
+      _createAudioAPI  = cc.createAudioAPI
+      _createXMLHttpRequest = cc.createXMLHttpRequest
+      
       cc.createSynthClientWorkerImpl = function() {
         cc.opmode = "worker";
         return { sampleRate: 44100, channels: 2 };
       };
+      cc.createCompiler = function() {
+        return {
+          compile: function(code) { return code; }
+        };
+      };
+      cc.createWebWorker = nop;
+      cc.createAudioAPI = function() {
+        return {
+          sampleRate:8000, channels:1, strmLength:1024,
+          init:nop, play:nop, pause:nop,
+        };
+      };
+      cc.createXMLHttpRequest = function() {
+        var xhr = { open:nop, readyState:4, status:200, response:"xhr" };
+        xhr.send = function() {
+          setTimeout(function() { xhr.onreadystatechange(); }, 10);
+        };
+        return xhr;
+      };
     });
-    beforeEach(function() {
-      require("./client").use();
-      cc.createCompiler = nop;
+    after(function() {
+      cc.createSynthClientWorkerImpl = _createSynthClientWorkerImpl;
+      cc.createCompiler  = _createCompiler;
+      cc.createWebWorker = _createWebWorker;
+      cc.createAudioAPI  = _createAudioAPI
+      cc.createXMLHttpRequest = _createXMLHttpRequest
     });
     describe("SynthClient", function() {
       describe("createSynthClient", function() {
-        beforeEach(function() {
-          cc.createWebWorker = nop;
-        });
         it("WebWorker", function() {
           var exports = cc.createSynthClient();
           assert.equal("worker", cc.opmode);
@@ -63,43 +92,43 @@ define(function(require, exports, module) {
           instance = cc.createSynthClient();
         });
         it("#play", function() {
-          var actual = instance.play();
+          actual = instance.play();
           assert.equal(actual, instance, "return self");
           assert.equal(passed, "play",
                        "should call impl.play()");
         });
         it("#pause", function() {
-          var actual = instance.pause();
+          actual = instance.pause();
           assert.equal(actual, instance, "return self");
           assert.equal(passed, "pause",
                        "should call impl.pause()");
         });
         it("#reset", function() {
-          var actual = instance.reset();
+          actual = instance.reset();
           assert.equal(actual, instance, "return self");
           assert.equal(passed, "reset",
                        "should call impl.reset()");
         });
         it("#execute", function() {
-          var actual = instance.execute();
+          actual = instance.execute();
           assert.equal(actual, instance, "return self");
           assert.equal(passed, "execute",
                        "should call impl.execute()");
         });
         it("getStream", function() {
-          var actual = instance.getStream();
+          actual = instance.getStream();
           assert.equal(actual, "getStream");
           assert.equal(passed, "getStream",
                        "should call impl.getStream()");
         });
         it("importScripts", function() {
-          var actual = instance.importScripts();
+          actual = instance.importScripts();
           assert.equal(actual, instance, "return self");
           assert.equal(passed, "importScripts",
                        "should call impl.importScripts()");
         });
         it("getWebAudioComponents", function() {
-          var actual = instance.getWebAudioComponents();
+          actual = instance.getWebAudioComponents();
           assert.equal(actual, "getWebAudioComponents");
           assert.equal(passed, "getWebAudioComponents",
                        "should call impl.getWebAudioComponents()");
@@ -110,24 +139,6 @@ define(function(require, exports, module) {
       var instance, event, emitted, posted;
       beforeEach(function() {
         event = posted = "";
-        cc.createAudioAPI = function() {
-          return {
-            sampleRate:8000, channels:1, strmLength:1024,
-            init:nop, play:nop, pause:nop,
-          };
-        };
-        cc.createXMLHttpRequest = function() {
-          var xhr = { open:nop, readyState:4, status:200, response:"xhr" };
-          xhr.send = function() {
-            setTimeout(function() { xhr.onreadystatechange(); }, 10);
-          };
-          return xhr;
-        };
-        cc.createCompiler = function() {
-          return {
-            compile: function(code) { return code; }
-          };
-        };
         instance = cc.createSynthClientImpl({ emit:function(e) {
           event = e;
           emitted = [].slice.call(arguments, 1);

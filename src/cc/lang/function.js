@@ -46,7 +46,7 @@ define(function(require, exports, module) {
   // others
   fn.defineProperty(Function.prototype, "play", function() {
     var func = this;
-    return cc.createSynthDef(
+    return cc.global.SynthDef(
       function() {
         cc.global.Out(C.AUDIO, 0, func());
       }, []

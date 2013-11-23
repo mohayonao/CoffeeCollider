@@ -2,22 +2,29 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  
+  require("./string");
+  
   var cc = require("./cc");
 
   describe("lang/string.js", function() {
+    var _instanceOfUGen, _createTaskWaitLogic;
     before(function() {
-      require("./string");
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createTaskWaitLogic = cc.createTaskWaitLogic;
+      
+      cc.instanceOfUGen = function() {
+        return false;
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        return [logic].concat(list);
+      };
+    });
+    after(function() {
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createTaskWaitLogic = _createTaskWaitLogic;
     });
     describe("bop", function() {
-      before(function() {
-        cc.instanceOfUGen = function() {
-          return false;
-        };
-        cc.createTaskWaitLogic = function(logic, list) {
-          return [logic].concat(list);
-        };
-      });
       it("__plus__", function() {
         assert.equal("-10".__plus__(), -10);
         assert.equal("str".__plus__(),   0); // avoid NaN

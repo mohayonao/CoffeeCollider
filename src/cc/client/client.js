@@ -303,28 +303,24 @@ define(function(require, exports, module) {
   require("../common/console").bind(commands);
   
   cc.SynthClientImpl = SynthClientImpl;
+  cc.createSynthClient = function(opts) {
+    return new SynthClient(opts);
+  };
+  cc.createSynthClientImpl = function(exports, opts) {
+    return new SynthClientImpl(exports, opts);
+  };
+  
+  // TODO: moved
+  require("../common/browser");
+  require("../common/audioapi");
+  require("./compiler");
+  require("./client-worker");
+  require("./client-nodejs");
+  require("./client-socket");
   
   module.exports = {
     SynthClient    : SynthClient,
     SynthClientImpl: SynthClientImpl,
-    
-    use: function() {
-      require("./client-worker");
-      require("./client-nodejs");
-      require("./client-socket");
-      require("../common/browser");
-      require("../common/audioapi");
-      require("./compiler/compiler");
-      
-      cc.createSynthClient = function(opts) {
-        return new SynthClient(opts);
-      };
-      cc.createSynthClientImpl = function(exports, opts) {
-        return new SynthClientImpl(exports, opts);
-      };
-    }
   };
-
-  module.exports.use();
 
 });

@@ -53,16 +53,12 @@ define(function(require, exports, module) {
     return WorkerSynthServer;
   })();
   
-  module.exports = {
-    use: function() {
-      cc.createWorkerSynthServer = function() {
-        var server = new WorkerSynthServer();
-        cc.opmode = "worker";
-        return server;
-      };
-    }
+  cc.createWorkerSynthServer = function() {
+    var server = new WorkerSynthServer();
+    cc.opmode = "worker";
+    return server;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

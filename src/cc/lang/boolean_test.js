@@ -3,12 +3,27 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
+  require("./boolean");
+  
   var cc = require("./cc");
-
+  
   describe("labg/boolean.js", function() {
     var actual, expected;
+    var _instanceOfUGen, _createTaskWaitLogic;
     before(function() {
-      require("./boolean");
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createTaskWaitLogic = cc.createTaskWaitLogic;
+      
+      cc.instanceOfUGen = function() {
+        return false;
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        return [logic].concat(list);
+      };
+    });
+    after(function() {
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createTaskWaitLogic = _createTaskWaitLogic;
     });
     describe("uop", function() {
       it("__plus__", function() {
@@ -21,14 +36,6 @@ define(function(require, exports, module) {
       });
     });
     describe("bop", function() {
-      before(function() {
-        cc.instanceOfUGen = function() {
-          return false;
-        };
-        cc.createTaskWaitLogic = function(logic, list) {
-          return [logic].concat(list);
-        };
-      });
       it("__add__", function() {
         assert.equal(true .__add__(2), 3);
         assert.equal(true .__add__("str"), "truestr");

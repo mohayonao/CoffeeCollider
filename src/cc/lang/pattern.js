@@ -195,10 +195,10 @@ define(function(require, exports, module) {
   })();
 
   cc.global.PSequence = fn(function(list, repeats, offset) {
-    return cc.createPSequence(list, repeats, offset);
+    return new PSequence(list, repeats, offset);
   }).defaults("list,repeats=1,offset=0").build();
   cc.global.PShuffle = fn(function(list, repeats) {
-    return cc.createPShuffle(list, repeats);
+    return new PShuffle(list, repeats);
   }).defaults("list,repeats=1").build();
   
   module.exports = {
@@ -207,17 +207,6 @@ define(function(require, exports, module) {
     PShuffle : PShuffle,
     PUnaryOp : PUnaryOp,
     PBinaryOp: PBinaryOp,
-    
-    use: function() {
-      cc.createPSequence = function(list, repeats, offset) {
-        return new PSequence(list, repeats, offset);
-      };
-      cc.createPShuffle = function(list, repeats) {
-        return new PShuffle(list, repeats);
-      };
-    }
   };
-
-  module.exports.use();
 
 });

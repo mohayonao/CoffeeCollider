@@ -2,13 +2,30 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  
+  require("./function");
+  
   var cc = require("./cc");
-  var func = require("./function");
   var nop = function() {};
   
   describe("lang/function.js", function() {
     var actual, expected;
+    var _instanceOfUGen, _createTaskWaitLogic;
+    before(function() {
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createTaskWaitLogic = cc.createTaskWaitLogic;
+      
+      cc.instanceOfUGen = function() {
+        return false;
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        return [logic].concat(list);
+      };
+    });
+    after(function() {
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createTaskWaitLogic = _createTaskWaitLogic;
+    });
     describe("uop", function() {
       it("__plus__", function() {
         assert.equal(nop.__plus__(), 0); // avoid NaN
@@ -18,14 +35,6 @@ define(function(require, exports, module) {
       });
     });
     describe("bop", function() {
-      before(function() {
-        cc.instanceOfUGen = function() {
-          return false;
-        };
-        cc.createTaskWaitLogic = function(logic, list) {
-          return [logic].concat(list);
-        };
-      });
       it("__add__", function() {
         assert.equal(nop.__add__("str"), nop.toString() + "str");
       });

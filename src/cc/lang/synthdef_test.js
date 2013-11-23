@@ -3,13 +3,23 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  var cc = require("./cc");
   var synthdef = require("./synthdef");
-
+  
+  var cc = require("./cc");
+  
   describe("lang/synthdef.js", function() {
     var actual, expected, tl, addToSynth;
+    var _lang, _console, _setSynthDef, _createControl;
+    var _instanceOfOut, _instanceOfOutputProxy, _instanceOfMultiOutUGen;
     before(function() {
-      synthdef.use();
+      _lang    = cc.lang;
+      _console = cc.console;
+      _setSynthDef = cc.setSynthDef;
+      _createControl = cc.createControl;
+      _instanceOfOut = cc.instanceOfOut;
+      _instanceOfOutputProxy  = cc.instanceOfOutputProxy;
+      _instanceOfMultiOutUGen = cc.instanceOfMultiOutUGen;
+      
       cc.setSynthDef = function(func) {
         addToSynth = func;
       };
@@ -68,12 +78,21 @@ define(function(require, exports, module) {
         }
       };
     });
+    after(function() {
+      cc.lang = _lang;
+      cc.console = _console;
+      cc.setSynthDef = _setSynthDef;
+      cc.createControl = _createControl;
+      cc.instanceOfOut = _instanceOfOut;
+      cc.instanceOfOutputProxy = _instanceOfOutputProxy;
+      cc.instanceOfMultiOutUGen = _instanceOfMultiOutUGen;
+    });
     beforeEach(function() {
       tl = null;
       cc.console.warn.result = null;
     });
     it("create", function() {
-      var def = cc.createSynthDef(function(){});
+      var def = cc.global.SynthDef(function(){});
       assert.isTrue(cc.instanceOfSynthDef(def));
       assert.isFalse(cc.instanceOfSynthDef([]));
     });
@@ -98,7 +117,7 @@ define(function(require, exports, module) {
         addToSynth(b);
       };
       var args = [ "out", "0", "freq", "440" ];
-      var def  = cc.createSynthDef(func, args).build();
+      var def  = cc.global.SynthDef(func, args).build();
       assert.deepEqual(def.specs, {
         consts : [ 0 ],
         defList: [

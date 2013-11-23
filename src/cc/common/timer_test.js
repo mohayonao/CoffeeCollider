@@ -7,9 +7,6 @@ define(function(require, exports, module) {
   var timer = require("./timer");
 
   describe("common/timer.js", function() {
-    before(function() {
-      timer.use();
-    });
     it("start/stop", function(done) {
       var t = cc.createTimer();
       var passed = 0;

@@ -24,31 +24,26 @@ define(function(require, exports, module) {
     return Rate;
   })();
   
-  
-  module.exports = {
-    use: function() {
-      cc.createRate = function(sampleRate, bufLength) {
-        return new Rate(sampleRate, bufLength);
-      };
-      cc.getRateInstance = (function() {
-        var rates = {};
-        return function(rate) {
-          if (!rates[rate]) {
-            switch (rate) {
-            case C.AUDIO:
-              rates[C.AUDIO] = new Rate(cc.server.sampleRate, cc.server.bufLength);
-              break;
-            case C.CONTROL:
-              rates[C.CONTROL] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
-              break;
-            }
-          }
-          return rates[rate];
-        };
-      })();
-    }
+  cc.createRate = function(sampleRate, bufLength) {
+    return new Rate(sampleRate, bufLength);
   };
-
-  module.exports.use();
+  cc.getRateInstance = (function() {
+    var rates = {};
+    return function(rate) {
+      if (!rates[rate]) {
+        switch (rate) {
+        case C.AUDIO:
+          rates[C.AUDIO] = new Rate(cc.server.sampleRate, cc.server.bufLength);
+          break;
+        case C.CONTROL:
+          rates[C.CONTROL] = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
+          break;
+        }
+      }
+      return rates[rate];
+    };
+  })();
+  
+  module.exports = {};
 
 });

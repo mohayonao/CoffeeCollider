@@ -3,8 +3,9 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
+  require("./object");
+  
   var cc = require("../cc");
-  var object = require("./object");
   
   describe("lang/object.js", function() {
   });

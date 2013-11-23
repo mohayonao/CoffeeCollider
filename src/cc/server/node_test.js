@@ -7,13 +7,6 @@ define(function(require, exports, module) {
   var Group = node.Group;
   var Synth = node.Synth;
   
-  cc.server = {
-    timeline: {
-      push: function(func) { func(); }
-    },
-    sendToLang: function() {}
-  };
-  
   var walk = (function() {
     var _walk = function(node, list) {
       if (node) {
@@ -32,6 +25,20 @@ define(function(require, exports, module) {
   
   describe("server/node.js", function() {
     var nodeId, rootNode, nodes;
+    var _server;
+    before(function() {
+      _server = cc.server;
+      
+      cc.server = {
+        timeline: {
+          push: function(func) { func(); }
+        },
+        sendToLang: function() {}
+      };
+    });
+    after(function() {
+      cc.server = _server;
+    });
     beforeEach(function() {
       nodeId = 0;
       nodes = [];

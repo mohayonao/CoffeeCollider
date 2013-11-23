@@ -3,8 +3,9 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
+  require("./buffer");
+  
   var cc = require("./cc");
-  var buffer = require("./buffer");
   
   describe("lang/buffer.js", function() {
     // TODO: write tests

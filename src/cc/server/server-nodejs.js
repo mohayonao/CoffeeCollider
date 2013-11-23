@@ -102,17 +102,12 @@ define(function(require, exports, module) {
   })();
   
   cc.NodeJSSynthServer = NodeJSSynthServer;
-  
-  module.exports = {
-    use: function() {
-      cc.createNodeJSSynthServer = function() {
-        var server = new NodeJSSynthServer();
-        cc.opmode = "nodejs";
-        return server;
-      };
-    }
+  cc.createNodeJSSynthServer = function() {
+    var server = new NodeJSSynthServer();
+    cc.opmode = "nodejs";
+    return server;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

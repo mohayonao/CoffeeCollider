@@ -25,16 +25,12 @@ define(function(require, exports, module) {
     
     return NodeJSSynthLang;
   })();
-  
-  module.exports = {
-    use: function() {
-      cc.createNodeJSSynthLang = function() {
-        var lang = new NodeJSSynthLang();
-        return lang;
-      };
-    }
+
+  cc.createNodeJSSynthLang = function() {
+    var lang = new NodeJSSynthLang();
+    return lang;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

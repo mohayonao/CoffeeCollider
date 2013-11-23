@@ -116,48 +116,45 @@ define(function(require, exports, module) {
   
   cc.SynthServer = SynthServer;
   
-  module.exports = {
-    use: function() {
-      require("../common/timer");
-      require("../common/console");
-      require("./instance");
-      require("./rate");
-      require("./unit/unit");
-      require("./server-worker");
-      require("./server-nodejs");
-      require("./server-socket");
-      
-      cc.createSynthServer = function() {
-        switch (cc.opmode) {
-        case "worker":
-          return cc.createWorkerSynthServer();
-        case "nodejs":
-          return cc.createNodeJSSynthServer();
-        case "socket":
-          return cc.createSocketSynthServer();
-        }
-        throw new Error("A SynthServer is not defined for: " + cc.opmode);
-      };
-      
-      if (typeof global.console === "undefined") {
-        global.console = (function() {
-          var console = {};
-          ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-            console[method] = function() {
-              if (cc.server) {
-                var args = Array.prototype.slice.call(arguments).map(function(x) {
-                  return pack(x);
-                });
-                cc.server.sendToLang(["/console/" + method, args]);
-              }
-            };
-          });
-          return console;
-        })();
-      }
+  // TODO: moved
+  require("../common/timer");
+  require("../common/console");
+  require("./instance");
+  require("./rate");
+  require("./server-worker");
+  require("./server-nodejs");
+  require("./server-socket");
+  require("./unit/installer");
+  
+  cc.createSynthServer = function() {
+    switch (cc.opmode) {
+    case "worker":
+      return cc.createWorkerSynthServer();
+    case "nodejs":
+      return cc.createNodeJSSynthServer();
+    case "socket":
+      return cc.createSocketSynthServer();
     }
+    throw new Error("A SynthServer is not defined for: " + cc.opmode);
   };
-
-  module.exports.use();
+  
+  if (typeof global.console === "undefined") {
+    global.console = (function() {
+      var console = {};
+      ["log", "debug", "info", "warn", "error"].forEach(function(method) {
+        console[method] = function() {
+          if (cc.server) {
+            var args = Array.prototype.slice.call(arguments).map(function(x) {
+              return pack(x);
+            });
+            cc.server.sendToLang(["/console/" + method, args]);
+          }
+        };
+      });
+      return console;
+    })();
+  }
+  
+  module.exports = {};
 
 });

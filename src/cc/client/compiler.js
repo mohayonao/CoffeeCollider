@@ -3,8 +3,8 @@ define(function(require, exports, module) {
 
   var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
   
-  var cc = require("../../cc");
-  var timevalue = require("../../common/timevalue").calc;
+  var cc = require("../cc");
+  var timevalue = require("../common/timevalue").calc;
   
   // CoffeeScript tags
   // IDENTIFIER
@@ -1088,10 +1088,8 @@ define(function(require, exports, module) {
     return CoffeeCompiler;
   })();
   
-  var use = function() {
-    cc.createCoffeeCompiler = function() {
-      return new CoffeeCompiler();
-    };
+  cc.createCompiler = function() {
+    return new CoffeeCompiler();
   };
   
   module.exports = {
@@ -1116,10 +1114,6 @@ define(function(require, exports, module) {
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
     prettyPrint              : prettyPrint,
-    
-    use: use,
   };
-
-  module.exports.use();
 
 });

@@ -178,18 +178,13 @@ define(function(require, exports, module) {
     };
   })();
   
-  
-  module.exports = {
-    use: function() {
-      cc.createBinaryOpUGen = fn(function(selector, a, b) {
-        return new BinaryOpUGen().init(selector, a, b);
-      }).multiCall().build();
-      cc.instanceOfBinaryOpUGen = function(obj) {
-        return obj instanceof BinaryOpUGen;
-      };
-    }
+  cc.createBinaryOpUGen = fn(function(selector, a, b) {
+    return new BinaryOpUGen().init(selector, a, b);
+  }).multiCall().build();
+  cc.instanceOfBinaryOpUGen = function(obj) {
+    return obj instanceof BinaryOpUGen;
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

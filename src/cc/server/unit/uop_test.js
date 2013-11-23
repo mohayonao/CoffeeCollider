@@ -61,7 +61,6 @@ define(function(require, exports, module) {
     describe("unit", function() {
       var specialIndex;
       before(function() {
-        unit.use();
         specialIndex = ops.UNARY_OP_UGEN_MAP.length;
         ops.UNARY_OP_UGEN_MAP[specialIndex] = "uopTest";
         cc.getRateInstance = function() {

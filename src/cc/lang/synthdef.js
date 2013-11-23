@@ -41,15 +41,15 @@ define(function(require, exports, module) {
       var addAction = list[2];
       switch (addAction) {
       case "addToHead":
-        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
+        return cc.global.Synth(this, args, target, C.ADD_TO_HEAD);
       case "addToTail":
-        return cc.createSynth(target, C.ADD_TO_TAIL, this, args);
+        return cc.global.Synth(this, args, target, C.ADD_TO_TAIL);
       case "addBefore":
-        return cc.createSynth(target, C.ADD_BEFORE, this, args);
+        return cc.global.Synth(this, args, target, C.ADD_BEFORE);
       case "addAfter":
-        return cc.createSynth(target, C.ADD_AFTER, this, args);
+        return cc.global.Synth(this, args, target, C.ADD_AFTER);
       default:
-        return cc.createSynth(target, C.ADD_TO_HEAD, this, args);
+        return cc.global.Synth(this, args, target, C.ADD_TO_HEAD);
       }
     }).multiCall().build();
     
@@ -281,14 +281,16 @@ define(function(require, exports, module) {
     }
     return result;
   };
-  
+
   cc.global.SynthDef = function(func, args) {
-    return cc.createSynthDef(func, args);
+    return new SynthDef(func, args);
+  };
+  cc.instanceOfSynthDef = function(obj) {
+    return obj instanceof SynthDef;
   };
   
   module.exports = {
     SynthDef: SynthDef,
-    
     args2keyValues: args2keyValues,
     args2params   : args2params,
     isValidDefArg : isValidDefArg,
@@ -296,17 +298,6 @@ define(function(require, exports, module) {
     getConstValues: getConstValues,
     topoSort      : topoSort,
     makeDefList   : makeDefList,
-    
-    use: function() {
-      cc.createSynthDef = function(func, args) {
-        return new SynthDef(func, args);
-      };
-      cc.instanceOfSynthDef = function(obj) {
-        return obj instanceof SynthDef;
-      };
-    }
   };
-  
-  module.exports.use();
 
 });

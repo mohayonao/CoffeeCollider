@@ -9,7 +9,6 @@ define(function(require, exports, module) {
   describe("server/unit/unit.js", function() {
     var parent;
     before(function() {
-      unit.use();
       parent = {
         doneAction: function(action, tag) {
           parent.doneAction.result = action;

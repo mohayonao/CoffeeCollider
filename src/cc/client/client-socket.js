@@ -35,14 +35,10 @@ define(function(require, exports, module) {
     return SynthClientSocketImpl;
   })();
   
-  module.exports = {
-    use: function() {
-      cc.createSynthClientSocketImpl = function(exports, opts) {
-        return new SynthClientSocketImpl(exports, opts);
-      };
-    }
+  cc.createSynthClientSocketImpl = function(exports, opts) {
+    return new SynthClientSocketImpl(exports, opts);
   };
   
-  module.exports.use();
+  module.exports = {};
   
 });

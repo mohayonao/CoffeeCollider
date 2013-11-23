@@ -19,14 +19,10 @@ define(function(require, exports, module) {
     return SynthClientNodeJSImpl;
   })();
   
-  module.exports = {
-    use: function() {
-      cc.createSynthClientNodeJSImpl = function(exports, opts) {
-        return new SynthClientNodeJSImpl(exports, opts);
-      };
-    }
+  cc.createSynthClientNodeJSImpl = function(exports, opts) {
+    return new SynthClientNodeJSImpl(exports, opts);
   };
-
-  module.exports.use();
+  
+  module.exports = {};
 
 });

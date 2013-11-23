@@ -447,8 +447,6 @@ define(function(require, exports, module) {
     
     return TaskProcessorRecursive;
   })();
-
-  
   
   cc.global.Task = function(func) {
     return cc.createTaskFunction(func);
@@ -466,6 +464,52 @@ define(function(require, exports, module) {
     return new TaskProcessorRecursive(cc.createTaskFunction(func));
   };
   
+  cc.createTaskManager = function() {
+    cc.taskManager = new TaskManager();
+    return cc.taskManager;
+  };
+  cc.instanceOfTaskManager = function(obj) {
+    return obj instanceof TaskManager;
+  };
+  cc.createTaskFunction = function(init) {
+    return new TaskFunction(init);
+  };
+  cc.instanceOfTaskFunction = function(obj) {
+    return obj instanceof TaskFunction;
+  };
+  cc.createTaskWaitToken = function(item) {
+    if (item instanceof TaskWaitToken) {
+      return item;
+    }
+    switch (typeof item) {
+    case "number":
+      return new TaskWaitTokenNumber(item);
+    case "function":
+      return new TaskWaitTokenFunction(item);
+    case "boolean":
+      return new TaskWaitTokenBoolean(item);
+    default:
+      if (Array.isArray(item)) {
+        return cc.createTaskWaitLogic("and", item);
+      } else if (item && typeof item.performWait === "function") {
+        return new TaskWaitTokenBlockable(item);
+      }
+    }
+    throw new TypeError("TaskWaitToken: Invalid type");
+  };
+  cc.instanceOfTaskWaitToken = function(obj) {
+    return obj instanceof TaskWaitToken;
+  };
+  cc.createTaskWaitLogic = function(logic, list) {
+    list = list.map(function(token) {
+      return cc.createTaskWaitToken(token);
+    });
+    if (logic === "and") {
+      return new TaskWaitTokenLogicAND(list);
+    }
+    return new TaskWaitTokenLogicOR(list);
+  };
+  
   module.exports = {
     TaskManager  : TaskManager,
     TaskFunction : TaskFunction,
@@ -480,56 +524,6 @@ define(function(require, exports, module) {
     TaskProcessorDo       : TaskProcessorDo,
     TaskProcessorEach     : TaskProcessorEach,
     TaskProcessorRecursive: TaskProcessorRecursive,
-    
-    use: function() {
-      cc.createTaskManager = function() {
-        cc.taskManager = new TaskManager();
-        return cc.taskManager;
-      };
-      cc.instanceOfTaskManager = function(obj) {
-        return obj instanceof TaskManager;
-      };
-      cc.createTaskFunction = function(init) {
-        return new TaskFunction(init);
-      };
-      cc.instanceOfTaskFunction = function(obj) {
-        return obj instanceof TaskFunction;
-      };
-      cc.createTaskWaitToken = function(item) {
-        if (item instanceof TaskWaitToken) {
-          return item;
-        }
-        switch (typeof item) {
-        case "number":
-          return new TaskWaitTokenNumber(item);
-        case "function":
-          return new TaskWaitTokenFunction(item);
-        case "boolean":
-          return new TaskWaitTokenBoolean(item);
-        default:
-          if (Array.isArray(item)) {
-            return cc.createTaskWaitLogic("and", item);
-          } else if (item && typeof item.performWait === "function") {
-            return new TaskWaitTokenBlockable(item);
-          }
-        }
-        throw new TypeError("TaskWaitToken: Invalid type");
-      };
-      cc.instanceOfTaskWaitToken = function(obj) {
-        return obj instanceof TaskWaitToken;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        list = list.map(function(token) {
-          return cc.createTaskWaitToken(token);
-        });
-        if (logic === "and") {
-          return new TaskWaitTokenLogicAND(list);
-        }
-        return new TaskWaitTokenLogicOR(list);
-      };
-    }
   };
-  
-  module.exports.use();
 
 });

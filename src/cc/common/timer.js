@@ -71,9 +71,15 @@ define(function(require, exports, module) {
     };
     return WorkerTimer;
   })();
-
+  
   var timerIdCache = [];
-  var replaceNativeTimerFunctions = function() {
+  cc.createTimer = function() {
+    if (WorkerTimer) {
+      return new WorkerTimer();
+    }
+    return new NativeTimer();
+  };
+  cc.replaceNativeTimerFunctions = function() {
     global.setInterval = function(func, delay) {
       var id = _setInterval(func, delay);
       timerIdCache.push(id);
@@ -99,13 +105,13 @@ define(function(require, exports, module) {
       }
     };
   };
-  var restoreNativeTimerFunctions = function() {
+  cc.restoreNativeTimerFunctions = function() {
     global.setInterval   = _setInterval;
     global.clearInterval = _clearInterval;
     global.setTimeout    = _setTimeout;
     global.clearTimeout  = _clearTimeout;
   };
-  var resetNativeTimers = function() {
+  cc.resetNativeTimers = function() {
     timerIdCache.splice(0).forEach(function(timerId) {
       _clearInterval(timerId);
       _clearTimeout(timerId);
@@ -115,20 +121,6 @@ define(function(require, exports, module) {
   module.exports = {
     WorkerTimer: WorkerTimer,
     NativeTimer: NativeTimer,
-    
-    use: function() {
-      cc.createTimer = function() {
-        if (WorkerTimer) {
-          return new WorkerTimer();
-        }
-        return new NativeTimer();
-      };
-      cc.replaceNativeTimerFunctions = replaceNativeTimerFunctions;
-      cc.restoreNativeTimerFunctions = restoreNativeTimerFunctions;
-      cc.resetNativeTimers = resetNativeTimers;
-    }
   };
-
-  module.exports.use();
 
 });

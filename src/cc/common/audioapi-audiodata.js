@@ -69,16 +69,12 @@ define(function(require, exports, module) {
     }
   }
   
-  module.exports = {
-    use: function() {
-      cc.createAudioDataAPI = function(sys, opts) {
-        if (AudioAPI) {
-          return new AudioAPI(sys, opts);
-        }
-      };
+  cc.createAudioDataAPI = function(sys, opts) {
+    if (AudioAPI) {
+      return new AudioAPI(sys, opts);
     }
   };
   
-  module.exports.use();
+  module.exports = {};
 
 });

@@ -3,11 +3,12 @@ define(function(require, exports, module) {
   
   var assert = require("chai").assert;
 
-  var unitTestSuite = require("./suite_of_test");
+  var unitTestSuite = require("../../../testTools").unitTestSuite;
+  var unit  = require("./unit");
   var bufio = require("./bufio");
-
+  
   unitTestSuite.desc = "server/unit/bufio.js";
-
+  
   unitTestSuite("PlayBuf", [
     { rate  : C.AUDIO,
       inputs: [

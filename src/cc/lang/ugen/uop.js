@@ -28,18 +28,13 @@ define(function(require, exports, module) {
     return UnaryOpUGen;
   })();
   
-  
-  module.exports = {
-    use: function() {
-      cc.createUnaryOpUGen = function(selector, a) {
-        return new UnaryOpUGen().init(selector, a);
-      };
-      cc.instanceOfUnaryOpUGen = function(obj) {
-        return obj instanceof UnaryOpUGen;
-      };
-    }
+  cc.createUnaryOpUGen = function(selector, a) {
+    return new UnaryOpUGen().init(selector, a);
   };
-
-  module.exports.use();
+  cc.instanceOfUnaryOpUGen = function(obj) {
+    return obj instanceof UnaryOpUGen;
+  };
+  
+  module.exports = {};
 
 });

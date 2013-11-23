@@ -3,15 +3,37 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   
+  require("./number");
+  
   var cc = require("./cc");
   var random = require("../common/random");
-  var number = require("./number");
   
   describe("lang/number.js", function() {
     var actual, expected;
+    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createMulAdd;
     before(function() {
+      _lang = cc.lang;
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createTaskWaitLogic = cc.createTaskWaitLogic;
+      _createMulAdd = cc.createMulAdd;
+      
       cc.lang = {};
-    });    
+      cc.instanceOfUGen = function() {
+        return false;
+      };
+      cc.createTaskWaitLogic = function(logic, list) {
+        return [logic].concat(list);
+      };
+      cc.createMulAdd = function(a, mul, add) {
+        return a * mul + add;
+      };
+    });
+    after(function() {
+      cc.lang = _lang;
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createTaskWaitLogic = _createTaskWaitLogic;
+      cc.createMulAdd = _createMulAdd;
+    });
     describe("instance methods", function() {
       beforeEach(function() {
         cc.lang.random = new random.Random(1923);
@@ -266,14 +288,6 @@ define(function(require, exports, module) {
         });
       });
       describe("bop", function() {
-        before(function() {
-          cc.instanceOfUGen = function() {
-            return false;
-          };
-          cc.createTaskWaitLogic = function(logic, list) {
-            return [logic].concat(list);
-          };
-        });
         it("__add__", function() {
           assert.equal((-2.5).__add__(-3.5), -2.5 + -3.5);
           assert.equal((-2.5).__add__( 0.0), -2.5 +  0.0);
@@ -836,9 +850,6 @@ define(function(require, exports, module) {
           assert.closeTo((5).expexp(0.001,  4, 100, 1000, "max"), 1000, 1e-6);
         });
         it("madd", function() {
-          cc.createMulAdd = function(a, mul, add) {
-            return a * mul + add;
-          };
           assert.equal((5).madd(2, 3), 5 * 2 + 3);
         });
         it("dup", function() {

@@ -22,26 +22,23 @@ define(function(require, exports, module) {
     };
   };
   
-  module.exports = {
-    bind: bind,
-    use : function() {
-      cc.console = {
-        log: function() {
-          global.console.log.apply(global.console, arguments);
-        },
-        info: function() {
-          global.console.info.apply(global.console, arguments);
-        },
-        warn: function() {
-          global.console.warn.apply(global.console, arguments);
-        },
-        error: function() {
-          global.console.error.apply(global.console, arguments);
-        }
-      };
+  cc.console = {
+    log: function() {
+      global.console.log.apply(global.console, arguments);
+    },
+    info: function() {
+      global.console.info.apply(global.console, arguments);
+    },
+    warn: function() {
+      global.console.warn.apply(global.console, arguments);
+    },
+    error: function() {
+      global.console.error.apply(global.console, arguments);
     }
   };
-
-  module.exports.use();
+  
+  module.exports = {
+    bind: bind,
+  };
 
 });

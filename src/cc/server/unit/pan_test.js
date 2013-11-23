@@ -3,8 +3,9 @@ define(function(require, exports, module) {
   
   var assert = require("chai").assert;
 
-  var unitTestSuite = require("./suite_of_test");
-  var pan = require("./pan");
+  var unitTestSuite = require("../../../testTools").unitTestSuite;
+  var unit = require("./unit");
+  var pan  = require("./pan");
   
   unitTestSuite.desc = "server/unit/pan.js";
   
