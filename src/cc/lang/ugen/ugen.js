@@ -233,6 +233,13 @@ define(function(require, exports, module) {
       var scaled = (this.prune(inMin, inMax, clip).__sub__(inMin)).__div__(inMax.__sub__(inMin));
       return ((b.__sub__(scaled)).__div__(a)).log().__div__(curve);
     }).defaults("inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"").multiCall().build();
+
+    UGen.prototype.bilin = fn(function(inCenter, inMin, inMax, outCenter, outMin, outMax, clip) {
+      return cc.global.Select(this.rate, this.lt(inCenter), [
+        this.linlin(inCenter, inMax, outCenter, outMax, clip),
+        this.linlin(inMin, inCenter, outMin, outCenter, clip)
+      ]);
+    }).defaults("inCenter=0.5,inMin=0,inMax=1,outCenter=0.5,outMin=0,outMax=1,clip=\"minmax\"").build();
     
     ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
       if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
