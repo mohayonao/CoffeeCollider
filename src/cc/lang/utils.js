@@ -55,7 +55,18 @@ define(function(require, exports, module) {
     }
     return result;
   };
-
+  
+  var wrapExtend = function(list, size) {
+    if (size < list.length) {
+      return list.slice(0, size);
+    }
+    var a = new Array(size);
+    for (var i = 0; i < size; ++i) {
+      a[i] = list[i % list.length];
+    }
+    return a;
+  };
+  
   var lang_onmessage = function(e) {
     var msg = e.data;
     if (msg instanceof Uint8Array) {
@@ -70,6 +81,7 @@ define(function(require, exports, module) {
     flop   : flop,
     flatten: flatten,
     clump  : clump,
+    wrapExtend: wrapExtend,
     
     lang_onmessage: lang_onmessage
   };

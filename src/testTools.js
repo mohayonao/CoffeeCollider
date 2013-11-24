@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   var cc = require("./cc/cc");
   var ops = require("./cc/common/ops");
+  var slice = [].slice;
   
   var defineProperty = function(object, selector, value) {
     var ret = object[selector];
@@ -16,20 +17,33 @@ define(function(require, exports, module) {
     return ret;
   };
   
-  var _saved = {};
+  var _savedNumber = {};
+  var _savedArray  = {};
   var replaceTempNumberPrototype = function(selector, hack, callback) {
-    _saved[selector] = defineProperty(Number.prototype, selector, hack);
+    _savedNumber[selector] = defineProperty(Number.prototype, selector, hack);
+    _savedArray[selector]  = defineProperty(Array .prototype, selector, function() {
+      var args = slice.call(arguments);
+      return this.map(function(x) {
+        return x[selector].apply(x, args);
+      });
+    });
     if (callback) {
       callback();
       restoreTempNumberPrototype(selector);
     }
   };
   var restoreTempNumberPrototype = function(selector) {
-    var saved = _saved[selector];
-    if (saved) {
-      defineProperty(Number.prototype, selector, saved);
+    var savedNumber = _savedNumber[selector];
+    var savedArray  = _savedArray[selector];
+    if (savedNumber) {
+      defineProperty(Number.prototype, selector, savedNumber);
     } else {
       delete Number.prototype[selector];
+    }
+    if (savedArray) {
+      defineProperty(Array.prototype, selector, savedArray);
+    } else {
+      delete Array.prototype[selector];
     }
   };
 

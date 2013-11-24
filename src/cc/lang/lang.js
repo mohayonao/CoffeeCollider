@@ -198,6 +198,7 @@ define(function(require, exports, module) {
   require("./boolean");
   require("./buffer");
   require("./date");
+  require("./env");
   require("./function");
   require("./node");
   require("./number");
