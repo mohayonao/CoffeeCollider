@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
   var cc = require("./cc/cc");
+  var ops = require("./cc/common/ops");
   
   var defineProperty = function(object, selector, value) {
     var ret = object[selector];
@@ -51,7 +52,19 @@ define(function(require, exports, module) {
       });
     });
   };
-  
+
+  var shouldBeImplementedMethods = function() {
+    var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__","__and__","__or__" ];
+    list = list.concat(Object.keys(ops.UNARY_OPS).filter(function(selector) {
+      return /^[a-z]/.test(selector);
+    }));
+    list = list.concat(Object.keys(ops.BINARY_OPS).filter(function(selector) {
+      return /^[a-z]/.test(selector);
+    }));
+    list = list.concat(Object.keys(ops.ARITY_OPS));
+    list = list.concat(Object.keys(ops.COMMONS));
+    return list;
+  };
   
   var unitTestSuite = (function() {
     var parent = {
@@ -255,7 +268,9 @@ define(function(require, exports, module) {
     replaceTempNumberPrototype : replaceTempNumberPrototype,
     restoreTempNumberPrototype : restoreTempNumberPrototype,
     useFourArithmeticOperations: useFourArithmeticOperations,
+    shouldBeImplementedMethods : shouldBeImplementedMethods,
     unitTestSuite: unitTestSuite,
+    
   };
 
 });

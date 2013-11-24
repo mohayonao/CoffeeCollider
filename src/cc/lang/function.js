@@ -6,53 +6,18 @@ define(function(require, exports, module) {
   var ops = require("../common/ops");
   var slice = [].slice;
 
-  // unary operator methods
-  fn.defineProperty(Function.prototype, "__plus__", function() {
-    return 0; // avoid NaN
-  });
-  fn.defineProperty(Function.prototype, "__minus__", function() {
-    return 0; // avoid NaN
-  });
-
-  // binary operator methods
-  fn.defineProperty(Function.prototype, "__add__", function(b) {
-    return this.toString() + b;
-  });
-  fn.defineProperty(Function.prototype, "__sub__", function() {
-    return 0; // avoid NaN
-  });
-  fn.defineProperty(Function.prototype, "__mul__", function(b) {
-    if (typeof b === "function") {
-      var f = this, g = b;
-      return function() {
-        return f.call(null, g.apply(null, arguments));
-      };
+  var asNumber = function(val) {
+    val = val();
+    if (typeof val !== "number" || isNaN(val)) {
+      return 0;
     }
-    return 0; // avoid NaN
-  });
-  fn.defineProperty(Function.prototype, "__div__", function() {
-    return 0; // avoid NaN
-  });
-  fn.defineProperty(Function.prototype, "__mod__", function() {
-    return 0; // avoid NaN
-  });
-  fn.setupBinaryOp(Function, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.setupBinaryOp(Function, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
-
-  // others
-  fn.defineProperty(Function.prototype, "play", function() {
-    var func = this;
-    return cc.global.SynthDef(
-      function() {
-        cc.global.Out(C.AUDIO, 0, func());
-      }, []
-    ).play();
-  });
+    return val;
+  };
   
+  // common methods
+  fn.defineProperty(Function.prototype, "copy", function() {
+    return this;
+  });
   fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);
@@ -60,11 +25,14 @@ define(function(require, exports, module) {
       a[i] = this(i);
     }
     return a;
-  }).defaults("n=2").build());
+  }).defaults(ops.COMMONS.dup).build());
   
-  // global method
-  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (!cc.global.hasOwnProperty(selector)) {
+  // unary operator methods
+  ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(Function.prototype, selector, function() {
+      return asNumber(this)[selector]();
+    });
+    if (/^[a-z]/.test(selector) && !cc.global.hasOwnProperty(selector)) {
       cc.global[selector] = function(a) {
         if (typeof a[selector] === "function") {
           return a[selector]();
@@ -73,9 +41,13 @@ define(function(require, exports, module) {
       };
     }
   });
-
-  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (!cc.global.hasOwnProperty(selector)) {
+  
+  // binary operator methods
+  ["__sub__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(Function.prototype, selector, function(b) {
+      return asNumber(this)[selector](b);
+    });
+    if (/^[a-z]/.test(selector) && !cc.global.hasOwnProperty(selector)) {
       cc.global[selector] = function(a, b) {
         if (typeof a[selector] === "function") {
           return a[selector](b);
@@ -84,20 +56,49 @@ define(function(require, exports, module) {
       };
     }
   });
-
-  [
-    "rrand", "exprand", "madd",
-    "linlin", "linexp", "explin", "expexp",
-  ].forEach(function(selector) {
-    if (!cc.global.hasOwnProperty(selector)) {
-      cc.global[selector] = function() {
-        var a = arguments[0];
+  fn.defineProperty(Function.prototype, "__add__", function(b) {
+    return this.toString() + b;
+  });
+  fn.defineProperty(Function.prototype, "__mul__", function(b) {
+    if (typeof b === "function") {
+      var f = this, g = b;
+      return function() {
+        return f.call(null, g.apply(null, arguments));
+      };
+    }
+    return 0;
+  });
+  fn.defineBinaryProperty(Function.prototype, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.defineBinaryProperty(Function.prototype, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  
+  // arity operators
+  Object.keys(ops.ARITY_OPS).forEach(function(selector) {
+    fn.defineProperty(Function.prototype, selector, fn(function() {
+      var args = slice.call(arguments);
+      return (0)[selector].apply(asNumber(this), args);
+    }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
+    if (/^[a-z]/.test(selector) && !cc.global.hasOwnProperty(selector)) {
+      cc.global[selector] = function(a) {
         if (typeof a[selector] === "function") {
           return a[selector].apply(a, slice.call(arguments, 1));
         }
         return a;
       };
     }
+  });
+  
+  // others
+  fn.defineProperty(Function.prototype, "play", function() {
+    var func = this;
+    return cc.global.SynthDef(
+      function() {
+        cc.global.Out(C.AUDIO, 0, func());
+      }, []
+    ).play();
   });
   
   module.exports = {};

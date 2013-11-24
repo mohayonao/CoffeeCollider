@@ -41,16 +41,19 @@ define(function(require, exports, module) {
       return this._blocking;
     };
 
-    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+
+    // unary operators
+    ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+      if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function() {
           return new PUnaryOp(this, selector);
         };
       }
     });
-    
-    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
+
+    // binary operators
+    ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+      if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function(b) {
           return new PBinaryOp(this, selector, b);
         };

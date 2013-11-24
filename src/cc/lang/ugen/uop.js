@@ -12,8 +12,8 @@ define(function(require, exports, module) {
     extend(UnaryOpUGen, cc.UGen);
 
     UnaryOpUGen.prototype.init = function(selector, a) {
-      var index = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
-      if (index === -1) {
+      var index = ops.BINARY_OPS[selector];
+      if (typeof index === "undefined") {
         throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
       }
       var rate = a.rate|C.SCALAR;

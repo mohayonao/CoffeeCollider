@@ -1208,6 +1208,13 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.DC = (function() {
+    var ctor = function() {
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    return ctor;
+  });
   
   module.exports = {};
 

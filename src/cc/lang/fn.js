@@ -155,8 +155,8 @@ define(function(require, exports, module) {
     };
   })();
 
-  fn.defineProperty = function(Klass, key, func) {
-    Object.defineProperty(Klass, key, {
+  fn.defineProperty = function(object, selector, func) {
+    Object.defineProperty(object, selector, {
       configurable: true,
       enumerable  : false,
       writable    : true,
@@ -164,23 +164,38 @@ define(function(require, exports, module) {
     });
   };
   
-  fn.setupBinaryOp = function(Klass, selector, func) {
+  fn.defineBinaryProperty = function(object, selector, func) {
     var ugenSelector;
-    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
-      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    if (ops.ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.ALIASES[selector];
     } else {
       ugenSelector = selector;
     }
-    fn.defineProperty(Klass.prototype, selector, function(b) {
-      var a = this;
-      if (Array.isArray(b)) {
-        return b.map(function(b) {
-          return a[selector](b);
-        });
-      } else if (cc.instanceOfUGen(b)) {
-        return cc.createBinaryOpUGen(ugenSelector, a, b);
+    Object.defineProperty(object, selector, {
+      configurable: true,
+      enumerable  : false,
+      writable    : true,
+      value       : function(b) {
+        if (cc.instanceOfUGen(b)) {
+          return cc.createBinaryOpUGen(ugenSelector, this, b);
+        }
+        return func.call(this, b);
       }
-      return func.call(a, b);
+    });
+  };
+
+  fn.defineArityProperty = function(object, selector, func) {
+    Object.defineProperty(object, selector, {
+      configurable: true,
+      enumerable  : false,
+      writable    : true,
+      value       : function() {
+        var args = slice.call(arguments);
+        if (args.some(cc.instanceOfUGen)) {
+          return func.apply(cc.global.DC(C.SCALAR, this), args);
+        }
+        return func.apply(this, args);
+      }
     });
   };
   

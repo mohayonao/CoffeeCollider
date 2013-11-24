@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   var cc  = require("./cc");
   var ops = require("../common/ops");
   var random = require("../common/random");
-  
+
   describe("lang/array.js", function() {
     var actual, expected;
     var _lang, _instanceOfUGen, _createTaskWaitLogic, _createBinaryOpUGen;
@@ -17,9 +17,12 @@ define(function(require, exports, module) {
       _lang = cc.lang;
       _instanceOfUGen = cc.instanceOfUGen;
       _createTaskWaitLogic = cc.createTaskWaitLogic;
-      _createBinaryOpUGen = cc.createBinaryOpUGen;
+      _createBinaryOpUGen  = cc.createBinaryOpUGen;
       
       cc.lang = {};
+      cc.instanceOfUGen = function() {
+        return false;
+      };
       cc.createTaskWaitLogic = function(logic, list) {
         return [logic].concat(list);
       };
@@ -33,32 +36,216 @@ define(function(require, exports, module) {
       cc.createTaskWaitLogic = _createTaskWaitLogic;
       cc.createBinaryOpUGen  = _createBinaryOpUGen;
     });
+    
+    describe("class methods", function() {
+      it("series", function() {
+        actual   = Array.series(10);
+        expected = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.series(10, 100, 50);
+        expected = [ 100, 150, 200, 250, 300, 350, 400, 450, 500, 550 ];
+        assert.deepEqual(actual, expected);
+      });
+      it("geom", function() {
+        actual   = Array.geom(10);
+        expected = [ 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.geom(10, 1, 0.5);
+        expected = [ 1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625, 0.001953125 ];
+        assert.deepCloseTo(actual, expected, 1e-6);
+      });
+      it("fill", function() {
+        actual   = Array.fill(10);
+        expected = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+        assert.deepEqual(actual, expected);
+        
+        actual   = Array.fill(10, 1);
+        expected = [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.fill(10, function(i) {
+          return i * 100;
+        });
+        expected = [ 0, 100, 200, 300, 400, 500, 600, 700, 800, 900 ];
+        assert.deepEqual(actual, expected);
+      });
+      it("fill2D", function() {
+        actual   = Array.fill2D(3, 3);
+        expected = [ [0, 0, 0], [0, 0, 0], [0, 0, 0] ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.fill2D(3, 3, 1);
+        expected = [ [1, 1, 1], [1, 1, 1], [1, 1, 1] ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.fill2D(3, 3, function(i, j) {
+          return i * 10 + j;
+        });
+        expected = [ [0, 1, 2], [10, 11, 12], [20, 21, 22] ];
+        assert.deepEqual(actual, expected);
+      });
+      it("fillND", function() {
+        actual   = Array.fillND([3, 3]);
+        expected = [ [0, 0, 0], [0, 0, 0], [0, 0, 0] ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.fillND([3, 3], 1);
+        expected = [ [1, 1, 1], [1, 1, 1], [1, 1, 1] ];
+        assert.deepEqual(actual, expected);
+
+        actual   = Array.fillND([3, 3], function(i, j) {
+          return i * 10 + j;
+        });
+        expected = [ [0, 1, 2], [10, 11, 12], [20, 21, 22] ];
+        assert.deepEqual(actual, expected);
+      });
+      it("fib", function() {
+        actual   = Array.fib(10);
+        expected = [ 1, 1, 2, 3, 5, 8, 13, 21, 34, 55 ];
+        assert.deepEqual(actual, expected);
+      });
+      it("rand", function() {
+        var args = [];
+        testTools.replaceTempNumberPrototype("rrand", function(b) {
+          args = [ this, b ];
+          return "rand";
+        }, function() {
+          actual   = Array.rand(5);
+          expected = [ "rand", "rand", "rand", "rand", "rand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0, 1]);
+
+          actual   = Array.rand(5, 10, 100);
+          expected = [ "rand", "rand", "rand", "rand", "rand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
+      });
+      it("rand2", function() {
+        var args = [];
+        testTools.replaceTempNumberPrototype("rand2", function(b) {
+          args = [ this ];
+          return "rand2";
+        }, function() {
+          actual   = Array.rand2(5);
+          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [1]);
+
+          actual   = Array.rand2(5, 10);
+          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10]);
+        });
+      });
+      it("linrand", function() {
+        var args = [];
+        testTools.replaceTempNumberPrototype("linrand", function(b) {
+          args = [ this, b ];
+          return "linrand";
+        }, function() {
+          actual   = Array.linrand(5);
+          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0, 1]);
+
+          actual   = Array.linrand(5, 10, 100);
+          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
+      });
+      it("exprand", function() {
+        var args = [];
+        testTools.replaceTempNumberPrototype("exprand", function(b) {
+          args = [ this, b ];
+          return "exprand";
+        }, function() {
+          actual   = Array.exprand(5);
+          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [0.001, 1]);
+
+          actual   = Array.exprand(5, 10, 100);
+          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
+          assert.deepEqual(actual, expected);
+          assert.deepEqual(args, [10, 100]);
+        });
+      });
+      it("interpolation", function() {
+        actual   = Array.interpolation(1, 0, 5);
+        expected = [ 0 ];
+        assert.deepCloseTo(actual, expected, 1e-6);
+        
+        actual   = Array.interpolation(10, 0, 5);
+        expected = [ 0, 0.55555555555556, 1.1111111111111, 1.6666666666667, 2.2222222222222, 2.7777777777778, 3.3333333333333, 3.8888888888889, 4.4444444444444, 5 ];
+        assert.deepCloseTo(actual, expected, 1e-6);
+      });
+    });
+    
     describe("instance methods", function() {
+      it("exists?", function() {
+        testTools.shouldBeImplementedMethods().forEach(function(selector) {
+          assert.isFunction([][selector], selector);
+        });
+      });
       describe("common", function() {
-        before(function() {
+        it("copy", function() {
+          var list = [ 1, 2, 3 ];
+          actual   = list.copy();
+          expected = [ 1, 2, 3 ];
+          assert.deepEqual(actual, expected);
+          assert.notEqual(actual, list);
+        });
+        it("dup", function() {
+          actual   = [ 1, 2, 3 ].dup();
+          expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ] ];
+          assert.deepEqual(actual, expected);
+
+          actual   = [ 1, 2, 3 ].dup(5);
+          expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ] ];
+          assert.deepEqual(actual, expected);
+        });
+      });
+      describe("unary operators", function() {
+        it("common", function() {
+          ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+            testTools.replaceTempNumberPrototype(selector, function() {
+              return this;
+            }, function() {
+              assert.deepEqual([1,2,3][selector](), [1,2,3]);
+            });
+          });
+        });
+      });
+      describe("binary operators", function() {
+        it("common", function() {
+          ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+            testTools.replaceTempNumberPrototype(selector, function(b) {
+              return [ this, b ];
+            }, function() {
+              assert.deepEqual([1,2,3][selector](1), [ [1,1], [2,1], [3,1] ]);
+            });
+          });
+        });
+        it("__and__", function() {
+          assert.deepEqual([1,2,3].__and__(4), ["and", 1, 2, 3, 4]);
+        });
+        it("__or__", function() {
+          assert.deepEqual([1,2,3].__or__(4), ["or", 1, 2, 3, 4]);
+        });
+        it("ugen", function() {
+          cc.instanceOfUGen = function() {
+            return true;
+          };
+          actual   = [1, 2].max(0);
+          expected = [ [ "max", 1, 0 ], [ "max", 2, 0 ] ];
+          assert.deepEqual(actual, expected);
           cc.instanceOfUGen = function() {
             return false;
           };
-        });
-        it("instance methods", function() {
-          var funcs;
-          funcs = ops.UNARY_OP_UGEN_MAP.concat(ops.BINARY_OP_UGEN_MAP);
-          funcs = funcs.concat(Object.keys(ops.COMMON_FUNCTIONS));
-          funcs.forEach(function(selector) {
-            if (!/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-              return;
-            }
-            var a = [ 1, 2, 3, 4, 5 ];
-            var passed = 0;
-            testTools.replaceTempNumberPrototype(selector, function() {
-              passed += 1;
-              return this;
-            }, function() {
-              var b = a[selector]();
-              assert.deepEqual(a, b);
-              assert.equal(passed, a.length);
-            });
-          });
         });
         describe("adverb", function() {
           before(function() {
@@ -131,25 +318,19 @@ define(function(require, exports, module) {
           });
         });
       });
-      describe("logic", function() {
-        it("__and__", function() {
-          assert.deepEqual([1,2].__and__(3), ["and", 1, 2, 3]);
-        });
-        it("__or__", function() {
-          assert.deepEqual([1,2].__or__(3), ["or", 1, 2, 3]);
-        });
-      });
-      describe("ugen", function() {
-        it("ugen", function() {
-          cc.instanceOfUGen = function() {
-            return true;
-          };
-          actual   = [1, 2].max(0);
-          expected = [ [ "max", 1, 0 ], [ "max", 2, 0 ] ];
-          assert.deepEqual(actual, expected);
+      describe("arity operators", function() {
+        it("common", function() {
+          Object.keys(ops.ARITY_OPS).forEach(function(selector) {
+            var args = ops.ARITY_OPS[selector].split(",").map(function(_, i) { return i; });
+            testTools.replaceTempNumberPrototype(selector, function(b) {
+              return [ this ].concat(args);
+            }, function() {
+              assert.deepEqual([][selector].apply([1,2,3], args), [[1].concat(args), [2].concat(args), [3].concat(args)]);
+            });
+          });
         });
       });
-      describe("others", function() {
+      describe("dedicated", function() {
         var list;
         beforeEach(function() {
           list  = [ 1, -2, 3, -5, 8, -13 ];
@@ -406,158 +587,6 @@ define(function(require, exports, module) {
           assert.equal(list.choose(),   3);
           assert.equal(list.choose(),   3);
         });
-        it("dup", function() {
-          actual   = list.dup();
-          expected = [ [ 1, -2, 3, -5, 8, -13 ], [ 1, -2, 3, -5, 8, -13 ] ];
-          assert.deepEqual(actual, expected);
-        });
-      });
-    });
-    describe("class methods", function() {
-      it(".series", function() {
-        actual   = Array.series(10);
-        expected = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.series(10, 100, 50);
-        expected = [ 100, 150, 200, 250, 300, 350, 400, 450, 500, 550 ];
-        assert.deepEqual(actual, expected);
-      });
-      it(".geom", function() {
-        actual   = Array.geom(10);
-        expected = [ 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.geom(10, 1, 0.5);
-        expected = [ 1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625, 0.001953125 ];
-        assert.deepCloseTo(actual, expected, 1e-6);
-      });
-      it(".fill", function() {
-        actual   = Array.fill(10);
-        expected = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-        assert.deepEqual(actual, expected);
-        
-        actual   = Array.fill(10, 1);
-        expected = [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.fill(10, function(i) {
-          return i * 100;
-        });
-        expected = [ 0, 100, 200, 300, 400, 500, 600, 700, 800, 900 ];
-        assert.deepEqual(actual, expected);
-      });
-      it(".fill2D", function() {
-        actual   = Array.fill2D(3, 3);
-        expected = [ [0, 0, 0], [0, 0, 0], [0, 0, 0] ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.fill2D(3, 3, 1);
-        expected = [ [1, 1, 1], [1, 1, 1], [1, 1, 1] ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.fill2D(3, 3, function(i, j) {
-          return i * 10 + j;
-        });
-        expected = [ [0, 1, 2], [10, 11, 12], [20, 21, 22] ];
-        assert.deepEqual(actual, expected);
-      });
-      it(".fillND", function() {
-        actual   = Array.fillND([3, 3]);
-        expected = [ [0, 0, 0], [0, 0, 0], [0, 0, 0] ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.fillND([3, 3], 1);
-        expected = [ [1, 1, 1], [1, 1, 1], [1, 1, 1] ];
-        assert.deepEqual(actual, expected);
-
-        actual   = Array.fillND([3, 3], function(i, j) {
-          return i * 10 + j;
-        });
-        expected = [ [0, 1, 2], [10, 11, 12], [20, 21, 22] ];
-        assert.deepEqual(actual, expected);
-      });
-      it(".fib", function() {
-        actual   = Array.fib(10);
-        expected = [ 1, 1, 2, 3, 5, 8, 13, 21, 34, 55 ];
-        assert.deepEqual(actual, expected);
-      });
-      it(".rand", function() {
-        var args = [];
-        testTools.replaceTempNumberPrototype("rrand", function(b) {
-          args = [ this, b ];
-          return "rand";
-        }, function() {
-          actual   = Array.rand(5);
-          expected = [ "rand", "rand", "rand", "rand", "rand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [0, 1]);
-
-          actual   = Array.rand(5, 10, 100);
-          expected = [ "rand", "rand", "rand", "rand", "rand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [10, 100]);
-        });
-      });
-      it(".rand2", function() {
-        var args = [];
-        testTools.replaceTempNumberPrototype("rand2", function(b) {
-          args = [ this ];
-          return "rand2";
-        }, function() {
-          actual   = Array.rand2(5);
-          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [1]);
-
-          actual   = Array.rand2(5, 10);
-          expected = [ "rand2", "rand2", "rand2", "rand2", "rand2" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [10]);
-        });
-      });
-      it(".linrand", function() {
-        var args = [];
-        testTools.replaceTempNumberPrototype("linrand", function(b) {
-          args = [ this, b ];
-          return "linrand";
-        }, function() {
-          actual   = Array.linrand(5);
-          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [0, 1]);
-
-          actual   = Array.linrand(5, 10, 100);
-          expected = [ "linrand", "linrand", "linrand", "linrand", "linrand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [10, 100]);
-        });
-      });
-      it(".exprand", function() {
-        var args = [];
-        testTools.replaceTempNumberPrototype("exprand", function(b) {
-          args = [ this, b ];
-          return "exprand";
-        }, function() {
-          actual   = Array.exprand(5);
-          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [0.001, 1]);
-
-          actual   = Array.exprand(5, 10, 100);
-          expected = [ "exprand", "exprand", "exprand", "exprand", "exprand" ];
-          assert.deepEqual(actual, expected);
-          assert.deepEqual(args, [10, 100]);
-        });
-      });
-      it("interpolation", function() {
-        actual   = Array.interpolation(1, 0, 5);
-        expected = [ 0 ];
-        assert.deepCloseTo(actual, expected, 1e-6);
-        
-        actual   = Array.interpolation(10, 0, 5);
-        expected = [ 0, 0.55555555555556, 1.1111111111111, 1.6666666666667, 2.2222222222222, 2.7777777777778, 3.3333333333333, 3.8888888888889, 4.4444444444444, 5 ];
-        assert.deepCloseTo(actual, expected, 1e-6);
       });
     });
   });

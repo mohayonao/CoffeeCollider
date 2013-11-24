@@ -62,8 +62,8 @@ define(function(require, exports, module) {
         selector = "*";
       }
       
-      var index = ops.BINARY_OP_UGEN_MAP.indexOf(selector);
-      if (index === -1) {
+      var index = ops.BINARY_OPS[selector];
+      if (typeof index === "undefined") {
         throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
       }
       var rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);

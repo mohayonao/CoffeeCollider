@@ -4,8 +4,9 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
   
   require("./number");
-  
-  var cc = require("./cc");
+
+  var testTools = require("../../testTools");
+  var cc     = require("./cc");
   var random = require("../common/random");
   
   describe("lang/number.js", function() {
@@ -34,11 +35,36 @@ define(function(require, exports, module) {
       cc.createTaskWaitLogic = _createTaskWaitLogic;
       cc.createMulAdd = _createMulAdd;
     });
+
+    describe("class methods", function() {
+    });
+    
     describe("instance methods", function() {
       beforeEach(function() {
         cc.lang.random = new random.Random(1923);
       });
-      describe("uop", function() {
+      it("exists?", function() {
+        testTools.shouldBeImplementedMethods().forEach(function(selector) {
+          assert.isFunction((1)[selector], selector);
+        });
+      });
+      describe("common", function() {
+        it("copy", function() {
+          actual   = (10).copy();
+          expected = 10;
+          assert.equal(actual, expected);
+        });
+        it("dup", function() {
+          actual   = (10).dup();
+          expected = [ 10, 10 ];
+          assert.deepEqual(actual, expected);
+
+          actual   = (10).dup(5);
+          expected = [ 10, 10, 10, 10, 10 ];
+          assert.deepEqual(actual, expected);
+        });
+      });
+      describe("unary operators", function() {
         it("__plus__", function() {
           assert.equal(( 2.2).__plus__(), + 2.2);
           assert.equal(( 0.0).__plus__(), + 0.0);
@@ -59,10 +85,35 @@ define(function(require, exports, module) {
           assert.equal(( 0.0).not(), 1);
           assert.equal((-5.2).not(), 0);
         });
+        it("isNil", function() {
+          assert.equal((+5.2).isNil(), 0);
+          assert.equal(( 0.0).isNil(), 0);
+          assert.equal((-5.2).isNil(), 0);
+        });
+        it("notNil", function() {
+          assert.equal((+5.2).notNil(), 1);
+          assert.equal(( 0.0).notNil(), 1);
+          assert.equal((-5.2).notNil(), 1);
+        });
+        it("bitNot", function() {
+          assert.equal((+5.2).bitNot(), ~(+5.2));
+          assert.equal(( 0.0).bitNot(), ~( 0.0));
+          assert.equal((-5.2).bitNot(), ~(-5.2));
+        });
         it("abs", function() {
           assert.equal((+5.2).abs(), 5.2);
           assert.equal(( 0.0).abs(), 0.0);
           assert.equal((-5.2).abs(), 5.2);
+        });
+        it("asFloat", function() {
+          assert.equal((+5.2).asFloat(), +5.2);
+          assert.equal(( 0.0).asFloat(),  0.0);
+          assert.equal((-5.2).asFloat(), -5.2);
+        });
+        it("asInt", function() {
+          assert.equal((+5.2).asInt(), +5);
+          assert.equal(( 0.0).asInt(),  0);
+          assert.equal((-5.2).asInt(), -5);
         });
         it("ceil", function() {
           assert.equal((+5.2).ceil(),  6);
@@ -261,6 +312,26 @@ define(function(require, exports, module) {
           assert.equal((0.5).coin(), true );
           assert.equal((0.5).coin(), true );
         });
+        it.skip("digitvalue", function() {
+        });
+        it.skip("silence", function() {
+        });
+        it.skip("thru", function() {
+        });
+        it.skip("rectWindow", function() {
+        });
+        it.skip("hanWindow", function() {
+        });
+        it.skip("welWindow", function() {
+        });
+        it.skip("triWindow", function() {
+        });
+        it.skip("ramp", function() {
+        });
+        it.skip("scurve", function() {
+        });
+        it.skip("numunaryselectors", function() {
+        });
         it("num", function() {
           assert.equal(( 2.2).num(), + 2.2);
           assert.equal(( 0.0).num(), + 0.0);
@@ -287,7 +358,7 @@ define(function(require, exports, module) {
           assert.equal((10).twice(), 20);
         });
       });
-      describe("bop", function() {
+      describe("binary operators", function() {
         it("__add__", function() {
           assert.equal((-2.5).__add__(-3.5), -2.5 + -3.5);
           assert.equal((-2.5).__add__( 0.0), -2.5 +  0.0);
@@ -613,6 +684,8 @@ define(function(require, exports, module) {
           assert.equal((+31.4).unsignedRightShift( 0.0),  31);
           assert.equal((+31.4).unsignedRightShift(+1.5),  15);
         });
+        it.skip("fill", function() {
+        });
         it("ring1", function() {
           assert.closeTo((-31.4).ring1(-1.5),  15.7, 1e-6);
           assert.closeTo((-31.4).ring1( 0.0), -31.4, 1e-6);
@@ -792,22 +865,96 @@ define(function(require, exports, module) {
           assert.closeTo((  2.0).wrap2( 1.0),  0.0, 1e-6);
           assert.closeTo(( -2.0).wrap2( 1.0),  0.0, 1e-6);
         });
-      });
-      describe("common", function() {
-        it("rrand", function() {
-          assert.closeTo((10).rrand(100), 40.064505338669, 1e-6);
-          assert.closeTo((10).rrand(100), 92.335609197617, 1e-6);
-          assert.closeTo((10).rrand(100), 72.707160711288, 1e-6);
-          assert.closeTo((10).rrand(100), 49.119718074799, 1e-6);
-          assert.closeTo((10).rrand(100), 48.14605474472 , 1e-6);
+        it.skip("firstarg", function() {
         });
-        it("exprand", function() {
-          assert.closeTo((10).exprand(100), 21.579933147204, 1e-4);
-          assert.closeTo((10).exprand(100), 82.194018792543, 1e-4);
-          assert.closeTo((10).exprand(100), 49.744633658604, 1e-4);
-          assert.closeTo((10).exprand(100), 27.205932013319, 1e-4);
-          assert.closeTo((10).exprand(100), 26.53658713648 , 1e-4);
-          assert.closeTo(( 0).exprand(100), 0, 1e-4);
+        it.skip("randrange", function() {
+        });
+        it.skip("exprandrange", function() {
+        });
+        it.skip("numbinaryselectors", function() {
+        });
+      });
+      
+      describe("arity operators", function() {
+        it("madd", function() {
+          assert.equal((5).madd(2, 3), 5 * 2 + 3);
+        });
+        it("range", function() {
+          assert.equal((-1).range(0, 100), 0);
+          assert.equal(( 0).range(0, 100), 0);
+          assert.equal((0.2).range(0, 100), 20);
+          assert.equal((0.5).range(0, 100), 50);
+          assert.equal((1).range(0, 100), 100);
+          assert.equal((2).range(0, 100), 100);
+        });
+        it("exprange", function() {
+          assert.equal((-1).exprange(0.01, 100), 0.01);
+          assert.equal(( 0).exprange(0.01, 100), 0.01);
+          assert.closeTo((0.2).exprange(0.01, 100), 0.063095734448019, 1e-6);
+          assert.equal((0.5).exprange(0.01, 100), 1);
+          assert.equal((1).exprange(0.01, 100), 100);
+          assert.equal((2).exprange(0.01, 100), 100);
+        });
+        it.skip("curverange", function() {
+          
+        });
+        it("unipolar", function() {
+          assert.equal((0.5).unipolar(10), 5);
+        });
+        it("bipolar", function() {
+          assert.equal((0.5).bipolar(10), 0);
+        });
+        it("clip", function() {
+          assert.equal((-1.0).clip(-0.8, 0.8), -0.8);
+          assert.equal((-0.2).clip(-0.8, 0.8), -0.2);
+          assert.equal((+0.2).clip(-0.8, 0.8), +0.2);
+          assert.equal((+1.0).clip(-0.8, 0.8), +0.8);
+        });
+        it("fold", function() {
+          assert.closeTo((-1.0).fold(-0.8, 0.8), -0.6, 1e-6);
+          assert.closeTo((-0.2).fold(-0.8, 0.8), -0.2, 1e-6);
+          assert.closeTo((+0.2).fold(-0.8, 0.8), +0.2, 1e-6);
+          assert.closeTo((+1.0).fold(-0.8, 0.8), +0.6, 1e-6);
+        });
+        it("wrap", function() {
+          assert.closeTo((-1.0).wrap(-0.8, 0.8), +0.6, 1e-6);
+          assert.closeTo((-0.2).wrap(-0.8, 0.8), -0.2, 1e-6);
+          assert.closeTo((+0.2).wrap(-0.8, 0.8), +0.2, 1e-6);
+          assert.closeTo((+1.0).wrap(-0.8, 0.8), -0.6, 1e-6);
+        });
+        it("blend", function() {
+          assert.closeTo((-1.0).blend(2, 0.8), 1.4 , 1e-6);
+          assert.closeTo((-0.2).blend(2, 0.8), 1.56, 1e-6);
+          assert.closeTo((+0.2).blend(2, 0.8), 1.64, 1e-6);
+          assert.closeTo((+1.0).blend(2, 0.8), 1.8 , 1e-6);
+          assert.closeTo((-1.0).blend(2, -0.8), -3.4 , 1e-6);
+          assert.closeTo((-0.2).blend(2, -0.8), -1.96, 1e-6);
+          assert.closeTo((+0.2).blend(2, -0.8), -1.24, 1e-6);
+          assert.closeTo((+1.0).blend(2, -0.8),  0.2 , 1e-6);
+        });
+        it("lag", function() {
+          assert.equal((0.5).lag(), 0.5);
+        });
+        it("lag2", function() {
+          assert.equal((0.5).lag2(), 0.5);
+        });
+        it("lag3", function() {
+          assert.equal((0.5).lag3(), 0.5);
+        });
+        it("lagud", function() {
+          assert.equal((0.5).lagud(), 0.5);
+        });
+        it("lag2ud", function() {
+          assert.equal((0.5).lag2ud(), 0.5);
+        });
+        it("lag3ud", function() {
+          assert.equal((0.5).lag3ud(), 0.5);
+        });
+        it("varlag", function() {
+          assert.equal((0.5).varlag(), 0.5);
+        });
+        it("slew", function() {
+          assert.equal((0.5).slew(), 0.5);
         });
         it("linlin", function() {
           assert.closeTo((1).linlin(0, 10, 100, 1000), 190, 1e-6);
@@ -849,14 +996,40 @@ define(function(require, exports, module) {
           assert.closeTo((5).expexp(    6, 10, 100, 1000, "min"),  100, 1e-6);
           assert.closeTo((5).expexp(0.001,  4, 100, 1000, "max"), 1000, 1e-6);
         });
-        it("madd", function() {
-          assert.equal((5).madd(2, 3), 5 * 2 + 3);
+        it("lincurve", function() {
+          assert.closeTo((-1.0).lincurve(-1, 1, 1, 100, -4), 1, 1e-6);
+          assert.closeTo((-0.2).lincurve(-1, 1, 1, 100, -4), 81.486404641393, 1e-6);
+          assert.closeTo((+0.2).lincurve(-1, 1, 1, 100, -4), 92.698438103309, 1e-6);
+          assert.closeTo((+1.0).lincurve(-1, 1, 1, 100, -4), 100, 1e-6);
         });
-        it("dup", function() {
-          actual   = (10).dup();
-          expected = [10, 10];
-          assert.deepEqual(actual, expected);
+        it("curvelin", function() {
+          assert.closeTo((-1.0).curvelin(-1, 1, 1, 100, -4), 1, 1e-6);
+          assert.closeTo((-0.2).curvelin(-1, 1, 1, 100, -4), -0.0014829932986402, 1e-6);
+          assert.closeTo((+0.2).curvelin(-1, 1, 1, 100, -4), -0.00098963900683673, 1e-6);
+          assert.closeTo((+1.0).curvelin(-1, 1, 1, 100, -4), 100, 1e-6);
         });
+        it("bilin", function() {
+          assert.closeTo((-1.0).bilin(0.1, -1, 1, 25, 1, 100, -4), 1, 1e-6);
+          assert.closeTo((-0.2).bilin(0.1, -1, 1, 25, 1, 100, -4), 18.454545454545, 1e-6);
+          assert.closeTo((+0.2).bilin(0.1, -1, 1, 25, 1, 100, -4), 33.333333333333, 1e-6);
+          assert.closeTo((+1.0).bilin(0.1, -1, 1, 25, 1, 100, -4), 100, 1e-6);
+        });
+        it("rrand", function() {
+          assert.closeTo((10).rrand(100), 40.064505338669, 1e-6);
+          assert.closeTo((10).rrand(100), 92.335609197617, 1e-6);
+          assert.closeTo((10).rrand(100), 72.707160711288, 1e-6);
+          assert.closeTo((10).rrand(100), 49.119718074799, 1e-6);
+          assert.closeTo((10).rrand(100), 48.14605474472 , 1e-6);
+        });
+        it("exprand", function() {
+          assert.closeTo((10).exprand(100), 21.579933147204, 1e-4);
+          assert.closeTo((10).exprand(100), 82.194018792543, 1e-4);
+          assert.closeTo((10).exprand(100), 49.744633658604, 1e-4);
+          assert.closeTo((10).exprand(100), 27.205932013319, 1e-4);
+          assert.closeTo((10).exprand(100), 26.53658713648 , 1e-4);
+          assert.closeTo(( 0).exprand(100), 0, 1e-4);
+        });
+        
       });
     });
   });

@@ -9,7 +9,7 @@ define(function(require, exports, module) {
   cc.unit.specs.BinaryOpUGen = (function() {
     
     var ctor = function() {
-      var func = calcFunc[ops.BINARY_OP_UGEN_MAP[this.specialIndex]];
+      var func = calcFunc[ops.BINARY_OPS_MAP[this.specialIndex]];
       var process;
       if (func) {
         switch (this.inRates[0]) {
@@ -44,7 +44,7 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OP_UGEN_MAP[this.specialIndex] + "] is not defined.");
+        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OPS_MAP[this.specialIndex] + "] is not defined.");
       }
     };
     

@@ -3,61 +3,48 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var ops   = require("../common/ops");
+  var slice = [].slice;
   
-  // unary operator methods
-  fn.defineProperty(Date.prototype, "__plus__", function() {
-    return +this;
+  // common methods
+  fn.defineProperty(Date.prototype, "copy", function() {
+    return new Date(+this);
   });
-  fn.defineProperty(Date.prototype, "__minus__", function() {
-    return -this;
-  });
-
-  // binary operator methods
-  fn.defineProperty(Date.prototype, "__add__", function(b) {
-    return this + b;
-  });
-  fn.defineProperty(Date.prototype, "__sub__", function(b) {
-    var num = this - b;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  fn.defineProperty(Date.prototype, "__mul__", function(b) {
-    var num = this * b;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  fn.defineProperty(Date.prototype, "__div__", function(b) {
-    var num = this / b;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  fn.defineProperty(Date.prototype, "__mod__", function(b) {
-    var num = this % b;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  fn.setupBinaryOp(Date, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.setupBinaryOp(Date, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
-
   fn.defineProperty(Date.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
       a[i] = this;
     }
     return a;
-  }).defaults("n=2").build());
+  }).defaults(ops.COMMONS.dup).build());
+  
+  // unary operator methods
+  ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(Date.prototype, selector, function() {
+      return (+this)[selector]();
+    });
+  });
+
+  // binary operator methods
+  ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(Date.prototype, selector, function(b) {
+      return (+this)[selector](b);
+    });
+  });
+  fn.defineBinaryProperty(Date.prototype, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.defineBinaryProperty(Date.prototype, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  
+  // arity operators
+  Object.keys(ops.ARITY_OPS).forEach(function(selector) {
+    fn.defineProperty(Date.prototype, selector, fn(function() {
+      var args = slice.call(arguments);
+      return (0)[selector].apply(+this, args);
+    }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
+  });
   
   module.exports = {};
 

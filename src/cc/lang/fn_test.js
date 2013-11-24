@@ -9,6 +9,25 @@ define(function(require, exports, module) {
 
   describe("lang/fn.js", function() {
     var actual, expected;
+    var _instanceOfUGen, _createBinaryOpUGen, _DC;
+    before(function() {
+      _instanceOfUGen = cc.instanceOfUGen;
+      _createBinaryOpUGen = cc.createBinaryOpUGen;
+      _DC = cc.global.DC;
+      
+      cc.createBinaryOpUGen = function(ugenSelector, a, b) {
+        return [ ugenSelector, a, b ];
+      };
+      cc.global.DC = function(rate, input) {
+        return 1;
+      };
+    });
+    after(function() {
+      cc.instanceOfUGen = _instanceOfUGen;
+      cc.createBinaryOpUGen = _createBinaryOpUGen;
+      cc.global.DC = _DC;
+    });
+    
     describe("Fn", function() {
       it("none", function() {
         var calc = fn(function(val, mul, add) {
@@ -216,28 +235,33 @@ define(function(require, exports, module) {
       });
       assert.equal([10].fn_test(), "fn_test");
     });
-    it("setupBinaryOp", function() {
+    it("defineBinaryProperty", function() {
+      fn.defineBinaryProperty(Number.prototype, "fn_test", function(b) {
+        return this + b;
+      });
       cc.instanceOfUGen = function() {
         return false;
       };
-      fn.setupBinaryOp(Number, "fn_test", function(b) {
-        return this + b;
-      });
       assert.equal((10).fn_test(5), 15);
-      assert.deepEqual((10).fn_test([5]), [15]);
-
+      
       cc.instanceOfUGen = function() {
         return true;
       };
-      cc.createBinaryOpUGen = function(ugenSelector, a, b) {
-        return [ ugenSelector, a, b ];
-      };
       assert.deepEqual((10).fn_test(5), ["fn_test", 10, 5]);
-
-      ops.UGEN_OP_ALIASES["__fn_test__"] = "fn_test";
-      fn.setupBinaryOp(Number, "__fn_test__", function() {});
+    });
+    it("defineArityProperty", function() {
+      fn.defineArityProperty(Number.prototype, "fn_test", function(a, b) {
+        return this * a + b;
+      });
+      cc.instanceOfUGen = function() {
+        return false;
+      };
+      assert.equal((10).fn_test(5, 3), 53);
       
-      assert.deepEqual((10).__fn_test__(5), ["fn_test", 10, 5]);
+      cc.instanceOfUGen = function() {
+        return true;
+      };
+      assert.equal((10).fn_test(5, 3), 8);
     });
   });
 

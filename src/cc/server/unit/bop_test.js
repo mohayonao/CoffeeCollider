@@ -11,7 +11,7 @@ define(function(require, exports, module) {
   describe("server/unit/bop.js", function() {
     describe("calcFunc", function() {
       Object.keys(bop.calcFunc).forEach(function(selector) {
-        var specialIndex = ops.BINARY_OP_UGEN_MAP.indexOf(selector);
+        var specialIndex = ops.BINARY_OPS_MAP.indexOf(selector);
         it(selector + "("+specialIndex+")", function() {
           var func = bop.calcFunc[selector];
           assert.isFalse(isNaN(func(-1, -1)));
@@ -321,8 +321,8 @@ define(function(require, exports, module) {
     describe("unit", function() {
       var specialIndex;
       before(function() {
-        specialIndex = ops.BINARY_OP_UGEN_MAP.length;
-        ops.BINARY_OP_UGEN_MAP[specialIndex] = "bopTest";
+        specialIndex = ops.BINARY_OPS_MAP.length;
+        ops.BINARY_OPS_MAP[specialIndex] = "bopTest";
         cc.getRateInstance = function() {
           return { bufLength:8, slopeFactor:1/8 };
         };

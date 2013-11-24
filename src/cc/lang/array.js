@@ -1,26 +1,34 @@
 define(function(require, exports, module) {
   "use strict";
-
+  
   var cc = require("./cc");
   var fn = require("./fn");
   var ops   = require("../common/ops");
   var utils = require("./utils");
   var slice = [].slice;
-
-  var setupUnaryOp = function(selector) {
-    fn.defineProperty(Array.prototype, selector, function() {
-      return this.map(function(x) { return x[selector](); });
-    });
-  };
-
-  setupUnaryOp("__plus__");
-  setupUnaryOp("__minus__");
-  ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      setupUnaryOp(selector);
+  
+  // common methods
+  fn.defineProperty(Array.prototype, "copy", function() {
+    return this.slice();
+  });
+  fn.defineProperty(Array.prototype, "dup", fn(function(n) {
+    var a = new Array(n|0);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = this.slice();
     }
+    return a;
+  }).defaults(ops.COMMONS.dup).build());
+  
+  // unary operator methods
+  ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(Array.prototype, selector, function() {
+      return this.map(function(x) {
+        return x[selector]();
+      });
+    });
   });
   
+  // binary operator methods
   var foldAt = function(list, index) {
     var len = list.length;
     index = index % (len * 2 - 2);
@@ -73,11 +81,16 @@ define(function(require, exports, module) {
       });
     }
   };
-
-  var setupBinaryOp = function(selector) {
+  
+  cc.global.SHORT = C.SHORT;
+  cc.global.FOLD  = C.FOLD;
+  cc.global.TABLE = C.TABLE;
+  cc.global.FLAT  = C.FLAT;
+  
+  ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
     var ugenSelector;
-    if (ops.UGEN_OP_ALIASES.hasOwnProperty(selector)) {
-      ugenSelector = ops.UGEN_OP_ALIASES[selector];
+    if (ops.ALIASES.hasOwnProperty(selector)) {
+      ugenSelector = ops.ALIASES[selector];
     } else {
       ugenSelector = selector;
     }
@@ -93,27 +106,16 @@ define(function(require, exports, module) {
         return a[selector](b);
       });
     });
-  };
-
-  setupBinaryOp("__add__");
-  setupBinaryOp("__sub__");
-  setupBinaryOp("__mul__");
-  setupBinaryOp("__div__");
-  setupBinaryOp("__mod__");
+  });
   fn.defineProperty(Array.prototype, "__and__", function(b) {
     return cc.createTaskWaitLogic("and", this.concat(b));
   });
   fn.defineProperty(Array.prototype, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", this.concat(b));
   });
-  ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-    if (/^[a-z][a-zA-Z0-9_]*$/.test(selector)) {
-      setupBinaryOp(selector);
-    }
-  });
-
-  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
-  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
+  
+  // arity operators
+  Object.keys(ops.ARITY_OPS).forEach(function(selector) {
     fn.defineProperty(Array.prototype, selector, fn(function() {
       var args = slice.call(arguments);
       return this.map(function(_in) {
@@ -122,14 +124,11 @@ define(function(require, exports, module) {
         }
         return _in;
       });
-    }).defaults(COMMON_FUNCTIONS[selector]).multiCall().build());
+    }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
   });
   
-  cc.global.SHORT = C.SHORT;
-  cc.global.FOLD  = C.FOLD;
-  cc.global.TABLE = C.TABLE;
-  cc.global.FLAT  = C.FLAT;
-
+  
+  // Array methods
   // utils
   var cc_func = function(func) {
     if (typeof func === "function") {
@@ -146,7 +145,7 @@ define(function(require, exports, module) {
     return ((cc.lang.random.next() * n)|0);
   };
   
-  // array class methods
+  // class methods
   fn.defineProperty(Array, "series", fn(function(size, start, step) {
     size |= 0;
     var a = new Array(size);
@@ -157,7 +156,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,start=0,step=1").build());
-
+  
   fn.defineProperty(Array, "geom", fn(function(size, start, grow) {
     size |= 0;
     var a = new Array(size);
@@ -168,7 +167,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,start=1,grow=2").build());
-
+  
   fn.defineProperty(Array, "fill", fn(function(size, func) {
     size |= 0;
     var a = new Array(size);
@@ -178,7 +177,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,func=0").build());
-
+  
   fn.defineProperty(Array, "fill2D", fn(function(rows, cols, func) {
     rows |= 0;
     cols |= 0;
@@ -193,7 +192,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("rows=0,cols=0,func=0").build());
-
+  
   fn.defineProperty(Array, "fillND", (function() {
     var fillND = function(dimensions, func, args) {
       var n, a, argIndex, i;
@@ -219,7 +218,7 @@ define(function(require, exports, module) {
       return fillND(dimensions, cc_func(func), []);
     }).defaults("dimensions=[],func=0").build();
   })());
-
+  
   fn.defineProperty(Array, "fib", fn(function(size, x, y) {
     var a = new Array(size|0);
     for (var t, i = 0, imax = a.length; i < imax; i++) {
@@ -230,7 +229,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,a=0,b=1").build());
-
+  
   fn.defineProperty(Array, "rand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
@@ -246,7 +245,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,val=1").build());
-
+  
   fn.defineProperty(Array, "linrand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
@@ -254,7 +253,7 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults("size=0,minVal=0,maxVal=1").build());
-
+  
   fn.defineProperty(Array, "exprand", fn(function(size, minVal, maxVal) {
     var a = new Array(size|0);
     for (var i = 0, imax = a.length; i < imax; i++) {
@@ -276,7 +275,7 @@ define(function(require, exports, module) {
   }).defaults("size=0,start=0,end=1").build());
   
   
-  // array instance methods
+  // instance methods
   var ifold = function(index, len) {
     var len2 = len * 2 - 2;
     index = (index|0) % len2;
@@ -380,7 +379,6 @@ define(function(require, exports, module) {
     return x0 + Math.abs(index - i) * (x1 - x0);
   }).multiCall().build());
   
-  
   fn.defineProperty(Array.prototype, "put", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
@@ -394,7 +392,7 @@ define(function(require, exports, module) {
     }
     return this;
   });
-
+  
   fn.defineProperty(Array.prototype, "clipPut", function(index, item) {
     if (Array.isArray(index)) {
       index.forEach(function(index) {
@@ -494,7 +492,6 @@ define(function(require, exports, module) {
       return item / sum;
     });
   });
-  
   
   fn.defineProperty(Array.prototype, "mirror", function() {
     var size = this.length * 2 - 1;
@@ -656,14 +653,6 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "choose", function() {
     return this[irand(this.length)];
   });
-  
-  fn.defineProperty(Array.prototype, "dup", fn(function(n) {
-    var a = new Array(n|0);
-    for (var i = 0, imax = a.length; i < imax; ++i) {
-      a[i] = this.slice();
-    }
-    return a;
-  }).defaults("n=2").build());
   
   module.exports = {};
 

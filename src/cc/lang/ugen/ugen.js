@@ -54,53 +54,60 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
+
+    // common methods
+    UGen.prototype.copy = function() {
+      return this;
+    };
+    UGen.prototype.dup = fn(function(n) {
+      var a = new Array(n|0);
+      for (var i = 0, imax = a.length; i < imax; ++i) {
+        a[i] = this;
+      }
+      return a;
+    }).defaults(ops.COMMONS.dup).build();
     
-    ops.UNARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
+    // unary operator methods
+    ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+      var ugenSelector;
+      if (ops.ALIASES.hasOwnProperty(selector)) {
+        ugenSelector = ops.ALIASES[selector];
+      } else {
+        ugenSelector = selector;
+      }
+      if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
         UGen.prototype[selector] = function() {
-          return cc.createUnaryOpUGen(selector, this);
+          return cc.createUnaryOpUGen(ugenSelector, this);
         };
       }
     });
     
-    UGen.prototype.__plus__ = function() {
-      return this;
-    };
-    UGen.prototype.__minus__ = function() {
-      return this.neg();
-    };
-    
-    ops.BINARY_OP_UGEN_MAP.forEach(function(selector) {
-      if (/^[a-z][a-zA-Z0-9_]*/.test(selector)) {
-        fn.setupBinaryOp(UGen, selector, function(b) {
-          return cc.createBinaryOpUGen(selector, this, b);
+    // binay operator methods
+    ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+      var ugenSelector;
+      if (ops.ALIASES.hasOwnProperty(selector)) {
+        ugenSelector = ops.ALIASES[selector];
+      } else {
+        ugenSelector = selector;
+      }
+      if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
+        fn.defineBinaryProperty(UGen.prototype, selector, function(b) {
+          return cc.createBinaryOpUGen(ugenSelector, this, b);
         });
       }
     });
-    
-    fn.setupBinaryOp(UGen, "__add__", function(b) {
-      return cc.createBinaryOpUGen("+", this, b);
-    });
-    fn.setupBinaryOp(UGen, "__sub__", function(b) {
-      return cc.createBinaryOpUGen("-", this, b);
-    });
-    fn.setupBinaryOp(UGen, "__mul__", function(b) {
-      return cc.createBinaryOpUGen("*", this, b);
-    });
-    fn.setupBinaryOp(UGen, "__div__", function(b) {
-      return cc.createBinaryOpUGen("/", this, b);
-    });
-    fn.setupBinaryOp(UGen, "__mod__", function(b) {
-      return cc.createBinaryOpUGen("%", this, b);
-    });
 
-    UGen.prototype.copy = function() {
-      return this;
+    UGen.prototype.__and__ = function() {
+      return 0;
+    };
+    UGen.prototype.__or__ = function() {
+      return 0;
     };
     
+    // arity operators methods
     UGen.prototype.madd = fn(function(mul, add) {
       return cc.createMulAdd(this, mul, add);
-    }).defaults("mul=1,add=0").multiCall().build();
+    }).defaults(ops.ARITY_OPS.madd).multiCall().build();
     
     UGen.prototype.range = fn(function(lo, hi) {
       var mul, add;
@@ -112,7 +119,7 @@ define(function(require, exports, module) {
         add = lo;
       }
       return cc.createMulAdd(this, mul, add);
-    }).defaults("lo=0,hi=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.range).multiCall().build();
     
     UGen.prototype.exprange = fn(function(lo, hi) {
       if (this.signalRange === C.BIPOLAR) {
@@ -120,7 +127,7 @@ define(function(require, exports, module) {
       } else {
         return this.linexp( 0, 1, lo, hi);
       }
-    }).defaults("lo=0.01,hi=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.exprange).multiCall().build();
 
     UGen.prototype.curverange = fn(function(lo, hi, curve) {
       if (this.signalRange === C.BIPOLAR) {
@@ -128,79 +135,79 @@ define(function(require, exports, module) {
       } else {
         return this.lincurve( 0, 1, lo, hi, curve);
       }
-    }).defaults("lo=0.01,hi=1,curve=-4").multiCall().build();
+    }).defaults(ops.ARITY_OPS.curverange).multiCall().build();
     
     UGen.prototype.unipolar = fn(function(mul) {
       return this.range(0, mul);
-    }).defaults("mul=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.unipolar).multiCall().build();
     
     UGen.prototype.bipolar = fn(function(mul) {
       return this.range(mul.neg(), mul);
-    }).defaults("mul=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.bipolar).multiCall().build();
 
     UGen.prototype.clip = fn(function(lo, hi) {
       return cc.global.Clip(this.rate, this, lo, hi);
-    }).defaults("lo=1,hi=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.clip).multiCall().build();
 
     UGen.prototype.fold = fn(function(lo, hi) {
       return cc.global.Fold(this.rate, this, lo, hi);
-    }).defaults("lo=1,hi=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.fold).multiCall().build();
     
     UGen.prototype.wrap = fn(function(lo, hi) {
       return cc.global.Wrap(this.rate, this, lo, hi);
-    }).defaults("lo=1,hi=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.wrap).multiCall().build();
 
     UGen.prototype.blend = fn(function(that, blendFrac) {
-      var pan = blendFrac.linlin(0.0, 1.0, -1, 1);
+      var pan = blendFrac.linlin(0, 1, -1, 1);
       if (this.rate === C.AUDIO) {
-        return cc.global.XFade2.ar(this, that, pan);
+        return cc.global.XFade2(C.AUDIO, this, that, pan);
       }
       if (that.rate === C.AUDIO) {
-        return cc.global.XFade2.ar(that, this, pan.neg());
+        return cc.global.XFade2(C.AUDIO, that, this, pan.neg());
       }
       return cc.global.LinXFade2(this.rate, this, that, pan);
-    }).defaults("that=0,blendFrac=0.5").multiCall().build();
+    }).defaults(ops.ARITY_OPS.blend).multiCall().build();
     
     UGen.prototype.lag = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
         return cc.global.Lag(this.rate, this, t1);
       }
       return cc.global.LagUD(this.rate, this, t1, t2);
-    }).defaults("t1=0.1,t2").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lag).multiCall().build();
     
     UGen.prototype.lag2 = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
         return cc.global.Lag2(this.rate, this, t1);
       }
       return cc.global.Lag2UD(this.rate, this, t1, t2);
-    }).defaults("t1=0.1,t2").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lag2).multiCall().build();
     
     UGen.prototype.lag3 = fn(function(t1, t2) {
       if (typeof t2 === "undefined") {
         return cc.global.Lag3(this.rate, this, t1);
       }
       return cc.global.Lag3UD(this.rate, this, t1, t2);
-    }).defaults("t1=0.1,t2").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lag3).multiCall().build();
     
     UGen.prototype.lagud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.LagUD(this.rate, this, lagTimeU, lagTimeD);
-    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lagud).multiCall().build();
     
     UGen.prototype.lag2ud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.Lag2UD(this.rate, this, lagTimeU, lagTimeD);
-    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lag2ud).multiCall().build();
     
     UGen.prototype.lag3ud = fn(function(lagTimeU, lagTimeD) {
       return cc.global.Lag3UD(this.rate, this, lagTimeU, lagTimeD);
-    }).defaults("lagTimeU=0.1,lagTimeD=0.1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lag3ud).multiCall().build();
 
     UGen.prototype.varlag = fn(function(time, curvature, warp, start) {
       return cc.global.VarLag(this.rate, this, time, curvature, warp, start);
-    }).defaults("time=0.1,curvature=0,warp=5,start=0").multiCall().build();
+    }).defaults(ops.ARITY_OPS.varlag).multiCall().build();
     
     UGen.prototype.slew = fn(function(up, down) {
       return cc.global.Slew(this.rate, this, up, down);
-    }).defaults("up=1,down=1").multiCall().build();
+    }).defaults(ops.ARITY_OPS.slew).multiCall().build();
     
     UGen.prototype.prune = function(min, max, type) {
       switch (type) {
@@ -220,7 +227,7 @@ define(function(require, exports, module) {
         this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
-    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    }).defaults(ops.ARITY_OPS.linlin).multiCall().build();
     
     UGen.prototype.linexp = fn(function(inMin, inMax, outMin, outMax, clip) {
       return cc.global.LinExp(
@@ -228,7 +235,7 @@ define(function(require, exports, module) {
         this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
-    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    }).defaults(ops.ARITY_OPS.linexp).multiCall().build();
     
     UGen.prototype.explin = fn(function(inMin, inMax, outMin, outMax, clip) {
       return cc.global.ExpLin(
@@ -236,11 +243,15 @@ define(function(require, exports, module) {
         this.prune(inMin, inMax, clip),
         inMin, inMax, outMin, outMax
       );
-    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+    }).defaults(ops.ARITY_OPS.explin).multiCall().build();
     
     UGen.prototype.expexp = fn(function(inMin, inMax, outMin, outMax, clip) {
-      return outMax.__div__(outMin).pow(this.prune(inMin, inMax, clip).__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
-    }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build();
+      return cc.global.ExpExp(
+        this.rate,
+        this.prune(inMin, inMax, clip),
+        inMin, inMax, outMin, outMax
+      );
+    }).defaults(ops.ARITY_OPS.expexp).multiCall().build();
     
     UGen.prototype.lincurve = fn(function(inMin, inMax, outMin, outMax, curve, clip) {
       if (typeof curve === "number" && Math.abs(curve) < 0.25) {
@@ -251,7 +262,7 @@ define(function(require, exports, module) {
       var b = outMin.__add__(a);
       var scaled = (this.prune(inMin, inMax, clip).__sub__(inMin)).__div__(inMax.__sub__(inMin));
       return b.__sub__(a.__mul__(grow.pow(scaled)));
-    }).defaults("inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"").multiCall().build();
+    }).defaults(ops.ARITY_OPS.lincurve).multiCall().build();
     
     UGen.prototype.curvelin = fn(function(inMin, inMax, outMin, outMax, curve, clip) {
       if (typeof curve === "number" && Math.abs(curve) < 0.25) {
@@ -262,14 +273,22 @@ define(function(require, exports, module) {
       var b = outMin.__add__(a);
       var scaled = (this.prune(inMin, inMax, clip).__sub__(inMin)).__div__(inMax.__sub__(inMin));
       return ((b.__sub__(scaled)).__div__(a)).log().__div__(curve);
-    }).defaults("inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"").multiCall().build();
+    }).defaults(ops.ARITY_OPS.curvelin).multiCall().build();
 
     UGen.prototype.bilin = fn(function(inCenter, inMin, inMax, outCenter, outMin, outMax, clip) {
       return cc.global.Select(this.rate, this.lt(inCenter), [
         this.linlin(inCenter, inMax, outCenter, outMax, clip),
         this.linlin(inMin, inCenter, outMin, outCenter, clip)
       ]);
-    }).defaults("inCenter=0.5,inMin=0,inMax=1,outCenter=0.5,outMin=0,outMax=1,clip=\"minmax\"").build();
+    }).defaults(ops.ARITY_OPS.bilin).build();
+    
+    UGen.prototype.rrand = fn(function() {
+      return 0;
+    }).defaults(ops.ARITY_OPS.rrand).build();
+    
+    UGen.prototype.exprand = fn(function() {
+      return 0;
+    }).defaults(ops.ARITY_OPS.exprand).build();
     
     return UGen;
   })();

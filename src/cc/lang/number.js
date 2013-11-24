@@ -8,6 +8,20 @@ define(function(require, exports, module) {
   var drand = function() {
     return cc.lang.random.next();
   };
+
+  // common methods
+  fn.defineProperty(Number.prototype, "copy", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "dup", fn(function(n) {
+    var a = new Array(n|0);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = this;
+    }
+    return a;
+  }).defaults(ops.COMMONS.dup).build());
+  
   
   // unary operator methods
   fn.defineProperty(Number.prototype, "__plus__", function() {
@@ -22,8 +36,23 @@ define(function(require, exports, module) {
   fn.defineProperty(Number.prototype, "not", function() {
     return this === 0 ? 1 : 0;
   });
+  fn.defineProperty(Number.prototype, "isNil", function() {
+    return 0;
+  });
+  fn.defineProperty(Number.prototype, "notNil", function() {
+    return 1;
+  });
+  fn.defineProperty(Number.prototype, "bitNot", function() {
+    return ~this;
+  });
   fn.defineProperty(Number.prototype, "abs", function() {
     return Math.abs(this);
+  });
+  fn.defineProperty(Number.prototype, "asFloat", function() {
+    return +this;
+  });
+  fn.defineProperty(Number.prototype, "asInt", function() {
+    return this|0;
   });
   fn.defineProperty(Number.prototype, "ceil", function() {
     return Math.ceil(this);
@@ -145,6 +174,36 @@ define(function(require, exports, module) {
   fn.defineProperty(Number.prototype, "coin", function() {
     return drand() < this;
   });
+  fn.defineProperty(Number.prototype, "digitvalue", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "silence", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "thru", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "rectWindow", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "hanWindow", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "welWindow", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "triWindow", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "ramp", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "scurve", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineProperty(Number.prototype, "numunaryselectors", function() {
+    return 0; // TODO: implements
+  });
   fn.defineProperty(Number.prototype, "num", function() {
     return +this;
   });
@@ -165,64 +224,64 @@ define(function(require, exports, module) {
   });
   
   // binary operator methods
-  fn.setupBinaryOp(Number, "__add__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__add__", function(b) {
     return this + b;
   });
-  fn.setupBinaryOp(Number, "__sub__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__sub__", function(b) {
     return this - b;
   });
-  fn.setupBinaryOp(Number, "__mul__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__mul__", function(b) {
     return this * b;
   });
-  fn.setupBinaryOp(Number, "__div__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__div__", function(b) {
     if (this === 0 && b === 0) {
       return 0; // avoid NaN
     }
     return this / b;
   });
-  fn.setupBinaryOp(Number, "__mod__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__mod__", function(b) {
     if (b === 0) {
       return 0; // avoid NaN
     }
     return this % b;
   });
-  fn.setupBinaryOp(Number, "__and__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__and__", function(b) {
     return cc.createTaskWaitLogic("and", [this].concat(b));
   });
-  fn.setupBinaryOp(Number, "__or__", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "__or__", function(b) {
     return cc.createTaskWaitLogic("or", [this].concat(b));
   });
-  fn.setupBinaryOp(Number, "eq", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "eq", function(b) {
     return this === b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "ne", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "ne", function(b) {
     return this !== b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "lt", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "lt", function(b) {
     return this < b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "gt", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "gt", function(b) {
     return this > b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "le", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "le", function(b) {
     return this <= b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "ge", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "ge", function(b) {
     return this >= b ? 1 : 0;
   });
-  fn.setupBinaryOp(Number, "bitAnd", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "bitAnd", function(b) {
     return this & b;
   });
-  fn.setupBinaryOp(Number, "bitOr", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "bitOr", function(b) {
     return this | b;
   });
-  fn.setupBinaryOp(Number, "bitXor", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "bitXor", function(b) {
     return this ^ b;
   });
-  fn.setupBinaryOp(Number, "min", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "min", function(b) {
     return Math.min(this, b);
   });
-  fn.setupBinaryOp(Number, "max", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "max", function(b) {
     return Math.max(this, b);
   });
   
@@ -233,115 +292,118 @@ define(function(require, exports, module) {
     }
     return Math.abs(a);
   };
-  fn.setupBinaryOp(Number, "lcm", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "lcm", function(b) {
     if (this === 0 && b === 0) {
       return 0; // avoid NaN
     }
     return Math.abs(this * b) / gcd(this, b);
   });
-  fn.setupBinaryOp(Number, "gcd", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "gcd", function(b) {
     return gcd(this, b);
   });
-  fn.setupBinaryOp(Number, "round", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "round", function(b) {
     if (b === 0) {
       return this; // avoid NaN
     }
     return Math.round(this / b) * b;
   });
-  fn.setupBinaryOp(Number, "roundUp", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "roundUp", function(b) {
     if (b === 0) {
       return this; // avoid NaN
     }
     return Math.ceil(this / b) * b;
   });
-  fn.setupBinaryOp(Number, "roundDown", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "roundDown", function(b) {
     if (b === 0) {
       return this; // avoid NaN
     }
     return Math.floor(this / b) * b;
   });
-  fn.setupBinaryOp(Number, "trunc", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "trunc", function(b) {
     if (b === 0) {
       return this; // avoid NaN
     }
     return Math.floor(this / b) * b;
   });
-  fn.setupBinaryOp(Number, "atan2", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "atan2", function(b) {
     return Math.atan2(this, b);
   });
-  fn.setupBinaryOp(Number, "hypot", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "hypot", function(b) {
     return Math.sqrt((this * this) + (b * b));
   });
-  fn.setupBinaryOp(Number, "hypotApx", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "hypotApx", function(b) {
     var x = Math.abs(this), y = Math.abs(b);
     var minxy = Math.min(x, y);
     return x + y - (Math.sqrt(2) - 1) * minxy;
   });
-  fn.setupBinaryOp(Number, "pow", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "pow", function(b) {
     return Math.pow(Math.abs(this), b);
   });
-  fn.setupBinaryOp(Number, "leftShift", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "leftShift", function(b) {
     if (b < 0) {
       return (this|0) >> (-b|0);
     }
     return (this|0) << (b|0);
   });
-  fn.setupBinaryOp(Number, "rightShift", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "rightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  fn.setupBinaryOp(Number, "unsignedRightShift", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "unsignedRightShift", function(b) {
     if (b < 0) {
       return (this|0) << (-b|0);
     }
     return (this|0) >> (b|0);
   });
-  fn.setupBinaryOp(Number, "ring1", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "fill", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineBinaryProperty(Number.prototype, "ring1", function(b) {
     return this * b + this;
   });
-  fn.setupBinaryOp(Number, "ring2", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "ring2", function(b) {
     return this * b + this + b;
   });
-  fn.setupBinaryOp(Number, "ring3", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "ring3", function(b) {
     return this * this * b;
   });
-  fn.setupBinaryOp(Number, "ring4", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "ring4", function(b) {
     return this * this * b - this * b * b;
   });
-  fn.setupBinaryOp(Number, "difsqr", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "difsqr", function(b) {
     return this * this - b * b;
   });
-  fn.setupBinaryOp(Number, "sumsqr", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "sumsqr", function(b) {
     return this * this + b * b;
   });
-  fn.setupBinaryOp(Number, "sqrsum", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "sqrsum", function(b) {
     return (this + b) * (this + b);
   });
-  fn.setupBinaryOp(Number, "sqrdif", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "sqrdif", function(b) {
     return (this - b) * (this - b);
   });
-  fn.setupBinaryOp(Number, "absdif", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "absdif", function(b) {
     return Math.abs(this - b);
   });
-  fn.setupBinaryOp(Number, "thresh", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "thresh", function(b) {
     return this < b ? 0 : this;
   });
-  fn.setupBinaryOp(Number, "amclip", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "amclip", function(b) {
     return this * 0.5 * (b + Math.abs(b));
   });
-  fn.setupBinaryOp(Number, "scaleneg", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "scaleneg", function(b) {
     b = 0.5 * b + 0.5;
     return (Math.abs(this) - this) * b + this;
   });
-  fn.setupBinaryOp(Number, "clip2", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "clip2", function(b) {
     return Math.max(-b, Math.min(this, b));
   });
-  fn.setupBinaryOp(Number, "excess", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "excess", function(b) {
     return this - Math.max(-b, Math.min(this, b));
   });
-  fn.setupBinaryOp(Number, "fold2", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "fold2", function(b) {
     var _in = this, x, c, range, range2;
     x = _in + b;
     if (_in >= b) {
@@ -368,7 +430,7 @@ define(function(require, exports, module) {
     }
     return c - b;
   });
-  fn.setupBinaryOp(Number, "wrap2", function(b) {
+  fn.defineBinaryProperty(Number.prototype, "wrap2", function(b) {
     var _in = this, range;
     if (_in >= b) {
       range = b + b;
@@ -390,122 +452,300 @@ define(function(require, exports, module) {
     }
     return _in - range * Math.floor((_in + b) / range);
   });
+  fn.defineBinaryProperty(Number.prototype, "firstarg", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineBinaryProperty(Number.prototype, "randrange", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineBinaryProperty(Number.prototype, "exprandrange", function() {
+    return 0; // TODO: implements
+  });
+  fn.defineBinaryProperty(Number.prototype, "numbinaryselectors", function() {
+    return 0; // TODO: implements
+  });
+  
+  // arity operator methods
+  fn.defineProperty(Number.prototype, "madd", fn(function(mul, add) {
+    return cc.createMulAdd(this, mul, add);
+  }).defaults(ops.ARITY_OPS.madd).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "range", fn(function(lo, hi) {
+    return this.linlin(0, 1, lo, hi);
+  }).defaults(ops.ARITY_OPS.range).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "exprange", fn(function(lo, hi) {
+    return this.linexp(0, 1, lo, hi);
+  }).defaults(ops.ARITY_OPS.exprange).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "curverange", fn(function(lo, hi, curve) {
+    return this.lincurve(0, 1, lo, hi, curve);
+  }).defaults(ops.ARITY_OPS.curverange).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "unipolar", fn(function(mul) {
+    return this.__mul__(mul);
+  }).defaults(ops.ARITY_OPS.unipolar).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "bipolar", fn(function(mul) {
+    return (this * 2 - 1).__mul__(mul);
+  }).defaults(ops.ARITY_OPS.bipolar).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "clip", fn(function(lo, hi) {
+    return Math.max(lo, Math.min(this, hi));
+  }).defaults(ops.ARITY_OPS.clip).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "fold", fn(function(lo, hi) {
+    var _in = this, x, c, range, range2;
+    x = _in - lo;
+    if (_in >= hi) {
+      _in = hi + hi - _in;
+      if (_in >= lo) {
+        return _in;
+      }
+    } else if (_in < lo) {
+      _in = lo + lo - _in;
+      if (_in < hi) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    
+    if (hi === lo) {
+      return lo;
+    }
+    range = hi - lo;
+    range2 = range + range;
+    c = x - range2 * Math.floor(x / range2);
+    if (c >= range) {
+      c = range2 - c;
+    }
+    return c + lo;
+  }).defaults(ops.ARITY_OPS.fold).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "wrap", fn(function(lo, hi) {
+    if (lo > hi) {
+      return this.wrap(hi, lo);
+    }
+    var _in = this, range;
+    if (_in >= hi) {
+      range = hi - lo;
+      _in -= range;
+      if (_in < hi) {
+        return _in;
+      }
+    } else if (_in < lo) {
+      range = hi - lo;
+      _in += range;
+      if (_in >= lo) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    
+    if (hi === lo) {
+      return lo;
+    }
+    return _in - range * Math.floor((_in - lo) / range);
+  }).defaults(ops.ARITY_OPS.wrap).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "blend", fn(function(that, blendFrac) {
+    return this + blendFrac * (that - this);
+  }).defaults(ops.ARITY_OPS.wrap).multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "lag", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "lag2", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "lag3", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "lagud", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "lag2ud", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "lag3ud", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "varlag", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "slew", function() {
+    return this;
+  });
+  
+  fn.defineArityProperty(Number.prototype, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    // (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
+    return (this.__sub__(inMin)).__div__(inMax.__sub__(inMin)).__mul__(outMax.__sub__(outMin)).__add__(outMin);
+  }).defaults(ops.ARITY_OPS.linlin).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    // Math.pow(outMax/outMin, (this-inMin)/(inMax-inMin)) * outMin;
+    return outMax.__div__(outMin).pow((this.__sub__(inMin)).__div__(inMax.__sub__(inMin))).__mul__(outMin);
+  }).defaults(ops.ARITY_OPS.linexp).multiCall().build());
 
-  fn.defineProperty(Number.prototype, "rrand", fn(function(num) {
+  fn.defineArityProperty(Number.prototype, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    // (((Math.log(this/inMin)) / (Math.log(inMax/inMin))) * (outMax-outMin)) + outMin;
+    return (this.__div__(inMin).log().__div__(inMax.__div__(inMin).log()).__mul__(outMax.__sub__(outMin))).__add__(outMin);
+  }).defaults(ops.ARITY_OPS.explin).multiCall().build());
+
+  fn.defineArityProperty(Number.prototype, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    // Math.pow(outMax/outMin, Math.log(this/inMin) / Math.log(inMax/inMin)) * outMin;
+    return outMax.__div__(outMin).pow(this.__div__(inMin).log().__div__(inMax.__div__(inMin).log())).__mul__(outMin);
+  }).defaults(ops.ARITY_OPS.expexp).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "lincurve", fn(function(inMin, inMax, outMin, outMax, curve, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    if (Math.abs(curve) < 0.001) {
+      return this.linlin(inMin, inMax, outMin, outMax, clip);
+    }
+    var grow = curve.exp();
+    var a = outMax.__sub__(outMin).__div__((1).__sub__(grow));
+    var b = outMin.__add__(a);
+    var scaled = (this.__sub__(inMin)).__div__(inMax.__sub__(inMin));
+    return b.__sub__(a.__mul__(grow.pow(scaled)));
+  }).defaults(ops.ARITY_OPS.lincurve).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "curvelin", fn(function(inMin, inMax, outMin, outMax, curve, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    if (Math.abs(curve) < 0.001) {
+      return this.linlin(inMin, inMax, outMin, outMax, clip);
+    }
+    var grow = curve.exp();
+    var a = outMax.__sub__(outMin).__div__((1).__sub__(grow));
+    var b = outMin.__add__(a);
+    var scaled = (this.__sub__(inMin)).__div__(inMax.__sub__(inMin));
+    return ((b.__sub__(scaled)).__div__(a)).log().__div__(curve);
+  }).defaults(ops.ARITY_OPS.curvelin).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "bilin", fn(function(inCenter, inMin, inMax, outCenter, outMin, outMax, clip) {
+    switch (clip) {
+    case "min":
+      if (this <= inMin) { return outMin; }
+      break;
+    case "max":
+      if (this >= inMax) { return outMax; }
+      break;
+    case "minmax":
+      /* falls through */
+    default:
+      if (this <= inMin) { return outMin; }
+      if (this >= inMax) { return outMax; }
+      break;
+    }
+    if (this >= inCenter) {
+      return this.linlin(inCenter, inMax, outCenter, outMax);
+    } else {
+      return this.linlin(inMin, inCenter, outMin, outCenter);
+    }
+  }).defaults(ops.ARITY_OPS.bilin).multiCall().build());
+  
+  fn.defineArityProperty(Number.prototype, "rrand", fn(function(num) {
     var a = this, b = num;
     return a + drand() * (b - a);
-  }).defaults("num=0").multiCall().build());
+  }).defaults(ops.ARITY_OPS.rrand).multiCall().build());
   
-  fn.defineProperty(Number.prototype, "exprand", fn(function(num) {
+  fn.defineArityProperty(Number.prototype, "exprand", fn(function(num) {
     var a = this, b = num;
     if (a === 0) {
       return 0;
     }
     return a * Math.exp(Math.log(b / a) * drand());
-  }).defaults("num=0").multiCall().build());
-  
-  // others
-  fn.defineProperty(Number.prototype, "madd", fn(function(mul, add) {
-    return cc.createMulAdd(this, mul, add);
-  }).defaults("mul=1,add=0").multiCall().build());
-
-  fn.defineProperty(Number.prototype, "linlin", fn(function(inMin, inMax, outMin, outMax, clip) {
-    switch (clip) {
-    case "min":
-      if (this <= inMin) {
-        return outMin;
-      }
-      break;
-    case "max":
-      if (this >= inMax) {
-        return outMax;
-      }
-      break;
-    case "minmax":
-      /* falls through */
-    default:
-      if (this <= inMin) {
-        return outMin;
-      }
-      if (this >= inMax) {
-        return outMax;
-      }
-      break;
-    }
-    return (this-inMin)/(inMax-inMin) * (outMax-outMin) + outMin;
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-
-  fn.defineProperty(Number.prototype, "linexp", fn(function(inMin, inMax, outMin, outMax, clip) {
-    switch (clip) {
-    case "min":
-      if (this <= inMin) { return outMin; }
-      break;
-    case "max":
-      if (this >= inMax) { return outMax; }
-      break;
-    case "minmax":
-      /* falls through */
-    default:
-      if (this <= inMin) { return outMin; }
-      if (this >= inMax) { return outMax; }
-      break;
-    }
-    return Math.pow(outMax/outMin, (this-inMin)/(inMax-inMin)) * outMin;
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-
-  fn.defineProperty(Number.prototype, "explin", fn(function(inMin, inMax, outMin, outMax, clip) {
-    switch (clip) {
-    case "min":
-      if (this <= inMin) { return outMin; }
-      break;
-    case "max":
-      if (this >= inMax) { return outMax; }
-      break;
-    case "minmax":
-      /* falls through */
-    default:
-      if (this <= inMin) { return outMin; }
-      if (this >= inMax) { return outMax; }
-      break;
-    }
-    return (Math.log(this/inMin)) / (Math.log(inMax/inMin)) * (outMax-outMin) + outMin;
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-
-  fn.defineProperty(Number.prototype, "expexp", fn(function(inMin, inMax, outMin, outMax, clip) {
-    switch (clip) {
-    case "min":
-      if (this <= inMin) { return outMin; }
-      break;
-    case "max":
-      if (this >= inMax) { return outMax; }
-      break;
-    case "minmax":
-      /* falls through */
-    default:
-      if (this <= inMin) { return outMin; }
-      if (this >= inMax) { return outMax; }
-      break;
-    }
-    return Math.pow(outMax/outMin, Math.log(this/inMin) / Math.log(inMax/inMin)) * outMin;
-  }).defaults("inMin=0,inMax=1,outMin=1,outMax=2,clip=\"minmax\"").multiCall().build());
-  
-  var COMMON_FUNCTIONS = ops.COMMON_FUNCTIONS;
-  Object.keys(COMMON_FUNCTIONS).forEach(function(selector) {
-    if (Number.prototype[selector]) {
-      return;
-    }
-    fn.defineProperty(Number.prototype, selector, function() {
-      return this;
-    });
-  });
-  
-  fn.defineProperty(Number.prototype, "dup", fn(function(n) {
-    var a = new Array(n|0);
-    for (var i = 0, imax = a.length; i < imax; ++i) {
-      a[i] = this;
-    }
-    return a;
-  }).defaults("n=2").build());
+  }).defaults(ops.ARITY_OPS.exprand).multiCall().build());
   
   module.exports = {};
 

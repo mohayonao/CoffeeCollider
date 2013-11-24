@@ -11,7 +11,7 @@ define(function(require, exports, module) {
   describe("server/unit/uop.js", function() {
     describe("calcFunc", function() {
       Object.keys(uop.calcFunc).forEach(function(selector) {
-        var specialIndex = ops.UNARY_OP_UGEN_MAP.indexOf(selector);
+        var specialIndex = ops.UNARY_OPS_MAP.indexOf(selector);
         it(selector + "("+specialIndex+")", function() {
           var func = uop.calcFunc[selector];
           assert.isFalse(isNaN(func(-1)));
@@ -61,8 +61,8 @@ define(function(require, exports, module) {
     describe("unit", function() {
       var specialIndex;
       before(function() {
-        specialIndex = ops.UNARY_OP_UGEN_MAP.length;
-        ops.UNARY_OP_UGEN_MAP[specialIndex] = "uopTest";
+        specialIndex = ops.UNARY_OPS_MAP.length;
+        ops.UNARY_OPS_MAP[specialIndex] = "uopTest";
         cc.getRateInstance = function() {
           return { bufLength: 64 };
         };

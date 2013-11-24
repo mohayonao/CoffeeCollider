@@ -4,15 +4,16 @@ define(function(require, exports, module) {
   var assert = require("chai").assert;
 
   require("./date");
-  
-  var cc = require("./cc");
+
+  var testTools = require("../../testTools");
+  var cc  = require("./cc");
+  var ops = require("../common/ops");
   
   describe("lang/date.js", function() {
-    var d, actual, expected;
+    var d = new Date(0), n = +d;
+    var actual, expected;
     var _instanceOfUGen, _createTaskWaitLogic;
     before(function() {
-      d = new Date();
-      
       _instanceOfUGen = cc.instanceOfUGen;
       _createTaskWaitLogic = cc.createTaskWaitLogic;
       
@@ -27,47 +28,72 @@ define(function(require, exports, module) {
       cc.instanceOfUGen = _instanceOfUGen;
       cc.createTaskWaitLogic = _createTaskWaitLogic;
     });
-    describe("uop", function() {
-      it("__plus__", function() {
-        assert.equal(d.__plus__(), +d);
-      });
-      it("__minus__", function() {
-        assert.equal(d.__minus__(), -d);
-      });
+    describe("class methods", function() {
     });
-    describe("bop", function() {
-      before(function() {
+    
+    describe("instance methods", function() {
+      it("exists?", function() {
+        testTools.shouldBeImplementedMethods().forEach(function(selector) {
+          assert.isFunction(d[selector], selector);
+        });
       });
-      it("__add__", function() {
-        assert.equal(d.__add__(2), d + 2);
-        assert.equal(d.__add__("str"), d + "str");
+      describe("common methods", function() {
+        it("copy", function() {
+          assert.deepEqual(d.copy(), d);
+          assert.notEqual(d.copy(), d);
+        });
+        it("dup", function() {
+          actual   = d.dup();
+          expected = [ d, d ];
+          assert.deepEqual(actual, expected);
+
+          actual   = d.dup(5);
+          expected = [ d, d, d, d, d ];
+          assert.deepEqual(actual, expected);
+        });
       });
-      it("__sub__", function() {
-        assert.equal(d.__sub__(2), d - 2);
-        assert.equal(d.__sub__("str"), 0); // avoid NaN
+      describe("unary operators", function() {
+        it("common", function() {
+          ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+            testTools.replaceTempNumberPrototype(selector, function() {
+              return this;
+            }, function() {
+              assert.equal(d[selector](), n);
+              assert.equal(d[selector](), n);
+            });
+          });
+        });
       });
-      it("__mul__", function() {
-        assert.equal(d.__mul__(2), d * 2);
-        assert.equal(d.__mul__("str"), 0); // avoid NaN
+      describe("binary operators", function() {
+        it("common", function() {
+          ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+            testTools.replaceTempNumberPrototype(selector, function(b) {
+              return [ this, b ];
+            }, function() {
+              assert.deepEqual(d[selector](1), [ n, 1 ]);
+              assert.deepEqual(d[selector](1), [ n, 1 ]);
+            });
+          });
+        });
+        it("__and__", function() {
+          assert.deepEqual(d.__and__(0), ["and", d, 0]);
+        });
+        it("__or__", function() {
+          assert.deepEqual(d.__or__(0), ["or", d, 0]);
+        });
       });
-      it("__div__", function() {
-        assert.equal(d.__div__(2), d / 2);
-        assert.equal(d.__div__("str"), 0); // avoid NaN
-      });
-      it("__mod__", function() {
-        assert.equal(d.__mod__(2), d % 2);
-        assert.equal(d.__mod__("str"), 0); // avoid NaN
-      });
-      it("__and__", function() {
-        assert.deepEqual(d.__and__(d), ["and", d, d]);
-      });
-      it("__or__", function() {
-        assert.deepEqual(d.__or__(d), ["or", d, d]);
-      });
-      it("dup", function() {
-        actual   = d.dup();
-        expected = [d, d];
-        assert.deepEqual(actual, expected);
+      describe("arity operators", function() {
+        it("common", function() {
+          Object.keys(ops.ARITY_OPS).forEach(function(selector) {
+            var args = ops.ARITY_OPS[selector].split(",").map(function(_, i) { return i; });
+            testTools.replaceTempNumberPrototype(selector, function(b) {
+              return [ this ].concat(args);
+            }, function() {
+              assert.deepEqual(d[selector].apply(d, args), [n].concat(args), selector);
+              assert.deepEqual(d[selector].apply(d, args), [n].concat(args), selector);
+            });
+          });
+        });
       });
     });
   });

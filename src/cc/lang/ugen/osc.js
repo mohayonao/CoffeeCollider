@@ -146,6 +146,27 @@ define(function(require, exports, module) {
     },
   };
   
+  cc.ugen.specs.DC = {
+    $ir: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(C.SCALAR, _in);
+      }
+    },
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(C.CONTROL, _in);
+      }
+    },
+    $ar: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.init(C.AUDIO, _in);
+      }
+    }
+  };
+  
   module.exports = {};
 
 });

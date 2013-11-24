@@ -1,37 +1,49 @@
 define(function(require, exports, module) {
   "use strict";
-  
+
+  var cc = require("./cc");
   var fn = require("./fn");
   var utils = require("./utils");
+  var ops = require("../common/ops");
+  var slice = [].slice;
+
+  var asNumber = function(val) {
+    val = +val;
+    if (isNaN(val)) {
+      return 0;
+    }
+    return val;
+  };
+  
+  // common methods
+  fn.defineProperty(String.prototype, "copy", function() {
+    return this;
+  });
+  fn.defineProperty(String.prototype, "dup", fn(function(n) {
+    var a = new Array(n|0);
+    for (var i = 0, imax = a.length; i < imax; ++i) {
+      a[i] = this;
+    }
+    return a;
+  }).defaults(ops.COMMONS.dup).build());
   
   // unary operator methods
-  fn.defineProperty(String.prototype, "__plus__", function() {
-    var num = +this;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  fn.defineProperty(String.prototype, "__minus__", function() {
-    var num = -this;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
-  });
-  
-  // binary operator methods
-  fn.setupBinaryOp(String, "__add__", function(b) {
-    return this + b;
-  });
-  fn.setupBinaryOp(String, "__sub__", function(b) {
-    var num = this - b;
-    if (isNaN(num)) {
-      return 0; // avoid NaN
-    }
-    return num;
+  ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(String.prototype, selector, function() {
+      return asNumber(this)[selector]();
+    });
   });
 
+  // binary operator methods
+  ["__sub__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
+    fn.defineProperty(String.prototype, selector, function(b) {
+      return asNumber(this)[selector](b);
+    });
+  });
+  fn.defineBinaryProperty(String.prototype, "__add__", function(b) {
+    return this + b.toString();
+  });
+  
   var repeat = (function() {
     var _repeat = function(s, n) {
       if (n < 1) {
@@ -51,27 +63,41 @@ define(function(require, exports, module) {
     };
   })();
   
-  fn.setupBinaryOp(String, "__mul__", function(b) {
+  fn.defineBinaryProperty(String.prototype, "__mul__", function(b) {
     if (typeof b === "number") {
       return repeat(this, b);
     }
-    return 0; // avoid NaN
+    return 0;
   });
-  fn.setupBinaryOp(String, "__div__", function(b) {
+  fn.defineBinaryProperty(String.prototype, "__div__", function(b) {
     if (typeof b === "number") {
       return utils.clump(this.split(""), Math.ceil(this.length/b)).map(function(items) {
         return items.join("");
       });
     }
-    return 0; // avoid NaN
+    return 0;
   });
-  fn.setupBinaryOp(String, "__mod__", function(b) {
+  fn.defineBinaryProperty(String.prototype, "__mod__", function(b) {
     if (typeof b === "number") {
       return utils.clump(this.split(""), Math.floor(b)).map(function(items) {
         return items.join("");
       });
     }
-    return 0; // avoid NaN
+    return 0;
+  });
+  fn.defineBinaryProperty(String.prototype, "__and__", function(b) {
+    return cc.createTaskWaitLogic("and", [this].concat(b));
+  });
+  fn.defineBinaryProperty(String.prototype, "__or__", function(b) {
+    return cc.createTaskWaitLogic("or", [this].concat(b));
+  });
+  
+  // arity operators
+  Object.keys(ops.ARITY_OPS).forEach(function(selector) {
+    fn.defineProperty(String.prototype, selector, fn(function() {
+      var args = slice.call(arguments);
+      return (0)[selector].apply(asNumber(this), args);
+    }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
   });
   
   module.exports = {};
