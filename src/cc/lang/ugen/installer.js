@@ -9,6 +9,7 @@ define(function(require, exports, module) {
   require("./debug");
   require("./decay");
   require("./delay");
+  require("./env");
   require("./filter");
   require("./inout");
   require("./line");
