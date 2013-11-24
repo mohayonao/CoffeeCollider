@@ -32,27 +32,38 @@ define(function(require, exports, module) {
       delete Number.prototype[selector];
     }
   };
+
+  var __add__ = function(b) { return this + b; };
+  var __sub__ = function(b) { return this - b; };
+  var __mul__ = function(b) { return this * b; };
+  var __div__ = function(b) { return this / b; };
   
-  var useFourArithmeticOperations = function(func) {
-    replaceTempNumberPrototype("__add__", function(b) {
-      return this + b;
-    }, function() {
-      replaceTempNumberPrototype("__sub__", function(b) {
-        return this - b;
-      }, function() {
-        replaceTempNumberPrototype("__mul__", function(b) {
-          return this * b;
-        }, function() {
-          replaceTempNumberPrototype("__div__", function(b) {
-            return this / b;
-          }, function() {
-            func();
+  var useFourArithmeticOperations = function(callback) {
+    if (callback) {
+      replaceTempNumberPrototype("__add__", __add__, function() {
+        replaceTempNumberPrototype("__sub__", __sub__, function() {
+          replaceTempNumberPrototype("__mul__", __mul__, function() {
+            replaceTempNumberPrototype("__div__", __div__, function() {
+              callback();
+            });
           });
         });
       });
-    });
+    } else {
+      replaceTempNumberPrototype("__add__", __add__);
+      replaceTempNumberPrototype("__sub__", __sub__);
+      replaceTempNumberPrototype("__mul__", __mul__);
+      replaceTempNumberPrototype("__div__", __div__);
+    }
   };
 
+  var unuseFourArithmeticOperations = function() {
+    restoreTempNumberPrototype("__add__");
+    restoreTempNumberPrototype("__sub__");
+    restoreTempNumberPrototype("__mul__");
+    restoreTempNumberPrototype("__div__");
+  };
+  
   var shouldBeImplementedMethods = function() {
     var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__","__and__","__or__" ];
     list = list.concat(Object.keys(ops.UNARY_OPS).filter(function(selector) {
@@ -267,7 +278,8 @@ define(function(require, exports, module) {
   module.exports = {
     replaceTempNumberPrototype : replaceTempNumberPrototype,
     restoreTempNumberPrototype : restoreTempNumberPrototype,
-    useFourArithmeticOperations: useFourArithmeticOperations,
+    useFourArithmeticOperations  : useFourArithmeticOperations,
+    unuseFourArithmeticOperations: unuseFourArithmeticOperations,
     shouldBeImplementedMethods : shouldBeImplementedMethods,
     unitTestSuite: unitTestSuite,
     

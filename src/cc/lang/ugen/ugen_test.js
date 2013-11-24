@@ -110,6 +110,12 @@ define(function(require, exports, module) {
         });
       });
       describe("binary operators", function() {
+        before(function() {
+          testTools.useFourArithmeticOperations();
+        });
+        after(function() {
+          testTools.unuseFourArithmeticOperations();
+        });
         it("common", function() {
           ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
             if (/^[_a-z]/.test(selector)) {
@@ -137,46 +143,40 @@ define(function(require, exports, module) {
             assert.equal(actual, 10 * 100 + 50);
           });
           it("range", function() {
-            testTools.useFourArithmeticOperations(function() {
-              var instance = cc.global.Test.ar(0.75);
-              actual = instance.range(-100, 100);
-              assert.equal(actual, 75);
+            var instance = cc.global.Test.ar(0.75);
+            actual = instance.range(-100, 100);
+            assert.equal(actual, 75);
 
-              instance.signalRange = C.UNIPOLAR;
-              actual = instance.range(-100, 100);
-              assert.equal(actual, 50);
-            });
+            instance.signalRange = C.UNIPOLAR;
+            actual = instance.range(-100, 100);
+            assert.equal(actual, 50);
           });
           it.skip("exprange", function() {
           });
           it.skip("curverange", function() {
           });
           it("unipolar", function() {
-            testTools.useFourArithmeticOperations(function() {
-              var instance = cc.global.Test.ar(0.5);
-              instance.signalRange = C.UNIPOLAR;
-              actual = instance.unipolar(10);
-              assert.equal(actual, 5);
-              
-              instance.signalRange = C.BIPOLAR;
-              actual = instance.unipolar(10);
-              assert.equal(actual, 7.5);
-            });
+            var instance = cc.global.Test.ar(0.5);
+            instance.signalRange = C.UNIPOLAR;
+            actual = instance.unipolar(10);
+            assert.equal(actual, 5);
+            
+            instance.signalRange = C.BIPOLAR;
+            actual = instance.unipolar(10);
+            assert.equal(actual, 7.5);
           });
           it("bipolar", function() {
             testTools.replaceTempNumberPrototype("neg", function() {
               return -this;
             }, function() {
-              testTools.useFourArithmeticOperations(function() {
-                var instance = cc.global.Test.ar(0.5);
-                instance.signalRange = C.UNIPOLAR;
-                actual = instance.bipolar(10);
-                assert.equal(actual, 0);
+              var instance = cc.global.Test.ar(0.5);
+              instance.signalRange = C.UNIPOLAR;
+              actual = instance.bipolar(10);
+              assert.equal(actual, 0);
 
-                instance.signalRange = C.BIPOLAR;
-                actual = instance.bipolar(10);
-                assert.equal(actual, 5);
-              });
+              instance.signalRange = C.BIPOLAR;
+              actual = instance.bipolar(10);
+              assert.equal(actual, 5);
             });
           });
           it("clip", function() {
