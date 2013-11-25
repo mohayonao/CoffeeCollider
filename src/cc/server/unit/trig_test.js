@@ -8,23 +8,23 @@ define(function(require, exports, module) {
   var trig = require("./trig");
 
   unitTestSuite.desc = "server/unit/trig.js";
-
-  unitTestSuite("Latch", [
+  
+  unitTestSuite(["Trig", "Trig1"], [
     { rate  : C.AUDIO,
       inputs: [
-        { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0   },
-        { name:"trig", rate:C.AUDIO, value:unitTestSuite.trig0 },
+        { name:"in" , rate:C.AUDIO, value:unitTestSuite.in0   },
+        { name:"dur", rate:C.AUDIO, value:unitTestSuite.in1 },
       ]
     },
     { rate  : C.CONTROL,
       inputs: [
-        { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in0   },
-        { name:"trig", rate:C.CONTROL, value:unitTestSuite.trig0 },
+        { name:"in" , rate:C.CONTROL, value:unitTestSuite.in0   },
+        { name:"dur", rate:C.CONTROL, value:unitTestSuite.in1 },
       ]
     }
   ]);
   
-  unitTestSuite("Gate", [
+  unitTestSuite(["Latch", "Gate"], [
     { rate  : C.AUDIO,
       inputs: [
         { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0   },

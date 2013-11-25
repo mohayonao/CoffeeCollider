@@ -370,6 +370,7 @@ define(function(require, exports, module) {
     var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
     var multiCall   = spec.multiCall;
     var checkInputs = spec.checkInputs;
+    var signalRange = spec.signalRange || C.BIPOLAR;
     
     var klass;
     if (spec.$new) {
@@ -394,15 +395,16 @@ define(function(require, exports, module) {
       if (key.charAt(0) !== "$") {
         return;
       }
-      var setting   = spec[key];
-      var defaults  = setting.defaults + ",tag";
-      var ctor      = setting.ctor;
+      var setting     = spec[key];
+      var defaults    = setting.defaults + ",tag";
+      var ctor        = setting.ctor;
       key = key.substr(1);
       if (BaseClass !== null) {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(new BaseClass(name, tag), args);
+          instance.signalRange = signalRange;
           return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       } else {
@@ -410,6 +412,7 @@ define(function(require, exports, module) {
           var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
+          instance.signalRange = signalRange;
           return init_instance(instance, tag, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       }

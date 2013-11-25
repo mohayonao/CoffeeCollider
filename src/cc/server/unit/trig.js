@@ -3,6 +3,143 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
 
+  cc.unit.specs.Trig = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO && this.inRates[0] !== C.AUDIO) {
+        this.process = next_k;
+      } else {
+        this.process = next;
+      }
+      this._counter = 0;
+      this._trig = 0;
+      this._level = 0;
+      this.outputs[0][0] = 0;
+    };
+    var next = function(inNumSamples) {
+      var out    = this.outputs[0];
+      var trigIn = this.inputs[0];
+      var dur    = this.inputs[1][0];
+      var sr = this.rate.sampleRate;
+      var trig  = this._trig;
+      var level = this._level;
+      var counter = this._counter;
+      var curTrig, zout;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curTrig = trigIn[i];
+        if (counter > 0) {
+          zout = --counter ? level : 0;
+        } else {
+          if (curTrig > 0 && trig <= 0) {
+            counter = Math.max(1, (dur * sr + 0.5)|0);
+            zout = level = curTrig;
+          } else {
+            zout = 0;
+          }
+        }
+        out[i] = zout;
+        trig   = curTrig;
+      }
+      this._trig    = trig;
+      this._counter = counter;
+      this._level   = level;
+    };
+    var next_k = function(inNumSamples) {
+      var out    = this.outputs[0];
+      var trigIn = this.inputs[0];
+      var dur    = this.inputs[1][0];
+      var sr = this.rate.sampleRate;
+      var trig  = this._trig;
+      var level = this._level;
+      var counter = this._counter;
+      var curTrig, zout;
+      curTrig = trigIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (counter > 0) {
+          zout = --counter ? level : 0;
+        } else {
+          if (curTrig > 0 && trig <= 0) {
+            counter = Math.max(1, (dur * sr + 0.5)|0);
+            zout = level = curTrig;
+          } else {
+            zout = 0;
+          }
+        }
+        out[i] = zout;
+        trig   = curTrig;
+      }
+      this._trig    = curTrig;
+      this._counter = counter;
+      this._level   = level;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Trig1 = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO && this.inRates[0] !== C.AUDIO) {
+        this.process = next_k;
+      } else {
+        this.process = next;
+      }
+      this._counter = 0;
+      this._trig    = 0;
+      this.outputs[0][0] = 0;
+    };
+    var next = function(inNumSamples) {
+      var out     = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var dur     = this.inputs[1][0];
+      var sr      = this.rate.sampleRate;
+      var trig    = this._trig;
+      var counter = this._counter;
+      var curTrig, zout;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curTrig = trigIn[i];
+        if (counter > 0) {
+          zout = --counter ? 1 : 0;
+        } else {
+          if (curTrig > 0 && trig <= 0) {
+            counter = Math.max(1, (dur * sr + 0.5)|0);
+            zout = 1;
+          } else {
+            zout = 0;
+          }
+        }
+        out[i] = zout;
+        trig   = curTrig;
+      }
+      this._trig    = trig;
+      this._counter = counter;
+    };
+    var next_k = function(inNumSamples) {
+      var out     = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var dur     = this.inputs[1][0];
+      var sr      = this.rate.sampleRate;
+      var trig    = this._trig;
+      var counter = this._counter;
+      var curTrig, zout;
+      curTrig = trigIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (counter > 0) {
+          zout = --counter ? 1 : 0;
+        } else {
+          if (curTrig > 0 && trig <= 0) {
+            counter = Math.max(1, (dur * sr + 0.5)|0);
+            zout = 1;
+          } else {
+            zout = 0;
+          }
+        }
+        out[i] = zout;
+        trig   = curTrig;
+      }
+      this._trig    = trig;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+  
   cc.unit.specs.Latch = (function() {
     var ctor = function() {
       if (this.inRates[1] === C.AUDIO) {
