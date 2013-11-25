@@ -28,15 +28,15 @@ define(function(require, exports, module) {
     return BufferSource;
   })();
   
-  var AudioBuffer = (function() {
-    function AudioBuffer(bufId, frames, channels) {
-      this.bufId      = bufId;
+  var Buffer = (function() {
+    function Buffer(bufnum, frames, channels) {
+      this.bufnum     = bufnum;
       this.frames     = frames;
       this.channels   = channels;
       this.sampleRate = cc.server.sampleRate;
       this.samples    = new Float32Array(frames * channels);
     }
-    AudioBuffer.prototype.bindBufferSource = function(bufSrc, startFrame, frames) {
+    Buffer.prototype.bindBufferSource = function(bufSrc, startFrame, frames) {
       startFrame = Math.max( 0, Math.min(startFrame|0, bufSrc.frames));
       frames  = Math.max(-1, Math.min(frames |0, bufSrc.frames - startFrame));
       if (startFrame === 0) {
@@ -59,7 +59,7 @@ define(function(require, exports, module) {
       this.channels   = bufSrc.channels;
       this.sampleRate = bufSrc.sampleRate;
     };
-    AudioBuffer.prototype.gen = function(cmd, flags, params) {
+    Buffer.prototype.gen = function(cmd, flags, params) {
       var func = gen_func[cmd];
       if (func) {
         var flag = {
@@ -70,7 +70,7 @@ define(function(require, exports, module) {
         func(this.samples, flag, params);
       }
     };
-    return AudioBuffer;
+    return Buffer;
   })();
 
   var gen_func = {};
@@ -154,7 +154,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     BufferSource: BufferSource,
-    AudioBuffer : AudioBuffer
+    Buffer: Buffer
   };
 
 });

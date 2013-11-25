@@ -3,6 +3,7 @@ define(function(require, exports, module) {
   
   var cc = require("../cc");
   var fn = require("../fn");
+  var utils  = require("../utils");
   var extend = require("../../common/extend");
   var ops    = require("../../common/ops");
   var slice  = [].slice;
@@ -401,7 +402,7 @@ define(function(require, exports, module) {
       key = key.substr(1);
       if (BaseClass !== null) {
         klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1);
+          var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(new BaseClass(name, tag), args);
           instance.signalRange = signalRange;
@@ -409,7 +410,7 @@ define(function(require, exports, module) {
         }).defaults(defaults).multiCall(multiCall).build();
       } else {
         klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1);
+          var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
           instance.signalRange = signalRange;

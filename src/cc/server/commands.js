@@ -57,17 +57,17 @@ define(function(require, exports, module) {
     }
   };
   commands["/b_new"] = function(msg) {
-    var bufId    = msg[1]|0;
+    var bufnum   = msg[1]|0;
     var frames   = msg[2]|0;
     var channels = msg[3]|0;
-    this.buffers[bufId] = new buffer.AudioBuffer(bufId, frames, channels);
+    this.buffers[bufnum] = new buffer.Buffer(bufnum, frames, channels);
   };
   commands["/b_bind"] = function(msg) {
-    var bufId      = msg[1]|0;
+    var bufnum     = msg[1]|0;
     var bufSrcId   = msg[2]|0;
     var startFrame = msg[3]|0;
     var frames     = msg[4]|0;
-    var buffer = this.buffers[bufId];
+    var buffer = this.buffers[bufnum];
     var bufSrc = this.bufSrc[bufSrcId];
     if (buffer) {
       if (bufSrc) {
@@ -80,11 +80,11 @@ define(function(require, exports, module) {
     }
   };
   commands["/b_gen"] = function(msg) {
-    var bufId  = msg[1]|0;
+    var bufnum = msg[1]|0;
     var cmd    = msg[2];
     var flag   = msg[3]|0;
     var params = msg.slice(4);
-    var buffer = this.buffers[bufId];
+    var buffer = this.buffers[bufnum];
     if (buffer) {
       buffer.gen(cmd, flag, params);
     }

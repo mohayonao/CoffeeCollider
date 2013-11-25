@@ -12,12 +12,12 @@ define(function(require, exports, module) {
   unitTestSuite("PlayBuf", [
     { rate  : C.AUDIO,
       inputs: [
-        { name:"bufnum"    , rate:C.SCALAR, value:0 },
-        { name:"rate"      , rate:C.SCALAR, value:1 },
-        { name:"trigger"   , rate:C.SCALAR, value:0 },
-        { name:"startPos"  , rate:C.SCALAR, value:0 },
-        { name:"loop"      , rate:C.SCALAR, value:0 },
-        { name:"doneAction", rate:C.SCALAR, value:0 },
+        { name:"bufnum"    , value:0 },
+        { name:"rate"      , value:1 },
+        { name:"trigger"   , value:0 },
+        { name:"startPos"  , value:0 },
+        { name:"loop"      , value:0 },
+        { name:"doneAction", value:0 },
       ]
     },
   ], {

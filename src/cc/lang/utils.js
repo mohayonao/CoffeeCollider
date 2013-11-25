@@ -6,6 +6,30 @@ define(function(require, exports, module) {
   var isDict = function(obj) {
     return !!(obj && obj.constructor === Object);
   };
+
+  var asArray = function(obj) {
+    if (!Array.isArray(obj)) {
+      obj = [ obj ];
+    }
+    return obj;
+  };
+  
+  var asUGenInput = function(obj) {
+    if (cc.instanceOfUGen(obj)) {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj;
+    }
+    if (cc.instanceOfBuffer(obj)) {
+      return obj.bufnum;
+    }
+    obj = +obj;
+    if (isNaN(obj)) {
+      obj = 0;
+    }
+    return obj;
+  };
   
   var flop = function(list) {
     var maxSize = list.reduce(function(len, sublist) {
@@ -78,6 +102,8 @@ define(function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
+    asArray    : asArray,
+    asUGenInput: asUGenInput,
     flop   : flop,
     flatten: flatten,
     clump  : clump,

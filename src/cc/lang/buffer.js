@@ -3,46 +3,44 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var fn = require("./fn");
+  var utils  = require("./utils");
   var extend = require("../common/extend");
   var emitter = require("../common/emitter");
 
   var bufSrcId = 0;
   var bufferSrcCache = {};
-
-  var AudioBuffer = (function() {
-    var bufId = 0;
-    function AudioBuffer(frames, channels) {
+  
+  var Buffer = (function() {
+    var bufnum = 0;
+    function Buffer(frames, channels) {
       emitter.mixin(this);
       this.klassName = "Buffer";
-
+      
+      this.bufnum     = bufnum++;
       this.frames     = frames  |0;
       this.channels   = channels|0;
-      this.sampleRate = 0;
       
       this._blocking = true;
-      this._bufId = bufId++;
       cc.lang.pushToTimeline([
-        "/b_new", this._bufId, this.frames, this.channels
+        "/b_new", this.bufnum, this.frames, this.channels
       ]);
     }
-    extend(AudioBuffer, cc.Object);
+    extend(Buffer, cc.Object);
 
-    AudioBuffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
-      if (!Array.isArray(amps)) {
-        amps = [ amps ];
-      }
+    Buffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
+      amps = utils.asArray(amps);
       var numflag = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
       cc.lang.pushToTimeline(
-        ["/b_gen", this._bufId, "sine1", numflag].concat(amps)
+        ["/b_gen", this.bufnum, "sine1", numflag].concat(amps)
       );
       return this;
     }).defaults("amps=[],normalize=true,asWavetable=true,clearFirst=true").build();
     
-    AudioBuffer.prototype.performWait = function() {
+    Buffer.prototype.performWait = function() {
       return this._blocking;
     };
     
-    return AudioBuffer;
+    return Buffer;
   })();
   
   var newBufferSource = function(path, buffer) {
@@ -83,7 +81,7 @@ define(function(require, exports, module) {
   
   var bindBufferSource = function(bufSrcId, startFrame, numFrames) {
     cc.lang.pushToTimeline([
-      "/b_bind", this._bufId, bufSrcId, startFrame, numFrames
+      "/b_bind", this.bufnum, bufSrcId, startFrame, numFrames
     ]);
   };
 
@@ -91,7 +89,7 @@ define(function(require, exports, module) {
   };
   
   cc.global.Buffer.alloc = fn(function(numFrames, numChannels) {
-    return new AudioBuffer(numFrames, numChannels);
+    return new Buffer(numFrames, numChannels);
   }).defaults("numFrames=0,numChannels=1").build();
   
   cc.global.Buffer.read = fn(function(path, startFrame, numFrames) {
@@ -99,7 +97,7 @@ define(function(require, exports, module) {
       throw new TypeError("Buffer.Read: arguments[0] should be a string.");
     }
     var bufSrcId = bufferSrcCache[path];
-    var buffer = new AudioBuffer();
+    var buffer = new Buffer();
     if (typeof bufSrcId === "number") {
       bindBufferSource.call(buffer, bufSrcId, startFrame, numFrames);
     } else {
@@ -113,19 +111,17 @@ define(function(require, exports, module) {
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").build();
   
-  cc.createAudioBuffer = function() {
-    return new AudioBuffer();
+  cc.instanceOfBuffer = function(obj) {
+    return obj instanceof Buffer;
   };
-  cc.instanceOfAudioBuffer = function(obj) {
-    return obj instanceof AudioBuffer;
-  };
+  
   cc.resetBuffer = function() {
     bufferSrcCache = {};
     bufSrcId = 0;
   };
   
   module.exports = {
-    AudioBuffer: AudioBuffer,
+    Buffer: Buffer,
   };
 
 });

@@ -217,18 +217,20 @@ define(function(require, exports, module) {
       var buffer = instance.buffers[this._bufnumIn[0]|0];
       if (buffer) {
         var samples = buffer.samples;
-        if (this._table === samples) {
-          return true;
-        }
-        var length  = samples.length;
-        var logSize = Math.log(length) / Math.log(2);
-        if (logSize === (logSize|0)) {
-          length >>= 1;
-          this._radtoinc = length / twopi;
-          this._cpstoinc = length * this.rate.sampleDur;
-          this._table = samples;
-          this._mask     = length - 1;
-          return true;
+        if (samples) {
+          if (this._table === samples) {
+            return true;
+          }
+          var length  = samples.length;
+          var logSize = Math.log(length) / Math.log(2);
+          if (logSize === (logSize|0)) {
+            length >>= 1;
+            this._radtoinc = length / twopi;
+            this._cpstoinc = length * this.rate.sampleDur;
+            this._table = samples;
+            this._mask     = length - 1;
+            return true;
+          }
         }
       }
       return false;
