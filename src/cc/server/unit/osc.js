@@ -56,8 +56,8 @@ define(function(require, exports, module) {
   
   var osc_next_aa = function(inNumSamples) {
     var out = this.outputs[0];
-    var freqIn  = this.inputs[0];
-    var phaseIn = this.inputs[1];
+    var freqIn  = this.inputs[this._freqIndex];
+    var phaseIn = this.inputs[this._phaseIndex];
     var mask  = this._mask;
     var table = this._table;
     var cpstoinc = this._cpstoinc;
@@ -73,8 +73,8 @@ define(function(require, exports, module) {
   };
   var osc_next_ak = function(inNumSamples) {
     var out = this.outputs[0];
-    var freqIn    = this.inputs[0];
-    var nextPhase = this.inputs[1][0];
+    var freqIn    = this.inputs[this._freqIndex];
+    var nextPhase = this.inputs[this._phaseIndex][0];
     var mask  = this._mask;
     var table = this._table;
     var radtoinc = this._radtoinc;
@@ -104,7 +104,7 @@ define(function(require, exports, module) {
   };
   var osc_next_ai = function(inNumSamples) {
     var out = this.outputs[0];
-    var freqIn = this.inputs[0];
+    var freqIn = this.inputs[this._freqIndex];
     var phase  = this._phase * this._radtoinc;
     var mask  = this._mask;
     var table = this._table;
@@ -120,8 +120,8 @@ define(function(require, exports, module) {
   };
   var osc_next_ka = function(inNumSamples) {
     var out = this.outputs[0];
-    var nextFreq = this.inputs[0][0];
-    var phaseIn = this.inputs[1];
+    var nextFreq = this.inputs[this._freqIndex][0];
+    var phaseIn = this.inputs[this._phaseIndex];
     var mask  = this._mask;
     var table = this._table;
     var radtoinc = this._radtoinc;
@@ -151,8 +151,8 @@ define(function(require, exports, module) {
   };
   var osc_next_kk = function(inNumSamples) {
     var out = this.outputs[0];
-    var nextFreq  = this.inputs[0][0];
-    var nextPhase = this.inputs[1][0];
+    var nextFreq  = this.inputs[this._freqIndex][0];
+    var nextPhase = this.inputs[this._phaseIndex][0];
     var mask  = this._mask;
     var table = this._table;
     var radtoinc = this._radtoinc;
@@ -192,6 +192,8 @@ define(function(require, exports, module) {
       this._bufnumIn = this.inputs[0];
       this._freq  = this.inputs[1][0];
       this._phase = this.inputs[2][0];
+      this._freqIndex  = 1;
+      this._phaseIndex = 2;
       this._radtoinc = 0;
       this._cpstoinc = 0;
       this._mask    = 0;
@@ -227,7 +229,7 @@ define(function(require, exports, module) {
             length >>= 1;
             this._radtoinc = length / twopi;
             this._cpstoinc = length * this.rate.sampleDur;
-            this._table = samples;
+            this._table    = samples;
             this._mask     = length - 1;
             return true;
           }
@@ -237,27 +239,27 @@ define(function(require, exports, module) {
     };
     var next_aa = function(inNumSamples, instance) {
       if (get_table.call(this, instance)) {
-        osc_next_aa.call(this, inNumSamples);
+        osc_next_aa.call(this, inNumSamples, 1);
       }
     };
     var next_ak = function(inNumSamples, instance) {
       if (get_table.call(this, instance)) {
-        osc_next_ak.call(this, inNumSamples);
+        osc_next_ak.call(this, inNumSamples, 1);
       }
     };
     var next_ai = function(inNumSamples, instance) {
       if (get_table.call(this, instance)) {
-        osc_next_ai.call(this, inNumSamples);
+        osc_next_ai.call(this, inNumSamples, 1);
       }
     };
     var next_ka = function(inNumSamples, instance) {
       if (get_table.call(this, instance)) {
-        osc_next_ka.call(this, inNumSamples);
+        osc_next_ka.call(this, inNumSamples, 1);
       }
     };
     var next_kk = function(inNumSamples, instance) {
       if (get_table.call(this, instance)) {
-        osc_next_kk.call(this, inNumSamples);
+        osc_next_kk.call(this, inNumSamples, 1);
       }
     };
     return ctor;
@@ -267,6 +269,8 @@ define(function(require, exports, module) {
     var ctor = function() {
       this._freq  = this.inputs[0][0];
       this._phase = this.inputs[1][0];
+      this._freqIndex  = 0;
+      this._phaseIndex = 1;
       this._radtoinc = kSineSize / twopi;
       this._cpstoinc = kSineSize * this.rate.sampleDur;
       this._mask  = kSineMask;

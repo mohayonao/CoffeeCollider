@@ -29,12 +29,44 @@ define(function(require, exports, module) {
 
     Buffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
       amps = utils.asArray(amps);
-      var numflag = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
       cc.lang.pushToTimeline(
-        ["/b_gen", this.bufnum, "sine1", numflag].concat(amps)
+        ["/b_gen", this.bufnum, "sine1", flags].concat(amps)
       );
       return this;
     }).defaults("amps=[],normalize=true,asWavetable=true,clearFirst=true").build();
+
+    Buffer.prototype.sine2 = fn(function(freqs, amps, normalize, asWavetable, clearFirst) {
+      freqs = utils.asArray(freqs);
+      amps  = utils.asArray(amps);
+      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var len = Math.max(freqs.length, amps.length) * 2;
+      cc.lang.pushToTimeline(
+        ["/b_gen", this.bufnum, "sine2", flags].concat(utils.lace([freqs, amps], len))
+      );
+      return this;
+    }).defaults("freqs=[],amps=[],normalize=true,asWavetable=true,clearFirst=true").build();
+
+    Buffer.prototype.sine3 = fn(function(freqs, amps, phases, normalize, asWavetable, clearFirst) {
+      freqs  = utils.asArray(freqs);
+      amps   = utils.asArray(amps);
+      phases = utils.asArray(phases);
+      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var len = Math.max(freqs.length, amps.length, phases.length) * 3;
+      cc.lang.pushToTimeline(
+        ["/b_gen", this.bufnum, "sine3", flags].concat(utils.lace([freqs, amps, phases], len))
+      );
+      return this;
+    }).defaults("freqs=[],amps=[],phases=[],normalize=true,asWavetable=true,clearFirst=true").build();
+
+    Buffer.prototype.cheby = fn(function(amplitudes, normalize, asWavetable, clearFirst) {
+      amplitudes = utils.asArray(amplitudes);
+      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      cc.lang.pushToTimeline(
+        ["/b_gen", this.bufnum, "cheby", flags].concat(amplitudes)
+      );
+      return this;
+    }).defaults("amplitudes=[],normalize=true,asWavetable=true,clearFirst=true").build();
     
     Buffer.prototype.performWait = function() {
       return this._blocking;

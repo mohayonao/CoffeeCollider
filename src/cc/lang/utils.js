@@ -79,6 +79,16 @@ define(function(require, exports, module) {
     }
     return result;
   };
+
+  var lace = function(list, length) {
+    var a = new Array(length);
+    var v, wrap = list.length;
+    for (var i = 0; i < length; ++i) {
+      v = list[i % wrap];
+      a[i] = v[ ((i/wrap)|0) % v.length ] || 0;
+    }
+    return a;
+  };
   
   var wrapExtend = function(list, size) {
     if (size < list.length) {
@@ -107,6 +117,7 @@ define(function(require, exports, module) {
     flop   : flop,
     flatten: flatten,
     clump  : clump,
+    lace   : lace,
     wrapExtend: wrapExtend,
     
     lang_onmessage: lang_onmessage
