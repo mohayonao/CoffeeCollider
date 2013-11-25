@@ -27,6 +27,11 @@ define(function(require, exports, module) {
       };
     },
     preProcess: function(i) {
+      if (i === 0) {
+        for (var j = this.outputs[0].length; j--; ) {
+          this.outputs[0][j] = 0;
+        }
+      }
       if (i === 1) {
         unitTestSuite.instance.buffers[0] = {
           samples : new Float32Array(1024),

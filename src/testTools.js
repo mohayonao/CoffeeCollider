@@ -189,6 +189,10 @@ define(function(require, exports, module) {
         }
       }
       u.init();
+
+      if (u.calcRate !== C.SCALAR && !u.process) {
+        throw new Error("process not exists");
+      }
       
       var n = ((u.rate.sampleRate * (opts.dur || 1)) / u.rate.bufLength)|0;
       for (i = 0; i < n; ++i) {
@@ -198,10 +202,13 @@ define(function(require, exports, module) {
             inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
           }
         }
-        if (opts.preProcess) {
-          opts.preProcess.call(u, i, n);
-        }
         if (u.process) {
+          for (j = u.allOutputs.length; j--; ) {
+            u.allOutputs[j] = NaN;
+          }
+          if (opts.preProcess) {
+            opts.preProcess.call(u, i, n);
+          }
           u.process(u.rate.bufLength, testSuite.instance);
           for (j = u.allOutputs.length; j--; ) {
             var x = u.allOutputs[j];
@@ -294,6 +301,9 @@ define(function(require, exports, module) {
     testSuite.time1 = [ 0, 0, 0.5, 0.5, 1, 1, -0, -0.5, -1 ];
     testSuite.freq0 = [ 220, 220, 440, 660, 880, 1760, 3520 ];
     testSuite.freq1 = [ 220, 220, 440, 660, 880, 1760, 44100, 0, -44100 ];
+    testSuite.trig0 = [ 1, 0, 0, 0, 0, 0, 0, 0 ];
+    testSuite.trig1 = [ 1, 0, 0, 0,-1, 0, 0, 0 ];
+    testSuite.trig2 = [ 1, 1, 1, 1, 1, 1, 1, 1 ];
     
     return testSuite;
   })();

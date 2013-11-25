@@ -1584,7 +1584,6 @@ define(function(require, exports, module) {
       var sampleDur = this.rate.sampleDur;
       var upf = +this.inputs[1][0] * sampleDur;
       var dnf = -this.inputs[2][0] * sampleDur;
-      console.log(upf, dnf);
       var level = this._level;
       var slope;
       for (var i = 0; i < inNumSamples; ++i) {

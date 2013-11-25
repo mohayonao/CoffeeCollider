@@ -53,7 +53,7 @@ define(function(require, exports, module) {
       this._x1 = x1;
     };
     var next_k = function() {
-      this.outputs[0] = this._x1;
+      this.outputs[0][0] = this._x1;
       this._x1 = this.inputs[0][0];
     };
     return ctor;
@@ -91,7 +91,7 @@ define(function(require, exports, module) {
       this._x2 = x2;
     };
     var next_k = function() {
-      this.outputs[0] = this._x1;
+      this.outputs[0][0] = this._x1;
       this._x1 = this._x2;
       this._x2 = this.inputs[0][0];
     };

@@ -55,6 +55,7 @@ define(function(require, exports, module) {
       var numstages, doneAction, loopNode;
       var envPtr, stageOffset, endLevel, dur, shape, curve;
       var w, a1, a2, b1, y0, y1, y2, grow;
+      var i, j = 0;
       
       var checkGate = true, counterOffset = 0;
       if (prevGate <= 0 && gate > 0) {
@@ -188,8 +189,7 @@ define(function(require, exports, module) {
         }
         
         var nsmps = Math.min(remain, counter);
-        var i;
-
+        
         grow = this._grow;
         a2 = this._a2;
         b1 = this._b1;
@@ -199,90 +199,63 @@ define(function(require, exports, module) {
         switch (this._shape) {
         case shape_Step:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
-            if (isNaN(out[i])) {
-              console.log("shape_Step:NaN");
-            }
+            out[j++] = level;
           }
           break;
         case shape_Linear:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             level += grow;
-            if (isNaN(out[i])) {
-              console.log("shape_Linear:NaN");
-            }
           }
           break;
         case shape_Exponential:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             level *= grow;
-            if (isNaN(out[i])) {
-              console.log("shape_Exponential:NaN");
-            }
           }
           break;
         case shape_Sine:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             y0 = b1 * y1 - y2;
             level = a2 - y0;
             y2 = y1;
             y1 = y0;
-            if (isNaN(out[i])) {
-              console.log("shape_Sine:NaN");
-            }
           }
           break;
         case shape_Welch:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             y0 = b1 * y1 - y2;
             level = a2 + y0;
             y2 = y1;
             y1 = y0;
-            if (isNaN(out[i])) {
-              console.log("shape_Welch:NaN");
-            }
           }
           break;
         case shape_Curve:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             b1 *= grow;
             level = a2 - b1;
-            if (isNaN(out[i])) {
-              console.log("shape_Curve:NaN");
-            }
           }
           break;
         case shape_Squared:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             y1 += grow;
             level = y1 * y1;
-            if (isNaN(out[i])) {
-              console.log("shape_Squared:NaN", level, y1, grow);
-            }
           }
           break;
         case shape_Cubed:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
+            out[j++] = level;
             y1 += grow;
             level = y1 * y1 * y1;
-            if (isNaN(out[i])) {
-              console.log("shape_Cubed:NaN");
-            }
           }
           break;
         case shape_Sustain:
           for (i = 0; i < nsmps; ++i) {
-            out[i] = level;
-            if (isNaN(out[i])) {
-              console.log("shape_Sustain:NaN");
-            }
+            out[j++] = level;
           }
           break;
         }
