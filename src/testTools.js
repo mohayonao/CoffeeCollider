@@ -21,12 +21,16 @@ define(function(require, exports, module) {
   var _savedArray  = {};
   var replaceTempNumberPrototype = function(selector, hack, callback) {
     _savedNumber[selector] = defineProperty(Number.prototype, selector, hack);
-    _savedArray[selector]  = defineProperty(Array .prototype, selector, function() {
-      var args = slice.call(arguments);
-      return this.map(function(x) {
-        return x[selector].apply(x, args);
+    if (!Array.prototype[selector]) {
+      _savedArray[selector] = defineProperty(Array .prototype, selector, function() {
+        var args = slice.call(arguments);
+        return this.map(function(x) {
+          return x[selector].apply(x, args);
+        });
       });
-    });
+    } else {
+      _savedArray[selector] = null;
+    }
     if (callback) {
       callback();
       restoreTempNumberPrototype(selector);
@@ -37,12 +41,12 @@ define(function(require, exports, module) {
     var savedArray  = _savedArray[selector];
     if (savedNumber) {
       defineProperty(Number.prototype, selector, savedNumber);
-    } else {
+    } else if (savedNumber === undefined) {
       delete Number.prototype[selector];
     }
     if (savedArray) {
       defineProperty(Array.prototype, selector, savedArray);
-    } else {
+    } else if (savedArray === undefined) {
       delete Array.prototype[selector];
     }
   };
