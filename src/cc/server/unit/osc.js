@@ -53,205 +53,211 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
-
-  cc.unit.specs.Osc = (function() {
-    var ctor = function() {
-      this._tableSize = -1;
-      this._bufnum = this.inputs[0][0];
-      this._freq  = this.inputs[1][0];
-      this._phase = this.inputs[2][0];
-      this._radtoinc = 0;
-      this._cpstoinc = 0;
-      this._mask   = 0;
-      this._samples = 0;
-      this._table   = null;
-      if (this.inRates[0] === C.AUDIO) {
-        if (this.inRates[1] === C.AUDIO) {
-          this.process = next_aa;
-        } else if (this.inRates[1] === C.CONTROL) {
-          this.process = next_ak;
-        } else {
-          this.process = next_ai;
-        }
-        this._x = 0;
-      } else {
-        if (this.inRates[1] === C.AUDIO) {
-          this.process = next_ka;
-          this._x = 0;
-        } else {
-          this.process = next_kk;
-          this._x = this._phase * this._radtoinc;
-        }
-      }
-    };
-    var get_table = function(instance) {
-      var buffer = instance.buffers[this._bufnum];
-      if (buffer) {
-        var samples = buffer.samples;
-        var length  = samples.length;
-        if (this._samples !== length) {
-          var logSize = Math.log(length) / Math.log(2);
-          if (logSize !== (logSize|0)) {
-            return false;
-          }
-          length >>= 1;
-          this._samples = length;
-          this._radtoinc = length / twopi;
-          this._cpstoinc = length * this.rate.sampleDur;
-          this._table = samples;
-          this._mask  = length - 1;
-        }
-        return true;
-      }
-      return false;
-    };
-    var next_aa = function(inNumSamples, instance) {
-      if (!get_table.call(this, instance)) {
-        return;
-      }
-      var out = this.outputs[0];
-      var freqIn  = this.inputs[1];
-      var phaseIn = this.inputs[2];
-      var mask  = this._mask;
-      var table = this._table;
-      var cpstoinc = this._cpstoinc;
-      var radtoinc = this._radtoinc;
-      var x = this._x, pphase, index, i;
-      for (i = 0; i < inNumSamples; ++i) {
-        pphase = x + radtoinc * phaseIn[i];
-        index  = (pphase & mask) << 1;
-        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-        x += freqIn[i] * cpstoinc;
-      }
-      this._x = x;
-    };
-    var next_ak = function(inNumSamples, instance) {
-      if (!get_table.call(this, instance)) {
-        return;
-      }
-      var out = this.outputs[0];
-      var freqIn    = this.inputs[1];
-      var nextPhase = this.inputs[2][0];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var phase = this._phase;
-      var x = this._x, pphase, index, i;
-      if (nextPhase === phase) {
-        phase *= radtoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freqIn[i] * cpstoinc;
-        }
-      } else {
-        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          phase += phase_slope;
-          x += freqIn[i] * cpstoinc;
-        }
-        this._phase = nextPhase;
-      }
-      this._x = x;
-    };
-    var next_ai = function(inNumSamples, instance) {
-      if (!get_table.call(this, instance)) {
-        return;
-      }
-      var out = this.outputs[0];
-      var freqIn = this.inputs[1];
-      var phase  = this._phase * this._radtoinc;
-      var mask  = this._mask;
-      var table = this._table;
-      var cpstoinc = this._cpstoinc;
-      var x = this._x, pphase, index, i;
+  
+  var osc_next_aa = function(inNumSamples) {
+    var out = this.outputs[0];
+    var freqIn  = this.inputs[0];
+    var phaseIn = this.inputs[1];
+    var mask  = this._mask;
+    var table = this._table;
+    var cpstoinc = this._cpstoinc;
+    var radtoinc = this._radtoinc;
+    var x = this._x, pphase, index, i;
+    for (i = 0; i < inNumSamples; ++i) {
+      pphase = x + radtoinc * phaseIn[i];
+      index  = (pphase & mask) << 1;
+      out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+      x += freqIn[i] * cpstoinc;
+    }
+    this._x = x;
+  };
+  var osc_next_ak = function(inNumSamples) {
+    var out = this.outputs[0];
+    var freqIn    = this.inputs[0];
+    var nextPhase = this.inputs[1][0];
+    var mask  = this._mask;
+    var table = this._table;
+    var radtoinc = this._radtoinc;
+    var cpstoinc = this._cpstoinc;
+    var phase = this._phase;
+    var x = this._x, pphase, index, i;
+    if (nextPhase === phase) {
+      phase *= radtoinc;
       for (i = 0; i < inNumSamples; ++i) {
         pphase = x + phase;
         index  = (pphase & mask) << 1;
         out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-        x += cpstoinc * freqIn[i];
+        x += freqIn[i] * cpstoinc;
       }
-      this._x = x;
+    } else {
+      var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + radtoinc * phase;
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        phase += phase_slope;
+        x += freqIn[i] * cpstoinc;
+      }
+      this._phase = nextPhase;
+    }
+    this._x = x;
+  };
+  var osc_next_ai = function(inNumSamples) {
+    var out = this.outputs[0];
+    var freqIn = this.inputs[0];
+    var phase  = this._phase * this._radtoinc;
+    var mask  = this._mask;
+    var table = this._table;
+    var cpstoinc = this._cpstoinc;
+    var x = this._x, pphase, index, i;
+    for (i = 0; i < inNumSamples; ++i) {
+      pphase = x + phase;
+      index  = (pphase & mask) << 1;
+      out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+      x += cpstoinc * freqIn[i];
+    }
+    this._x = x;
+  };
+  var osc_next_ka = function(inNumSamples) {
+    var out = this.outputs[0];
+    var nextFreq = this.inputs[0][0];
+    var phaseIn = this.inputs[1];
+    var mask  = this._mask;
+    var table = this._table;
+    var radtoinc = this._radtoinc;
+    var cpstoinc = this._cpstoinc;
+    var freq = this._freq;
+    var x = this._x, pphase, index, i;
+    if (nextFreq === freq) {
+      freq *= cpstoinc;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + radtoinc * phaseIn[i];
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += freq;
+      }
+    } else {
+      var freq_slope = (nextFreq - freq) * this.rate.slopeFactor;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + radtoinc * phaseIn[i];
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += freq * cpstoinc;
+        freq += freq_slope;
+      }
+      this._freq = nextFreq;
+    }
+    this._x = x;
+  };
+  var osc_next_kk = function(inNumSamples) {
+    var out = this.outputs[0];
+    var nextFreq  = this.inputs[0][0];
+    var nextPhase = this.inputs[1][0];
+    var mask  = this._mask;
+    var table = this._table;
+    var radtoinc = this._radtoinc;
+    var cpstoinc = this._cpstoinc;
+    var freq = this._freq;
+    var phase = this._phase;
+    var x = this._x, pphase, index, i;
+    if (nextFreq === freq && nextPhase === phase) {
+      freq  *= cpstoinc;
+      phase *= radtoinc;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + phase;
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += freq;
+      }
+    } else {
+      var freq_slope  = (nextFreq  - freq ) * this.rate.slopeFactor;
+      var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + radtoinc * phase;
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += freq * cpstoinc;
+        freq  += freq_slope;
+        phase += phase_slope;
+      }
+      this._freq  = nextFreq;
+      this._phase = nextPhase;
+    }
+    this._x = x;
+  };
+  
+
+  cc.unit.specs.Osc = (function() {
+    var ctor = function() {
+      this._bufnumIn = this.inputs[0];
+      this._freq  = this.inputs[1][0];
+      this._phase = this.inputs[2][0];
+      this._radtoinc = 0;
+      this._cpstoinc = 0;
+      this._mask    = 0;
+      this._table   = null;
+      this._x = 0;
+      switch (this.inRates[0]) {
+      case C.AUDIO:
+        switch (this.inRates[1]) {
+        case C.AUDIO  : this.process = next_aa; break;
+        case C.CONTROL: this.process = next_ak; break;
+        case C.SCALAR : this.process = next_ai; break;
+        }
+        break;
+      default:
+        switch (this.inRates[1]) {
+        case C.AUDIO  : this.process = next_ka; break;
+        case C.CONTROL: this.process = next_kk; break;
+        case C.SCALAR : this.process = next_kk; break;
+        }
+      }
+    };
+    var get_table = function(instance) {
+      var buffer = instance.buffers[this._bufnumIn[0]|0];
+      if (buffer) {
+        var samples = buffer.samples;
+        if (this._table === samples) {
+          return true;
+        }
+        var length  = samples.length;
+        var logSize = Math.log(length) / Math.log(2);
+        if (logSize === (logSize|0)) {
+          length >>= 1;
+          this._radtoinc = length / twopi;
+          this._cpstoinc = length * this.rate.sampleDur;
+          this._table = samples;
+          this._mask     = length - 1;
+          return true;
+        }
+      }
+      return false;
+    };
+    var next_aa = function(inNumSamples, instance) {
+      if (get_table.call(this, instance)) {
+        osc_next_aa.call(this, inNumSamples);
+      }
+    };
+    var next_ak = function(inNumSamples, instance) {
+      if (get_table.call(this, instance)) {
+        osc_next_ak.call(this, inNumSamples);
+      }
+    };
+    var next_ai = function(inNumSamples, instance) {
+      if (get_table.call(this, instance)) {
+        osc_next_ai.call(this, inNumSamples);
+      }
     };
     var next_ka = function(inNumSamples, instance) {
-      if (!get_table.call(this, instance)) {
-        return;
+      if (get_table.call(this, instance)) {
+        osc_next_ka.call(this, inNumSamples);
       }
-      var out = this.outputs[0];
-      var nextFreq = this.inputs[1][0];
-      var phaseIn = this.inputs[2];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var freq = this._freq;
-      var x = this._x, pphase, index, i;
-      if (nextFreq === freq) {
-        freq *= cpstoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phaseIn[i];
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq;
-        }
-      } else {
-        var freq_slope = (nextFreq - freq) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phaseIn[i];
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq * cpstoinc;
-          freq += freq_slope;
-        }
-        this._freq = nextFreq;
-      }
-      this._x = x;
     };
     var next_kk = function(inNumSamples, instance) {
-      if (!get_table.call(this, instance)) {
-        return;
+      if (get_table.call(this, instance)) {
+        osc_next_kk.call(this, inNumSamples);
       }
-      var out = this.outputs[0];
-      var nextFreq  = this.inputs[1][0];
-      var nextPhase = this.inputs[2][0];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var freq = this._freq;
-      var phase = this._phase;
-      var x = this._x, pphase, index, i;
-      if (nextFreq === freq && nextPhase === phase) {
-        freq  *= cpstoinc;
-        phase *= radtoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq;
-        }
-      } else {
-        var freq_slope  = (nextFreq  - freq ) * this.rate.slopeFactor;
-        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq * cpstoinc;
-          freq  += freq_slope;
-          phase += phase_slope;
-        }
-        this._freq  = nextFreq;
-        this._phase = nextPhase;
-      }
-      this._x = x;
     };
-    
     return ctor;
   })();
   
@@ -263,164 +269,30 @@ define(function(require, exports, module) {
       this._cpstoinc = kSineSize * this.rate.sampleDur;
       this._mask  = kSineMask;
       this._table = gSineWavetable;
-      if (this.inRates[0] === C.AUDIO) {
-        if (this.inRates[1] === C.AUDIO) {
-          this.process = next_aa;
-        } else if (this.inRates[1] === C.CONTROL) {
-          this.process = next_ak;
-        } else {
-          this.process = next_ai;
+      this._x = 0;
+      switch (this.inRates[0]) {
+      case C.AUDIO:
+        switch (this.inRates[1]) {
+        case C.AUDIO  : this.process = osc_next_aa; break;
+        case C.CONTROL: this.process = osc_next_ak; break;
+        case C.SCALAR : this.process = osc_next_ai; break;
         }
-        this._x = 0;
-      } else {
-        if (this.inRates[1] === C.AUDIO) {
-          this.process = next_ka;
-          this._x = 0;
-        } else {
-          this.process = next_kk;
-          this._x = this._phase * this._radtoinc;
+        break;
+      default:
+        switch (this.inRates[1]) {
+        case C.AUDIO  : this.process = osc_next_ka; break;
+        case C.CONTROL: this.process = osc_next_kk; break;
+        case C.SCALAR : this.process = osc_next_kk; break;
         }
       }
-      next_kk.call(this, 1);
+      osc_next_kk.call(this, 1);
     };
-    var next_aa = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn  = this.inputs[0];
-      var phaseIn = this.inputs[1];
-      var mask  = this._mask;
-      var table = this._table;
-      var cpstoinc = this._cpstoinc;
-      var radtoinc = this._radtoinc;
-      var x = this._x, pphase, index, i;
-      for (i = 0; i < inNumSamples; ++i) {
-        pphase = x + radtoinc * phaseIn[i];
-        index  = (pphase & mask) << 1;
-        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-        x += freqIn[i] * cpstoinc;
-      }
-      this._x = x;
-    };
-    var next_ak = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn    = this.inputs[0];
-      var nextPhase = this.inputs[1][0];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var phase = this._phase;
-      var x = this._x, pphase, index, i;
-      if (nextPhase === phase) {
-        phase *= radtoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freqIn[i] * cpstoinc;
-        }
-      } else {
-        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          phase += phase_slope;
-          x += freqIn[i] * cpstoinc;
-        }
-        this._phase = nextPhase;
-      }
-      this._x = x;
-    };
-    var next_ai = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn = this.inputs[0];
-      var phase  = this._phase * this._radtoinc;
-      var mask  = this._mask;
-      var table = this._table;
-      var cpstoinc = this._cpstoinc;
-      var x = this._x, pphase, index, i;
-      for (i = 0; i < inNumSamples; ++i) {
-        pphase = x + phase;
-        index  = (pphase & mask) << 1;
-        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-        x += cpstoinc * freqIn[i];
-      }
-      this._x = x;
-    };
-    var next_ka = function(inNumSamples) {
-      var out = this.outputs[0];
-      var nextFreq = this.inputs[0][0];
-      var phaseIn = this.inputs[1];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var freq = this._freq;
-      var x = this._x, pphase, index, i;
-      if (nextFreq === freq) {
-        freq *= cpstoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phaseIn[i];
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq;
-        }
-      } else {
-        var freq_slope = (nextFreq - freq) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phaseIn[i];
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq * cpstoinc;
-          freq += freq_slope;
-        }
-        this._freq = nextFreq;
-      }
-      this._x = x;
-    };
-    var next_kk = function(inNumSamples) {
-      var out = this.outputs[0];
-      var nextFreq  = this.inputs[0][0];
-      var nextPhase = this.inputs[1][0];
-      var mask  = this._mask;
-      var table = this._table;
-      var radtoinc = this._radtoinc;
-      var cpstoinc = this._cpstoinc;
-      var freq = this._freq;
-      var phase = this._phase;
-      var x = this._x, pphase, index, i;
-      if (nextFreq === freq && nextPhase === phase) {
-        freq  *= cpstoinc;
-        phase *= radtoinc;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq;
-        }
-      } else {
-        var freq_slope  = (nextFreq  - freq ) * this.rate.slopeFactor;
-        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          pphase = x + radtoinc * phase;
-          index  = (pphase & mask) << 1;
-          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
-          x += freq * cpstoinc;
-          freq  += freq_slope;
-          phase += phase_slope;
-        }
-        this._freq  = nextFreq;
-        this._phase = nextPhase;
-      }
-      this._x = x;
-    };
-    
     return ctor;
   })();
 
   cc.unit.specs.SinOscFB = (function() {
     var ctor = function() {
-      this.process = next_aa;
+      this.process = next;
       this._radtoinc = kSineSize / twopi;
       this._cpstoinc = kSineSize * this.rate.sampleDur;
       this._mask  = kSineMask;
@@ -429,9 +301,9 @@ define(function(require, exports, module) {
       this._feedback = this.inputs[1][0] * this._radtoinc;
       this._y = 0;
       this._x = 0;
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_aa = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out = this.outputs[0];
       var nextFreq     = this.inputs[0][0];
       var nextFeedback = this.inputs[1][0];
@@ -471,37 +343,17 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
-
+  
   cc.unit.specs.LFSaw = (function() {
     var ctor = function() {
-      if (this.inRates[0] === C.AUDIO) {
-        this.process = next_a;
-      } else {
-        this.process = next_k;
-      }
+      this.process = next;
       this._cpstoinc = 2 * this.rate.sampleDur;
       this._phase    = this.inputs[1][0];
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_a = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn   = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = phase;
-        phase += freqIn[i] * cpstoinc;
-        if (phase >= 1) {
-          phase -= 2;
-        } else if (phase <= -1) {
-          phase += 2;
-        }
-      }
-      this._phase = phase;
-    };
-    var next_k = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
       var i;
       if (freq >= 0) {
@@ -523,47 +375,19 @@ define(function(require, exports, module) {
       }
       this._phase = phase;
     };
-    
     return ctor;
   })();
-
+  
   cc.unit.specs.LFPar = (function() {
     var ctor = function() {
-      if (this.inRates[0] === C.AUDIO) {
-        this.process = next_a;
-      } else {
-        this.process = next_k;
-      }
+      this.process = next;
       this._cpstoinc = 4 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_a = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn   = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      var z, y;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase < 1) {
-          z = phase;
-          y = 1 - z * z;
-        } else if (phase < 3) {
-          z = phase - 2;
-          y = z * z - 1;
-        } else {
-          phase -= 4;
-          z = phase;
-          y = 1 - z * z;
-        }
-        out[i] = y;
-        phase += freqIn[i] * cpstoinc;
-      }
-      this._phase = phase;
-    };
-    var next_k = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
       var z, y;
       for (var i = 0; i < inNumSamples; ++i) {
@@ -588,38 +412,14 @@ define(function(require, exports, module) {
 
   cc.unit.specs.LFCub = (function() {
     var ctor = function() {
-      if (this.inRates[0] === C.AUDIO) {
-        this.process = next_a;
-      } else {
-        this.process = next_k;
-      }
+      this.process = next;
       this._cpstoinc = 2 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0] + 0.5;
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_a = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn   = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      var z;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase < 1) {
-          z = phase;
-        } else if (phase < 2) {
-          z = 2 - phase;
-        } else {
-          phase -= 2;
-          z = phase;
-        }
-        out[i] = z * z * (6 - 4 * z) - 1;
-        phase += freqIn[i] * cpstoinc;
-      }
-      this._phase = phase;
-    };
-    var next_k = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
       var z;
       for (var i = 0; i < inNumSamples; ++i) {
@@ -641,35 +441,21 @@ define(function(require, exports, module) {
 
   cc.unit.specs.LFTri = (function() {
     var ctor = function() {
-      if (this.inRates[0] === C.AUDIO) {
-        this.process = next_a;
-      } else {
-        this.process = next_k;
-      }
+      this.process = next;
       this._cpstoinc = 4 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_a = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freqIn   = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = phase > 1 ? 2 - phase : phase;
-        phase += freqIn[i] * cpstoinc;
-        if (phase >= 3) { phase -= 4; }
-      }
-      this._phase = phase;
-    };
-    var next_k = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var freq  = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = phase > 1 ? 2 - phase : phase;
         phase += freq;
-        if (phase >= 3) { phase -= 4; }
+        if (phase >= 3) {
+          phase -= 4;
+        }
       }
       this._phase = phase;
     };
@@ -678,41 +464,15 @@ define(function(require, exports, module) {
 
   cc.unit.specs.LFPulse = (function() {
     var ctor = function() {
-      if (this.inRates[0] === C.AUDIO) {
-        this.process = next_a;
-      } else {
-        this.process = next_k;
-      }
+      this.process = next;
       this._cpstoinc = this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
       this._duty    = this.inputs[2][0];
-      this.process(1);
+      next.call(this, 1);
     };
-    var next_a = function(inNumSamples) {
+    var next = function(inNumSamples) {
       var out = this.outputs[0];
-      var freqIn   = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var nextDuty = this.inputs[2][0];
-      var duty  = this._duty;
-      var phase = this._phase;
-      var z;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase > 1) {
-          phase -= 1;
-          duty = nextDuty;
-          z = duty < 0.5 ? 1 : 0;
-        } else {
-          z = phase < duty ? 1 : 0;
-        }
-        out[i] = z;
-        phase += freqIn[i] * cpstoinc;
-      }
-      this._duty  = duty;
-      this._phase = phase;
-    };
-    var next_k = function(inNumSamples) {
-      var out = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
+      var freq     = this.inputs[0][0] * this._cpstoinc;
       var nextDuty = this.inputs[2][0];
       var duty  = this._duty;
       var phase = this._phase;
@@ -746,7 +506,7 @@ define(function(require, exports, module) {
       this._mask = kSineMask;
       this._scale = 0.5 / this._N;
       this._phase = 0;
-      this.process(1);
+      next.call(this, 1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -1034,7 +794,6 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  
   cc.unit.specs.Pulse = (function() {
     var ctor = function() {
       this.process = next;
@@ -1283,14 +1042,14 @@ define(function(require, exports, module) {
           this.process = next_ak;
           this._phase = 1;
         } else {
-          this.process = next_a;
+          this.process = next_ai;
         }
       } else {
         if (this.inRates[1] !== C.SCALAR) {
           this.process = next_kk;
           this._phase = 1;
         } else {
-          this.process = next_k;
+          this.process = next_ki;
         }
       }
       this._phaseOffset = 0;
@@ -1298,22 +1057,6 @@ define(function(require, exports, module) {
       if (this._phase === 0) {
         this._phase = 1;
       }
-    };
-    var next_a = function(inNumSamples) {
-      var out    = this.outputs[0];
-      var freqIn = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase >= 1) {
-          phase -= 1;
-          out[i] = 1;
-        } else {
-          out[i] = 0;
-        }
-        phase += freqIn[i] * cpstoinc;
-      }
-      this._phase = phase;
     };
     var next_ak = function(inNumSamples) {
       var out     = this.outputs[0];
@@ -1337,6 +1080,22 @@ define(function(require, exports, module) {
       this._phase = phase - phaseOffset;
       this._phaseOffset = phaseOffset;
     };
+    var next_ai = function(inNumSamples) {
+      var out    = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase;
+    };
     var next_kk = function(inNumSamples) {
       var out   = this.outputs[0];
       var freq  = this.inputs[0][0] * this._cpstoinc;
@@ -1358,7 +1117,7 @@ define(function(require, exports, module) {
       this._phase = phase - phaseOffset;
       this._phaseOffset = phaseOffset;
     };
-    var next_k = function(inNumSamples) {
+    var next_ki = function(inNumSamples) {
       var out  = this.outputs[0];
       var freq = this.inputs[0][0] * this._cpstoinc;
       var phase = this._phase;
@@ -1409,10 +1168,14 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
-
+  
   cc.unit.specs.DC = (function() {
     var ctor = function() {
-      this.outputs[0][0] = this.inputs[0][0];
+      var out = this.outputs[0];
+      var val = this.inputs[0][0];
+      for (var i = out.length; i--; ) {
+        out[i] = val;
+      }
     };
     return ctor;
   });

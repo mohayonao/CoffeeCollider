@@ -2,7 +2,10 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+  var utils = require("./utils");
   var log001 = Math.log(0.001);
+  
+  var cubicinterp = utils.cubicinterp;
   
   var calcDelay = function(unit, delaytime, minDelay) {
     return Math.max(minDelay, Math.min(delaytime * unit.rate.sampleRate, unit._fdelaylen));
@@ -16,13 +19,6 @@ define(function(require, exports, module) {
     } else {
       return -Math.exp(log001 * delaytime / -decaytime);
     }
-  };
-  var cubicinterp = function(x, y0, y1, y2, y3) {
-    var c0 = y1;
-    var c1 = 0.5 * (y2 - y0);
-    var c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3;
-    var c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
-    return ((c3 * x + c2) * x + c1) * x + c0;
   };
   
   cc.unit.specs.Delay1 = (function() {
