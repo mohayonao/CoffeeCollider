@@ -167,6 +167,24 @@ define(function(require, exports, module) {
     }
   };
   
+  cc.ugen.specs.Silent = {
+    $ir: {
+      ctor: function() {
+        return cc.global.DC.ir(0);
+      }
+    },
+    $kr: {
+      ctor: function() {
+        return cc.global.DC.kr(0);
+      }
+    },
+    $ar: {
+      ctor: function() {
+        return cc.global.DC.ar(0);
+      }
+    }
+  };
+  
   module.exports = {};
 
 });
