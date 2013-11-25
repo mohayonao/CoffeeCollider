@@ -11,21 +11,32 @@ define(function(require, exports, module) {
 
   var AudioBuffer = (function() {
     var bufId = 0;
-    function AudioBuffer() {
+    function AudioBuffer(frames, channels) {
       emitter.mixin(this);
       this.klassName = "Buffer";
-      // TODO: set below parameters
-      this.frames     = 0;
-      this.channels   = 0;
+
+      this.frames     = frames  |0;
+      this.channels   = channels|0;
       this.sampleRate = 0;
       
       this._blocking = true;
       this._bufId = bufId++;
       cc.lang.pushToTimeline([
-        "/b_new", this._bufId
+        "/b_new", this._bufId, this.frames, this.channels
       ]);
     }
     extend(AudioBuffer, cc.Object);
+
+    AudioBuffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
+      if (!Array.isArray(amps)) {
+        amps = [ amps ];
+      }
+      var numflag = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      cc.lang.pushToTimeline(
+        ["/b_gen", this._bufId, "sine1", numflag].concat(amps)
+      );
+      return this;
+    }).defaults("amps=[],normalize=true,asWavetable=true,clearFirst=true").build();
     
     AudioBuffer.prototype.performWait = function() {
       return this._blocking;
@@ -75,10 +86,15 @@ define(function(require, exports, module) {
       "/b_bind", this._bufId, bufSrcId, startFrame, numFrames
     ]);
   };
-  
-  var BufferInterface = function() {
+
+  cc.global.Buffer = function() {
   };
-  BufferInterface.read = fn(function(path, startFrame, numFrames) {
+  
+  cc.global.Buffer.alloc = fn(function(numFrames, numChannels) {
+    return new AudioBuffer(numFrames, numChannels);
+  }).defaults("numFrames=0,numChannels=1").build();
+  
+  cc.global.Buffer.read = fn(function(path, startFrame, numFrames) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: arguments[0] should be a string.");
     }
@@ -95,9 +111,7 @@ define(function(require, exports, module) {
       });
     }
     return buffer;
-  }).defaults("path,startFrame=0,numFrames=-1").multiCall().build();
-  
-  cc.global.Buffer = BufferInterface;
+  }).defaults("path,startFrame=0,numFrames=-1").build();
   
   cc.createAudioBuffer = function() {
     return new AudioBuffer();

@@ -17,6 +17,23 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Osc = {
+    $ar: {
+      defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(bufnum, freq, phase, mul, add) {
+        bufnum = bufnum._bufId;
+        return this.init(C.AUDIO, bufnum, freq, phase).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(bufnum, freq, phase, mul, add) {
+        bufnum = bufnum._bufId;
+        return this.init(C.CONTROL, bufnum, freq, phase).madd(mul, add);
+      }
+    },
+  };
   
   cc.ugen.specs.SinOsc = {
     $ar: {

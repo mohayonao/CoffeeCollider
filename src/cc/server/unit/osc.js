@@ -53,6 +53,203 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.Osc = (function() {
+    var ctor = function() {
+      this._tableSize = -1;
+      this._bufnum = this.inputs[0][0];
+      this._freq  = this.inputs[1][0];
+      this._phase = this.inputs[2][0];
+      this._radtoinc = 0;
+      this._cpstoinc = 0;
+      this._mask   = 0;
+      this._samples = 0;
+      this._table   = null;
+      if (this.inRates[0] === C.AUDIO) {
+        if (this.inRates[1] === C.AUDIO) {
+          this.process = next_aa;
+        } else if (this.inRates[1] === C.CONTROL) {
+          this.process = next_ak;
+        } else {
+          this.process = next_ai;
+        }
+        this._x = 0;
+      } else {
+        if (this.inRates[1] === C.AUDIO) {
+          this.process = next_ka;
+          this._x = 0;
+        } else {
+          this.process = next_kk;
+          this._x = this._phase * this._radtoinc;
+        }
+      }
+    };
+    var get_table = function(instance) {
+      var buffer = instance.buffers[this._bufnum];
+      if (buffer) {
+        var samples = buffer.samples;
+        var length  = samples.length;
+        if (this._samples !== length) {
+          this._samples = length;
+          length >>= 1;
+          this._radtoinc = length / twopi;
+          this._cpstoinc = length * this.rate.sampleDur;
+          this._table = samples;
+          this._mask  = length - 1;
+        }
+        return true;
+      }
+      return false;
+    };
+    var next_aa = function(inNumSamples, instance) {
+      if (!get_table.call(this, instance)) {
+        return;
+      }
+      var out = this.outputs[0];
+      var freqIn  = this.inputs[1];
+      var phaseIn = this.inputs[2];
+      var mask  = this._mask;
+      var table = this._table;
+      var cpstoinc = this._cpstoinc;
+      var radtoinc = this._radtoinc;
+      var x = this._x, pphase, index, i;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + radtoinc * phaseIn[i];
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += freqIn[i] * cpstoinc;
+      }
+      this._x = x;
+    };
+    var next_ak = function(inNumSamples, instance) {
+      if (!get_table.call(this, instance)) {
+        return;
+      }
+      var out = this.outputs[0];
+      var freqIn    = this.inputs[1];
+      var nextPhase = this.inputs[2][0];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var phase = this._phase;
+      var x = this._x, pphase, index, i;
+      if (nextPhase === phase) {
+        phase *= radtoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + phase;
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freqIn[i] * cpstoinc;
+        }
+      } else {
+        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * phase;
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          phase += phase_slope;
+          x += freqIn[i] * cpstoinc;
+        }
+        this._phase = nextPhase;
+      }
+      this._x = x;
+    };
+    var next_ai = function(inNumSamples, instance) {
+      if (!get_table.call(this, instance)) {
+        return;
+      }
+      var out = this.outputs[0];
+      var freqIn = this.inputs[1];
+      var phase  = this._phase * this._radtoinc;
+      var mask  = this._mask;
+      var table = this._table;
+      var cpstoinc = this._cpstoinc;
+      var x = this._x, pphase, index, i;
+      for (i = 0; i < inNumSamples; ++i) {
+        pphase = x + phase;
+        index  = (pphase & mask) << 1;
+        out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+        x += cpstoinc * freqIn[i];
+      }
+      this._x = x;
+    };
+    var next_ka = function(inNumSamples, instance) {
+      if (!get_table.call(this, instance)) {
+        return;
+      }
+      var out = this.outputs[0];
+      var nextFreq = this.inputs[1][0];
+      var phaseIn = this.inputs[2];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var freq = this._freq;
+      var x = this._x, pphase, index, i;
+      if (nextFreq === freq) {
+        freq *= cpstoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * phaseIn[i];
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq;
+        }
+      } else {
+        var freq_slope = (nextFreq - freq) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * phaseIn[i];
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq * cpstoinc;
+          freq += freq_slope;
+        }
+        this._freq = nextFreq;
+      }
+      this._x = x;
+    };
+    var next_kk = function(inNumSamples, instance) {
+      if (!get_table.call(this, instance)) {
+        return;
+      }
+      var out = this.outputs[0];
+      var nextFreq  = this.inputs[1][0];
+      var nextPhase = this.inputs[2][0];
+      var mask  = this._mask;
+      var table = this._table;
+      var radtoinc = this._radtoinc;
+      var cpstoinc = this._cpstoinc;
+      var freq = this._freq;
+      var phase = this._phase;
+      var x = this._x, pphase, index, i;
+      if (nextFreq === freq && nextPhase === phase) {
+        freq  *= cpstoinc;
+        phase *= radtoinc;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + phase;
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq;
+        }
+      } else {
+        var freq_slope  = (nextFreq  - freq ) * this.rate.slopeFactor;
+        var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          pphase = x + radtoinc * phase;
+          index  = (pphase & mask) << 1;
+          out[i] = table[index] + (pphase-(pphase|0)) * table[index+1];
+          x += freq * cpstoinc;
+          freq  += freq_slope;
+          phase += phase_slope;
+        }
+        this._freq  = nextFreq;
+        this._phase = nextPhase;
+      }
+      this._x = x;
+    };
+    
+    return ctor;
+  })();
   
   cc.unit.specs.SinOsc = (function() {
     var ctor = function() {
