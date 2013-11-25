@@ -176,7 +176,11 @@ define(function(require, exports, module) {
       enumerable  : false,
       writable    : true,
       value       : function(b) {
-        if (cc.instanceOfUGen(b)) {
+        if (Array.isArray(b)) {
+          return b.map(function(b) {
+            return func.call(this, b);
+          }, this);
+        } else if (cc.instanceOfUGen(b)) {
           return cc.createBinaryOpUGen(ugenSelector, this, b);
         }
         return func.call(this, b);
