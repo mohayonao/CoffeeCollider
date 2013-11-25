@@ -28,7 +28,8 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0]);
         }
       } else {
-        cc.console.warn("UnaryOpUGen[" + ops.UNARY_OPS_MAP[this.specialIndex] + "] is not defined.");
+        var opName = ops.UNARY_OPS_MAP[this.specialIndex] || "unknown";
+        throw new Error("UnaryOpUGen[" + opName + "] is not defined.");
       }
     };
     

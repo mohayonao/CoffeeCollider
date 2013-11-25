@@ -10,14 +10,13 @@ define(function(require, exports, module) {
   
   describe("lang/lang.js", function() {
     var called;
-    var _exports, _createWebWorker, _createTaskManager, _resetBuffer, _resetNode, _resetNativeTimers;
+    var _exports, _createWebWorker, _createTaskManager, _resetBuffer, _resetNode, _resetBuiltin;
     before(function() {
       _exports = cc.exports;
       _createWebWorker = cc.createWebWorker;
       _createTaskManager = cc.createTaskManager;
       _resetBuffer = cc.resetBuffer;
       _resetNode   = cc.resetNode;
-      _resetNativeTimers = cc.resetNativeTimers;
       
       cc.exports = nop;
       cc.createWebWorker = nop;
@@ -40,8 +39,8 @@ define(function(require, exports, module) {
       cc.resetNode   = function() {
         called.push("resetNode");
       };
-      cc.resetNativeTimers = function() {
-        called.push("resetNativeTimers");
+      cc.resetBuiltin = function() {
+        called.push("resetBuiltin");
       };
     });
     after(function() {
@@ -50,7 +49,6 @@ define(function(require, exports, module) {
       cc.createTaskManager = _createTaskManager;
       cc.resetBuffer = _resetBuffer;
       cc.resetNode   = _resetNode;
-      cc.resetNativeTimers = _resetNativeTimers;
     });
     beforeEach(function() {
       called = [];
@@ -98,10 +96,10 @@ define(function(require, exports, module) {
         });
         it("#reset", function() {
           instance.reset(["/reset"]);
-          assert.notEqual(called.indexOf("resetBuffer")      , -1);
-          assert.notEqual(called.indexOf("resetNode")        , -1);
-          assert.notEqual(called.indexOf("resetNativeTimers"), -1);
-          assert.notEqual(called.indexOf("tl.reset")         , -1);
+          assert.notEqual(called.indexOf("resetBuffer") , -1);
+          assert.notEqual(called.indexOf("resetNode")   , -1);
+          assert.notEqual(called.indexOf("resetBuiltin"), -1);
+          assert.notEqual(called.indexOf("tl.reset")    , -1);
           assert.equal(called.length, 4);
           assert.deepEqual(sendToServer, ["/reset"]);
         });

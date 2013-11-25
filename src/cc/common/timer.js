@@ -1,13 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
-
-  var cc = require("../cc");
   
-  // save native timer functions
-  var _setInterval   = setInterval;
-  var _clearInterval = clearInterval;
-  var _setTimeout    = setTimeout;
-  var _clearTimeout  = clearTimeout;
+  var cc = require("../cc");
   
   var NativeTimer = (function() {
     function NativeTimer() {
@@ -15,13 +9,13 @@ define(function(require, exports, module) {
     }
     NativeTimer.prototype.start = function(callback, interval) {
       if (this._timerId) {
-        _clearInterval(this._timerId);
+        clearInterval(this._timerId);
       }
-      this._timerId = _setInterval(callback, interval);
+      this._timerId = setInterval(callback, interval);
     };
     NativeTimer.prototype.stop = function() {
       if (this._timerId) {
-        _clearInterval(this._timerId);
+        clearInterval(this._timerId);
       }
       this._timerId = 0;
     };
@@ -72,50 +66,11 @@ define(function(require, exports, module) {
     return WorkerTimer;
   })();
   
-  var timerIdCache = [];
   cc.createTimer = function() {
     if (WorkerTimer) {
       return new WorkerTimer();
     }
     return new NativeTimer();
-  };
-  cc.replaceNativeTimerFunctions = function() {
-    global.setInterval = function(func, delay) {
-      var id = _setInterval(func, delay);
-      timerIdCache.push(id);
-      return id;
-    };
-    global.clearInterval = function(id) {
-      _clearInterval(id);
-      var index = timerIdCache.indexOf(id);
-      if (index !== -1) {
-        timerIdCache.splice(index, 1);
-      }
-    };
-    global.setTimeout = function(func, delay) {
-      var id = _setTimeout(func, delay);
-      timerIdCache.push(id);
-      return id;
-    };
-    global.clearTimeout = function(id) {
-      _clearTimeout(id);
-      var index = timerIdCache.indexOf(id);
-      if (index !== -1) {
-        timerIdCache.splice(index, 1);
-      }
-    };
-  };
-  cc.restoreNativeTimerFunctions = function() {
-    global.setInterval   = _setInterval;
-    global.clearInterval = _clearInterval;
-    global.setTimeout    = _setTimeout;
-    global.clearTimeout  = _clearTimeout;
-  };
-  cc.resetNativeTimers = function() {
-    timerIdCache.splice(0).forEach(function(timerId) {
-      _clearInterval(timerId);
-      _clearTimeout(timerId);
-    });
   };
   
   module.exports = {

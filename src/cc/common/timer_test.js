@@ -25,34 +25,6 @@ define(function(require, exports, module) {
         }
       }, 10);
     });
-    describe("native hack", function(done) {
-      beforeEach(function() {
-        cc.replaceNativeTimerFunctions();
-      });
-      afterEach(function() {
-        cc.restoreNativeTimerFunctions();
-      });
-      it("setInterval", function(done) {
-        var t = setInterval(function() {
-          clearInterval(t);
-          done();
-        }, 10);
-      });
-      it("setTimeout", function(done) {
-        var t = setTimeout(function() {
-          done();
-        }, 10);
-      });
-      it("reset", function() {
-        setInterval(function() {
-          assert.fail("timer should be cancelled.");
-        }, 10);
-        setTimeout(function() {
-          assert.fail("timer should be cancelled.");
-        }, 10);
-        cc.resetNativeTimers();
-      });
-    });
   });
 
 });

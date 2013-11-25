@@ -300,7 +300,9 @@ define(function(require, exports, module) {
   commands["/socket/sendToClient"] = function(msg) {
     this.exports.emit("message", msg[1]);
   };
-  require("../common/console").bind(commands);
+  commands["/console/log"] = function(msg) {
+    console.log.apply(console, unpack(msg[1]));
+  };
   
   cc.SynthClientImpl = SynthClientImpl;
   cc.createSynthClient = function(opts) {

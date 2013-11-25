@@ -9,11 +9,10 @@ define(function(require, exports, module) {
   
   describe("lang/synthdef.js", function() {
     var actual, expected, tl, addToSynth;
-    var _lang, _console, _setSynthDef, _createControl;
+    var _lang, _setSynthDef, _createControl;
     var _instanceOfOut, _instanceOfOutputProxy, _instanceOfMultiOutUGen;
     before(function() {
       _lang    = cc.lang;
-      _console = cc.console;
       _setSynthDef = cc.setSynthDef;
       _createControl = cc.createControl;
       _instanceOfOut = cc.instanceOfOut;
@@ -72,15 +71,9 @@ define(function(require, exports, module) {
           tl = cmd;
         },
       };
-      cc.console = {
-        warn: function(str) {
-          cc.console.warn.result = str;
-        }
-      };
     });
     after(function() {
       cc.lang = _lang;
-      cc.console = _console;
       cc.setSynthDef = _setSynthDef;
       cc.createControl = _createControl;
       cc.instanceOfOut = _instanceOfOut;
@@ -89,7 +82,6 @@ define(function(require, exports, module) {
     });
     beforeEach(function() {
       tl = null;
-      cc.console.warn.result = null;
     });
     it("create", function() {
       var def = cc.global.SynthDef(function(){});
@@ -254,9 +246,9 @@ define(function(require, exports, module) {
         // a(OUT)
         a = {name:"a", klassName:"Out"}; b = {name:"b"}; c = {name:"c"}; d = {name:"d"};
         a.inputs = [b]; b.inputs = [c]; c.inputs = [d]; d.inputs = [a];
-        actual = synthdef.topoSort([ a, b, c, d ]);
-        assert.deepEqual(actual, [ d, c, b, a ], "recursive");
-        assert.isString(cc.console.warn.result);
+        assert.throws(function() {
+          synthdef.topoSort([ a, b, c, d ]);
+        }, "UGen graph contains recursion.");
       });
       it("makeDefList", function() {
         var a, b, c, d, e, f, list, consts;

@@ -44,7 +44,8 @@ define(function(require, exports, module) {
           this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
         }
       } else {
-        cc.console.warn("BinaryOpUGen[" + ops.BINARY_OPS_MAP[this.specialIndex] + "] is not defined.");
+        var opName = ops.BINARY_OPS_MAP[this.specialIndex] || "unknown";
+        throw new Error("BinaryOpUGen[" + opName + "] is not defined.");
       }
     };
     

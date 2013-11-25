@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var pack  = require("../common/pack").pack;
   var commands = {};
   
   var SynthServer = (function() {
@@ -118,7 +117,6 @@ define(function(require, exports, module) {
   
   // TODO: moved
   require("../common/timer");
-  require("../common/console");
   require("./instance");
   require("./rate");
   require("./server-worker");
@@ -137,23 +135,6 @@ define(function(require, exports, module) {
     }
     throw new Error("A SynthServer is not defined for: " + cc.opmode);
   };
-  
-  if (typeof global.console === "undefined") {
-    global.console = (function() {
-      var console = {};
-      ["log", "debug", "info", "warn", "error"].forEach(function(method) {
-        console[method] = function() {
-          if (cc.server) {
-            var args = Array.prototype.slice.call(arguments).map(function(x) {
-              return pack(x);
-            });
-            cc.server.sendToLang(["/console/" + method, args]);
-          }
-        };
-      });
-      return console;
-    })();
-  }
   
   module.exports = {};
 

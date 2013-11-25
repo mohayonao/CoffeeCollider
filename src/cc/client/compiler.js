@@ -391,8 +391,7 @@ define(function(require, exports, module) {
 
   func.setVariables = function(stack) {
     var ignored = [
-      "cc", "global", "console",
-      "setInterval", "setTimeout", "clearInterval", "clearTimeout"
+      "cc", "global"
     ];
     return function(name) {
       if (ignored.indexOf(name) !== -1) {

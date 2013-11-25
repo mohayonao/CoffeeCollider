@@ -128,17 +128,12 @@ define(function(require, exports, module) {
         assert.equal(u.outputs[0][7], 0);
       });
       it("undefined", function() {
-        cc.console = {
-          warn: function(str) {
-            cc.console.warn.result = str;
-          }
-        };
         var u = cc.createUnit({}, [
           "UnaryOpUGen", C.AUDIO, -1, [ 0,0 ], [ C.AUDIO ]
         ]);
-        cc.console.warn.result = null;
-        u.init();
-        assert.isString(cc.console.warn.result);
+        assert.throws(function() {
+          u.init();
+        }, "UnaryOpUGen[unknown] is not defined.");
       });
     });
   });

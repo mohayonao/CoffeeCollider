@@ -63,7 +63,7 @@ define(function(require, exports, module) {
     SynthLang.prototype.reset = function(msg) {
       cc.resetBuffer();
       cc.resetNode();
-      cc.resetNativeTimers();
+      cc.resetBuiltin();
       this.taskManager.reset();
       this.sendToServer(msg);
     };
@@ -145,21 +145,6 @@ define(function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-  commands["/console/log"] = function(msg) {
-    this.sendToClient(msg);
-  };
-  commands["/console/debug"] = function(msg) {
-    this.sendToClient(msg);
-  };
-  commands["/console/info"] = function(msg) {
-    this.sendToClient(msg);
-  };
-  commands["/console/warn"] = function(msg) {
-    this.sendToClient(msg);
-  };
-  commands["/console/error"] = function(msg) {
-    this.sendToClient(msg);
-  };
   commands["/emit/n_end"] = function(msg) {
     var nodeId = msg[1]|0;
     var n = cc.getNode(nodeId);
@@ -179,7 +164,6 @@ define(function(require, exports, module) {
   cc.SynthLang = SynthLang;
   
   cc.createSynthLang = function() {
-    cc.replaceNativeTimerFunctions();
     switch (cc.opmode) {
     case "worker":
       return cc.createWorkerSynthLang();
@@ -192,11 +176,10 @@ define(function(require, exports, module) {
   };
   
   // TODO: moved
-  require("../common/timer");
-  require("../common/console");
   require("./array");
   require("./boolean");
   require("./buffer");
+  require("./builtin");
   require("./date");
   require("./env");
   require("./function");

@@ -128,7 +128,6 @@ define(function(require, exports, module) {
     var instance = null;
     function SocketSynthServerExports(server, opts) {
       if (instance) {
-        cc.console.warn("CoffeeColliderSocketServer has been created already.");
         return instance;
       }
       emitter.mixin(this);
