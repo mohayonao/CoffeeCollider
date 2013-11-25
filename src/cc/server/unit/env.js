@@ -23,10 +23,13 @@ define(function(require, exports, module) {
   var shape_Cubed         = 7;
   var shape_Sustain       = 9999;
   
-  
   cc.unit.specs.EnvGen = (function() {
     var ctor = function() {
-      this.process = next_k;
+      if (this.calcRate === C.AUDIO) {
+        this.process = next_ak;
+      } else {
+        this.process = next_k;
+      }
       this._level    = this.inputs[kEnvGen_initLevel][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
       this._endLevel = this._level;
       this._counter  = 0;
@@ -43,6 +46,256 @@ define(function(require, exports, module) {
       this._shape = 0;
       next_k.call(this, 1);
     };
+    var next_ak = function(inNumSamples) {
+      var out = this.outputs[0];
+      var gate = this.inputs[kEnvGen_gate][0];
+      var counter  = this._counter;
+      var level    = this._level;
+      var prevGate = this._prevGate;
+      var numstages, doneAction, loopNode;
+      var envPtr, stageOffset, endLevel, dur, shape, curve;
+      var w, a1, a2, b1, y0, y1, y2, grow;
+      
+      var checkGate = true, counterOffset = 0;
+      if (prevGate <= 0 && gate > 0) {
+        this._stage = -1;
+        this._released = false;
+        this.done = false;
+        counter   = counterOffset;
+        checkGate = false;
+      } else if (gate <= -1 && prevGate > -1 && !this._released) {
+        numstages = this.inputs[kEnvGen_numStages][0]|0;
+        dur = -gate - 1;
+        counter = Math.max(1, (dur * this.rate.sampleRate)|0) + counterOffset;
+        this._stage = numstages;
+        this._shape = shape_Linear;
+        this._endLevel = this.inputs[this.numOfInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
+        this._grow     = (this._endLevel - level) / counter;
+        this._released = true;
+        checkGate = true;
+      } else if (prevGate > 0 && gate <= 0 && this._releaseNode >= 0 && !this._released) {
+        counter = counterOffset;
+        this._stage = this._releaseNode - 1;
+        this._released = true;
+        checkGate = false;
+      }
+      this._prevGate = gate;
+      
+      var remain = inNumSamples;
+      while (remain) {
+        var initSegment = false;
+        if (counter === 0) {
+          numstages = this.inputs[kEnvGen_numStages][0]|0;
+          if (this._stage + 1 >= numstages) {
+            counter = Infinity;
+            this._shape = 0;
+            level = this._endLevel;
+            this.done = true;
+            doneAction = this.inputs[kEnvGen_doneAction][0]|0;
+            this.doneAction(doneAction);
+          } else if (this._stage + 1 === this._releaseNode && !this._released) { // sustain stage
+            loopNode = this.inputs[kEnvGen_loopNode][0]|0;
+            if (loopNode >= 0 && loopNode < numstages) {
+              this._stage = loopNode;
+              initSegment = true;
+            } else {
+              counter = Infinity;
+              this._shape = shape_Sustain;
+              level = this._endLevel;
+            }
+          } else {
+            this._stage += 1;
+            initSegment = true;
+          }
+        }
+
+        if (initSegment) {
+          stageOffset = (this._stage << 2) + kEnvGen_nodeOffset;
+          if (stageOffset + 4 > this.numOfInputs) {
+            // oops;
+            return;
+          }
+          
+          envPtr = this.inputs;
+          endLevel = envPtr[0+stageOffset][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0]; // scale levels
+          dur      = envPtr[1+stageOffset][0] * this.inputs[kEnvGen_timeScale ][0];
+          shape    = envPtr[2+stageOffset][0]|0;
+          curve    = envPtr[3+stageOffset][0];
+          this._endLevel = endLevel;
+          this._shape    = shape;
+          
+          counter = Math.max(1, (dur * this.rate.sampleRate)|0);
+          if (counter === 1) {
+            this._shape = shape_Linear;
+          }
+          switch (this._shape) {
+          case shape_Step:
+            level = endLevel;
+            break;
+          case shape_Linear:
+            this._grow = (endLevel - level) / counter;
+            break;
+          case shape_Exponential:
+            if (Math.abs(level) < 1e-6) {
+              level = 1e-6;
+            }
+            this._grow = Math.pow(endLevel / level, 1 / counter);
+            break;
+          case shape_Sine:
+            w = Math.PI / counter;
+            this._a2 = (endLevel + level) * 0.5;
+            this._b1 = 2 * Math.cos(w);
+            this._y1 = (endLevel - level) * 0.5;
+            this._y2 = this._y1 * Math.sin(Math.PI * 0.5 - w);
+            level = this._a2 - this._y1;
+            break;
+          case shape_Welch:
+            w = (Math.PI * 0.5) / counter;
+            this._b1 = 2 * Math.cos(w);
+            if (endLevel >= level) {
+              this._a2 = level;
+              this._y1 = 0;
+              this._y2 = -Math.sin(w) * (endLevel - level);
+            } else {
+              this._a2 = endLevel;
+              this._y1 = level - endLevel;
+              this._y2 = Math.cos(w) * (level - endLevel);
+            }
+            level = this._a2 + this._y1;
+            break;
+          case shape_Curve:
+            if (Math.abs(curve) < 0.001) {
+              this._shape = shape_Linear;
+              this._grow = (endLevel - level) / counter;
+            } else {
+              a1 = (endLevel - level) / (1.0 - Math.exp(curve));
+              this._a2 = level + a1;
+              this._b1 = a1;
+              this._grow = Math.exp(curve / counter);
+            }
+            break;
+          case shape_Squared:
+            this._y1 = Math.sqrt(level);
+            this._y2 = Math.sqrt(endLevel);
+            this._grow = (this._y2 - this._y1) / counter;
+            break;
+          case shape_Cubed:
+            this._y1 = Math.pow(level   , 0.33333333);
+            this._y2 = Math.pow(endLevel, 0.33333333);
+            this._grow = (this._y2 - this._y1) / counter;
+            break;
+          }
+        }
+        
+        var nsmps = Math.min(remain, counter);
+        var i;
+
+        grow = this._grow;
+        a2 = this._a2;
+        b1 = this._b1;
+        y1 = this._y1;
+        y2 = this._y2;
+
+        switch (this._shape) {
+        case shape_Step:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            if (isNaN(out[i])) {
+              console.log("shape_Step:NaN");
+            }
+          }
+          break;
+        case shape_Linear:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            level += grow;
+            if (isNaN(out[i])) {
+              console.log("shape_Linear:NaN");
+            }
+          }
+          break;
+        case shape_Exponential:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            level *= grow;
+            if (isNaN(out[i])) {
+              console.log("shape_Exponential:NaN");
+            }
+          }
+          break;
+        case shape_Sine:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            y0 = b1 * y1 - y2;
+            level = a2 - y0;
+            y2 = y1;
+            y1 = y0;
+            if (isNaN(out[i])) {
+              console.log("shape_Sine:NaN");
+            }
+          }
+          break;
+        case shape_Welch:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            y0 = b1 * y1 - y2;
+            level = a2 + y0;
+            y2 = y1;
+            y1 = y0;
+            if (isNaN(out[i])) {
+              console.log("shape_Welch:NaN");
+            }
+          }
+          break;
+        case shape_Curve:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            b1 *= grow;
+            level = a2 - b1;
+            if (isNaN(out[i])) {
+              console.log("shape_Curve:NaN");
+            }
+          }
+          break;
+        case shape_Squared:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            y1 += grow;
+            level = y1 * y1;
+            if (isNaN(out[i])) {
+              console.log("shape_Squared:NaN", level, y1, grow);
+            }
+          }
+          break;
+        case shape_Cubed:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            y1 += grow;
+            level = y1 * y1 * y1;
+            if (isNaN(out[i])) {
+              console.log("shape_Cubed:NaN");
+            }
+          }
+          break;
+        case shape_Sustain:
+          for (i = 0; i < nsmps; ++i) {
+            out[i] = level;
+            if (isNaN(out[i])) {
+              console.log("shape_Sustain:NaN");
+            }
+          }
+          break;
+        }
+        remain  -= nsmps;
+        counter -= nsmps;
+      }
+      this._level   = level;
+      this._counter = counter;
+      this._a2 = a2;
+      this._b1 = b1;
+      this._y1 = y1;
+      this._y2 = y2;
+    };
     var next_k = function() {
       var out = this.outputs[0];
       var gate = this.inputs[kEnvGen_gate][0];
@@ -51,7 +304,7 @@ define(function(require, exports, module) {
       var prevGate = this._prevGate;
       var numstages, doneAction, loopNode;
       var envPtr, stageOffset, endLevel, dur, shape, curve;
-      var w, a1, a2, b1, y0, y1, y2;
+      var w, a1, a2, b1, y0, y1, y2, grow;
       
       var checkGate = true, counterOffset = 0;
       if (prevGate <= 0 && gate > 0) {
@@ -131,6 +384,9 @@ define(function(require, exports, module) {
           this._grow = (endLevel - level) / counter;
           break;
         case shape_Exponential:
+          if (Math.abs(level) < 1e-6) {
+            level = 1e-6;
+          }
           this._grow = Math.pow(endLevel / level, 1 / counter);
           break;
         case shape_Sine:
@@ -157,7 +413,7 @@ define(function(require, exports, module) {
           break;
         case shape_Curve:
           if (Math.abs(curve) < 0.001) {
-            this._shape = 1; // shape_Linear
+            this._shape = shape_Linear;
             this._grow = (endLevel - level) / counter;
           } else {
             a1 = (endLevel - level) / (1.0 - Math.exp(curve));
@@ -179,6 +435,7 @@ define(function(require, exports, module) {
         }
       }
 
+      grow = this._grow;
       a2 = this._a2;
       b1 = this._b1;
       y1 = this._y1;
@@ -188,10 +445,10 @@ define(function(require, exports, module) {
       case shape_Step:
         break;
       case shape_Linear:
-        level += this._grow;
+        level += grow;
         break;
       case shape_Exponential:
-        level *= this._grow;
+        level *= grow;
         break;
       case shape_Sine:
         y0 = b1 * y1 - y2;
@@ -206,15 +463,15 @@ define(function(require, exports, module) {
         y1 = y0;
         break;
       case shape_Curve:
-        b1 *= this._grow;
+        b1 *= grow;
         level = a2 - b1;
         break;
       case shape_Squared:
-        y1 += this._grow;
+        y1 += grow;
         level = y1 * y1;
         break;
       case shape_Cubed:
-        y1 += this._grow;
+        y1 += grow;
         level = y1 * y1 * y1;
         break;
       case shape_Sustain:

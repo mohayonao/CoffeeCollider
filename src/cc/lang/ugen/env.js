@@ -8,13 +8,13 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.EnvGen = {
-    // $ar: {
-    //   defaults: "envelope,gate=1,levelScale=1,levelBias=0,timeScale=1,doneAction=0",
-    //   ctor: function(envelope, gate, levelScale, levelBias, timeScale, doneAction) {
-    //     envelope = convertEnv(envelope)[0]; // TODO: unbubble
-    //     return this.init.apply(this, [C.AUDIO, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
-    //   }
-    // },
+    $ar: {
+      defaults: "envelope,gate=1,levelScale=1,levelBias=0,timeScale=1,doneAction=0",
+      ctor: function(envelope, gate, levelScale, levelBias, timeScale, doneAction) {
+        envelope = convertEnv(envelope)[0]; // TODO: unbubble
+        return this.init.apply(this, [C.AUDIO, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
+      }
+    },
     $kr: {
       defaults: "envelope,gate=1,levelScale=1,levelBias=0,timeScale=1,doneAction=0",
       ctor: function(envelope, gate, levelScale, levelBias, timeScale, doneAction) {

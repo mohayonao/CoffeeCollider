@@ -259,7 +259,7 @@ define(function(require, exports, module) {
             var unitSpec = [ name, rate, 0, inputs, outputs ];
             var testName = name + "." + ["ir","kr","ar"][rate];
             testName += "(" + items.inputs.map(function(_in) {
-              return ["ir","kr","ar"][_in.rate];
+              return ["ir","kr","ar"][_in.rate|0];
             }).join(", ") + ")";
             if (opts.verbose) {
               console.log(testName);
@@ -267,11 +267,17 @@ define(function(require, exports, module) {
             it(testName, (function(items) {
               return function() {
                 var inputSpecs = items.inputs.map(function(items) {
-                  return inputSpec({
-                    rate   : items.rate,
-                    process: signal(items.value),
-                    value  : items.value
-                  });
+                  if (typeof items === "number") {
+                    return inputSpec({
+                      rate:C.SCALAR, value:items
+                    });
+                  } else {
+                    return inputSpec({
+                      rate   : items.rate || C.SCALAR,
+                      process: signal(items.value),
+                      value  : items.value
+                    });
+                  }
                 });
                 unitTest(unitSpec, inputSpecs, opts);
               };
