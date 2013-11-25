@@ -1487,6 +1487,31 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.Slew = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._level = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var sampleDur = this.rate.sampleDur;
+      var upf = +this.inputs[1][0] * sampleDur;
+      var dnf = -this.inputs[2][0] * sampleDur;
+      console.log(upf, dnf);
+      var level = this._level;
+      var slope;
+      for (var i = 0; i < inNumSamples; ++i) {
+        slope = inIn[i] - level;
+        level += Math.max(dnf, Math.min(slope, upf));
+        out[i] = level;
+      }
+      this._level = level;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

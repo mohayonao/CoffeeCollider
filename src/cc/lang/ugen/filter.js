@@ -132,6 +132,22 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.Lag2UD = cc.ugen.specs.LagUD;
   cc.ugen.specs.Lag3UD = cc.ugen.specs.LagUD;
+
+  cc.ugen.specs.Slew = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,up=1,dn=1,mul=1,add=0",
+      ctor: function(_in, up, dn, mul, add) {
+        return this.init(C.AUDIO, _in, up, dn).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,up=1,dn=1,mul=1,add=0",
+      ctor: function(_in, up, dn, mul, add) {
+        return this.init(C.CONTROL, _in, up, dn).madd(mul, add);
+      }
+    },
+  };
   
   module.exports = {};
 

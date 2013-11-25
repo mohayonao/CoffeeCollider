@@ -108,4 +108,14 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite("Slew", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in", rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"up", rate:C.CONTROL, value:[+1, +0.5, 0, -0.5, -1] },
+        { name:"dn", rate:C.CONTROL, value:[-1, -0.5, 0, +0.5, +1] },
+      ]
+    }
+  ]);
+
 });
