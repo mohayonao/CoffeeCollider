@@ -19,6 +19,7 @@ define(function(require, exports, module) {
   require("./random");
   require("./range");
   require("./reverb");
+  require("./trig");
   require("./ui");
   require("./uop");
   

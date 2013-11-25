@@ -150,13 +150,6 @@ define(function(require, exports, module) {
       inputs: [
         { name:"in0", rate:C.AUDIO  , value:unitTestSuite.in0 },
         { name:"in1", rate:C.CONTROL, value:unitTestSuite.in1 },
-        { name:"in2", rate:C.AUDIO  , value:unitTestSuite.in2 },
-      ]
-    },
-    { rate  : C.AUDIO,
-      inputs: [
-        { name:"in0", rate:C.AUDIO  , value:unitTestSuite.in0 },
-        { name:"in1", rate:C.CONTROL, value:unitTestSuite.in1 },
         { name:"in2", rate:C.CONTROL, value:unitTestSuite.in2 },
       ]
     },
