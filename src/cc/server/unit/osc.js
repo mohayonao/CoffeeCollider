@@ -90,8 +90,12 @@ define(function(require, exports, module) {
         var samples = buffer.samples;
         var length  = samples.length;
         if (this._samples !== length) {
-          this._samples = length;
+          var logSize = Math.log(length) / Math.log(2);
+          if (logSize !== (logSize|0)) {
+            return false;
+          }
           length >>= 1;
+          this._samples = length;
           this._radtoinc = length / twopi;
           this._cpstoinc = length * this.rate.sampleDur;
           this._table = samples;
