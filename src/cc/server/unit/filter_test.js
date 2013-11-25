@@ -108,6 +108,18 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite("VarLag", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in", rate:C.AUDIO  , value:unitTestSuite.in0 },
+        { name:"time"     , rate:C.CONTROL, value:[0.1, 0.2, 0.3] },
+        { name:"curvature", rate:C.CONTROL, value:[0.0, 0.5, 1.0] },
+        { name:"warp"     , rate:C.SCALAR , value:5 },
+        { name:"start"    , rate:C.SCALAR , value:0 },
+      ]
+    }
+  ]);
+  
   unitTestSuite("Slew", [
     { rate  : C.AUDIO,
       inputs: [

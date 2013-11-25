@@ -133,6 +133,22 @@ define(function(require, exports, module) {
   cc.ugen.specs.Lag2UD = cc.ugen.specs.LagUD;
   cc.ugen.specs.Lag3UD = cc.ugen.specs.LagUD;
 
+  cc.ugen.specs.VarLag = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,time=0.1,curvature=0,warp=5,start=0,mul=1,add=0",
+      ctor: function(_in, time, curvature, warp, start, mul, add) {
+        return this.init(C.AUDIO, _in, time, curvature, warp, start).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,time=0.1,curvature=0,warp=5,start=0,mul=1,add=0",
+      ctor: function(_in, time, curvature, warp, start, mul, add) {
+        return this.init(C.CONTROL, _in, time, curvature, warp, start).madd(mul, add);
+      }
+    }
+  };
+  
   cc.ugen.specs.Slew = {
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
     $ar: {

@@ -1488,6 +1488,90 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  cc.unit.specs.VarLag = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next;
+      }
+      var lagTime = this.inputs[1][0];
+      var counter = Math.max(1, (lagTime * this.rate.sampleRate)|0);
+      this._level   = this.inputs[2][0];
+      this._counter = counter;
+      this._in      = this.inputs[0][0];
+      this._slope   = (this._in - this._level) / counter;
+      this._lagTime = lagTime;
+      this.outputs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var _in = this.inputs[0][0];
+      var lagTime = this.inputs[1][0];
+      var slope   = this._slope;
+      var level   = this._level;
+      var counter = this._counter;
+      var i, scaleFactor;
+      if (_in !== this._in) {
+        this._counter = counter = Math.max(1, (lagTime * this.rate.sampleRate)|0);
+        this._slope   = slope   = (_in - this._in) / counter;
+        this._in      = _in;
+        this._lagTime = lagTime;
+      } else if (lagTime !== this._lagTime) {
+        scaleFactor = lagTime / this._lagTime;
+        this._counter = counter = Math.max(1, (this._counter * scaleFactor)|0);
+        this._slope   = slope   = this._slope / scaleFactor;
+        this._lagTime = lagTime;
+      }
+      _in = this._in;
+      if (counter > 0) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = level;
+          if (counter > 0) {
+            level += slope;
+            counter -= 1;
+          } else {
+            level = _in;
+          }
+        }
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = level;
+        }
+      }
+      this._level   = level;
+      this._slope   = slope;
+      this._counter = counter;
+    };
+    var next_1 = function() {
+      var _in  = this.inputs[0][0];
+      var lagTime = this.inputs[1][0];
+      var counter = this._counter;
+      var scaleFactor;
+      if (_in !== this._in) {
+        this._counter = counter = Math.max(1, (lagTime * this.rate.sampleRate)|0);
+        this._slope   = (_in - this._level) / counter;
+        this._in      = _in;
+        this._lagTime = lagTime;
+      } else if (lagTime !== this._lagTime) {
+        if (counter !== 0) {
+          scaleFactor = lagTime / this._lagTime;
+          this._counter = counter = Math.max(1, (this._counter * scaleFactor)|0);
+          this._slope   = this._slope / scaleFactor;
+        }
+        this._lagTime = lagTime;
+      }
+      this.outputs[0][0] = this._level;
+      if (this._counter > 0) {
+        this._level += this._slope;
+        this._counter -= 1;
+      } else {
+        this._level = this._in;
+      }
+    };
+    return ctor;
+  })();
+
   cc.unit.specs.Slew = (function() {
     var ctor = function() {
       this.process = next;
