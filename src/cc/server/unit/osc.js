@@ -731,6 +731,7 @@ define(function(require, exports, module) {
       this._scale = 0.5 / this._N;
       this._phase = 0;
       this._y1 = -0.46;
+      next.call(this, 1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];

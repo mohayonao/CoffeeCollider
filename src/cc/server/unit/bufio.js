@@ -332,7 +332,7 @@ define(function(require, exports, module) {
   cc.unit.specs.BufRateScale = (function() {
     var ctor = function() {
       this.process = next;
-      this._sampleDur = cc.getRateInstance(C.AUDIO);
+      this._sampleDur = cc.getRateInstance(C.AUDIO).sampleDur;
     };
     var next = function(inNumSamples, instance) {
       if (get_buffer.call(this, instance)) {
@@ -369,7 +369,7 @@ define(function(require, exports, module) {
   cc.unit.specs.BufDur = (function() {
     var ctor = function() {
       this.process = next;
-      this._sampleDur = cc.getRateInstance(C.AUDIO);
+      this._sampleDur = cc.getRateInstance(C.AUDIO).sampleDur;
     };
     var next = function(inNumSamples, instance) {
       if (get_buffer.call(this, instance)) {

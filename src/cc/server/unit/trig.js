@@ -230,6 +230,67 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
+  var sc_wrap = function(val, lo, hi) {
+    if (lo > hi) {
+      var t = lo;
+      lo = hi;
+      hi = t;
+    }
+    var _in = val, range;
+    if (_in >= hi) {
+      range = hi - lo;
+      _in -= range;
+      if (_in < hi) {
+        return _in;
+      }
+    } else if (_in < lo) {
+      range = hi - lo;
+      _in += range;
+      if (_in >= lo) {
+        return _in;
+      }
+    } else {
+      return _in;
+    }
+    
+    if (hi === lo) {
+      return lo;
+    }
+    return _in - range * Math.floor((_in - lo) / range);
+  };
+  
+  cc.unit.specs.Phasor = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next;
+      }
+      this._prev = this.inputs[0][0];
+      this.outputs[0][0] = this._level = this.inputs[2][0];
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trig  = this.inputs[0][0];
+      var rate  = this.inputs[1][0];
+      var start = this.inputs[2][0];
+      var end   = this.inputs[3][0];
+      var prev  = this._prev;
+      var level = this._level;
+      if (prev <= 0 && trig > 0) {
+        level = this.inputs[4][0];
+      }
+      for (var i = 0; i < inNumSamples; ++i) {
+        level = sc_wrap(level, start, end);
+        out[i] = level;
+        level += rate;
+      }
+      this._prev  = trig;
+      this._level = level;
+    };
+    return ctor;
+  })();
+  
   module.exports = {};
 
 });

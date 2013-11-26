@@ -32,9 +32,6 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        if (phase.rate !== C.AUDIO) {
-          throw new Error("BufRd: phase input is not audio rate.");
-        }
         this.init(C.AUDIO, bufnum, phase, loop, interpolation);
         return this.initOutputs(numChannels, this.rate);
       }

@@ -37,6 +37,21 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Gate = cc.ugen.specs.Latch;
+
+  cc.ugen.specs.Phasor = {
+    $ar: {
+      defaults: "trig=0,rate=1,start=0,end=1,resetPos=0",
+      ctor: function(trig, rate, start, end, resetPos) {
+        return this.init(C.AUDIO, trig, rate, start, end, resetPos);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,rate=1,start=0,end=1,resetPos=0",
+      ctor: function(trig, rate, start, end, resetPos) {
+        return this.init(C.AUDIO, trig, rate, start, end, resetPos);
+      }
+    }
+  };
   
   module.exports = {};
 

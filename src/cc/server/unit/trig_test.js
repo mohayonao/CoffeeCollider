@@ -38,6 +38,18 @@ define(function(require, exports, module) {
       ]
     }
   ]);
+
+  unitTestSuite("Phasor", [
+    { rate: C.AUDIO,
+      inputs: [
+        { name:"trig"    , rate:C.CONTROL, value:unitTestSuite.trig0 },
+        { name:"rate"    , rate:C.CONTROL, value:unitTestSuite.in0 },
+        { name:"start"   , rate:C.CONTROL, value:[-1,-0.5,0,+0.5,+1] },
+        { name:"end"     , rate:C.CONTROL, value:[+1,+0.5,0,-0.5,-1,-1] },
+        { name:"resetPos", rate:C.CONTROL, value:[+0.5,0,-0.5] },
+      ]
+    }
+  ]);
   
   module.exports = {};
 
