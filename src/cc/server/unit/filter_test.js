@@ -8,7 +8,17 @@ define(function(require, exports, module) {
   var filter = require("./filter");
 
   unitTestSuite.desc = "server/unit/filter.js";
-
+  
+  unitTestSuite("Resonz", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO  , value:unitTestSuite.in0   },
+        { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq0 },
+        { name:"bwr" , rate:C.CONTROL, value:[0.1, 0.5, 1]       },
+      ]
+    }
+  ]);
+  
   unitTestSuite(["OnePole", "OneZero"], [
     { rate  : C.AUDIO,
       inputs: [

@@ -3,6 +3,22 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
 
+  cc.ugen.specs.Resonz = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,freq=440,bwr=1,mul=1,add=0",
+      ctor: function(_in, freq, bwr, mul, add) {
+        return this.init(C.AUDIO, _in, freq, bwr).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,freq=440,bwr=1,mul=1,add=0",
+      ctor: function(_in, freq, bwr, mul, add) {
+        return this.init(C.CONTROL, _in, freq, bwr).madd(mul, add);
+      }
+    }
+  };
+  
   cc.ugen.specs.OnePole = {
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
     $ar: {
