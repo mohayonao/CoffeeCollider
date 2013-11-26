@@ -38,6 +38,24 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.Gate = cc.ugen.specs.Latch;
 
+  cc.ugen.specs.ZeroCrossing = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "trig=0",
+      ctor: function(trig) {
+        return this.init(C.AUDIO, trig);
+      }
+    },
+    $kr: {
+      defaults: "trig=0",
+      ctor: function(trig) {
+        return this.init(C.CONTROL, trig);
+      }
+    }
+  };
+  
+  cc.ugen.specs.Timer = cc.ugen.specs.ZeroCrossing;
+  
   cc.ugen.specs.Phasor = {
     $ar: {
       defaults: "trig=0,rate=1,start=0,end=1,resetPos=0",

@@ -229,6 +229,80 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.ZeroCrossing = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevfrac = 0;
+      this._previn  = this.inputs[0][0];
+      this._counter = 0;
+      this.outputs[0][0] = this._level = 0;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var previn   = this._previn;
+      var prevfrac = this._prevfrac;
+      var level   = this._level;
+      var counter = this._counter;
+      var sampleRate = this.rate.sampleRate;
+      var curin, frac;
+      for (var i = 0; i < inNumSamples; ++i) {
+        counter++;
+        curin = inIn[i];
+        if (counter > 4 && previn <= 0 && curin > 0) {
+          frac = -previn / (curin - previn);
+          level = sampleRate / (frac + counter - prevfrac);
+          prevfrac = frac;
+          counter  = 0;
+        }
+        out[i] = level;
+        previn = curin;
+      }
+      this._previn   = previn;
+      this._prevfrac = prevfrac;
+      this._level    = level;
+      this._counter  = counter;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.Timer = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevfrac = 0;
+      this._previn  = this.inputs[0][0];
+      this._counter = 0;
+      this.outputs[0][0] = this._level = 0;
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var previn   = this._previn;
+      var prevfrac = this._prevfrac;
+      var level   = this._level;
+      var counter = this._counter;
+      var sampleDur = this.rate.sampleDur;
+      var curin, frac;
+      for (var i = 0; i < inNumSamples; ++i) {
+        counter++;
+        curin = inIn[i];
+        if (previn <= 0 && curin > 0) {
+          frac = -previn / (curin - previn);
+          level = sampleDur * (frac + counter - prevfrac);
+          prevfrac = frac;
+          counter  = 0;
+        }
+        out[i] = level;
+        previn = curin;
+      }
+      this._previn   = previn;
+      this._prevfrac = prevfrac;
+      this._level    = level;
+      this._counter  = counter;
+    };
+    return ctor;
+  })();
   
   var sc_wrap = function(val, lo, hi) {
     if (lo > hi) {
