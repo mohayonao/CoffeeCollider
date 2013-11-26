@@ -149,6 +149,22 @@ define(function(require, exports, module) {
   cc.ugen.specs.BPZ2  = cc.ugen.specs.LPZ1;
   cc.ugen.specs.BRZ2  = cc.ugen.specs.LPZ1;
   
+  cc.ugen.specs.Changed = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,threshold=0",
+      ctor: function(_in, threshold) {
+        return cc.global.HPZ1.ar(_in).abs().gt(threshold);
+      }
+    },
+    $kr: {
+      defaults: "in=0,threshold=0",
+      ctor: function(_in, threshold) {
+        return cc.global.HPZ1.kr(_in).abs().gt(threshold);
+      }
+    }
+  };
+  
   cc.ugen.specs.Lag = {
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
     $ar: {
