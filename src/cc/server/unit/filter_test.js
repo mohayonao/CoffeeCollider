@@ -87,6 +87,14 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite(["LPZ1", "HPZ1", "Slope", "LPZ2", "HPZ2", "BPZ2", "BRZ2"], [
+    { rate : C.AUDIO,
+      inputs: [
+        { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+      ]
+    }
+  ]);
+  
   unitTestSuite(["Lag", "Lag2", "Lag3", "Ramp"], [
     { rate  : C.AUDIO,
       inputs: [

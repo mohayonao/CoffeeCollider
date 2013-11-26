@@ -1119,6 +1119,236 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  cc.unit.specs.LPZ1 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1;
+      var i, j = 0;
+      for (i = inNumSamples >> 3; i--; ) {
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 + x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 + x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 + x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 + x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 + x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 + x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 + x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 + x0);
+      }
+      for (i = inNumSamples & 3; i--; ) {
+        x0 = inIn[j];
+        out[j++] = 0.5 * (x0 + x1);
+        x1 = x0;
+      }
+      this._x1 = x1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.HPZ1 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1;
+      var i, j = 0;
+      for (i = inNumSamples >> 3; i--; ) {
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 - x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 - x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 - x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 - x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 - x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 - x0);
+        x0 = inIn[j]; out[j++] = 0.5 * (x0 - x1);
+        x1 = inIn[j]; out[j++] = 0.5 * (x1 - x0);
+      }
+      for (i = inNumSamples & 3; i--; ) {
+        x0 = inIn[j];
+        out[j++] = 0.5 * (x0 - x1);
+        x1 = x0;
+      }
+      this._x1 = x1;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.Slope = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this.inputs[0][0];
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1;
+      var sr = this.rate.sampleRate;
+      var i, j = 0;
+      for (i = inNumSamples >> 3; i--; ) {
+        x0 = inIn[i]; out[j++] = sr * (x0 - x1);
+        x1 = inIn[i]; out[j++] = sr * (x1 - x0);
+        x0 = inIn[i]; out[j++] = sr * (x0 - x1);
+        x1 = inIn[i]; out[j++] = sr * (x1 - x0);
+        x0 = inIn[i]; out[j++] = sr * (x0 - x1);
+        x1 = inIn[i]; out[j++] = sr * (x1 - x0);
+        x0 = inIn[i]; out[j++] = sr * (x0 - x1);
+        x1 = inIn[i]; out[j++] = sr * (x1 - x0);
+      }
+      for (i = inNumSamples & 3; i--; ) {
+        x0 = inIn[j];
+        out[j++] = 0.5 * (x0 - x1);
+        x1 = x0;
+      }
+      this._x1 = x1;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.LPZ2 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this._x2 = this.inputs[0][0];
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1, x2 = this._x2;
+      var i, imax, j = 0;
+      for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+        x0 = inIn[j]; out[j++] = (x0 + 2 * x1 + x2) * 0.25;
+        x2 = inIn[j]; out[j++] = (x2 + 2 * x0 + x1) * 0.25;
+        x1 = inIn[j]; out[j++] = (x1 + 2 * x2 + x0) * 0.25;
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = (x0 + 2 * x1 + x2) * 0.25;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.HPZ2 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this._x2 = this.inputs[0][0];
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1, x2 = this._x2;
+      var i, imax, j = 0;
+      for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+        x0 = inIn[j]; out[j++] = (x0 - 2 * x1 + x2) * 0.25;
+        x2 = inIn[j]; out[j++] = (x2 - 2 * x0 + x1) * 0.25;
+        x1 = inIn[j]; out[j++] = (x1 - 2 * x2 + x0) * 0.25;
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = (x0 - 2 * x1 + x2) * 0.25;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+
+  cc.unit.specs.BPZ2 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this._x2 = this.inputs[0][0];
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1, x2 = this._x2;
+      var i, imax, j = 0;
+      for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+        x0 = inIn[j]; out[j++] = (x0 - x2) * 0.5;
+        x2 = inIn[j]; out[j++] = (x2 - x1) * 0.5;
+        x1 = inIn[j]; out[j++] = (x1 - x0) * 0.5;
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = (x0 - x2) * 0.25;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.BRZ2 = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._x1 = this._x2 = this.inputs[0][0];
+      var tmp_floops  = this.rate.filterLoops;
+      var tmp_framain = this.rate.filterRemain;
+      this.rate.filterLoops  = 0;
+      this.rate.filterRemain = 1;
+      next.call(this, 1);
+      this.rate.filterLoops  = tmp_floops;
+      this.rate.filterRemain = tmp_framain;
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var x0, x1 = this._x1, x2 = this._x2;
+      var i, imax, j = 0;
+      for (i = 0, imax = this.rate.filterLoops; i < imax; ++i) {
+        x0 = inIn[j]; out[j++] = (x0 + x2) * 0.5;
+        x2 = inIn[j]; out[j++] = (x2 + x1) * 0.5;
+        x1 = inIn[j]; out[j++] = (x1 + x0) * 0.5;
+      }
+      for (i = 0, imax = this.rate.filterRemain; i < imax; ++i) {
+        x0 = inIn[j];
+        out[j++] = (x0 + x2) * 0.25;
+        x2 = x1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
   cc.unit.specs.Lag = (function() {
     var ctor = function() {
       if (this.rate.bufLength === 1) {

@@ -110,6 +110,29 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
 
+  cc.ugen.specs.LPZ1 = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(C.AUDIO, _in, mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,mul=1,add=0",
+      ctor: function(_in, mul, add) {
+        return this.init(C.CONTROL, _in, mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.HPZ1  = cc.ugen.specs.LPZ1;
+  cc.ugen.specs.Slope = cc.ugen.specs.LPZ1;
+  cc.ugen.specs.LPZ2  = cc.ugen.specs.LPZ1;
+  cc.ugen.specs.HPZ2  = cc.ugen.specs.LPZ1;
+  cc.ugen.specs.BPZ2  = cc.ugen.specs.LPZ1;
+  cc.ugen.specs.BRZ2  = cc.ugen.specs.LPZ1;
+  
   cc.ugen.specs.Lag = {
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
     $ar: {
