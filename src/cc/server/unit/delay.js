@@ -7,20 +7,6 @@ define(function(require, exports, module) {
   
   var cubicinterp = utils.cubicinterp;
   
-  var calcDelay = function(unit, delaytime, minDelay) {
-    return Math.max(minDelay, Math.min(delaytime * unit.rate.sampleRate, unit._fdelaylen));
-  };
-  var calcFeedback = function(delaytime, decaytime) {
-    if (delaytime === 0 || decaytime === 0) {
-      return 0;
-    }
-    if (decaytime > 0) {
-      return +Math.exp(log001 * delaytime / +decaytime);
-    } else {
-      return -Math.exp(log001 * delaytime / -decaytime);
-    }
-  };
-  
   cc.unit.specs.Delay1 = (function() {
     var ctor = function() {
       if (this.bufLength === 1) {
@@ -93,9 +79,38 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
+  // util functions
+  var calcDelay = function(unit, delaytime, minDelay) {
+    return Math.max(minDelay, Math.min(delaytime * unit.rate.sampleRate, unit._fdelaylen));
+  };
+  var calcFeedback = function(delaytime, decaytime) {
+    if (delaytime === 0 || decaytime === 0) {
+      return 0;
+    }
+    if (decaytime > 0) {
+      return +Math.exp(log001 * delaytime / +decaytime);
+    } else {
+      return -Math.exp(log001 * delaytime / -decaytime);
+    }
+  };
+  var perform_N = function(table, mask, phase) {
+    return table[phase & mask];
+  };
+  var perform_L = function(table, mask, phase, frac) {
+    var d1 = table[(phase  )&mask];
+    var d2 = table[(phase-1)&mask];
+    return d1 + frac * (d2 - d1);
+  };
+  var perform_C = function(table, mask, phase, frac) {
+    var d0 = table[(phase+1)&mask];
+    var d1 = table[(phase  )&mask];
+    var d2 = table[(phase-1)&mask];
+    var d3 = table[(phase-2)&mask];
+    return cubicinterp(frac, d0, d1, d2, d3);
+  };
   
   // DelayN/DelayL/DelayC
-  var Delay_Ctor = function() {
+  var delay_ctor = function() {
     this._maxdelaytime = this.inputs[1][0];
     this._delaytime    = this.inputs[2][0];
     this._dlybuf       = 0;
@@ -112,152 +127,73 @@ define(function(require, exports, module) {
     this._numoutput = 0;
     this._iwrphase  = 0;
   };
+  var delay_next = function(inNumSamples, perform) {
+    var out  = this.outputs[0];
+    var inIn = this.inputs[0];
+    var delaytime = this.inputs[2][0];
+    var dlybuf   = this._dlybuf;
+    var iwrphase = this._iwrphase;
+    var dsamp    = this._dsamp;
+    var mask     = this._mask;
+    var frac, irdphase;
+    var i;
+    if (delaytime === this._delaytime) {
+      frac = dsamp - (dsamp|0);
+      for (i = 0; i < inNumSamples; ++i) {
+        dlybuf[iwrphase & mask] = inIn[i];
+        irdphase = iwrphase - (dsamp|0);
+        out[i] = perform(dlybuf, mask, irdphase, frac);
+        iwrphase += 1;
+      }
+    } else {
+      var next_dsamp  = calcDelay(this, delaytime, 1);
+      var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+      for (i = 0; i < inNumSamples; ++i) {
+        dlybuf[iwrphase & mask] = inIn[i];
+        dsamp += dsamp_slope;
+        frac     = dsamp - (dsamp|0);
+        irdphase = iwrphase - (dsamp|0);
+        out[i] = perform(dlybuf, mask, irdphase, frac);
+        iwrphase += 1;
+      }
+      this._dsamp     = next_dsamp;
+      this._delaytime = delaytime;
+    }
+    if (iwrphase > dlybuf.length) {
+      iwrphase -= dlybuf.length;
+    }
+    this._iwrphase = iwrphase;
+  };
   
   cc.unit.specs.DelayN = (function() {
     var ctor = function() {
-      Delay_Ctor.call(this);
+      delay_ctor.call(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var inIn = this.inputs[0];
-      var delaytime = this.inputs[2][0];
-      var dlybuf   = this._dlybuf;
-      var iwrphase = this._iwrphase;
-      var dsamp    = this._dsamp;
-      var mask     = this._mask;
-      var irdphase;
-      var i;
-      if (delaytime === this._delaytime) {
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          
-          irdphase = iwrphase - (dsamp|0);
-          out[i] = dlybuf[irdphase & mask];
-          iwrphase += 1;
-        }
-      } else {
-        var next_dsamp  = calcDelay(this, delaytime, 1);
-        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          
-          dsamp += dsamp_slope;
-          irdphase = iwrphase - (dsamp|0);
-          out[i] = dlybuf[irdphase & mask];
-          iwrphase += 1;
-        }
-        this._dsamp     = next_dsamp;
-        this._delaytime = delaytime;
-      }
-      if (iwrphase > dlybuf.length) {
-        iwrphase -= dlybuf.length;
-      }
-      this._iwrphase = iwrphase;
+      delay_next.call(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
   
   cc.unit.specs.DelayL = (function() {
     var ctor = function() {
-      Delay_Ctor.call(this);
+      delay_ctor.call(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var inIn = this.inputs[0];
-      var delaytime = this.inputs[2][0];
-      var dlybuf   = this._dlybuf;
-      var iwrphase = this._iwrphase;
-      var dsamp    = this._dsamp;
-      var mask     = this._mask;
-      var frac, irdphase, d1, d2;
-      var i;
-      if (delaytime === this._delaytime) {
-        frac = dsamp - (dsamp|0);
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          irdphase = iwrphase - (dsamp|0);
-          d1 = dlybuf[(irdphase  ) & mask];
-          d2 = dlybuf[(irdphase-1) & mask];
-          out[i] = d1 + frac * (d2 - d1);
-          iwrphase += 1;
-        }
-      } else {
-        var next_dsamp  = calcDelay(this, delaytime, 1);
-        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          
-          dsamp += dsamp_slope;
-          frac     = dsamp - (dsamp|0);
-          irdphase = iwrphase - (dsamp|0);
-          d1 = dlybuf[(irdphase  ) & mask];
-          d2 = dlybuf[(irdphase-1) & mask];
-          out[i] = d1 + frac * (d2 - d1);
-          iwrphase += 1;
-        }
-        this._dsamp     = next_dsamp;
-        this._delaytime = delaytime;
-      }
-      if (iwrphase > dlybuf.length) {
-        iwrphase -= dlybuf.length;
-      }
-      this._iwrphase = iwrphase;
+      delay_next.call(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
   
   cc.unit.specs.DelayC = (function() {
     var ctor = function() {
-      Delay_Ctor.call(this);
+      delay_ctor.call(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var inIn = this.inputs[0];
-      var delaytime = this.inputs[2][0];
-      var dlybuf   = this._dlybuf;
-      var iwrphase = this._iwrphase;
-      var dsamp    = this._dsamp;
-      var mask     = this._mask;
-      var frac, irdphase, d0, d1, d2, d3;
-      var i;
-      if (delaytime === this._delaytime) {
-        frac = dsamp - (dsamp|0);
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          irdphase = iwrphase - (dsamp|0);
-          d0 = dlybuf[(irdphase+1) & mask];
-          d1 = dlybuf[(irdphase  ) & mask];
-          d2 = dlybuf[(irdphase-1) & mask];
-          d3 = dlybuf[(irdphase-2) & mask];
-          out[i] = cubicinterp(frac, d0, d1, d2, d3);
-          iwrphase += 1;
-        }
-      } else {
-        var next_dsamp  = calcDelay(this, delaytime, 1);
-        var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
-        for (i = 0; i < inNumSamples; ++i) {
-          dlybuf[iwrphase & mask] = inIn[i];
-          
-          dsamp += dsamp_slope;
-          frac     = dsamp - (dsamp|0);
-          irdphase = iwrphase - (dsamp|0);
-          d0 = dlybuf[(irdphase+1) & mask];
-          d1 = dlybuf[(irdphase  ) & mask];
-          d2 = dlybuf[(irdphase-1) & mask];
-          d3 = dlybuf[(irdphase-2) & mask];
-          out[i] = cubicinterp(frac, d0, d1, d2, d3);
-          iwrphase += 1;
-        }
-        this._dsamp     = next_dsamp;
-        this._delaytime = delaytime;
-      }
-      if (iwrphase > dlybuf.length) {
-        iwrphase -= dlybuf.length;
-      }
-      this._iwrphase = iwrphase;
+      delay_next.call(this, inNumSamples, perform_C);
     };
     return ctor;
   })();
@@ -344,11 +280,8 @@ define(function(require, exports, module) {
       comb_ctor.call(this);
       this.process = next;
     };
-    var perform_CombN = function(table, mask, phase) {
-      return table[phase & mask];
-    };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_CombN);
+      comb_next.call(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
@@ -358,13 +291,8 @@ define(function(require, exports, module) {
       comb_ctor.call(this);
       this.process = next;
     };
-    var perform_CombL = function(table, mask, phase, frac) {
-      var d1 = table[(phase  )&mask];
-      var d2 = table[(phase-1)&mask];
-      return d1 + frac * (d2 - d1);
-    };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_CombL);
+      comb_next.call(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
@@ -374,15 +302,8 @@ define(function(require, exports, module) {
       comb_ctor.call(this);
       this.process = next;
     };
-    var perform_combC = function(table, mask, phase, frac) {
-      var d0 = table[(phase+1)&mask];
-      var d1 = table[(phase  )&mask];
-      var d2 = table[(phase-1)&mask];
-      var d3 = table[(phase-2)&mask];
-      return cubicinterp(frac, d0, d1, d2, d3);
-    };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_combC);
+      comb_next.call(this, inNumSamples, perform_C);
     };
     return ctor;
   })();
@@ -459,11 +380,8 @@ define(function(require, exports, module) {
       allpass_ctor.call(this);
       this.process = next;
     };
-    var perform_AllpassN = function(table, mask, phase) {
-      return table[phase & mask];
-    };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_AllpassN);
+      allpass_next.call(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
@@ -473,13 +391,8 @@ define(function(require, exports, module) {
       allpass_ctor.call(this);
       this.process = next;
     };
-    var perform_AllpassL = function(table, mask, phase, frac) {
-      var d1 = table[(phase  )&mask];
-      var d2 = table[(phase-1)&mask];
-      return d1 + frac * (d2 - d1);
-    };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_AllpassL);
+      allpass_next.call(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
@@ -489,15 +402,8 @@ define(function(require, exports, module) {
       allpass_ctor.call(this);
       this.process = next;
     };
-    var perform_AllpassC = function(table, mask, phase, frac) {
-      var d0 = table[(phase+1)&mask];
-      var d1 = table[(phase  )&mask];
-      var d2 = table[(phase-1)&mask];
-      var d3 = table[(phase-2)&mask];
-      return cubicinterp(frac, d0, d1, d2, d3);
-    };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_AllpassC);
+      allpass_next.call(this, inNumSamples, perform_C);
     };
     return ctor;
   })();
