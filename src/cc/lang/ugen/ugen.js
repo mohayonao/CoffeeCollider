@@ -345,22 +345,17 @@ define(function(require, exports, module) {
     });
   };
   
-  var init_instance = function(instance, tag, checkInputs) {
+  var init_instance = function(instance, tag, signalRange, checkInputs) {
     if (Array.isArray(instance)) {
       instance.forEach(function(ugen) {
-        if (ugen instanceof UGen) {
-          checkBadInput(instance);
-          if (checkInputs) {
-            checkInputs(instance);
-          }
-          instance.tag = tag || "";
-        }
+        init_instance(ugen, tag, signalRange, checkInputs);
       });
     } else if (instance instanceof UGen) {
       checkBadInput(instance);
       if (checkInputs) {
         checkInputs(instance);
       }
+      instance.signalRange = signalRange;
       instance.tag = tag || "";
     }
     return instance;
@@ -405,16 +400,14 @@ define(function(require, exports, module) {
           var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(new BaseClass(name, tag), args);
-          instance.signalRange = signalRange;
-          return init_instance(instance, tag, checkInputs);
+          return init_instance(instance, tag, signalRange, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       } else {
         klass[key] = fn(function() {
           var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
           var tag  = arguments[arguments.length - 1];
           var instance = ctor.apply(null, args);
-          instance.signalRange = signalRange;
-          return init_instance(instance, tag, checkInputs);
+          return init_instance(instance, tag, signalRange, checkInputs);
         }).defaults(defaults).multiCall(multiCall).build();
       }
     });
