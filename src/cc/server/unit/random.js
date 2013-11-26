@@ -216,6 +216,48 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.unit.specs.CoinGate = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._trig = this.inputs[1][0];
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn = this.inputs[1];
+      var prevTrig = this._trig;
+      var prob   = this.inputs[0][0];
+      var curTrig, level;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curTrig = trigIn[i];
+        level   = 0;
+        if (prevTrig <= 0 && curTrig > 0) {
+          if (Math.random() < prob) {
+            level = curTrig;
+          }
+        }
+        prevTrig = curTrig;
+        out[i] = level;
+      }
+      this._trig = prevTrig;
+    };
+    var next_k = function() {
+      var trig = this.inputs[1][0];
+      var level = 0;
+      if (trig > 0 && this._trig <= 0) {
+        if (Math.random() < this.inputs[0][0]) {
+          level = trig;
+        }
+      }
+      this.outputs[0][0] = level;
+      this._trig = trig;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

@@ -92,6 +92,21 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.CoinGate = {
+    $ar: {
+      defaults: "prob=0,in=0",
+      ctor: function(prob, _in) {
+        return this.init(C.AUDIO, prob, _in);
+      }
+    },
+    $kr: {
+      defaults: "prob=0,in=0",
+      ctor: function(prob, _in) {
+        return this.init(C.CONTROL, prob, _in);
+      }
+    }
+  };
   
   module.exports = {};
 
