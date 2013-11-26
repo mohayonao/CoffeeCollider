@@ -110,6 +110,22 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.RHPF = cc.ugen.specs.RLPF;
 
+  cc.ugen.specs.MidEQ = {
+    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    $ar: {
+      defaults: "in=0,freq=440,rq=1,db=0,mul=1,add=0",
+      ctor: function(_in, freq, rq, db, mul, add) {
+        return this.init(C.AUDIO, _in, freq, rq, db).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,freq=440,rq=1,db=0,mul=1,add=0",
+      ctor: function(_in, freq, rq, db, mul, add) {
+        return this.init(C.CONTROL, _in, freq, rq, db).madd(mul, add);
+      }
+    }
+  };
+  
   cc.ugen.specs.LPZ1 = {
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
     $ar: {

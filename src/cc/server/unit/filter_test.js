@@ -87,6 +87,17 @@ define(function(require, exports, module) {
     }
   ]);
 
+  unitTestSuite("MidEQ", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+        { name:"freq", rate:C.AUDIO, value:unitTestSuite.freq0 },
+        { name:"rq"  , rate:C.AUDIO, value:[ 0, 0.5, 0.5, 1, 2 ] },
+        { name:"db"  , rate:C.AUDIO, value:[ -3, 0, 0, +3 ] },
+      ]
+    }
+  ]);
+  
   unitTestSuite(["LPZ1", "HPZ1", "Slope", "LPZ2", "HPZ2", "BPZ2", "BRZ2"], [
     { rate : C.AUDIO,
       inputs: [

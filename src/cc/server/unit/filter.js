@@ -769,6 +769,80 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+  
+  cc.unit.specs.MidEQ = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._a0 = 0;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq = undefined;
+      this._bw   = undefined;
+      this._db   = undefined;
+      do_next_1.call(this, next);
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var bw   = this.inputs[2][0];
+      var db   = this.inputs[3][0];
+      var y0, zin;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var rate = this.rate;
+      var i, j = 0;
+      if (freq !== this._freq || bw !== this._bw || db !== this._db) {
+        var amp = Math.pow(10, db * 0.05) - 1;
+        var pfreq = freq * rate.radiansPerSample;
+        var pbw   = bw * pfreq * 0.5;
+        var C = pbw ? 1 / Math.tan(pbw) : 0;
+        var D = 2 * Math.cos(pfreq);
+        var next_a0 = 1 / (1 + C);
+        var next_b1 = C * D * next_a0;
+        var next_b2 = (1 - C) * next_a0;
+        next_a0 *= amp;
+        var a0_slope = (next_a0 - a0) * rate.filterSlope;
+        var b1_slope = (next_b1 - b1) * rate.filterSlope;
+        var b2_slope = (next_b2 - b2) * rate.filterSlope;
+        for (i = rate.filterLoops; i--; ) {
+          zin = inIn[j]; y0 = zin + b1 * y1 + b2 * y2; out[j++] = zin + a0 * (y0 - y2);
+          zin = inIn[j]; y2 = zin + b1 * y0 + b2 * y1; out[j++] = zin + a0 * (y2 - y1);
+          zin = inIn[j]; y1 = zin + b1 * y2 + b2 * y0; out[j++] = zin + a0 * (y1 - y0);
+          a0 += a0_slope;
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._bw   = bw;
+        this._db   = db;
+        this._a0 = next_a0;
+        this._b1 = next_b1;
+        this._b2 = next_b2;
+      } else {
+        for (i = rate.filterLoops; i--; ) {
+          zin = inIn[j]; y0 = zin + b1 * y1 + b2 * y2; out[j++] = zin + a0 * (y0 - y2);
+          zin = inIn[j]; y2 = zin + b1 * y0 + b2 * y1; out[j++] = zin + a0 * (y2 - y1);
+          zin = inIn[j]; y1 = zin + b1 * y2 + b2 * y0; out[j++] = zin + a0 * (y1 - y0);
+        }
+      }
+      for (i = rate.filterRemain; i--; ) {
+        zin = inIn[j];
+        y0 = zin + b1 * y1 + b2 * y2;
+        out[j++] = zin + a0 * (y0 - y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = zapgremlins(y1);
+      this._y2 = zapgremlins(y2);
+    };
+    return ctor;
+  })();
 
   cc.unit.specs.LPZ1 = (function() {
     var ctor = function() {
