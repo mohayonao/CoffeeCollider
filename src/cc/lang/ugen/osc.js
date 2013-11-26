@@ -2,22 +2,7 @@ define(function(require, exports, module) {
   "use strict";
   
   var cc = require("../cc");
-
-  cc.ugen.specs.FSinOsc = {
-    $ar: {
-      defaults: "freq=440,iphase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(C.AUDIO, freq, phase).madd(mul, add);
-      }
-    },
-    $kr: {
-      defaults: "freq=440,iphase=0,mul=1,add=0",
-      ctor: function(freq, phase, mul, add) {
-        return this.init(C.CONTROL, freq, phase).madd(mul, add);
-      }
-    }
-  };
-
+  
   cc.ugen.specs.Osc = {
     $ar: {
       defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
@@ -59,6 +44,36 @@ define(function(require, exports, module) {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
         return this.init(C.CONTROL, freq, feedback).madd(mul, add);
+      }
+    }
+  };
+
+  cc.ugen.specs.OscN = {
+    $ar: {
+      defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(bufnum, freq, phase, mul, add) {
+        return this.init(C.AUDIO, bufnum, freq, phase).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(bufnum, freq, phase, mul, add) {
+        return this.init(C.CONTROL, bufnum, freq, phase).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.ugen.specs.FSinOsc = {
+    $ar: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(C.AUDIO, freq, phase).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "freq=440,iphase=0,mul=1,add=0",
+      ctor: function(freq, phase, mul, add) {
+        return this.init(C.CONTROL, freq, phase).madd(mul, add);
       }
     }
   };
