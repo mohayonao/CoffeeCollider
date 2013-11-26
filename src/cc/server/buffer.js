@@ -38,7 +38,7 @@ define(function(require, exports, module) {
     }
     Buffer.prototype.bindBufferSource = function(bufSrc, startFrame, frames) {
       startFrame = Math.max( 0, Math.min(startFrame|0, bufSrc.frames));
-      frames  = Math.max(-1, Math.min(frames |0, bufSrc.frames - startFrame));
+      frames     = Math.max(-1, Math.min(frames |0, bufSrc.frames - startFrame));
       if (startFrame === 0) {
         if (frames === -1) {
           this.samples = bufSrc.samples;
