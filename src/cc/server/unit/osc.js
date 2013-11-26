@@ -389,7 +389,7 @@ define(function(require, exports, module) {
       var out = this.outputs[0];
       var freq = this.inputs[0][0];
       var rate = this.rate;
-      var b1, y0, y1, y2, w, i, imax, j;
+      var b1, y0, y1, y2, w, i, j;
       if (freq !== this._freq) {
         this._freq = freq;
         w = freq * rate.radiansPerSample;
@@ -400,12 +400,12 @@ define(function(require, exports, module) {
       y1 = this._y1;
       y2 = this._y2;
       j = 0;
-      for (i = 0, imax = rate.filterLoops; i < imax; ++i) {
+      for (i = rate.filterLoops; i--; ) {
         out[j++] = y0 = b1 * y1 - y2;
         out[j++] = y2 = b1 * y0 - y1;
         out[j++] = y1 = b1 * y2 - y0;
       }
-      for (i = 0, imax = rate.filterRemain; i < imax; ++i) {
+      for (i = rate.filterRemain; i--; ) {
         out[j++] = y0 = b1 * y1 - y2;
         y2 = y1;
         y1 = y0;
