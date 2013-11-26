@@ -189,7 +189,34 @@ define(function(require, exports, module) {
       ]
     }
   ]);
-
+  
+  unitTestSuite("SyncSaw", [
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"syncFreq", rate:C.AUDIO, value:unitTestSuite.freq0 },
+        { name:"sawFreq" , rate:C.AUDIO, value:unitTestSuite.freq1}
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"syncFreq", rate:C.AUDIO  , value:unitTestSuite.freq0 },
+        { name:"sawFreq" , rate:C.CONTROL, value:unitTestSuite.freq1}
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"syncFreq", rate:C.CONTROL, value:unitTestSuite.freq0 },
+        { name:"sawFreq" , rate:C.AUDIO  , value:unitTestSuite.freq1}
+      ]
+    },
+    { rate  : C.AUDIO,
+      inputs: [
+        { name:"syncFreq", rate:C.CONTROL, value:unitTestSuite.freq0 },
+        { name:"sawFreq" , rate:C.CONTROL, value:unitTestSuite.freq1}
+      ]
+    },
+  ]);
+  
   unitTestSuite("Select", [
     { rate  : C.AUDIO,
       inputs: [

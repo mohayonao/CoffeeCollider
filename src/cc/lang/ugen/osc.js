@@ -154,6 +154,21 @@ define(function(require, exports, module) {
     }
   };
 
+  cc.ugen.specs.SyncSaw = {
+    $ar: {
+      defaults: "syncFreq=440,sawFreq=440,mul=1,add=0",
+      ctor: function(syncFreq, sawFreq, mul, add) {
+        return this.init(C.AUDIO, syncFreq, sawFreq).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "syncFreq=440,sawFreq=440,mul=1,add=0",
+      ctor: function(syncFreq, sawFreq, mul, add) {
+        return this.init(C.CONTROL, syncFreq, sawFreq).madd(mul, add);
+      }
+    }
+  };
+  
   cc.ugen.specs.Select = {
     multiCall: 1,
     $ar: {

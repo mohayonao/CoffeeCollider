@@ -1208,6 +1208,130 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  cc.unit.specs.SyncSaw = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        if (this.inRates[1] === C.AUDIO) {
+          this.process = next_aa;
+        } else {
+          this.process = next_ak;
+        }
+      } else {
+        if (this.inRates[1] === C.AUDIO) {
+          this.process = next_ka;
+        } else {
+          this.process = next_kk;
+        }
+      }
+      this._freqMul = 2 * this.rate.sampleDur;
+      this._phase1 = 0;
+      this._phase2 = 0;
+      next_kk.call(this, 1);
+    };
+    var next_aa = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq1In = this.inputs[0];
+      var freq2In = this.inputs[1];
+      var freqMul = this._freqMul;
+      var phase1 = this._phase1;
+      var phase2 = this._phase2;
+      var freq1x, freq2x, z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        freq1x = freq1In[i] * freqMul;
+        freq2x = freq2In[i] * freqMul;
+        z = phase2;
+        phase2 += freq2x;
+        if (phase2 >= 1) {
+          phase2 -= 2;
+        }
+        phase1 += freq1x;
+        if (phase1 >= 1) {
+          phase1 -= 2;
+          phase2 = (phase1 + 1) * freq2x / freq1x - 1;
+        }
+        out[i] = z;
+      }
+      this._phase1 = phase1;
+      this._phase2 = phase2;
+    };
+    var next_ak = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq1In = this.inputs[0];
+      var freq2In = this.inputs[1];
+      var freqMul = this._freqMul;
+      var phase1 = this._phase1;
+      var phase2 = this._phase2;
+      var freq1x, freq2x, z;
+      freq2x = freq2In[0] * freqMul;
+      for (var i = 0; i < inNumSamples; ++i) {
+        freq1x = freq1In[i] * freqMul;
+        z = phase2;
+        phase2 += freq2x;
+        if (phase2 >= 1) {
+          phase2 -= 2;
+        }
+        phase1 += freq1x;
+        if (phase1 >= 1) {
+          phase1 -= 2;
+          phase2 = (phase1 + 1) * freq2x / freq1x - 1;
+        }
+        out[i] = z;
+      }
+      this._phase1 = phase1;
+      this._phase2 = phase2;
+    };
+    var next_ka = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq1In = this.inputs[0];
+      var freq2In = this.inputs[1];
+      var freqMul = this._freqMul;
+      var phase1 = this._phase1;
+      var phase2 = this._phase2;
+      var freq1x, freq2x, z;
+      freq1x = freq1In[0] * freqMul;
+      for (var i = 0; i < inNumSamples; ++i) {
+        freq2x = freq2In[i] * freqMul;
+        z = phase2;
+        phase2 += freq2x;
+        if (phase2 >= 1) {
+          phase2 -= 2;
+        }
+        phase1 += freq1x;
+        if (phase1 >= 1) {
+          phase1 -= 2;
+          phase2 = (phase1 + 1) * freq2x / freq1x - 1;
+        }
+        out[i] = z;
+      }
+      this._phase1 = phase1;
+      this._phase2 = phase2;
+    };
+    var next_kk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq1x = this.inputs[0][0] * this._freqMul;
+      var freq2x = this.inputs[1][0] * this._freqMul;
+      var phase1 = this._phase1;
+      var phase2 = this._phase2;
+      var z;
+      for (var i = 0; i < inNumSamples; ++i) {
+        z = phase2;
+        phase2 += freq2x;
+        if (phase2 >= 1) {
+          phase2 -= 2;
+        }
+        phase1 += freq1x;
+        if (phase1 >= 1) {
+          phase1 -= 2;
+          phase2 = (phase1 + 1) * freq2x / freq1x - 1;
+        }
+        out[i] = z;
+      }
+      this._phase1 = phase1;
+      this._phase2 = phase2;
+    };
+    return ctor;
+  })();
+
   cc.unit.specs.Select = (function() {
     var ctor = function() {
       if (this.bufLength === 1) {
