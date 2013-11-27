@@ -164,11 +164,6 @@ define(function(require, exports, module) {
     
     var unitTest = function(spec, inputSpecs, opts) {
       opts = opts || {};
-      
-      cc.getRateInstance = function(rate) {
-        return (rate === C.AUDIO) ? a_rate : k_rate;
-      };
-      
       var i, j, k;
       var u = cc.createUnit(parent, spec);
       for (i = 0; i < u.numOfInputs; ++i) {
@@ -230,7 +225,17 @@ define(function(require, exports, module) {
     var testSuite = function(name, specs, opts) {
       opts = opts || {};
       var desc = testSuite.desc || "test";
+      var _getRateInstance;
       describe(desc, function() {
+        before(function() {
+          _getRateInstance = cc.getRateInstance;
+          cc.getRateInstance = function(rate) {
+            return (rate === C.AUDIO) ? a_rate : k_rate;
+          };
+        });
+        after(function() {
+          cc.getRateInstance = _getRateInstance;
+        });
         specs.forEach(function(items) {
           var rate = items.rate;
           var numOfInputs  = items.inputs.length;

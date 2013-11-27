@@ -4,7 +4,6 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   
-  var Unit = require("./unit/unit").Unit;
   var graphFunc  = {};
   var doneAction = {};
   
@@ -347,7 +346,7 @@ define(function(require, exports, module) {
         return instance.getFixNum(value);
       });
       var unitList = specs.defList.map(function(spec) {
-        return new Unit(this, spec);
+        return cc.createUnit(this, spec);
       }, this);
       this.params   = specs.params;
       this.controls = new Float32Array(this.params.values);

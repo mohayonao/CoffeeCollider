@@ -183,6 +183,7 @@ define(function(require, exports, module) {
   require("./date");
   require("./env");
   require("./function");
+  require("./mix");
   require("./node");
   require("./number");
   require("./object");
@@ -191,10 +192,17 @@ define(function(require, exports, module) {
   require("./string");
   require("./synthdef");
   require("./task");
-  require("./ugen/installer");
+  require("./ugen");
+  require("./basic_ugen");
+  require("../plugins/installer");
+  
   require("./lang-worker");
   require("./lang-nodejs");
   require("./lang-socket");
+
+  Object.keys(cc.ugen.specs).forEach(function(name) {
+    cc.ugen.register(name, cc.ugen.specs[name]);
+  });
   
   module.exports = {};
 
