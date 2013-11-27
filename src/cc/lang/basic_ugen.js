@@ -90,7 +90,9 @@ define(function(require, exports, module) {
         b = 1 / b; // TODO: div(0) ?
       }
       if (selector === "*") {
-        if (a === 1) {
+        if (a === 0 || b === 0) {
+          return 0;
+        } else if (a === 1) {
           return b;
         } else if (b === 1) {
           return a;
