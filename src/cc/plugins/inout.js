@@ -20,10 +20,11 @@ define(function(require, exports, module) {
     },
     init: function(numChannels) {
       this.inputs = slice.call(arguments, 1);
+      this.numOfInputs = this.inputs.length;
       return this.initOutputs(numChannels, this.rate);
     }
   };
-
+  
   cc.unit.specs.In = (function() {
     var ctor = function() {
       this._bufLength = cc.server.bufLength;

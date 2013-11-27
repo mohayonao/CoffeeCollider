@@ -343,8 +343,6 @@ define(function(require, exports, module) {
     
     return Sum4;
   })();
-
-  
   
   cc.ugen.specs.Out = {
     Klass: cc.Out,

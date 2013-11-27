@@ -32,7 +32,7 @@ define(function(require, exports, module) {
       return obj;
     }
     if (Array.isArray(obj)) {
-      return obj;
+      return obj.map(asUGenInput);
     }
     if (cc.instanceOfBuffer(obj)) {
       return obj.bufnum;

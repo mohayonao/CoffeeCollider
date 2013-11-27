@@ -21,13 +21,18 @@ define(function(require, exports, module) {
   var rate2str = function(rate) {
     return ["scalar","control","audio","demand"][rate] || "scalar";
   };
+  var new1 = function(obj) {
+    var instance = new obj.constructor();
+    instance.klassName = obj.klassName;
+    return instance;
+  };
   
   cc.ugen.multiNewList = function(ugen, args) {
     var size = 0, i, imax;
     args = utils.asUGenInput(args);
     for (i = 0, imax = args.length; i < imax; ++i) {
       if (Array.isArray(args[i]) && size < args[i].length) {
-        size = size < args[i].length;
+        size = args[i].length;
       }
     }
     if (size === 0) {
@@ -35,7 +40,7 @@ define(function(require, exports, module) {
     }
     var results = new Array(size);
     for (i = 0; i < size; ++i) {
-      results[i] = cc.ugen.multiNewList(ugen, args.map(newArgsWithIndex(i)));
+      results[i] = cc.ugen.multiNewList(new1(ugen), args.map(newArgsWithIndex(i)));
     }
     return results;
   };
@@ -79,7 +84,7 @@ define(function(require, exports, module) {
       this.numOfInputs = this.inputs.length;
       return this;
     };
-
+    
     // common methods
     UGen.prototype.copy = function() {
       return this;
@@ -335,16 +340,6 @@ define(function(require, exports, module) {
       }
       this.channels = channels;
       this.numOfOutputs = channels.length;
-      this.inputs = this.inputs.map(function(ugen) {
-        if (!(ugen instanceof UGen)) {
-          ugen = +ugen;
-          if (isNaN(ugen)) {
-            ugen = 0;
-          }
-        }
-        return ugen;
-      });
-      this.numOfInputs = this.inputs.length;
       return (numChannels === 1) ? channels[0] : channels;
     };
     
