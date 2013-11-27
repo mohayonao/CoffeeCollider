@@ -13,7 +13,13 @@ define(function(require, exports, module) {
         return Math.max(rate, asRate(obj));
       }, 0);
     }
-    return (obj && obj.rate) || 0;
+    if (obj) {
+      switch (obj.rate) {
+      case C.SCALAR: case C.CONTROL: case C.AUDIO:
+        return obj.rate;
+      }
+    }
+    return C.SCALAR;
   };
   
   var Control = (function() {
@@ -44,8 +50,8 @@ define(function(require, exports, module) {
       if (typeof index === "undefined") {
         throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
       }
-      var rate = a.rate|C.SCALAR;
-      cc.UGen.prototype.init.call(this, rate);
+      a = utils.asUGenInput(a);
+      cc.UGen.prototype.init.call(this, asRate(a));
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a];
@@ -55,7 +61,7 @@ define(function(require, exports, module) {
     
     return UnaryOpUGen;
   })();
-
+  
   var BinaryOpUGen = (function() {
     function BinaryOpUGen() {
       cc.UGen.call(this, "BinaryOpUGen");
@@ -63,6 +69,18 @@ define(function(require, exports, module) {
     extend(BinaryOpUGen, cc.UGen);
     
     BinaryOpUGen.prototype.init = function(selector, a, b) {
+      a = utils.asUGenInput(a);
+      b = utils.asUGenInput(b);
+      if (typeof a === "number" && typeof b === "number") {
+        switch (selector) {
+        case "+": return utils.asUGenInput(a + b);
+        case "-": return utils.asUGenInput(a - b);
+        case "*": return utils.asUGenInput(a * b);
+        case "/": return utils.asUGenInput(a / b);
+        case "%": return utils.asUGenInput(a % b);
+        }
+      }
+      
       if (selector === "-" && typeof b === "number") {
         selector = "+";
         b = -b;
@@ -72,25 +90,23 @@ define(function(require, exports, module) {
         b = 1 / b; // TODO: div(0) ?
       }
       if (selector === "*") {
-        if (typeof a === "number" && typeof b === "number") {
-          return a * b;
-        } else if (a === 0 || b === 0) {
-          return 0;
+        if (a === 1) {
+          return b;
+        } else if (b === 1) {
+          return a;
         }
         return optimizeMulObjects(a, b);
       }
       if (selector === "+") {
-        if (typeof a === "number" && typeof b === "number") {
-          return a + b;
-        } else if (a === 0) {
+        if (a === 0) {
           return b;
         } else if (b === 0) {
           return a;
-        } else if (cc.instanceOfBinaryOpUGen(a)) {
+        } else if (a instanceof BinaryOpUGen) {
           if (a.selector === "*") {
             return cc.createMulAdd(a.inputs[0], a.inputs[1], b);
           }
-        } else if (cc.instanceOfMulAdd(a)) {
+        } else if (a instanceof MulAdd) {
           if (typeof a.inputs[2] === "number" && typeof b === "number") {
             if (a.inputs[2] + b === 0) {
               return cc.createBinaryOpUGen("*!", a.inputs[0], a.inputs[1]);
@@ -110,20 +126,18 @@ define(function(require, exports, module) {
       } else if (selector === "*!") {
         selector = "*";
       }
-      
       var index = ops.BINARY_OPS[selector];
       if (typeof index === "undefined") {
         throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
       }
-      var rate = Math.max(a.rate|C.SCALAR, b.rate|C.SCALAR);
-      cc.UGen.prototype.init.call(this, rate);
+      cc.UGen.prototype.init.call(this, asRate([a, b]));
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
       this.numOfInputs = 2;
       return this;
     };
-
+    
     return BinaryOpUGen;
   })();
   
@@ -133,11 +147,11 @@ define(function(require, exports, module) {
         return obj;
       }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "+") {
+      if (obj instanceof BinaryOpUGen && obj.selector === "+") {
         return [ collect(i[0]), collect(i[1]) ];
-      } else if (cc.instanceOfSum3(obj)) {
+      } else if (obj instanceof Sum3) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]) ];
-      } else if (cc.instanceOfSum4(obj)) {
+      } else if (obj instanceof Sum4) {
         return [ collect(i[0]), collect(i[1]), collect(i[2]), collect(i[3]) ];
       }
       return obj;
@@ -184,7 +198,7 @@ define(function(require, exports, module) {
     var collect = function(obj) {
       if (typeof obj === "number") { return obj; }
       var i = obj.inputs;
-      if (cc.instanceOfBinaryOpUGen(obj) && obj.selector === "*") {
+      if (obj instanceof BinaryOpUGen && obj.selector === "*") {
         return [ collect(i[0]), collect(i[1]) ];
       }
       return obj;
@@ -235,12 +249,20 @@ define(function(require, exports, module) {
 
     MulAdd.prototype.init = function(_in, mul, add) {
       var t, minus, nomul, noadd, rate;
-      if (_in.rate - mul.rate < 0) {
+      if (asRate(_in) < asRate(mul)) {
         t = _in; _in = mul; mul = t;
       }
+      _in = utils.asUGenInput(_in);
+      mul = utils.asUGenInput(mul);
+      add = utils.asUGenInput(add);
       if (mul === 0) {
         return add;
       }
+      if (typeof _in === "number" && typeof mul === "number") {
+        _in *= mul;
+        mul = 1;
+      }
+      
       minus = mul === -1;
       nomul = mul ===  1;
       noadd = add ===  0;
@@ -260,30 +282,8 @@ define(function(require, exports, module) {
       if (nomul) {
         return cc.createBinaryOpUGen("+", _in, add);
       }
-      if (validate(_in, mul, add)) {
-        rate = asRate([_in, mul, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
-      }
-      if (validate(mul, _in, add)) {
-        rate = asRate([mul, _in, add]);
-        return cc.UGen.prototype.init.apply(this, [rate, mul, _in, add]);
-      }
-      return _in * mul + add;
-    };
-    
-    var validate = function(_in, mul, add) {
-      _in = asRate(_in);
-      mul = asRate(mul);
-      add = asRate(add);
-      if (_in === C.AUDIO) {
-        return true;
-      }
-      if (_in === C.CONTROL &&
-          (mul === C.CONTROL || mul === C.SCALAR) &&
-          (add === C.CONTROL || add === C.SCALAR)) {
-        return true;
-      }
-      return false;
+      rate = asRate([_in, mul, add]);
+      return cc.UGen.prototype.init.apply(this, [rate, _in, mul, add]);
     };
     
     return MulAdd;
@@ -292,7 +292,7 @@ define(function(require, exports, module) {
   var Sum3 = (function() {
     function Sum3() {
       cc.UGen.call(this, "Sum3");
-       }
+    }
     extend(Sum3, cc.UGen);
     
     Sum3.prototype.init = function(in0, in1, in2) {
@@ -307,7 +307,7 @@ define(function(require, exports, module) {
       }
       var rate = asRate([in0, in1, in2]);
       var sortedArgs = [in0, in1, in2].sort(function(a, b) {
-        return b.rate - a.rate;
+        return asRate(b) - asRate(a);
       });
       return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
@@ -336,7 +336,7 @@ define(function(require, exports, module) {
       }
       var rate = asRate([in0, in1, in2, in3]);
       var sortedArgs = [in0, in1, in2, in3].sort(function(a, b) {
-        return b.rate - a.rate;
+        return asRate(b) - asRate(a);
       });
       return cc.UGen.prototype.init.apply(this, [rate].concat(sortedArgs));
     };
@@ -365,43 +365,29 @@ define(function(require, exports, module) {
   cc.createControl = function(rate) {
     return new Control(rate);
   };
-  
   cc.createUnaryOpUGen = function(selector, a) {
     return new UnaryOpUGen().init(selector, a);
   };
-  cc.instanceOfUnaryOpUGen = function(obj) {
-    return obj instanceof UnaryOpUGen;
-  };
-  
   cc.createBinaryOpUGen = fn(function(selector, a, b) {
     return new BinaryOpUGen().init(selector, a, b);
   }).multiCall().build();
-  cc.instanceOfBinaryOpUGen = function(obj) {
-    return obj instanceof BinaryOpUGen;
-  };
-  
   cc.createMulAdd = fn(function(_in, mul, add) {
     return new MulAdd().init(_in, mul, add);
   }).multiCall().build();
-  
   cc.createSum3 = function(in0, in1, in2) {
     return new Sum3().init(in0, in1, in2);
   };
-  
   cc.createSum4 = function(in0, in1, in2, in3) {
     return new Sum4().init(in0, in1, in2, in3);
   };
   
-  cc.instanceOfMulAdd = function(obj) {
-    return obj instanceof MulAdd;
+  module.exports = {
+    Control: Control,
+    UnaryOpUGen: UnaryOpUGen,
+    BinaryOpUGen: BinaryOpUGen,
+    MulAdd: MulAdd,
+    Sum3: Sum3,
+    Sum4: Sum4,
   };
-  cc.instanceOfSum3 = function(obj) {
-    return obj instanceof Sum3;
-  };
-  cc.instanceOfSum4 = function(obj) {
-    return obj instanceof Sum4;
-  };
-  
-  module.exports = {};
 
 });
