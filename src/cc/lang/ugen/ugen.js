@@ -12,24 +12,51 @@ define(function(require, exports, module) {
   var specs = {};
   
   cc.ugen = {
-    specs:specs,
-    checkSameRateAsFirstInput: function(ugen) {
-      if (ugen.rate !== ugen.inputs[0].rate) {
-        var strRate = ["ir","kr","ar"][ugen.rate];
-        throw new Error("first input is not " + strRate + " rate");
+    specs:specs
+  };
+
+  var newArgsWithIndex = function(index) {
+    return function(item) {
+      if (Array.isArray(item)) {
+        return item[index % item.length];
       }
-    },
-    checkNInputs: function(n) {
-      return function(ugen) {
-        if (ugen.rate === C.AUDIO) {
-          for (var i = 0; i < n; ++i) {
-            if (ugen.inputs[i].rate !== C.AUDIO) {
-              throw new Error("input[" + i + "] is not AUDIO rate");
-            }
+      return item;
+    };
+  };
+  
+  cc.ugen.multiNewList = function(ugen, args) {
+    var size = 0, i, imax;
+    args = utils.asUGenInput(args);
+    for (i = 0, imax = args.length; i < imax; ++i) {
+      if (Array.isArray(args[i]) && size < args[i].length) {
+        size = size < args[i].length;
+      }
+    }
+    if (size === 0) {
+      return ugen.init.apply(ugen, args);
+    }
+    var results = new Array(size);
+    for (i = 0; i < size; ++i) {
+      results[i] = cc.ugen.multiNewList(ugen, args.map(newArgsWithIndex(i)));
+    }
+    return results;
+  };
+  cc.ugen.checkSameRateAsFirstInput = function(ugen) {
+    if (ugen.rate !== ugen.inputs[0].rate) {
+      var strRate = ["ir","kr","ar"][ugen.rate];
+      throw new Error("first input is not " + strRate + " rate");
+    }
+  };
+  cc.ugen.checkNInputs = function(n) {
+    return function(ugen) {
+      if (ugen.rate === C.AUDIO) {
+        for (var i = 0; i < n; ++i) {
+          if (ugen.inputs[i].rate !== C.AUDIO) {
+            throw new Error("input[" + i + "] is not AUDIO rate");
           }
         }
-      };
-    }
+      }
+    };
   };
   
   var UGen = (function() {
@@ -337,44 +364,34 @@ define(function(require, exports, module) {
     return OutputProxy;
   })();
   
-  var checkBadInput = function(ugen) {
-    ugen.inputs.forEach(function(_in, i) {
-      if (!(typeof _in === "number" || _in instanceof UGen)) {
-        throw new TypeError("arg[" + i + "] bad input");
-      }
-    });
-  };
-  
-  var init_instance = function(instance, tag, signalRange, checkInputs) {
+  var init_instance = function(instance, tag, opts) {
     if (Array.isArray(instance)) {
       instance.forEach(function(ugen) {
-        init_instance(ugen, tag, signalRange, checkInputs);
+        init_instance(ugen, tag, opts);
       });
     } else if (instance instanceof UGen) {
-      checkBadInput(instance);
-      if (checkInputs) {
-        checkInputs(instance);
+      if (opts.checkInputs) {
+        opts.checkInputs(instance);
       }
-      instance.signalRange = signalRange;
+      instance.signalRange = opts.signalRange;
       instance.tag = tag || "";
     }
     return instance;
   };
   
-  
   var register = function(name, spec) {
-    var BaseClass = (spec.Klass === null) ? null : (spec.Klass || UGen);
-    var multiCall   = spec.multiCall;
-    var checkInputs = spec.checkInputs;
-    var signalRange = spec.signalRange || C.BIPOLAR;
-    
-    var klass;
+    var Klass = spec.Klass || UGen;
+    var opts  = {
+      checkInputs: spec.checkInputs,
+      signalRange: spec.signalRange || C.BIPOLAR
+    };
+    var ugenInterface;
     if (spec.$new) {
-      klass = function() {
+      ugenInterface = function() {
         return cc.global[name]["new"].apply(null, slice.call(arguments));
       };
     } else {
-      klass = function(rate) {
+      ugenInterface = function(rate) {
         if (typeof rate === "number") {
           rate = ["ir", "kr", "ar"][rate];
         }
@@ -385,30 +402,18 @@ define(function(require, exports, module) {
         return new UGen(name);
       };
     }
-    cc.global[name] = klass;
+    cc.global[name] = ugenInterface;
     
     Object.keys(spec).forEach(function(key) {
-      if (key.charAt(0) !== "$") {
-        return;
-      }
-      var setting     = spec[key];
-      var defaults    = setting.defaults + ",tag";
-      var ctor        = setting.ctor;
-      key = key.substr(1);
-      if (BaseClass !== null) {
-        klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
+      if (key.charAt(0) === "$") {
+        var defaults = spec[key].defaults + ",tag";
+        var ctor     = spec[key].ctor;
+        ugenInterface[key.substr(1)] = fn(function() {
+          var args = slice.call(arguments, 0, arguments.length - 1);
           var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(new BaseClass(name, tag), args);
-          return init_instance(instance, tag, signalRange, checkInputs);
-        }).defaults(defaults).multiCall(multiCall).build();
-      } else {
-        klass[key] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1).map(utils.asUGenInput);
-          var tag  = arguments[arguments.length - 1];
-          var instance = ctor.apply(null, args);
-          return init_instance(instance, tag, signalRange, checkInputs);
-        }).defaults(defaults).multiCall(multiCall).build();
+          var instance = ctor.apply(new Klass(name), args);
+          return init_instance(instance, tag, opts);
+        }).defaults(defaults).build();
       }
     });
   };

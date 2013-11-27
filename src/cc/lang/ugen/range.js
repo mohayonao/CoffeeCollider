@@ -7,19 +7,19 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
-        return this.init(C.AUDIO, _in, lo, hi);
+        return cc.ugen.multiNewList(this, [C.AUDIO, _in, lo, hi]);
       }
     },
     $kr: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
-        return this.init(C.CONTROL, _in, lo, hi);
+        return cc.ugen.multiNewList(this, [C.CONTROL, _in, lo, hi]);
       }
     },
     $ir: {
       defaults: "in,lo=0,hi=1",
       ctor: function(_in, lo, hi) {
-        return this.init(C.SCALAR, _in, lo, hi);
+        return cc.ugen.multiNewList(this, [C.SCALAR, _in, lo, hi]);
       }
     }
   };

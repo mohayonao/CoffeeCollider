@@ -3,7 +3,6 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var extend = require("../../common/extend");
-  var utils = require("../utils");
 
   var Control = (function() {
     function Control(rate) {
@@ -25,16 +24,16 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        this.init.call(this, C.AUDIO);
-        this.inputs = [ bus ];
+        cc.ugen.multiNewList(this, [C.AUDIO]);
+        this.inputs = Array.isArray(bus) ? bus : [bus];
         return this.initOutputs(numChannels, this.rate);
       },
     },
     $kr: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        this.init.call(this, C.CONTROL);
-        this.inputs = [ bus ];
+        cc.ugen.multiNewList(this, [C.CONTROL]);
+        this.inputs = Array.isArray(bus) ? bus : [bus];
         return this.initOutputs(numChannels, this.rate);
       }
     }
@@ -49,38 +48,21 @@ define(function(require, exports, module) {
     return Out;
   })();
   
-  var out_ctor = function(rate) {
-    function ctor(bus, channelsArray) {
-      if (!Array.isArray(channelsArray)) {
-        channelsArray = [ channelsArray ];
-      }
-      channelsArray = utils.flatten(channelsArray);
-      if (channelsArray.length) {
-        cc.UGen.prototype.init.apply(new Out(), [rate, bus].concat(channelsArray));
-      }
-    }
-    return function(bus, channelsArray) {
-      if (Array.isArray(bus)) {
-        bus.forEach(function(bus) {
-          ctor(bus, channelsArray);
-        });
-      } else {
-        ctor(bus, channelsArray);
-      }
-      return 1; // Out has no output
-    };
-  };
-  
   cc.ugen.specs.Out = {
-    Klass    : null,
-    multiCall: 0,
+    Klass: Out,
     $ar: {
       defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(C.AUDIO),
+      ctor: function(bus, channelsArray) {
+        cc.ugen.multiNewList(this, [C.AUDIO, bus].concat(channelsArray));
+        return 0; // Out has no output
+      }
     },
     $kr: {
       defaults: "bus=0,channelsArray=0",
-      ctor: out_ctor(C.CONTROL),
+      ctor: function(bus, channelsArray) {
+        cc.ugen.multiNewList(this, [C.CONTROL, bus].concat(channelsArray));
+        return 0; // Out has no output
+      }
     }
   };
   
@@ -88,7 +70,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.CONTROL, _in);
+        return cc.ugen.multiNewList(this, [C.CONTROL, _in]);
       }
     }
   };
@@ -97,16 +79,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.AUDIO, _in);
+        return cc.ugen.multiNewList(this, [C.AUDIO, _in]);
       }
     }
   };
 
   cc.createControl = function(rate) {
     return new Control(rate);
-  };
-  cc.createOut = function(rate, bus, channelsArray) {
-    return out_ctor(rate)(bus, channelsArray);
   };
   cc.instanceOfOut = function(obj) {
     return obj instanceof Out;

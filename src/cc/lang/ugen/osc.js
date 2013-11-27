@@ -7,13 +7,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
       ctor: function(bufnum, freq, phase, mul, add) {
-        return this.init(C.AUDIO, bufnum, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, bufnum, freq, phase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
       ctor: function(bufnum, freq, phase, mul, add) {
-        return this.init(C.CONTROL, bufnum, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum, freq, phase]).madd(mul, add);
       }
     },
   };
@@ -22,13 +22,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.AUDIO, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, phase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.CONTROL, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, phase]).madd(mul, add);
       }
     }
   };
@@ -37,13 +37,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
-        return this.init(C.AUDIO, freq, feedback).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, feedback]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,feedback=0,mul=1,add=0",
       ctor: function(freq, feedback, mul, add) {
-        return this.init(C.CONTROL, freq, feedback).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, feedback]).madd(mul, add);
       }
     }
   };
@@ -52,13 +52,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
       ctor: function(bufnum, freq, phase, mul, add) {
-        return this.init(C.AUDIO, bufnum, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, bufnum, freq, phase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "bufnum=0,freq=440,phase=0,mul=1,add=0",
       ctor: function(bufnum, freq, phase, mul, add) {
-        return this.init(C.CONTROL, bufnum, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum, freq, phase]).madd(mul, add);
       }
     }
   };
@@ -67,13 +67,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.AUDIO, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, phase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.CONTROL, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, phase]).madd(mul, add);
       }
     }
   };
@@ -82,13 +82,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
-        return this.init(C.AUDIO, freq, iphase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, iphase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,iphase=0,mul=1,add=0",
       ctor: function(freq, iphase, mul, add) {
-        return this.init(C.CONTROL, freq, iphase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, iphase]).madd(mul, add);
       }
     }
   };
@@ -101,13 +101,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
-        return this.init(C.AUDIO, freq, iphase, width).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, iphase, width]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,iphase=0,width=0.5,mul=1,add=0",
       ctor: function(freq, iphase, width, mul, add) {
-        return this.init(C.CONTROL, freq, iphase, width).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, iphase, width]).madd(mul, add);
       }
     }
   };
@@ -116,7 +116,7 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,numharm=200,mul=1,add=0",
       ctor: function(freq, numharm, mul, add) {
-        return this.init(C.AUDIO, freq, numharm).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, numharm]).madd(mul, add);
       }
     }
   };
@@ -125,7 +125,7 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,mul=1,add=0",
       ctor: function(freq, mul, add) {
-        return this.init(C.AUDIO, freq).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq]).madd(mul, add);
       }
     }
   };
@@ -134,7 +134,7 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,width=0.5,mul=1,add=0",
       ctor: function(freq, width, mul, add) {
-        return this.init(C.AUDIO, freq, width).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, width]).madd(mul, add);
       }
     }
   };
@@ -143,13 +143,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.AUDIO, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, freq, phase]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=440,phase=0,mul=1,add=0",
       ctor: function(freq, phase, mul, add) {
-        return this.init(C.CONTROL, freq, phase).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, freq, phase]).madd(mul, add);
       }
     }
   };
@@ -158,35 +158,29 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "syncFreq=440,sawFreq=440,mul=1,add=0",
       ctor: function(syncFreq, sawFreq, mul, add) {
-        return this.init(C.AUDIO, syncFreq, sawFreq).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.AUDIO, syncFreq, sawFreq]).madd(mul, add);
       }
     },
     $kr: {
       defaults: "syncFreq=440,sawFreq=440,mul=1,add=0",
       ctor: function(syncFreq, sawFreq, mul, add) {
-        return this.init(C.CONTROL, syncFreq, sawFreq).madd(mul, add);
+        return cc.ugen.multiNewList(this, [C.CONTROL, syncFreq, sawFreq]).madd(mul, add);
       }
     }
   };
   
   cc.ugen.specs.Select = {
-    multiCall: 1,
+    // TODO: checkInputs
     $ar: {
       defaults: "which=0,array=[]",
       ctor: function(which, array) {
-        if (!Array.isArray(array)) {
-          array = [ array ];
-        }
-        return this.init.apply(this, [C.AUDIO, which].concat(array));
+        return cc.ugen.multiNewList(this, [C.AUDIO, which].concat(array));
       }
     },
     $kr: {
       defaults: "which=0,array=[]",
       ctor: function(which, array) {
-        if (!Array.isArray(array)) {
-          array = [ array ];
-        }
-        return this.init.apply(this, [C.CONTROL, which].concat(array));
+        return cc.ugen.multiNewList(this, [C.CONTROL, which].concat(array));
       }
     },
   };
@@ -195,19 +189,19 @@ define(function(require, exports, module) {
     $ir: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.SCALAR, _in);
+        return cc.ugen.multiNewList(this, [C.SCALAR, _in]);
       }
     },
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.CONTROL, _in);
+        return cc.ugen.multiNewList(this, [C.CONTROL, _in]);
       }
     },
     $ar: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.AUDIO, _in);
+        return cc.ugen.multiNewList(this, [C.AUDIO, _in]);
       }
     }
   };

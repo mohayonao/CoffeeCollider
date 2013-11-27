@@ -11,7 +11,7 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        this.init(C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction);
+        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction]);
         return this.initOutputs(numChannels, this.rate);
       }
     },
@@ -21,7 +21,7 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        this.init(C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction);
+        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction]);
         return this.initOutputs(numChannels, this.rate);
       }
     }
@@ -32,14 +32,14 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        this.init(C.AUDIO, bufnum, phase, loop, interpolation);
+        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, phase, loop, interpolation]);
         return this.initOutputs(numChannels, this.rate);
       }
     },
     $kr: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        this.init(C.CONTROL, bufnum, phase, loop, interpolation);
+        cc.ugen.multiNewList(this, [C.CONTROL, bufnum, phase, loop, interpolation]);
         return this.initOutputs(numChannels, this.rate);
       }
     }
@@ -49,13 +49,13 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return this.init(C.CONTROL, bufnum);
+        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum]);
       }
     },
     $ir: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return this.init(C.CONTROL, bufnum); // TODO: SCALAR rate
+        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum]); // TODO: SCALAR rate
       }
     }
   };

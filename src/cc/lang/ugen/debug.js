@@ -7,13 +7,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.AUDIO, _in);
+        return cc.ugen.multiNewList(this, [C.AUDIO, _in]);
       }
     },
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
-        return this.init(C.CONTROL, _in);
+        return cc.ugen.multiNewList(this, [C.CONTROL, _in]);
       }
     }
   };

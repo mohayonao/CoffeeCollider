@@ -5,7 +5,7 @@ define(function(require, exports, module) {
   
   var pan2_ctor = function(rate) {
     return function(_in, pos, level) {
-      this.init.call(this, rate, _in, pos, level);
+      cc.ugen.multiNewList(this, [rate, _in, pos, level]);
       this.channels = [
         cc.createOutputProxy(this.rate, this, 0),
         cc.createOutputProxy(this.rate, this, 1),
@@ -33,13 +33,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return this.init(C.AUDIO, inA, inB, pan, level);
+        return cc.ugen.multiNewList(this, [C.AUDIO, inA, inB, pan, level]);
       }
     },
     $kr: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return this.init(C.CONTROL, inA, inB, pan, level);
+        return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan, level]);
       }
     }
   };
@@ -49,13 +49,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return this.init(C.AUDIO, inA, inB, pan).__mul__(level);
+        return cc.ugen.multiNewList(this, [C.AUDIO, inA, inB, pan]).__mul__(level);
       }
     },
     $kr: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return this.init(C.CONTROL, inA, inB, pan).__mul__(level);
+        return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan]).__mul__(level);
       }
     }
   };
