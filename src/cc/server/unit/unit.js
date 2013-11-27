@@ -2,9 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-
-  var specs = {};
-  cc.unit = { specs:specs };
   
   var Unit = (function() {
     function Unit(parent, specs) {
@@ -35,7 +32,7 @@ define(function(require, exports, module) {
       this.done       = false;
     }
     Unit.prototype.init = function(tag) {
-      var ctor = specs[this.name];
+      var ctor = cc.unit.specs[this.name];
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {

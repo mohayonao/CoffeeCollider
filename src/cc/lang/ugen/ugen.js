@@ -9,12 +9,7 @@ define(function(require, exports, module) {
   var slice  = [].slice;
   
   var addToSynthDef = null;
-  var specs = {};
   
-  cc.ugen = {
-    specs:specs
-  };
-
   var newArgsWithIndex = function(index) {
     return function(item) {
       if (Array.isArray(item)) {
@@ -22,6 +17,9 @@ define(function(require, exports, module) {
       }
       return item;
     };
+  };
+  var rate2str = function(rate) {
+    return ["scalar","control","audio","demand"][rate] || "scalar";
   };
   
   cc.ugen.multiNewList = function(ugen, args) {
@@ -41,22 +39,22 @@ define(function(require, exports, module) {
     }
     return results;
   };
-  cc.ugen.checkSameRateAsFirstInput = function(ugen) {
-    if (ugen.rate !== ugen.inputs[0].rate) {
-      var strRate = ["ir","kr","ar"][ugen.rate];
-      throw new Error("first input is not " + strRate + " rate");
-    }
-  };
   cc.ugen.checkNInputs = function(n) {
-    return function(ugen) {
-      if (ugen.rate === C.AUDIO) {
-        for (var i = 0; i < n; ++i) {
-          if (ugen.inputs[i].rate !== C.AUDIO) {
-            throw new Error("input[" + i + "] is not AUDIO rate");
-          }
+    if (this.rate === C.AUDIO) {
+      for (var i = 0; i < n; ++i) {
+        if (this.inputs[i].rate !== C.AUDIO) {
+          var str = utils.asString(this.inputs[i]) + " " + rate2str(this.inputs[i].rate);
+          throw new Error("input[" + i + "] is not AUDIO rate: " + str);
         }
       }
-    };
+    }
+  };
+  cc.ugen.checkSameRateAsFirstInput = function() {
+    cc.global.console.log(this.inputs);
+    if (this.rate !== this.inputs[0].rate) {
+      var str = utils.asString(this.inputs[0]) + " " + rate2str(this.inputs[0].rate);
+      throw new Error("first input is not " + rate2str(this.rate) + " rate: " + str);
+    }
   };
   
   var UGen = (function() {
@@ -94,6 +92,9 @@ define(function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
+    UGen.prototype.toString = function() {
+      return this.klassName;
+    };
     
     // unary operator methods
     ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
@@ -366,15 +367,18 @@ define(function(require, exports, module) {
   
   var init_instance = function(instance, tag, opts) {
     if (Array.isArray(instance)) {
-      instance.forEach(function(ugen) {
-        init_instance(ugen, tag, opts);
+      return instance.map(function(ugen) {
+        return init_instance(ugen, tag, opts);
       });
     } else if (instance instanceof UGen) {
       if (opts.checkInputs) {
-        opts.checkInputs(instance);
+        opts.checkInputs.call(instance);
       }
       instance.signalRange = opts.signalRange;
       instance.tag = tag || "";
+      if (opts.init) {
+        return opts.init.apply(instance, instance.inputs);
+      }
     }
     return instance;
   };
@@ -383,7 +387,8 @@ define(function(require, exports, module) {
     var Klass = spec.Klass || UGen;
     var opts  = {
       checkInputs: spec.checkInputs,
-      signalRange: spec.signalRange || C.BIPOLAR
+      signalRange: spec.signalRange || C.BIPOLAR,
+      init: spec.init
     };
     var ugenInterface;
     if (spec.$new) {
@@ -406,11 +411,14 @@ define(function(require, exports, module) {
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "$") {
-        var defaults = spec[key].defaults + ",tag";
+        var defaults = spec[key].defaults || "tag";
         var ctor     = spec[key].ctor;
+        if (defaults !== "tag") {
+          defaults += ",tag";
+        }
         ugenInterface[key.substr(1)] = fn(function() {
-          var args = slice.call(arguments, 0, arguments.length - 1);
-          var tag  = arguments[arguments.length - 1];
+          var args = slice.call(arguments);
+          var tag  = args.pop();
           var instance = ctor.apply(new Klass(name), args);
           return init_instance(instance, tag, opts);
         }).defaults(defaults).build();

@@ -2,6 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+  var slice = [].slice;
   
   cc.ugen.specs.PlayBuf = {
     Klass: cc.MultiOutUGen,
@@ -11,8 +12,7 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction]);
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, rate, trigger, startPos, loop, doneAction]);
       }
     },
     $kr: {
@@ -21,30 +21,35 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, rate, trigger, startPos, loop, doneAction]);
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, rate, trigger, startPos, loop, doneAction]);
       }
+    },
+    init: function(numChannels) {
+      this.inputs = slice.call(arguments, 1);
+      return this.initOutputs(numChannels, this.rate);
     }
   };
-
+  
   cc.ugen.specs.BufRd = {
     Klass: cc.MultiOutUGen,
     $ar: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        cc.ugen.multiNewList(this, [C.AUDIO, bufnum, phase, loop, interpolation]);
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, phase, loop, interpolation]);
       }
     },
     $kr: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        cc.ugen.multiNewList(this, [C.CONTROL, bufnum, phase, loop, interpolation]);
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.CONTROL, numChannels, bufnum, phase, loop, interpolation]);
       }
+    },
+    init: function(numChannels) {
+      this.inputs = slice.call(arguments, 1);
+      return this.initOutputs(numChannels, this.rate);
     }
   };
-
+  
   cc.ugen.specs.BufSampleRate = {
     $kr: {
       defaults: "bufnum=0",

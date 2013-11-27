@@ -4,7 +4,9 @@ define(function(require, exports, module) {
   module.exports = {
     version: "#{VERSION}",
     global : {},
-    Object : function() {}
+    Object : function() {},
+    ugen   : {specs:{}},
+    unit   : {specs:{}},
   };
 
 });

@@ -2,34 +2,37 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
+  var slice = [].slice;
   
-  var pan2_ctor = function(rate) {
-    return function(_in, pos, level) {
-      cc.ugen.multiNewList(this, [rate, _in, pos, level]);
+  cc.ugen.specs.Pan2 = {
+    Klass: cc.MultiOutUGen,
+    $ar: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: function(_in, pos, level) {
+        return cc.ugen.multiNewList(this, [C.AUDIO, _in, pos, level]);
+      }
+    },
+    $kr: {
+      defaults: "in=0,pos=0,level=1",
+      ctor: function(_in, pos, level) {
+        return cc.ugen.multiNewList(this, [C.CONTROL, _in, pos, level]);
+      }
+    },
+    init: function() {
+      this.inputs = slice.call(arguments);
       this.channels = [
         cc.createOutputProxy(this.rate, this, 0),
         cc.createOutputProxy(this.rate, this, 1),
       ];
       this.numOfOutputs = 2;
       return this.channels;
-    };
-  };
-  
-  cc.ugen.specs.Pan2 = {
-    Klass: cc.MultiOutUGen,
-    checkInputs: cc.ugen.checkNInputs(1),
-    $ar: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(C.AUDIO)
     },
-    $kr: {
-      defaults: "in=0,pos=0,level=1",
-      ctor: pan2_ctor(C.CONTROL),
+    checkInputs: function() {
+      return cc.ugen.checkNInputs.call(this, 1);
     }
   };
-
+  
   cc.ugen.specs.XFade2 = {
-    checkInputs: cc.ugen.checkNInputs(2),
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
@@ -41,11 +44,13 @@ define(function(require, exports, module) {
       ctor: function(inA, inB, pan, level) {
         return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan, level]);
       }
+    },
+    checkInputs: function() {
+      return cc.ugen.checkNInputs.call(this, 2);
     }
   };
 
   cc.ugen.specs.LinXFade2 = {
-    checkInputs: cc.ugen.checkNInputs(2),
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
@@ -57,6 +62,9 @@ define(function(require, exports, module) {
       ctor: function(inA, inB, pan, level) {
         return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan]).__mul__(level);
       }
+    },
+    checkInputs: function() {
+      return cc.ugen.checkNInputs.call(this, 2);
     }
   };
   

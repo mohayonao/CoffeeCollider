@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var extend = require("../../common/extend");
+  var slice = [].slice;
 
   var Control = (function() {
     function Control(rate) {
@@ -24,18 +25,18 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        cc.ugen.multiNewList(this, [C.AUDIO]);
-        this.inputs = Array.isArray(bus) ? bus : [bus];
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bus]);
       },
     },
     $kr: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        cc.ugen.multiNewList(this, [C.CONTROL]);
-        this.inputs = Array.isArray(bus) ? bus : [bus];
-        return this.initOutputs(numChannels, this.rate);
+        return cc.ugen.multiNewList(this, [C.CONTROL, numChannels, bus]);
       }
+    },
+    init: function(numChannels) {
+      this.inputs = slice.call(arguments, 1);
+      return this.initOutputs(numChannels, this.rate);
     }
   };
   

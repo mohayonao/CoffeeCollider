@@ -92,7 +92,6 @@ define(function(require, exports, module) {
       }
     }
   };
-
   cc.ugen.specs.LFPar = cc.ugen.specs.LFSaw;
   cc.ugen.specs.LFCub = cc.ugen.specs.LFSaw;
   cc.ugen.specs.LFTri = cc.ugen.specs.LFSaw;
@@ -170,7 +169,6 @@ define(function(require, exports, module) {
   };
   
   cc.ugen.specs.Select = {
-    // TODO: checkInputs
     $ar: {
       defaults: "which=0,array=[]",
       ctor: function(which, array) {
@@ -183,6 +181,16 @@ define(function(require, exports, module) {
         return cc.ugen.multiNewList(this, [C.CONTROL, which].concat(array));
       }
     },
+    checkInputs: function() {
+      if (this.rate === C.AUDIO) {
+        var inputs = this.inputs;
+        for (var i = 1, imax = inputs.length; i < imax; ++i) {
+          if (inputs[i].rate !== C.AUDIO) {
+            throw new Error("input was not audio rate:" + inputs[i].toString());
+          }
+        }
+      }
+    }
   };
   
   cc.ugen.specs.DC = {

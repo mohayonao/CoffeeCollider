@@ -17,7 +17,6 @@ define(function(require, exports, module) {
       }
     }
   };
-  
   cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
   cc.ugen.specs.ClipNoise = cc.ugen.specs.WhiteNoise;
   
@@ -35,7 +34,6 @@ define(function(require, exports, module) {
       }
     }
   };
-  
   cc.ugen.specs.Dust2 = cc.ugen.specs.Dust;
 
   cc.ugen.specs.LFNoise0 = {
@@ -52,7 +50,6 @@ define(function(require, exports, module) {
       }
     }
   };
-  
   cc.ugen.specs.LFNoise1 = cc.ugen.specs.LFNoise0;
   cc.ugen.specs.LFNoise2 = cc.ugen.specs.LFNoise0;
   cc.ugen.specs.LFClipNoise = cc.ugen.specs.LFNoise0;
