@@ -125,7 +125,6 @@ define(function(require, exports, module) {
   require("./server-socket");
   require("./basic_unit");
   require("../plugins/installer");
-  require("./unit/installer");
   
   cc.createSynthServer = function() {
     switch (cc.opmode) {

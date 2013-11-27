@@ -140,7 +140,7 @@ define(function(require, exports, module) {
     // arity operators methods
     UGen.prototype.madd = fn(function(mul, add) {
       return cc.createMulAdd(this, mul, add);
-    }).defaults(ops.ARITY_OPS.madd).multiCall().build();
+    }).defaults(ops.ARITY_OPS.madd).build();
     
     UGen.prototype.range = fn(function(lo, hi) {
       var mul, add;
@@ -152,7 +152,7 @@ define(function(require, exports, module) {
         add = lo;
       }
       return cc.createMulAdd(this, mul, add);
-    }).defaults(ops.ARITY_OPS.range).multiCall().build();
+    }).defaults(ops.ARITY_OPS.range).build();
     
     UGen.prototype.exprange = fn(function(lo, hi) {
       if (this.signalRange === C.BIPOLAR) {

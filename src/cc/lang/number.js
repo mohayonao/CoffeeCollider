@@ -468,27 +468,27 @@ define(function(require, exports, module) {
   // arity operator methods
   fn.defineProperty(Number.prototype, "madd", fn(function(mul, add) {
     return cc.createMulAdd(this, mul, add);
-  }).defaults(ops.ARITY_OPS.madd).multiCall().build());
+  }).defaults(ops.ARITY_OPS.madd).build());
   
   fn.defineArityProperty(Number.prototype, "range", fn(function(lo, hi) {
     return this.linlin(0, 1, lo, hi);
-  }).defaults(ops.ARITY_OPS.range).multiCall().build());
+  }).defaults(ops.ARITY_OPS.range).build());
   
   fn.defineArityProperty(Number.prototype, "exprange", fn(function(lo, hi) {
     return this.linexp(0, 1, lo, hi);
-  }).defaults(ops.ARITY_OPS.exprange).multiCall().build());
+  }).defaults(ops.ARITY_OPS.exprange).build());
   
   fn.defineArityProperty(Number.prototype, "curverange", fn(function(lo, hi, curve) {
     return this.lincurve(0, 1, lo, hi, curve);
-  }).defaults(ops.ARITY_OPS.curverange).multiCall().build());
+  }).defaults(ops.ARITY_OPS.curverange).build());
   
   fn.defineArityProperty(Number.prototype, "unipolar", fn(function(mul) {
     return this.__mul__(mul);
-  }).defaults(ops.ARITY_OPS.unipolar).multiCall().build());
+  }).defaults(ops.ARITY_OPS.unipolar).build());
   
   fn.defineArityProperty(Number.prototype, "bipolar", fn(function(mul) {
     return (this * 2 - 1).__mul__(mul);
-  }).defaults(ops.ARITY_OPS.bipolar).multiCall().build());
+  }).defaults(ops.ARITY_OPS.bipolar).build());
   
   fn.defineArityProperty(Number.prototype, "clip", fn(function(lo, hi) {
     return Math.max(lo, Math.min(this, hi));

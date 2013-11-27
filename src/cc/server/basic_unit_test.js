@@ -10,6 +10,13 @@ define(function(require, exports, module) {
   var ops  = require("../common/ops");
   
   describe("server/basic_unit.js", function() {
+    var _getRateInstance;
+    before(function() {
+      _getRateInstance = cc.getRateInstance;
+    });
+    after(function() {
+      cc.getRateInstance = _getRateInstance;
+    });
     describe("unary operators", function() {
       describe("uopFunc", function() {
         Object.keys(basic_unit.uopFunc).forEach(function(selector) {

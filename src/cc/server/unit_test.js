@@ -7,21 +7,23 @@ define(function(require, exports, module) {
   var unit = require("./unit");
   
   describe("server/unit.js", function() {
-    var parent;
+    var parent, _getRateInstance;
     before(function() {
       parent = {
         doneAction: function(action, tag) {
           parent.doneAction.result = action;
         }
       };
+      _getRateInstance = cc.getRateInstance;
       cc.getRateInstance = function(rate) {
-        return {
-          bufLength: 64
-        };
+        return { bufLength: 64 };
       };
       cc.unit.specs.TestUnit = function() {
         cc.unit.specs.TestUnit.called = true;
       };
+    });
+    after(function() {
+      cc.getRateInstance = _getRateInstance;
     });
     it("create", function() {
       var specs = [
