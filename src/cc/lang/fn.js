@@ -29,7 +29,11 @@ define(function(require, exports, module) {
           items = items.trim().split("=");
           keys.push( items[0].trim());
           if (items.length === 2) {
-            vals.push(JSON.parse(items[1]));
+            if (items[1] === "Infinity") {
+              vals.push(Infinity);
+            } else {
+              vals.push(JSON.parse(items[1]));
+            }
           } else {
             vals.push(undefined);
           }

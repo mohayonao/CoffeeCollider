@@ -48,6 +48,7 @@ define(function(require, exports, module) {
         this.strm  = new Int16Array(this.strmLength * this.channels);
         this.instanceManager.init(this);
         this.instanceManager.append(0);
+        cc.initRateInstance();
       }
     };
     SynthServer.prototype.play = function(msg, userId) {

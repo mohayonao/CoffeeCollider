@@ -343,6 +343,11 @@ define(function(require, exports, module) {
       this.specs = specs;
 
       var fixNumList = specs.consts.map(function(value) {
+        if (value === "Infinity") {
+          value = Infinity;
+        } else if (value === "-Infinity") {
+          value = -Infinity;
+        }
         return instance.getFixNum(value);
       });
       var unitList = specs.defList.map(function(spec) {
@@ -352,8 +357,9 @@ define(function(require, exports, module) {
       this.controls = new Float32Array(this.params.values);
       this.set(controls);
       this.unitList = unitList.filter(function(unit) {
-        var inputs  = unit.inputs;
-        var inRates = unit.inRates;
+        var inputs    = unit.inputs;
+        var inRates   = unit.inRates;
+        var fromUnits = unit.fromUnits;
         var inSpec  = unit.specs[3];
         var tag     = unit.specs[5];
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
@@ -362,8 +368,9 @@ define(function(require, exports, module) {
             inputs[i]  = fixNumList[inSpec[i2+1]].outputs[0];
             inRates[i] = C.SCALAR;
           } else {
-            inputs[i]  = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
-            inRates[i] = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+            inputs[i]    = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
+            inRates[i]   = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
+            fromUnits[i] = unitList[inSpec[i2]];
           }
         }
         unit.init(tag);
@@ -385,7 +392,9 @@ define(function(require, exports, module) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
-          unit.process(unit.rate.bufLength, instance);
+          if (unit.calcRate !== C.DEMAND) {
+            unit.process(unit.rate.bufLength, instance);
+          }
         }
       }
       if (this.next) {

@@ -184,6 +184,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_aa; break;
         case C.CONTROL: this.process = next_ak; break;
         case C.SCALAR : this.process = next_ai; break;
+        case C.DEMAND : this.process = next_ak; break;
         }
         break;
       default:
@@ -191,6 +192,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_ka; break;
         case C.CONTROL: this.process = next_kk; break;
         case C.SCALAR : this.process = next_kk; break;
+        case C.DEMAND : this.process = next_kk; break;
         }
       }
     };
@@ -258,6 +260,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_aa; break;
         case C.CONTROL: this.process = next_ak; break;
         case C.SCALAR : this.process = next_ai; break;
+        case C.DEMAND : this.process = next_ak; break;
         }
         break;
       default:
@@ -265,6 +268,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_ka; break;
         case C.CONTROL: this.process = next_kk; break;
         case C.SCALAR : this.process = next_kk; break;
+        case C.DEMAND : this.process = next_kk; break;
         }
       }
       osc_next_kk.call(this, 1, wcalc);
@@ -394,6 +398,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_aa; break;
         case C.CONTROL: this.process = next_ak; break;
         case C.SCALAR : this.process = next_ai; break;
+        case C.DEMAND : this.process = next_ak; break;
         }
         break;
       default:
@@ -401,6 +406,7 @@ define(function(require, exports, module) {
         case C.AUDIO  : this.process = next_ka; break;
         case C.CONTROL: this.process = next_kk; break;
         case C.SCALAR : this.process = next_kk; break;
+        case C.DEMAND : this.process = next_kk; break;
         }
       }
     };

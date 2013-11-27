@@ -23,6 +23,13 @@ define(function(require, exports, module) {
     SynthDef.prototype.build = function() {
       if (!this.specs) {
         build.call(this);
+        var consts = this.specs.consts;
+        if (consts[0] === -Infinity) {
+          consts[0] = "-Infinity";
+        }
+        if (consts[consts.length-1] === Infinity) {
+          consts[consts.length-1] = "Infinity";
+        }
         cc.lang.pushToTimeline([
           "/s_def", this._defId, JSON.stringify(this.specs)
         ]);

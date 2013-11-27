@@ -15,7 +15,7 @@ define(function(require, exports, module) {
     }
     if (obj) {
       switch (obj.rate) {
-      case C.SCALAR: case C.CONTROL: case C.AUDIO:
+      case C.SCALAR: case C.CONTROL: case C.AUDIO: case C.DEMAND:
         return obj.rate;
       }
     }
@@ -46,9 +46,9 @@ define(function(require, exports, module) {
     extend(UnaryOpUGen, cc.UGen);
 
     UnaryOpUGen.prototype.init = function(selector, a) {
-      var index = ops.BINARY_OPS[selector];
+      var index = ops.UNARY_OPS[selector];
       if (typeof index === "undefined") {
-        throw new TypeError("UnaryOpUGen: unknown operator '" + selector + "'");
+        throw new Error("UnaryOpUGen: unknown operator '" + selector + "'");
       }
       a = utils.asUGenInput(a);
       cc.UGen.prototype.init.call(this, asRate(a));
@@ -130,7 +130,7 @@ define(function(require, exports, module) {
       }
       var index = ops.BINARY_OPS[selector];
       if (typeof index === "undefined") {
-        throw new TypeError("BinaryOpUGen: unknown operator '" + selector + "'");
+        throw new Error("BinaryOpUGen: unknown operator '" + selector + "'");
       }
       cc.UGen.prototype.init.call(this, asRate([a, b]));
       this.selector = selector;

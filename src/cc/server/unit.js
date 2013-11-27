@@ -12,10 +12,11 @@ define(function(require, exports, module) {
       this.specialIndex = specs[2];
       this.numOfInputs  = specs[3].length >> 1;
       this.numOfOutputs = specs[4].length;
-      this.inputs   = new Array(this.numOfInputs);
-      this.inRates  = new Array(this.numOfInputs);
+      this.inputs    = new Array(this.numOfInputs);
+      this.inRates   = new Array(this.numOfInputs);
+      this.fromUnits = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate     = cc.getRateInstance(this.calcRate || C.CONTROL);
+      this.rate     = cc.getRateInstance(this.calcRate);
       var bufLength = this.rate.bufLength;
       var allOutputs = new Float32Array(bufLength * this.numOfOutputs);
       var outputs    = new Array(this.numOfOutputs);

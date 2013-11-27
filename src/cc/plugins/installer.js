@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   require("./debug");
   require("./decay");
   require("./delay");
+  require("./demand");
   require("./env");
   require("./filter");
   require("./inout");

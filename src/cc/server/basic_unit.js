@@ -14,6 +14,30 @@ define(function(require, exports, module) {
     }
     return a;
   };
+
+  var calcDemandInput = function(unit, index, offset) {
+    var fromUnit = unit.fromUnits[index];
+    if (fromUnit) {
+      switch (fromUnit.calcRate) {
+      case C.AUDIO:
+        return unit.inputs[index][offset-1];
+      case C.DEMAND:
+        fromUnit.process(offset);
+        /* fall through */
+      default:
+        return unit.inputs[index][0];
+      }
+    } else {
+      return unit.inputs[index][0];
+    }
+  };
+  
+  var resetDemandInput = function(unit, index) {
+    var fromUnit = unit.fromUnits[index];
+    if (fromUnit && fromUnit.calcRate === C.DEMAND) {
+      fromUnit.process(0);
+    }
+  };
   
   var uopFunc = {};
   
@@ -23,18 +47,17 @@ define(function(require, exports, module) {
       var process;
       if (func) {
         switch (this.inRates[0]) {
-        case C.AUDIO:
-          process = func.a;
-          break;
-        case C.CONTROL:
-          process = func.k;
-          break;
+        case C.AUDIO  : process = func.a; break;
+        case C.CONTROL: process = func.k; break;
+        case C.DEMAND : process = func.d; break;
         }
         this.process = process;
-        if (this.process) {
-          this.process(1);
-        } else {
-          this.outputs[0][0] = func(this.inputs[0][0]);
+        if (this.calcRate !== C.DEMAND) {
+          if (this.process) {
+            this.process(1);
+          } else {
+            this.outputs[0][0] = func(this.inputs[0][0]);
+          }
         }
       } else {
         var opName = ops.UNARY_OPS_MAP[this.specialIndex] || "unknown";
@@ -59,6 +82,16 @@ define(function(require, exports, module) {
         out[i+2] = func(a[i+2]); out[i+3] = func(a[i+3]);
         out[i+4] = func(a[i+4]); out[i+5] = func(a[i+5]);
         out[i+6] = func(a[i+6]); out[i+7] = func(a[i+7]);
+      }
+    };
+  };
+  var unary_d = function(func) {
+    return function(inNumSamples) {
+      if (inNumSamples) {
+        var x = calcDemandInput(this, 0, inNumSamples);
+        this.outputs[0][0] = isNaN(x) ? NaN : func(x);
+      } else {
+        resetDemandInput(this, 0);
       }
     };
   };
@@ -217,6 +250,7 @@ define(function(require, exports, module) {
     var func = uopFunc[key];
     func.a = unary_a(func);
     func.k = unary_k(func);
+    func.d = unary_d(func);
   });
   
   var bopFunc = {};
@@ -226,36 +260,42 @@ define(function(require, exports, module) {
       var func = bopFunc[ops.BINARY_OPS_MAP[this.specialIndex]];
       var process;
       if (func) {
-        switch (this.inRates[0]) {
-        case C.AUDIO:
-          switch (this.inRates[1]) {
-          case C.AUDIO:   process = func.aa; break;
-          case C.CONTROL: process = func.ak; break;
-          case C.SCALAR:  process = func.ai; break;
+        if (this.calcRate === C.DEMAND) {
+          process = func.dd;
+        } else {
+          switch (this.inRates[0]) {
+          case C.AUDIO:
+            switch (this.inRates[1]) {
+            case C.AUDIO  : process = func.aa; break;
+            case C.CONTROL: process = func.ak; break;
+            case C.SCALAR : process = func.ai; break;
+            }
+            break;
+          case C.CONTROL:
+            switch (this.inRates[1]) {
+            case C.AUDIO  : process = func.ka; break;
+            case C.CONTROL: process = func.kk; break;
+            case C.SCALAR : process = func.kk; break;
+            }
+            break;
+          case C.SCALAR:
+            switch (this.inRates[1]) {
+            case C.AUDIO  : process = func.ia; break;
+            case C.CONTROL: process = func.kk; break;
+            case C.SCALAR : process = null   ; break;
+            }
+            break;
           }
-          break;
-        case C.CONTROL:
-          switch (this.inRates[1]) {
-          case C.AUDIO:   process = func.ka; break;
-          case C.CONTROL: process = func.kk; break;
-          case C.SCALAR:  process = func.kk; break;
-          }
-          break;
-        case C.SCALAR:
-          switch (this.inRates[1]) {
-          case C.AUDIO:   process = func.ia; break;
-          case C.CONTROL: process = func.kk; break;
-          case C.SCALAR:  process = null   ; break;
-          }
-          break;
         }
         this.process = process;
         this._a = this.inputs[0][0];
         this._b = this.inputs[1][0];
-        if (this.process) {
-          this.process(1);
-        } else {
-          this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+        if (this.calcRate !== C.DEMAND) {
+          if (this.process) {
+            this.process(1);
+          } else {
+            this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
+          }
         }
       } else {
         var opName = ops.BINARY_OPS_MAP[this.specialIndex] || "unknown";
@@ -353,7 +393,18 @@ define(function(require, exports, module) {
       }
     };
   };
-  
+  var binary_dd = function(func) {
+    return function(inNumSamples) {
+      if (inNumSamples) {
+        var a = calcDemandInput(this, 0, inNumSamples);
+        var b = calcDemandInput(this, 1, inNumSamples);
+        this.outputs[0][0] = isNaN(a) || isNaN(b) ? NaN : func(a, b);
+      } else {
+        resetDemandInput(this, 0);
+        resetDemandInput(this, 1);
+      }
+    };
+  };
   
   bopFunc["+"] = function(a, b) {
     return a + b;
@@ -820,6 +871,7 @@ define(function(require, exports, module) {
     }
     func.ki = func.kk;
     func.ik = func.kk;
+    func.dd = binary_dd(func);
   });
   
   cc.unit.specs.Control = (function() {
@@ -886,7 +938,13 @@ define(function(require, exports, module) {
   cc.unit.specs.MulAdd = (function() {
     var ctor = function() {
       var rates = this.inRates;
-      var process = next[rates[0]][rates[1]][rates[2]];
+      var r0 = rates[0];
+      var r1 = rates[1];
+      var r2 = rates[2];
+      if (r0 === C.DEMAND || r1 === C.DEMAND || r2 === C.DEMAND) {
+        r0 = r1 = r2 = C.CONTROL; // TODO: Fix
+      }
+      var process = next[r0][r1][r2];
       this.process = process;
       this._in  = this.inputs[0][0];
       this._mul = this.inputs[1][0];
@@ -1137,7 +1195,13 @@ define(function(require, exports, module) {
   cc.unit.specs.Sum3 = (function() {
     var ctor = function() {
       var rates = this.inRates;
-      var process = next[rates[0]][rates[1]][rates[2]];
+      var r0 = rates[0];
+      var r1 = rates[1];
+      var r2 = rates[2];
+      if (r0 === C.DEMAND || r1 === C.DEMAND || r2 === C.DEMAND) {
+        r0 = r1 = r2 = C.CONTROL; // TODO: Fix
+      }
+      var process = next[r0][r1][r2];
       this.process = process;
       this._in0 = this.inputs[0][0];
       this._in1 = this.inputs[1][0];
@@ -1258,7 +1322,14 @@ define(function(require, exports, module) {
   cc.unit.specs.Sum4 = (function() {
     var ctor = function() {
       var rates = this.inRates;
-      var process = next[rates[0]][rates[1]][rates[2]][rates[3]];
+      var r0 = rates[0];
+      var r1 = rates[1];
+      var r2 = rates[2];
+      var r3 = rates[3];
+      if (r0 === C.DEMAND || r1 === C.DEMAND || r2 === C.DEMAND) {
+        r0 = r1 = r2 = r3 = C.CONTROL; // TODO: Fix
+      }
+      var process = next[r0][r1][r2][r3];
       this.process = process;
       this._in0 = this.inputs[0][0];
       this._in1 = this.inputs[1][0];

@@ -49,7 +49,7 @@ define(function(require, exports, module) {
       u1 = new UGen(C.SCALAR);
       u2 = new UGen(C.CONTROL);
       u3 = new UGen(C.AUDIO);
-      u4 = new UGen(C.AUDIO);
+      u4 = new UGen(C.DEMAND);
     });
     after(function() {
       cc.UGen = _UGen;
@@ -59,7 +59,7 @@ define(function(require, exports, module) {
     });
     describe("UnaryOpUGen", function() {
       it("create", function() {
-        actual = cc.createUnaryOpUGen("-", u1);
+        actual = cc.createUnaryOpUGen("neg", u1);
         assert.instanceOf(actual, basic_ugen.UnaryOpUGen);
         assert.deepEqual(actual.inputs, [u1]);
         
@@ -74,7 +74,8 @@ define(function(require, exports, module) {
         assert.instanceOf(actual, basic_ugen.BinaryOpUGen);
         assert.deepEqual(actual.inputs, [u1, u2]);
         assert.equal(actual.selector, "*");
-
+        assert.equal(actual.rate, C.CONTROL);
+        
         actual = cc.createBinaryOpUGen("+", 2, 3);
         assert.equal(actual, 5);
         
@@ -122,6 +123,31 @@ define(function(require, exports, module) {
           cc.createBinaryOpUGen("dummy", u1, u2);
         }, "BinaryOpUGen: unknown operator 'dummy'");
       });
+      it("rate", function() {
+        actual = cc.createBinaryOpUGen("+", u1, u1);
+        assert.instanceOf(actual, basic_ugen.BinaryOpUGen);
+        assert.deepEqual(actual.inputs, [u1, u1]);
+        assert.equal(actual.selector, "+");
+        assert.equal(actual.rate, C.SCALAR);
+
+        actual = cc.createBinaryOpUGen("+", u1, u2);
+        assert.instanceOf(actual, basic_ugen.BinaryOpUGen);
+        assert.deepEqual(actual.inputs, [u1, u2]);
+        assert.equal(actual.selector, "+");
+        assert.equal(actual.rate, C.CONTROL);
+
+        actual = cc.createBinaryOpUGen("+", u3, u2);
+        assert.instanceOf(actual, basic_ugen.BinaryOpUGen);
+        assert.deepEqual(actual.inputs, [u3, u2]);
+        assert.equal(actual.selector, "+");
+        assert.equal(actual.rate, C.AUDIO);
+
+        actual = cc.createBinaryOpUGen("+", u3, u4);
+        assert.instanceOf(actual, basic_ugen.BinaryOpUGen);
+        assert.deepEqual(actual.inputs, [u3, u4]);
+        assert.equal(actual.selector, "+");
+        assert.equal(actual.rate, C.DEMAND);
+      });      
     });
     describe("MulAdd", function() {
       it("create", function() {
@@ -189,6 +215,27 @@ define(function(require, exports, module) {
         assert.deepEqual(actual.inputs, [u1, 2]);
         assert.equal(actual.selector, "*");
       });
+      it("rate", function() {
+        actual = cc.createMulAdd(u1, u1, u1);
+        assert.instanceOf(actual, basic_ugen.MulAdd);
+        assert.deepEqual(actual.inputs, [u1, u1, u1]);
+        assert.equal(actual.rate, C.SCALAR);
+
+        actual = cc.createMulAdd(u1, u2, u1);
+        assert.instanceOf(actual, basic_ugen.MulAdd);
+        assert.deepEqual(actual.inputs, [u2, u1, u1]);
+        assert.equal(actual.rate, C.CONTROL);
+
+        actual = cc.createMulAdd(u1, u2, u3);
+        assert.instanceOf(actual, basic_ugen.MulAdd);
+        assert.deepEqual(actual.inputs, [u2, u1, u3]);
+        assert.equal(actual.rate, C.AUDIO);
+
+        actual = cc.createMulAdd(u4, u2, u3);
+        assert.instanceOf(actual, basic_ugen.MulAdd);
+        assert.deepEqual(actual.inputs, [u4, u2, u3]);
+        assert.equal(actual.rate, C.DEMAND);
+      });      
     });
     describe("Sum3", function() {
       it("create", function() {
@@ -211,12 +258,33 @@ define(function(require, exports, module) {
         assert.deepEqual(actual.inputs, [u2, u3]);
         assert.equal(actual.selector, "+");
       });
+      it("rate", function() {
+        actual = cc.createSum3(u1, u1, u1);
+        assert.instanceOf(actual, basic_ugen.Sum3);
+        assert.deepEqual(actual.inputs, [u1, u1, u1]);
+        assert.equal(actual.rate, C.SCALAR);
+
+        actual = cc.createSum3(u1, u1, u2);
+        assert.instanceOf(actual, basic_ugen.Sum3);
+        assert.deepEqual(actual.inputs, [u2, u1, u1]);
+        assert.equal(actual.rate, C.CONTROL);
+
+        actual = cc.createSum3(u1, u2, u3);
+        assert.instanceOf(actual, basic_ugen.Sum3);
+        assert.deepEqual(actual.inputs, [u3, u2, u1]);
+        assert.equal(actual.rate, C.AUDIO);
+        
+        actual = cc.createSum3(u4, u2, u3);
+        assert.instanceOf(actual, basic_ugen.Sum3);
+        assert.deepEqual(actual.inputs, [u4, u3, u2]);
+        assert.equal(actual.rate, C.DEMAND);
+      });      
     });
     describe("Sum4", function() {
       it("create", function() {
         actual = cc.createSum4(u1, u2, u3, u4);
         assert.instanceOf(actual, basic_ugen.Sum4);
-        assert.deepEqual(actual.inputs, [u3, u4, u2, u1]);
+        assert.deepEqual(actual.inputs, [u4, u3, u2, u1]);
         
         actual = cc.createSum4(u1, u2, u3, 0);
         assert.instanceOf(actual, basic_ugen.Sum3);
@@ -228,11 +296,32 @@ define(function(require, exports, module) {
 
         actual = cc.createSum4(u1, 0, u3, u4);
         assert.instanceOf(actual, basic_ugen.Sum3);
-        assert.deepEqual(actual.inputs, [u3, u4, u1]);
+        assert.deepEqual(actual.inputs, [u4, u3, u1]);
 
         actual = cc.createSum4(0, u2, u3, u4);
         assert.instanceOf(actual, basic_ugen.Sum3);
-        assert.deepEqual(actual.inputs, [u3, u4, u2]);
+        assert.deepEqual(actual.inputs, [u4, u3, u2]);
+      });
+      it("rate", function() {
+        actual = cc.createSum4(u1, u1, u1, u1);
+        assert.instanceOf(actual, basic_ugen.Sum4);
+        assert.deepEqual(actual.inputs, [u1, u1, u1, u1]);
+        assert.equal(actual.rate, C.SCALAR);
+
+        actual = cc.createSum4(u1, u2, u1, u1);
+        assert.instanceOf(actual, basic_ugen.Sum4);
+        assert.deepEqual(actual.inputs, [u2, u1, u1, u1]);
+        assert.equal(actual.rate, C.CONTROL);
+
+        actual = cc.createSum4(u1, u2, u3, u1);
+        assert.instanceOf(actual, basic_ugen.Sum4);
+        assert.deepEqual(actual.inputs, [u3, u2, u1, u1]);
+        assert.equal(actual.rate, C.AUDIO);
+
+        actual = cc.createSum4(u1, u2, u3, u4);
+        assert.instanceOf(actual, basic_ugen.Sum4);
+        assert.deepEqual(actual.inputs, [u4, u3, u2, u1]);
+        assert.equal(actual.rate, C.DEMAND);
       });
     });
     describe("optimizing", function() {
@@ -255,7 +344,9 @@ define(function(require, exports, module) {
         assert.instanceOf(actual, basic_ugen.MulAdd);
         assert.equal(actual.inputs[0], u2);
         assert.equal(actual.inputs[1], u1);
-        assert.deepEqual(actual.inputs[2].inputs, [u4, u3]);
+        assert.instanceOf(actual.inputs[2], basic_ugen.BinaryOpUGen);
+        assert.deepEqual(actual.inputs[2].inputs, [u3, u4]);
+        assert.equal(actual.inputs[2].selector, "+");
       });
       it("bop + ugen = sum3", function() {
         var bop = cc.createBinaryOpUGen("+", u1, u2);
@@ -273,7 +364,7 @@ define(function(require, exports, module) {
         var sum3 = cc.createSum3(u1, u2, u3);
         actual = cc.createBinaryOpUGen("+", sum3, u4);
         assert.instanceOf(actual, basic_ugen.Sum4);
-        assert.deepEqual(actual.inputs, [u3, u4, u2, u1]);
+        assert.deepEqual(actual.inputs, [u4, u3, u2, u1]);
       });
       it("sum3 - ugen = bop", function() {
         var sum3 = cc.createSum3(u1, u2, 3);

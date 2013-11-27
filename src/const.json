@@ -40,6 +40,8 @@
   "SCALAR" : 0,
   "CONTROL": 1,
   "AUDIO"  : 2,
+  "DEMAND" : 3,
+  
   "UNIPOLAR": 1,
   "BIPOLAR" : 2,
   "AUDIO_BUS_LEN"  : 16,

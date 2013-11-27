@@ -23,6 +23,7 @@ define(function(require, exports, module) {
     });
     it("get(AUDIO)", function() {
       cc.server = { sampleRate:44100, bufLength:64 };
+      cc.initRateInstance();
       var r = cc.getRateInstance(C.AUDIO);
       assert.equal(r.sampleRate, 44100  , "sampleRate");
       assert.equal(r.sampleDur , 1/44100, "sampleDur");
@@ -37,6 +38,7 @@ define(function(require, exports, module) {
     });
     it("get(CONTROL)", function() {
       cc.server = { sampleRate:44100, bufLength:64 };
+      cc.initRateInstance();
       var r = cc.getRateInstance(C.CONTROL);
       assert.equal(r.sampleRate, 44100/64    , "sampleRate");
       assert.equal(r.sampleDur , 1/(44100/64), "sampleDur");
@@ -51,6 +53,7 @@ define(function(require, exports, module) {
     });
     it("second time", function() {
       cc.server = { sampleRate:44100, bufLength:64 };
+      cc.initRateInstance();
       var r1 = cc.getRateInstance(C.CONTROL);
       var r2 = cc.getRateInstance(C.CONTROL);
       assert.equal(r1, r2, "return a cached item in the second time or later");
