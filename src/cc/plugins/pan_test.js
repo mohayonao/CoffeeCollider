@@ -34,21 +34,28 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"in"   , rate:C.AUDIO  , value:unitTestSuite.freq1 },
+          { name:"in"   , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"pos"  , rate:C.AUDIO  , value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
-          { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
         ],
         outputs: 2
       },
       { rate  : C.AUDIO,
         inputs: [
-          { name:"in"   , rate:C.AUDIO  , value:unitTestSuite.freq1 },
-          { name:"pos"  , rate:C.CONTROL, value:unitTestSuite.in0 },
-          { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"in"   , rate:C.AUDIO  , value:unitTestSuite.in0 },
+          { name:"pos"  , rate:C.CONTROL, value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
         ],
         outputs: 2
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
 
     ugenTestSuite("XFade2", {
       ar: {
@@ -64,19 +71,26 @@ define(function(require, exports, module) {
         inputs: [
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
-          { name:"pos"  , rate:C.AUDIO  , value:unitTestSuite.in2 },
-          { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"pos"  , rate:C.AUDIO  , value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
         ]
       },
       { rate: C.AUDIO,
         inputs: [
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
-          { name:"pos"  , rate:C.CONTROL, value:unitTestSuite.in2 },
-          { name:"level", rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"pos"  , rate:C.CONTROL, value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
 
     ugenTestSuite("LinXFade2", {
       ar: {
@@ -94,17 +108,24 @@ define(function(require, exports, module) {
         inputs: [
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
-          { name:"pos"  , rate:C.AUDIO  , value:unitTestSuite.in2 },
+          { name:"pos"  , rate:C.AUDIO  , value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
         ]
       },
       { rate: C.AUDIO,
         inputs: [
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
-          { name:"pos"  , rate:C.CONTROL, value:unitTestSuite.in2 },
+          { name:"pos"  , rate:C.CONTROL, value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
   });
 
 });

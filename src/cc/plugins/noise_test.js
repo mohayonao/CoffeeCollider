@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -17,19 +18,15 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [],
-        checker: {
-          WhiteNoise: function(result) {
-            // console.log(result);
-          },
-          PinkNoise: function(result) {
-            // console.log(result);
-          },
-          ClipNoise: function(result) {
-            // console.log(result);
-          },
-        }
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
 
     ugenTestSuite(["Dust", "Dust2"], {
       ar: ["density",0],
@@ -37,18 +34,17 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"density", rate:C.CONTROL, value:[10,10,20,20] },
-        ],
-        checker: {
-          Dust: function(result) {
-            // console.log(result);
-          },
-          Dust2: function(result) {
-            // console.log(result);
-          },
-        }
+          { name:"density", rate:C.CONTROL, value:[ 10, 5, 20 ] },
+        ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
 
     ugenTestSuite(["LFNoise0", "LFNoise1", "LFNoise2", "LFClipNoise"], {
       ar: ["freq",500],
@@ -56,24 +52,17 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"freq", rate:C.CONTROL, value:[500,500,500] },
-        ],
-        checker: {
-          LFNoise0: function(result) {
-            // console.log(result);
-          },
-          LFNoise1: function(result) {
-            // console.log(result);
-          },
-          LFNoise2: function(result) {
-            // console.log(result);
-          },
-          LFClipNoise: function(result) {
-            // console.log(result);
-          },
-        }
+          { name:"freq", rate:C.CONTROL, value:[ 500, 1000 ] },
+        ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
   });
 
 });

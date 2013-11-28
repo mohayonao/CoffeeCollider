@@ -1087,7 +1087,7 @@ define(function(require, exports, module) {
       }
       for (i = inNumSamples & 3; i--; ) {
         x0 = inIn[j];
-        out[j++] = 0.5 * (x0 - x1);
+        out[j++] = sr * (x0 - x1);
         x1 = x0;
       }
       this._x1 = x1;

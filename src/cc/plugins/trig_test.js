@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -17,17 +18,24 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"in" , rate:C.CONTROL, value:unitTestSuite.in0   },
-          { name:"dur", rate:C.AUDIO  , value:unitTestSuite.in1 },
+          { name:"in" , rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"dur", rate:C.AUDIO  , value:[ 0, 0.1, 0.25, 0.5 ] },
         ]
       },
       { rate  : C.CONTROL,
         inputs: [
-          { name:"in" , rate:C.CONTROL, value:unitTestSuite.in0   },
-          { name:"dur", rate:C.CONTROL, value:unitTestSuite.in1 },
+          { name:"in" , rate:C.CONTROL, value:unitTestSuite.in0 },
+          { name:"dur", rate:C.CONTROL, value:[ 0, 0.1, 0.25, 0.5 ] },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= 0);
+        assert.ok(statistics.max <= 1);
+      }
+    });
 
     ugenTestSuite(["Latch", "Gate"], {
       ar: ["in",0, "trig",0],
@@ -45,8 +53,15 @@ define(function(require, exports, module) {
           { name:"trig", rate:C.CONTROL, value:unitTestSuite.trig0 },
         ]
       }
-    ]);
-
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
+    
     ugenTestSuite(["ZeroCrossing", "Timer"], {
       ar: {
         ok: ["+trig","audio"],
@@ -62,7 +77,14 @@ define(function(require, exports, module) {
           { name:"int", rate:C.AUDIO, value:unitTestSuite.in0 }
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
 
     ugenTestSuite("Phasor", {
       ar: ["trig",0, "rate",1, "start",0, "end",1, "resetPos",0],
@@ -77,7 +99,14 @@ define(function(require, exports, module) {
           { name:"resetPos", rate:C.CONTROL, value:[+0.5,0,-0.5] },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
   });  
 
 });

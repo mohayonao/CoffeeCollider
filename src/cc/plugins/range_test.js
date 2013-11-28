@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -30,7 +31,14 @@ define(function(require, exports, module) {
           { name:"hi", rate:C.CONTROL, value:unitTestSuite.in2 },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
   });
 
 });

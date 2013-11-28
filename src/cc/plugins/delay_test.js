@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
-  
+
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -31,7 +32,14 @@ define(function(require, exports, module) {
           { name:"in", rate:C.CONTROL, value:unitTestSuite.in0 },
         ]
       },
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1);
+        assert.ok(statistics.max <= +1);
+      }
+    });
     
     ugenTestSuite(["DelayN", "DelayL", "DelayC"], {
       ar: {
@@ -46,11 +54,18 @@ define(function(require, exports, module) {
       { rate  : C.AUDIO,
         inputs: [
           { name:"in"          , rate:C.AUDIO  , value:unitTestSuite.in0 },
-          { name:"maxdelaytime", rate:C.SCALAR , value:0.25 },
-          { name:"delaytime"   , rate:C.CONTROL, value:unitTestSuite.time0 },
+          { name:"maxdelaytime", value:0.25 },
+          { name:"delaytime"   , rate:C.CONTROL, value:[ 0.2, 0.15, 0.1 ] },
         ]
       },
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.1);
+        assert.ok(statistics.max <= +1.1);
+      }
+    });
 
     ugenTestSuite(["CombN", "CombL", "CombC", "AllpassN", "AllpassL", "AllpassC"], {
       ar: {
@@ -65,12 +80,19 @@ define(function(require, exports, module) {
       { rate  : C.AUDIO,
         inputs: [
           { name:"in"          , rate:C.AUDIO  , value:unitTestSuite.in0 },
-          { name:"maxdelaytime", rate:C.SCALAR , value:0.25 },
-          { name:"delaytime"   , rate:C.CONTROL, value:unitTestSuite.time0 },
-          { name:"decaytime"   , rate:C.CONTROL, value:unitTestSuite.time1 },
+          { name:"maxdelaytime", value:0.25 },
+          { name:"delaytime"   , rate:C.CONTROL, value:[ 0, 0.2, 0.15, 0.1 ] },
+          { name:"decaytime"   , rate:C.CONTROL, value:[ 0, 0.2, 0.15, 0.1, -0.3 ] },
         ]
       },
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.1);
+        assert.ok(statistics.max <= +1.1);
+      }
+    });
   });
 
 });

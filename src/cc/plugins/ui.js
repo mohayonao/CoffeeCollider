@@ -8,11 +8,6 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
         return this.multiNew(C.CONTROL, minval, maxval, warp, lag);
       }
     }
@@ -22,13 +17,13 @@ define(function(require, exports, module) {
   
   cc.unit.specs.MouseX = (function() {
     var ctor = function() {
-      this.process = next_kkkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -56,13 +51,13 @@ define(function(require, exports, module) {
 
   cc.unit.specs.MouseY = (function() {
     var ctor = function() {
-      this.process = next_kkkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -97,13 +92,13 @@ define(function(require, exports, module) {
   
   cc.unit.specs.MouseButton = (function() {
     var ctor = function() {
-      this.process = next_kkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];

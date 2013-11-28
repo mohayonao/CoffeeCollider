@@ -13,24 +13,35 @@ define(function(require, exports, module) {
   
   describe("plugins/bufio.js", function() {
     var buffer_opts = {
-      beforeEach: function() {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      },
+      before: function() {
         unitTestSuite.instance = {
           buffers: [ null ]
         };
       },
       preProcess: function(i) {
         if (i === 0) {
-          for (var j = this.allOutputs.length; j--; ) {
-            this.allOutputs[j] = 0;
-          }
+          this.allOutputs.setScalar(0);
         }
         if (i === 1) {
+          var samples = new Float32Array(1024 * 4);
           unitTestSuite.instance.buffers[0] = {
-            samples : new Float32Array(1024 * 4),
+            samples : samples,
             channels: 4,
             frames  : 1024,
             sampleRate: 44100,
           };
+          for (var j = 0; j < 1024; ++j) {
+            samples[j +    0] = j / 1024;
+            samples[j + 1024] = j / 1024;
+            samples[j + 2048] = j / 1024;
+            samples[j + 3072] = j / 1024;
+          }
         }
       }
     };
@@ -107,7 +118,17 @@ define(function(require, exports, module) {
         ],
         outputs: 4
       },
-    ], buffer_opts);
+    ], {
+      bufLength: 64,
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      },
+      before    : buffer_opts.before,
+      preProcess: buffer_opts.preProcess,
+    });
     
     ugenTestSuite("BufRd", {
       ar: function() {
@@ -171,7 +192,17 @@ define(function(require, exports, module) {
         ],
         outputs: 4
       },
-    ], buffer_opts);
+    ], {
+      bufLength: 64,
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      },
+      before    : buffer_opts.before,
+      preProcess: buffer_opts.preProcess,
+    });
     
     ugenTestSuite("BufSampleRate", {
       kr: ["bufnum",0]

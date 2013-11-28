@@ -22,63 +22,29 @@ define(function(require, exports, module) {
   
   cc.unit.specs.Integrator = (function() {
     var ctor = function() {
-      if (this.inRates[1] === C.SCALAR) {
-        this.process = next_i;
-      } else {
-        this.process = next;
-      }
+      this.process = next;
       this._b1 = this.inputs[1][0];
       this._y1 = 0;
       next.call(this, 1);
     };
-    var next_i = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var inIn = this.inputs[0];
-      var b1 = this._b1;
-      var y1 = this._y1;
-      var i;
-      if (b1 === 1) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + y1);
-        }
-      } else if (b1 === 0) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i];
-        }
-      } else {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1);
-        }
-      }
-      this._y1 = y1;
-    };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
-      var b1 = this.inputs[1][0];
+      var nextB1 = this.inputs[1][0];
+      var b1 = this._b1;
       var y1 = this._y1;
       var i;
-      if (this._b1 === b1) {
-        if (b1 === 1) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + y1);
-          }
-        } else if (b1 === 0) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i];
-          }
-        } else {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1);
-          }
+      if (b1 === nextB1) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       } else {
-        var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
+        var b1_slope = (nextB1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
-        this._b1 = b1;
+        this._b1 = nextB1;
       }
       this._y1 = y1;
     };
@@ -117,23 +83,18 @@ define(function(require, exports, module) {
       var y1 = this._y1;
       var i;
       if (decayTime === this._decayTime) {
-        if (b1 === 0) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i];
-          }
-        } else {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1);
-          }
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       } else {
-        this._b1 = decayTime === 0 ? 0 : Math.exp(log001 / (decayTime * this.rate.sampleRate));
+        var next_b1 = decayTime === 0 ? 0 : Math.exp(log001 / (decayTime * this.rate.sampleRate));
         this._decayTime = decayTime;
-        var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
+        this._b1 = next_b1;
       }
       this._y1 = y1;
     };
@@ -188,8 +149,8 @@ define(function(require, exports, module) {
         this._attackTime = attackTime;
         var next_b1a = decayTime  === 0 ? 0 : Math.exp(log001 / (decayTime  * this.rate.sampleRate));
         var next_b1b = attackTime === 0 ? 0 : Math.exp(log001 / (attackTime * this.rate.sampleRate));
-        var b1a_slope = (this._b1a - next_b1a) * this.rate.slopeFactor;
-        var b1b_slope = (this._b1b - next_b1b) * this.rate.slopeFactor;
+        var b1a_slope = (next_b1a - b1a) * this.rate.slopeFactor;
+        var b1b_slope = (next_b1b - b1b) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;

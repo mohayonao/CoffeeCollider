@@ -98,18 +98,20 @@ define(function(require, exports, module) {
     list = list.concat(Object.keys(ops.COMMONS));
     return list;
   };
-  
-  var registerUGen = function(name) {
-    if (cc.ugen.specs[name]) {
-      cc.ugen.register(name, cc.ugen.specs[name]);
-    } else {
-      throw new Error(name + " is not defined.")
-    }
-  };
 
+  var asArray = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj;
+    }
+    return [ obj ];
+  };
+  var asRateStr = function(rate) {
+    return ["ir","kr","ar","demand"][rate|0];
+  };
+  
   var ugenTestSuite = (function() {
     var str2rate = function(str) {
-      return {ar:C.AUDIO,kr:C.CONTROL,ir:C.SCALAR,demand:C.DEMAND}[str];
+      return { ar:C.AUDIO, kr:C.CONTROL, ir:C.SCALAR, demand:C.DEMAND }[str];
     };
     var asUGenInput = function(val) {
       if (typeof testSuite[val] === "function") {
@@ -120,40 +122,70 @@ define(function(require, exports, module) {
     var args2defaults = function(args) {
       var params = [], inputs = [];
       for (var i = 0; i < args.length; i += 2) {
-        if (args[i].charAt(0) !== "-") {
-          var x = asUGenInput(args[i+1]);
-          if (args[i].charAt(0) === "+") {
-            params.push(x);
-          }
-          inputs.push(x);
+        if (args[i].charAt(0) === "-") { continue; }
+        var required = (args[i].charAt(0) === "+");
+        var value    = asUGenInput(args[i+1]);
+        if (required) {
+          params.push(value);
         }
+        inputs.push(value);
       }
-      return {
-        params:params, inputs:inputs
-      }
+      return { params:params, inputs:inputs };
     };
     var args2customs = function(args) {
       var params = {}, inputs = [];
       for (var i = 0; i < args.length; i += 2) {
-        if (args[i].charAt(0) !== "-") {
-          var name = args[i];
-          var x    = args[i+1];
-          x = typeof x === "number" ? (x + 1) : asUGenInput(x);
-          if (name.charAt(0) === "+") {
-            name = name.substr(1);
-          }
-          inputs.push( params[name] = x );
+        if (args[i].charAt(0) === "-") { continue; }
+        var required = (args[i].charAt(0) === "+");
+        var value    = asUGenInput(args[i+1]);
+        if (typeof value === "number") {
+          value += 1;
         }
+        params[args[i].replace(/^\+/, "")] = value;
+        inputs.push(value);
       }
       return {
         params:params, inputs:inputs
       }
     };
+    
+    var ok = function(Klass, name, args) {
+      var check = function(args) {
+        var defaults = args2defaults(args);
+        var u1 = Klass[name].apply(null, defaults.params);
+        assert.equal(u1.rate, str2rate(name), "unexpected rate");
+        assert.deepEqual(u1.inputs, defaults.inputs, "unexpected default inputs");
+        
+        var customs = args2customs(args);
+        var u2 = Klass[name](customs.params);
+        assert.deepEqual(u2.inputs, customs.inputs, "unexpected custom inputs");
+      };
+      return function() {
+        if (Array.isArray(args[0])) {
+          args.forEach(check);
+        } else {
+          check(args);
+        }
+      };
+    };
+    var ng = function(Klass, name, args) {
+      var check = function(args) {
+        assert.throws(function() {
+          var defaults = args2defaults(args);
+          Klass[name].apply(null, defaults);
+        }, Error);
+      };
+      return function() {
+        if (Array.isArray(args[0])) {
+          args.forEach(check);
+        } else {
+          check(args);
+        }
+      };
+    };
+    
     var testSuite = function(name, specs) {
-      if (!Array.isArray(name)) {
-        name = [ name ];
-      }
-      name.forEach(function(name) {
+      asArray(name).forEach(function(name) {
         if (cc.ugen.specs[name]) {
           cc.ugen.register(name, cc.ugen.specs[name]);
         } else {
@@ -166,6 +198,7 @@ define(function(require, exports, module) {
             _createBinaryOpUGen = cc.createBinaryOpUGen;
             cc.createMulAdd = function(_in) { return _in; }
             cc.createBinaryOpUGen = function(selector, a, b) { return a; }
+            
           });
           after(function() {
             cc.createMulAdd = _createMulAdd;
@@ -184,49 +217,8 @@ define(function(require, exports, module) {
               if (Array.isArray(test)) {
                 test.ok = test;
               }
-              if (test.ok) {
-                it(name, (function(args) {
-                  var check = function(args) {
-                    var defaults = args2defaults(args);
-                    var u1 = Klass[name].apply(null, defaults.params);
-                    assert.equal(u1.rate, str2rate(name), "unexpected rate");
-                    assert.deepEqual(u1.inputs, defaults.inputs, "unexpected inputs");
-                    
-                    var customs = args2customs(args);
-                    var u2 = Klass[name](customs.params);
-                    assert.equal(u2.rate, str2rate(name), "unexpected rate");
-                    assert.deepEqual(u2.inputs, customs.inputs, "unexpected inputs");
-                  };
-                  return function() {
-                    if (Array.isArray(args[0])) {
-                      args.forEach(function(args) {
-                        check(args);
-                      });
-                    } else {
-                      check(args);
-                    }
-                  };
-                })(test.ok));
-              }
-              if (test.ng) {
-                it(name, (function(args) {
-                  var check = function(args) {
-                    assert.throws(function() {
-                      var defaults = args2defaults(args);
-                      Klass[name].apply(null, defaults);
-                    });
-                  };
-                  return function() {
-                    if (Array.isArray(args[0])) {
-                      args.forEach(function(args) {
-                        check(args);
-                      });
-                    } else {
-                      check(args);
-                    }
-                  };
-                })(test.ng));
-              }
+              if (test.ok) { it(name, ok(Klass, name, test.ok)); }
+              if (test.ng) { it(name, ng(Klass, name, test.ng)); }
             }
           });
         });
@@ -265,102 +257,201 @@ define(function(require, exports, module) {
   })();
   
   var unitTestSuite = (function() {
-    var parent = {
-      controls: new Float32Array(16),
-      doneAction: function() {
+    var parent = { controls:new Float32Array(16), doneAction:function() {} };
+    
+    var create_rate = function(bufLength) {
+      var result = {};
+      result.sampleRate = 44100;
+      result.sampleDur  = 1 / 44100;
+      result.radiansPerSample = Math.PI * 2 / 44100;
+      result.bufLength   = bufLength;
+      result.bufDuration = bufLength / 44100;
+      result.bufRate     = 1 / result.bufDuration;
+      result.slopeFactor = 1 / bufLength;
+      result.filterLoops  = (bufLength / 3)|0;
+      result.filterRemain = (bufLength % 3)|0;
+      if (result.filterLoops === 0) {
+        result.filterSlope = 0;
+      } else {
+        result.filterSlope = 1 / result.filterLoops;
       }
+      return result;
     };
     
-    var a_rate = {
-      sampleRate: 44100,
-      sampleDur : 1 / 44100,
-      radiansPerSample: 2 * Math.PI / 44100,
-      bufLength  : 64,
-      bufDuration: 64 / 44100,
-      bufRate    : 1 / (64 / 44100),
-      slopeFactor: 1 / 64,
-      filterLoops : (64 / 3)|0,
-      filterRemain: (64 % 3)|0,
-      filterSlope : 1 / ((64 / 3)|0)
-    };
-    var k_rate = {
-      sampleRate: 689.0625,
-      sampleDur : 1 / 689.0625,
-      radiansPerSample: 2 * Math.PI / 689.0625,
-      bufLength  : 1,
-      bufDuration: 1 / 689.0625,
-      bufRate    : 1 / (1 / 689.0625),
-      slopeFactor: 1 / 1,
-      filterLoops : (1 / 3)|0,
-      filterRemain: (1 % 3)|0,
-      filterSlope : 1 / ((1 / 3)|0)
+    var audio_rate   = create_rate(64);
+    var control_rate = create_rate( 1);
+    
+    var RandomGenerator = function() {
+      var i = 0;
+      return function() {
+        return randomTable[i++ % randomTable.length];
+      };
     };
 
-    var writeScalarValue = function(_in, value) {
-      for (var i = _in.length; i--; ) {
-        _in[i] = value;
+    Float32Array.prototype.setScalar = function(value) {
+      for (var i = this.length; i--;) {
+        this[i] = value;
       }
-      return _in;
+      return this;
     };
     
-    var signal = function(offset) {
-      if (Array.isArray(offset)) {
-        index   = 0;
-        pattern = offset;
-        return function(_in) {
-          var value = pattern[(index++) % pattern.length];
-          writeScalarValue(_in, value);
-          return _in;
-        };
-      } else {
-        var index = offset || 0;
-        var pattern = [
-            +100, 10, 1, 1, 0.5, 0.5, 0, 0, 0, -0.5, -0.5, -1, -1, -10, -100
-        ];
-        return function(_in) {
-          var value = pattern[(index++) % pattern.length];
-          writeScalarValue(_in, value);
-          return _in;
-        };
+    var signal = function(pattern, sampleDur) {
+      var index  = 0;
+      var remain = 0;
+      var prev   = 0;
+      var invSampleDur = 1 / sampleDur;
+      return function(_in) {
+        var value = prev;
+        for (var i = 0, imax = _in.length; i < imax; ++i) {
+          if (remain <= 0) {
+            value = pattern[(index++) % pattern.length];
+            if (Array.isArray(value)) {
+              remain = value[1];
+              value  = value[0];
+            } else {
+              remain = Math.ceil(invSampleDur / (pattern.length + 1));
+            }
+            prev = value;
+          }
+          remain -= 1;
+          _in[i] = value;
+        }
+        return _in;
+      };
+    };
+    
+    var inputSpec = function(rate, value) {
+      rate = rate || C.SCALAR;
+      var sampleDur = ((rate === C.AUDIO) ? audio_rate : control_rate).sampleDur;
+      var process   = (rate !== C.SCALAR) ? signal(value, sampleDur) : null;
+      return {rate:rate, sampleDur:sampleDur, process:process, value:value};
+    };
+
+    var initInputs = function(num) {
+      var list = [];
+      for (var i = 0; i < num; i++) {
+        list.push(0, 0);
       }
+      return list;
+    };
+    var initOutputs = function(num, rate) {
+      var list = [];
+      for (var i = 0; i < num; i++) {
+        list.push(rate);
+      }
+      return list;
+    };
+    var defaultChecker = function(statistics) {
+      assert.isFalse(statistics.hasNaN, "NaN");
+      assert.isFalse(statistics.hasInfinity, "Infinity");
     };
     
-    var inputSpec = function(opts) {
-      var rate = (opts.rate === C.AUDIO) ? a_rate : k_rate;
-      opts.sampleDur = rate.sampleDur;
-      return opts;
+    var testSuite = function(name, specs, opts) {
+      opts = opts || {};
+      
+      var test = function(items) {
+        testSuite.instance = {};
+        
+        if (opts.before) beforeEach(opts.before);
+        if (opts.after ) afterEach (opts.after );
+        
+        var rate = items.rate;
+        var inputs  = initInputs(items.inputs.length);
+        var outputs = initOutputs(items.outputs || 1, rate);
+        
+        asArray(name).forEach(function(name) {
+          var unitSpec = [ name, rate, 0, inputs, outputs ];
+          var testName = name + "." + asRateStr(rate);
+          testName += "(" + items.inputs.map(function(_in) {
+            return asRateStr(_in.rate);
+          }).join(", ") + ")";
+          if (opts.verbose) {
+            console.log(testName);
+          }
+          it(testName, (function(items, opts) {
+            return function() {
+              var inputSpecs = items.inputs.map(function(items) {
+                return typeof items === "number" ? inputSpec(C.SCALAR, items) : inputSpec(items.rate, items.value);
+              });
+              var statistics = unitTest(unitSpec, inputSpecs, items.checker, opts);
+              if (!statistics.checked) {
+                if (opts.checker) {
+                  if (typeof opts.checker === "function") {
+                    opts.checker(statistics);
+                  } else if (typeof opts.checker[name] === "function") {
+                    opts.checker[name](statistics);
+                  } else {
+                    defaultChecker(statistics);
+                  }
+                } else {
+                  defaultChecker(statistics);
+                }
+              }
+            };
+          })(items, opts));
+        });
+      };
+      
+      var _getRateInstance;
+      describe("Unit", function() {
+        before(function() {
+          _getRateInstance = cc.getRateInstance;
+          cc.getRateInstance = function(rate) {
+            return (rate === C.AUDIO) ? audio_rate : control_rate;
+          };
+          Math.random = new RandomGenerator();
+        });
+        after(function() {
+          cc.getRateInstance = _getRateInstance;
+          Math.random = _Math.random;
+        });
+        specs.forEach(test);
+      });
     };
-    
+
     var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
-      var i, j, k;
-      var u = cc.createUnit(parent, spec);
-      for (i = 0; i < u.numOfInputs; ++i) {
-        u.inRates[i] = inputSpecs[i].rate;
-        switch (u.inRates[i]) {
+
+      if (opts.bufLength) {
+        audio_rate = create_rate(opts.bufLength);
+      } else {
+        audio_rate = create_rate(65536);
+      }
+      
+      var i, imax, j;
+      var unit = cc.createUnit(parent, spec);
+      var imax = Math.ceil(unit.rate.sampleRate / unit.rate.bufLength);
+      
+      for (i = 0; i < unit.numOfInputs; ++i) {
+        unit.inRates[i] = inputSpecs[i].rate;
+        switch (unit.inRates[i]) {
         case C.AUDIO:
-          u.inputs[i]  = new Float32Array(u.rate.bufLength);
+          unit.inputs[i] = new Float32Array(audio_rate.bufLength);
+          inputSpecs[i].process.call(inputSpecs[i], unit.inputs[i], 0, imax);
           break;
         case C.SCALAR:
-          u.inputs[i]  = new Float32Array(1);
-          writeScalarValue(u.inputs[i], inputSpecs[i].value || 0);
+          unit.inputs[i] = new Float32Array(control_rate.bufLength);
+          unit.inputs[i].setScalar(inputSpecs[i].value || 0);
           break;
         case C.CONTROL:
-          u.inputs[i]  = new Float32Array(1);
+          unit.inputs[i] = new Float32Array(control_rate.bufLength);
+          inputSpecs[i].process.call(inputSpecs[i], unit.inputs[i]);
           break;
         default:
-          throw new Error("Invalid rate: " + u.inRates[i]);
+          throw new Error("invalid rate: " + unit.inRates[i]);
         }
       }
-      u.init();
-
-      if (u.calcRate !== C.SCALAR && !u.process) {
+      unit.init();
+      
+      if (unit.calcRate !== C.SCALAR && !unit.process) {
         throw new Error("process not exists");
       }
-
-      var result = {
+      
+      var statistics = {
         name: spec[0],
         rate: spec[1],
+        process: 0,
+        time   : 0,
         hasNaN     : false,
         hasInfinity: false,
         min: +Infinity,
@@ -370,196 +461,92 @@ define(function(require, exports, module) {
         rms: 0,
         mean: 0,
         samples: 0,
-        ivalues: [],
+        variance: 0,
       };
-      
-      var n, prev = undefined;
       var values = [];
-      if (opts.dur === Infinity) {
-        n = Infinity;
-      } else {
-        n = ((u.rate.sampleRate * (opts.dur || 1)) / u.rate.bufLength)|0;
-      }
-      for (i = 0; i < n; ++i) {
-        for (j = 0; j < u.numOfInputs; ++j) {
+      var begin, end;
+      for (i = 0; i < imax; ++i) {
+        statistics.process += 1;
+        for (j = unit.numOfInputs; j--; ) {
           if (inputSpecs[j].rate !== C.SCALAR) {
-            writeScalarValue(u.inputs[j], 0);
-            inputSpecs[j].process.call(inputSpecs[j], u.inputs[j], i, n);
+            unit.inputs[j].setScalar(0);
+            inputSpecs[j].process.call(inputSpecs[j], unit.inputs[j], i, imax);
           }
         }
-        if (u.process) {
-          for (j = u.allOutputs.length; j--; ) {
-            u.allOutputs[j] = NaN;
+        if (unit.process) {
+          for (j = unit.allOutputs.length; j--; ) {
+            unit.allOutputs[j] = NaN;
           }
           if (opts.preProcess) {
-            opts.preProcess.call(u, i, n);
+            opts.preProcess.call(unit, i, imax);
           }
-          u.process(u.rate.bufLength, testSuite.instance);
-          for (j = u.allOutputs.length; j--; ) {
-            var x = u.allOutputs[j];
-            result.samples += 1;
+          begin = Date.now();
+          unit.process(unit.rate.bufLength, testSuite.instance);
+          end   = Date.now();
+          statistics.time += end - begin;
+          for (j = unit.allOutputs.length; j--; ) {
+            var x = unit.allOutputs[j];
+            statistics.samples += 1;
             if (isNaN(x)) {
-              result.hasNaN = true;
+              statistics.hasNaN = true;
             } else if (Math.abs(x) === Infinity) {
-              result.hasInfinity = true;
+              statistics.hasInfinity = true;
             } else {
-              if (x < result.min) {
-                result.min = x;
+              if (x < statistics.min) {
+                statistics.min = x;
               }
-              if (result.max < x) {
-                result.max = x;
+              if (statistics.max < x) {
+                statistics.max = x;
               }
-              if (Math.abs(x) < result.absmin) {
-                result.absmin = Math.abs(x);
+              if (Math.abs(x) < statistics.absmin) {
+                statistics.absmin = Math.abs(x);
               }
-              if (result.absmax < Math.abs(x)) {
-                result.absmax = Math.abs(x);
+              if (statistics.absmax < Math.abs(x)) {
+                statistics.absmax = Math.abs(x);
               }
               values.push(x);
-              result.mean += x;
-              result.rms  += x * x;
-              if (x === (x|0)) {
-                if (prev !== x) {
-                  if (result.ivalues.indexOf(x) === -1) {
-                    result.ivalues.push(x);  
-                  }
-                }
-                prev = x;
-              }
+              statistics.mean += x;
+              statistics.rms  += x * x;
             }
           }
         }
         if (opts.postProcess) {
-          opts.postProcess.call(u, i, n);
-        }
-        if (n === Infinity) {
-          if (i > 500 && result.rms !== 0) {
-            break;
-          }
+          opts.postProcess.call(unit, i, imax);
         }
       }
-      result.ivalues.sort();
-      result.mean = result.mean / result.samples;
-      result.rms  = Math.sqrt(result.rms / result.samples);
+      statistics.mean = statistics.mean / statistics.samples;
+      statistics.rms  = Math.sqrt(statistics.rms / statistics.samples);
       var variance = 0;
       for (i = values.length; i--; ) {
-        var x = result.mean - values[i];
+        var x = statistics.mean - values[i];
         variance += x * x;
       }
-      result.variance = variance / result.samples;
+      statistics.variance = variance / statistics.samples;
       
       if (checker) {
         if (typeof checker === "function") {
-          checker(result);
-          return;
+          checker(statistics);
+          statistics.checked = true;
         } else if (typeof checker[spec[0]] === "function") {
-          checker[spec[0]](result);
-          return;
+          checker[spec[0]](statistics);
+          statistics.checked = true;
         }
       }
-      defaultChecker(result);
+      
+      return statistics;      
     };
     
-    var defaultChecker = function(result) {
-      assert.isFalse(result.hasNaN, "NaN");
-      assert.isFalse(result.hasInfinity, "Infinity");
-    };
-
-    var RandomGenerator = function() {
-      var i = 0;
-      return function() {
-        return randomTable[i++ % randomTable.length];
-      };
-    };
+    testSuite.in0   = randomTable.slice( 0).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
+    testSuite.in1   = randomTable.slice(10).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
+    testSuite.in1.reverse();
+    testSuite.in2   = randomTable.slice(20).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
+    testSuite.in3   = randomTable.slice(30).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
+    testSuite.in3.reverse();
     
-    var testSuite = function(name, specs, opts) {
-      opts = opts || {};
-      var _getRateInstance;
-      describe("Unit", function() {
-        before(function() {
-          _getRateInstance = cc.getRateInstance;
-          cc.getRateInstance = function(rate) {
-            return (rate === C.AUDIO) ? a_rate : k_rate;
-          };
-          Math.random = RandomGenerator();
-        });
-        after(function() {
-          cc.getRateInstance = _getRateInstance;
-          Math.random = _Math.random;
-        });
-        specs.forEach(function(items) {
-          var rate = items.rate;
-          var numOfInputs  = items.inputs.length;
-          var numOfOutputs = items.outputs || 1;
-
-          testSuite.instance = {};
-          
-          if (opts.before) {
-            beforeEach(opts.before);
-          }
-          if (opts.beforeEach) {
-            beforeEach(opts.beforeEach);
-          }
-          if (opts.after) {
-            afterEach(opts.after);
-          }
-          if (opts.afterEach) {
-            afterEach(opts.afterEach);
-          }
-          
-          var inputs = [], outputs = [];
-          var i;
-          for (i = numOfInputs; i--; ) {
-            inputs.push(0, 0);
-          }
-          for (i = numOfOutputs; i--; ) {
-            outputs.push(rate);
-          }
-          if (!Array.isArray(name)) {
-            name = [name];
-          }
-          name.forEach(function(name) {
-            var unitSpec = [ name, rate, 0, inputs, outputs ];
-            var testName = name + "." + ["ir","kr","ar"][rate];
-            testName += "(" + items.inputs.map(function(_in) {
-              return ["ir","kr","ar"][_in.rate|0];
-            }).join(", ") + ")";
-            if (opts.verbose) {
-              console.log(testName);
-            }
-            it(testName, (function(items) {
-              return function() {
-                var inputSpecs = items.inputs.map(function(items) {
-                  if (typeof items === "number") {
-                    return inputSpec({
-                      rate:C.SCALAR, value:items
-                    });
-                  } else {
-                    return inputSpec({
-                      rate   : items.rate || C.SCALAR,
-                      process: signal(items.value),
-                      value  : items.value
-                    });
-                  }
-                });
-                unitTest(unitSpec, inputSpecs, items.checker, opts);
-              };
-            })(items));
-          });
-        });
-      });
-    };
-
-    testSuite.in0   = [ 1, 0.5, 0.25, 0, -0, -0.25, -0.5, -1 ];
-    testSuite.in1   = [ -0, -0.25, -0.5, -1, 1, 0.5, 0.25, 0 ];
-    testSuite.in2   = [ -0, -0.25, -0.5, -1, 1, 0.5, 0.25    ];
-    testSuite.time0 = [ 0, 0, 0.5, 0.5, 1, 1 ];
-    testSuite.time1 = [ 0, 0, 0.5, 0.5, 1, 1, -0, -0.5, -1 ];
-    testSuite.freq0 = [ 220, 220, 440, 660, 880, 1760, 3520 ];
-    testSuite.freq1 = [ 220, 220, 440, 660, 880, 1760, 44100, 0, -44100 ];
-    testSuite.trig0 = [ 1, 0, 0, 0, 0, 0, 0, 0 ];
-    testSuite.trig1 = [ 1, 0, 0, 0,-1, 0, 0, 0 ];
-    testSuite.trig2 = [ 1, 1, 1, 1, 1, 1, 1, 1 ];
+    testSuite.trig0 = [ [0, 100], [1, 0], [0, 1000] ];
+    testSuite.trig1 = [ [0,  10], [1, 0], [0,  100] ];
+    testSuite.trig2 = [ [1, 10], [0, 1000], [1, 0], [0, 2000], [-1, 100], [0, 4000] ];
+    testSuite.trig2 = [ [1,  1], [0,  100], [1, 0], [0,  200], [-1,  10], [0,  400] ];
     
     return testSuite;
   })();
@@ -571,7 +558,6 @@ define(function(require, exports, module) {
     useFourArithmeticOperations  : useFourArithmeticOperations,
     unuseFourArithmeticOperations: unuseFourArithmeticOperations,
     shouldBeImplementedMethods : shouldBeImplementedMethods,
-    registerUGen : registerUGen,
     ugenTestSuite: ugenTestSuite,
     unitTestSuite: unitTestSuite,
   };

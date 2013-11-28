@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -13,20 +14,13 @@ define(function(require, exports, module) {
   describe("plugin/debug.js", function() {
     var _console;
     ugenTestSuite("Debug", {
-      ar: {
-        ok: ["in",0]
-      },
-      kr: {
-        ok: ["in",0]
-      },
+      ar: ["in",0],
+      kr: ["in",0],
     }).unitTestSuite([
       { rate: C.CONTROL,
         inputs: [
-          { name:"in", rate:C.CONTROL, value:unitTestSuite.in0 }
-        ],
-        checker: function(result) {
-          console.log(result);
-        }
+          { name:"in", rate:C.CONTROL, value:unitTestSuite.in0  }
+        ]
       }
     ], {
       before: function() {
@@ -37,6 +31,12 @@ define(function(require, exports, module) {
       },
       after: function() {
         cc.global.console = _console;
+      },
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
       }
     });
   });    

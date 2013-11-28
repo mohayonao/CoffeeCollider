@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var assert = require("chai").assert;
   var testTools = require("../../testTools");
   var ugenTestSuite = testTools.ugenTestSuite;
   var unitTestSuite = testTools.unitTestSuite;
@@ -141,8 +142,15 @@ define(function(require, exports, module) {
           1, 0.00, 0, 0.0,
         ]
       }
-    ]);
-
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
+    
     ugenTestSuite("Linen", {
       kr: ["gate",1, "attackTime",0.01, "susLevel",1, "releaseTime",1, "doneAction",0]
     }).unitTestSuite([
@@ -165,9 +173,14 @@ define(function(require, exports, module) {
           { name:"doneAction" , value:2 },
         ]
       }
-    ]);
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min >= -1.0);
+        assert.ok(statistics.max <= +1.0);
+      }
+    });
   });
-  
-  module.exports = {};
 
 });
