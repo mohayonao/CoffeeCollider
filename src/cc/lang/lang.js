@@ -180,6 +180,7 @@ define(function(require, exports, module) {
   require("./boolean");
   require("./buffer");
   require("./builtin");
+  require("./bus");
   require("./date");
   require("./env");
   require("./function");
