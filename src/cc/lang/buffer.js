@@ -124,6 +124,10 @@ define(function(require, exports, module) {
       return this._blocking;
     };
     
+    Buffer.prototype.asUGenInput = function() {
+      return this.bufnum;
+    };
+    
     return Buffer;
   })();
   

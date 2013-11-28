@@ -48,6 +48,7 @@ define(function(require, exports, module) {
   var COMMONS = {
     copy: "",
     dup : "n=2",
+    asUGenInput: "",
   };
   
   var ALIASES = {

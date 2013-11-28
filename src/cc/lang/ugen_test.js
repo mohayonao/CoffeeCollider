@@ -11,12 +11,11 @@ define(function(require, exports, module) {
   
   describe("lang/ugen/ugen.js", function() {
     var actual, expected;
-    var _createMulAdd, _createUnaryOpUGen, _createBinaryOpUGen, _instanceOfBuffer;
+    var _createMulAdd, _createUnaryOpUGen, _createBinaryOpUGen;
     before(function() {
       _createMulAdd = cc.createMulAdd;
       _createUnaryOpUGen = cc.createUnaryOpUGen;
       _createBinaryOpUGen = cc.createBinaryOpUGen;
-      _instanceOfBuffer = cc.instanceOfBuffer;
       
       cc.createMulAdd = function(ugen, a, b) {
         return ugen.inputs[0] * a + b;
@@ -26,9 +25,6 @@ define(function(require, exports, module) {
       };
       cc.createBinaryOpUGen = function(selector, a, b) {
         return [ selector, a, b ];
-      };
-      cc.instanceOfBuffer = function() {
-        return false;
       };
       
       cc.ugen.register("Test", {
@@ -50,7 +46,6 @@ define(function(require, exports, module) {
       cc.createMulAdd = _createMulAdd;
       cc.createUnaryOpUGen  = _createUnaryOpUGen;
       cc.createBinaryOpUGen = _createBinaryOpUGen;
-      cc.instanceOfBuffer = _instanceOfBuffer;
     });
     
     describe("instance", function() {

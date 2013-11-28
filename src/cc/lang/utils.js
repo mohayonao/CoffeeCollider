@@ -28,14 +28,12 @@ define(function(require, exports, module) {
   };
   
   var asUGenInput = function(obj) {
-    if (cc.instanceOfUGen(obj)) {
+    if (obj === null || obj === undefined) {
+      return 0;
+    } else if (typeof obj.asUGenInput === "function") {
+      return obj.asUGenInput();
+    } else if (cc.instanceOfUGen(obj)) {
       return obj;
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(asUGenInput);
-    }
-    if (cc.instanceOfBuffer(obj)) {
-      return obj.bufnum;
     }
     obj = +obj;
     if (isNaN(obj)) {

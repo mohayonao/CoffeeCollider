@@ -17,6 +17,9 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  fn.defineProperty(Date.prototype, "asUGenInput", function() {
+    return +this;
+  });
   
   // unary operator methods
   ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {

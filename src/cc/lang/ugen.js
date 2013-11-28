@@ -96,6 +96,9 @@ define(function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
+    UGen.prototype.asUGenInput = function() {
+      return this;
+    };
     UGen.prototype.toString = function() {
       return this.klassName;
     };

@@ -21,7 +21,10 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-  
+
+  fn.defineProperty(Number.prototype, "asUGenInput", function() {
+    return this;
+  });
   
   // unary operator methods
   fn.defineProperty(Number.prototype, "__plus__", function() {

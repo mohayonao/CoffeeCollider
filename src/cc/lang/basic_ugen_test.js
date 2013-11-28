@@ -28,21 +28,17 @@ define(function(require, exports, module) {
   describe("lang/basic_ugen.js", function() {
     var actual, expected;
     var basic_ugen;
-    var _UGen, _MultiOutUGen, _instanceOfUGen, _instanceOfBuffer;
+    var _UGen, _MultiOutUGen, _instanceOfUGen;
     var u1, u2, u3, u4;
     before(function() {
       _UGen = cc.UGen;
       _MultiOutUGen = cc.MultiOutUGen;
       _instanceOfUGen = cc.instanceOfUGen;
-      _instanceOfBuffer = cc.instanceOfBuffer;
 
       cc.UGen = UGen;
       cc.MultiOutUGen = MultiOutUGen;
       cc.instanceOfUGen = function(obj) {
         return obj instanceof UGen || (_UGen && obj instanceof _UGen);
-      };
-      cc.instanceOfBuffer = function() {
-        return false;
       };
       
       basic_ugen = require("./basic_ugen")
@@ -55,7 +51,6 @@ define(function(require, exports, module) {
       cc.UGen = _UGen;
       cc.MultiOutUGen = _MultiOutUGen;
       cc.instanceOfUGen = _instanceOfUGen;
-      cc.instanceOfBuffer = _instanceOfBuffer;
     });
     describe("UnaryOpUGen", function() {
       it("create", function() {

@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var ops = require("../common/ops");
+  var utils = require("./utils");
   var slice = [].slice;
 
   var asNumber = function(val) {
@@ -26,6 +27,9 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  fn.defineProperty(Function.prototype, "asUGenInput", function() {
+    return utils.asUGenInput(this());
+  });
   
   // unary operator methods
   ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
