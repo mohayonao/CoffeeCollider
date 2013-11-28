@@ -16,7 +16,18 @@ define(function(require, exports, module) {
       kr: [],
     }).unitTestSuite([
       { rate  : C.AUDIO,
-        inputs: []
+        inputs: [],
+        checker: {
+          WhiteNoise: function(result) {
+            // console.log(result);
+          },
+          PinkNoise: function(result) {
+            // console.log(result);
+          },
+          ClipNoise: function(result) {
+            // console.log(result);
+          },
+        }
       }
     ]);
 
@@ -26,8 +37,16 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"density", rate:C.CONTROL, value:unitTestSuite.time1 },
-        ]
+          { name:"density", rate:C.CONTROL, value:[10,10,20,20] },
+        ],
+        checker: {
+          Dust: function(result) {
+            // console.log(result);
+          },
+          Dust2: function(result) {
+            // console.log(result);
+          },
+        }
       }
     ]);
 
@@ -37,8 +56,22 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"freq", rate:C.CONTROL, value:unitTestSuite.freq1 },
-        ]
+          { name:"freq", rate:C.CONTROL, value:[500,500,500] },
+        ],
+        checker: {
+          LFNoise0: function(result) {
+            // console.log(result);
+          },
+          LFNoise1: function(result) {
+            // console.log(result);
+          },
+          LFNoise2: function(result) {
+            // console.log(result);
+          },
+          LFClipNoise: function(result) {
+            // console.log(result);
+          },
+        }
       }
     ]);
   });

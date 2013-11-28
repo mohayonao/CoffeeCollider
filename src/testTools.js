@@ -1,10 +1,14 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var fs = require("fs");
   var assert = require("chai").assert;
   var cc = require("./cc/cc");
   var ops = require("./cc/common/ops");
   var slice = [].slice;
+  var _Math = Math;
+
+  var randomTable = fs.readFileSync(__dirname + "/random.txt").toString().split(",").map(Number);
   
   var defineProperty = function(object, selector, value) {
     var ret = object[selector];
@@ -327,7 +331,7 @@ define(function(require, exports, module) {
       return opts;
     };
     
-    var unitTest = function(spec, inputSpecs, opts) {
+    var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
       var i, j, k;
       var u = cc.createUnit(parent, spec);
@@ -353,8 +357,29 @@ define(function(require, exports, module) {
       if (u.calcRate !== C.SCALAR && !u.process) {
         throw new Error("process not exists");
       }
+
+      var result = {
+        name: spec[0],
+        rate: spec[1],
+        hasNaN     : false,
+        hasInfinity: false,
+        min: +Infinity,
+        max: -Infinity,
+        absmin: +Infinity,
+        absmax: -Infinity,
+        rms: 0,
+        mean: 0,
+        samples: 0,
+        ivalues: [],
+      };
       
-      var n = ((u.rate.sampleRate * (opts.dur || 1)) / u.rate.bufLength)|0;
+      var n, prev = undefined;
+      var values = [];
+      if (opts.dur === Infinity) {
+        n = Infinity;
+      } else {
+        n = ((u.rate.sampleRate * (opts.dur || 1)) / u.rate.bufLength)|0;
+      }
       for (i = 0; i < n; ++i) {
         for (j = 0; j < u.numOfInputs; ++j) {
           if (inputSpecs[j].rate !== C.SCALAR) {
@@ -372,19 +397,79 @@ define(function(require, exports, module) {
           u.process(u.rate.bufLength, testSuite.instance);
           for (j = u.allOutputs.length; j--; ) {
             var x = u.allOutputs[j];
+            result.samples += 1;
             if (isNaN(x)) {
-              throw new Error("NaN");
-            }
-            if (Math.abs(x) === Infinity) {
-              throw new Error("Infinity");
+              result.hasNaN = true;
+            } else if (Math.abs(x) === Infinity) {
+              result.hasInfinity = true;
+            } else {
+              if (x < result.min) {
+                result.min = x;
+              }
+              if (result.max < x) {
+                result.max = x;
+              }
+              if (Math.abs(x) < result.absmin) {
+                result.absmin = Math.abs(x);
+              }
+              if (result.absmax < Math.abs(x)) {
+                result.absmax = Math.abs(x);
+              }
+              values.push(x);
+              result.mean += x;
+              result.rms  += x * x;
+              if (x === (x|0)) {
+                if (prev !== x) {
+                  if (result.ivalues.indexOf(x) === -1) {
+                    result.ivalues.push(x);  
+                  }
+                }
+                prev = x;
+              }
             }
           }
         }
         if (opts.postProcess) {
           opts.postProcess.call(u, i, n);
         }
+        if (n === Infinity) {
+          if (i > 500 && result.rms !== 0) {
+            break;
+          }
+        }
       }
-      assert.ok(true);
+      result.ivalues.sort();
+      result.mean = result.mean / result.samples;
+      result.rms  = Math.sqrt(result.rms / result.samples);
+      var variance = 0;
+      for (i = values.length; i--; ) {
+        var x = result.mean - values[i];
+        variance += x * x;
+      }
+      result.variance = variance / result.samples;
+      
+      if (checker) {
+        if (typeof checker === "function") {
+          checker(result);
+          return;
+        } else if (typeof checker[spec[0]] === "function") {
+          checker[spec[0]](result);
+          return;
+        }
+      }
+      defaultChecker(result);
+    };
+    
+    var defaultChecker = function(result) {
+      assert.isFalse(result.hasNaN, "NaN");
+      assert.isFalse(result.hasInfinity, "Infinity");
+    };
+
+    var RandomGenerator = function() {
+      var i = 0;
+      return function() {
+        return randomTable[i++ % randomTable.length];
+      };
     };
     
     var testSuite = function(name, specs, opts) {
@@ -396,9 +481,11 @@ define(function(require, exports, module) {
           cc.getRateInstance = function(rate) {
             return (rate === C.AUDIO) ? a_rate : k_rate;
           };
+          Math.random = RandomGenerator();
         });
         after(function() {
           cc.getRateInstance = _getRateInstance;
+          Math.random = _Math.random;
         });
         specs.forEach(function(items) {
           var rate = items.rate;
@@ -455,7 +542,7 @@ define(function(require, exports, module) {
                     });
                   }
                 });
-                unitTest(unitSpec, inputSpecs, opts);
+                unitTest(unitSpec, inputSpecs, items.checker, opts);
               };
             })(items));
           });

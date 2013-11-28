@@ -23,7 +23,10 @@ define(function(require, exports, module) {
       { rate: C.CONTROL,
         inputs: [
           { name:"in", rate:C.CONTROL, value:unitTestSuite.in0 }
-        ]
+        ],
+        checker: function(result) {
+          console.log(result);
+        }
       }
     ], {
       before: function() {
