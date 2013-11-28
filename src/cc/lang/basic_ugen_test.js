@@ -39,7 +39,7 @@ define(function(require, exports, module) {
       cc.UGen = UGen;
       cc.MultiOutUGen = MultiOutUGen;
       cc.instanceOfUGen = function(obj) {
-        return obj instanceof UGen;
+        return obj instanceof UGen || (_UGen && obj instanceof _UGen);
       };
       cc.instanceOfBuffer = function() {
         return false;
