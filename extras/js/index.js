@@ -100,14 +100,8 @@ $(function() {
   $("#version").text(cc.version);
   
   cc.dev = function() {
-    $("#compile-coffee").on("click", function() {
-      var code = cc.impl.compiler.toString(editor.getValue().trim());
-      console.log(code);
-    }).show();
     $("#compile-js").on("click", function() {
-      var code = cc.impl.compiler.toString(editor.getValue().trim());
-      code = CoffeeScript.compile(code, {bare:true});
-      console.log(code);
+      console.log(cc.compile(editor.getValue().trim()));
     }).show();
   };
   

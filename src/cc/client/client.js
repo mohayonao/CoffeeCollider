@@ -39,6 +39,9 @@ define(function(require, exports, module) {
       this.impl.execute.apply(this.impl, arguments);
       return this;
     };
+    SynthClient.prototype.compile = function() {
+      return this.impl.compile.apply(this.impl, arguments);
+    };
     SynthClient.prototype.getStream = function() {
       return this.impl.getStream();
     };
@@ -175,6 +178,14 @@ define(function(require, exports, module) {
         ]);
         this.execId += 1;
       }
+    };
+    SynthClientImpl.prototype.compile = function(code) {
+      if (typeof code === "string") {
+        code = this.compiler.compile(code.trim());
+      } else {
+        code = "";
+      }
+      return code;
     };
     SynthClientImpl.prototype.getStream = function() {
       var f32 = new Float32Array(this.strm);
