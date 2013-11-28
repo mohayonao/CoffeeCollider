@@ -6,9 +6,7 @@ define(function(require, exports, module) {
   var cc = require("./cc/cc");
   var ops = require("./cc/common/ops");
   var slice = [].slice;
-  var _Math = Math;
-
-  var randomTable = fs.readFileSync(__dirname + "/random.txt").toString().split(",").map(Number);
+  var _random = Math.random;
   
   var defineProperty = function(object, selector, value) {
     var ret = object[selector];
@@ -281,13 +279,16 @@ define(function(require, exports, module) {
     var audio_rate   = create_rate(64);
     var control_rate = create_rate( 1);
     
-    var RandomGenerator = function() {
-      var i = 0;
+    var Random = function() {
+      var s1 = 1243598713, s2 = 3093459404, s3 = 1821928721;
       return function() {
-        return randomTable[i++ % randomTable.length];
+        s1 = ((s1 & 4294967294) << 12) ^ (((s1 << 13) ^  s1) >>> 19);
+        s2 = ((s2 & 4294967288) <<  4) ^ (((s2 <<  2) ^  s2) >>> 25);
+        s3 = ((s3 & 4294967280) << 17) ^ (((s3 <<  3) ^  s3) >>> 11);
+        return ((s1 ^ s2 ^ s3) >>> 0) / 4294967296;
       };
     };
-
+    
     Float32Array.prototype.setScalar = function(value) {
       for (var i = this.length; i--;) {
         this[i] = value;
@@ -399,11 +400,11 @@ define(function(require, exports, module) {
           cc.getRateInstance = function(rate) {
             return (rate === C.AUDIO) ? audio_rate : control_rate;
           };
-          Math.random = new RandomGenerator();
+          Math.random = new Random();
         });
         after(function() {
           cc.getRateInstance = _getRateInstance;
-          Math.random = _Math.random;
+          Math.random = _random;
         });
         specs.forEach(test);
       });
@@ -535,12 +536,18 @@ define(function(require, exports, module) {
       
       return statistics;      
     };
+
+    var randomTable = new Array(1024);
+    var rand = new Random();
+    for (var i = 0; i < 1024; ++i) {
+      randomTable[i] = rand();
+    }
     
-    testSuite.in0   = randomTable.slice( 0).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
-    testSuite.in1   = randomTable.slice(10).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
+    testSuite.in0 = randomTable.slice( 0).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
+    testSuite.in1 = randomTable.slice(10).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
     testSuite.in1.reverse();
-    testSuite.in2   = randomTable.slice(20).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
-    testSuite.in3   = randomTable.slice(30).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
+    testSuite.in2 = randomTable.slice(20).map(function(x, i) { return [ x * ((i%2)*2-1), 0] });
+    testSuite.in3 = randomTable.slice(30).map(function(x, i) { return [-x * ((i%2)*2-1), 0] });
     testSuite.in3.reverse();
     
     testSuite.trig0 = [ [0, 100], [1, 0], [0, 1000] ];
