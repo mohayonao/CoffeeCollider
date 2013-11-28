@@ -7,7 +7,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "lo=0,hi=1",
       ctor: function(lo, hi) {
-        return cc.ugen.multiNewList(this, [C.SCALAR, lo, hi]);
+        return this.multiNew(C.SCALAR, lo, hi);
       }
     }
   };
@@ -26,7 +26,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "lo=0,hi=127",
       ctor: function(lo, hi) {
-        return cc.ugen.multiNewList(this, [C.SCALAR, lo, hi]);
+        return this.multiNew(C.SCALAR, lo, hi);
       }
     }
   };
@@ -45,13 +45,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "lo=0,hi=1,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, lo, hi, trig]);
+        return this.multiNew(C.AUDIO, lo, hi, trig);
       }
     },
     $kr: {
       defaults: "lo=0,hi=1,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, lo, hi, trig]);
+        return this.multiNew(C.CONTROL, lo, hi, trig);
       }
     }
   };
@@ -110,13 +110,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "lo=0,hi=127,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, lo, hi, trig]);
+        return this.multiNew(C.AUDIO, lo, hi, trig);
       }
     },
     $kr: {
       defaults: "lo=0,hi=127,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, lo, hi, trig]);
+        return this.multiNew(C.CONTROL, lo, hi, trig);
       }
     }
   };
@@ -175,7 +175,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "lo=0,hi=1,minmax=0",
       ctor: function(lo, hi, minmax) {
-        return cc.ugen.multiNewList(this, [C.SCALAR, lo, hi, minmax]);
+        return this.multiNew(C.SCALAR, lo, hi, minmax);
       }
     }
   };
@@ -201,7 +201,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "lo=0,hi=1,n=0",
       ctor: function(lo, hi, n) {
-        return cc.ugen.multiNewList(this, [C.SCALAR, lo, hi, n]);
+        return this.multiNew(C.SCALAR, lo, hi, n);
       }
     }
   };
@@ -227,7 +227,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "lo=0.01,hi=1",
       ctor: function(lo, hi) {
-        return cc.ugen.multiNewList(this, [C.SCALAR, lo, hi]);
+        return this.multiNew(C.SCALAR, lo, hi);
       }
     }
   };
@@ -246,13 +246,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "lo=0.01,hi=1,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, lo, hi, trig]);
+        return this.multiNew(C.AUDIO, lo, hi, trig);
       }
     },
     $kr: {
       defaults: "lo=0.01,hi=1,trig=1",
       ctor: function(lo, hi, trig) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, lo, hi, trig]);
+        return this.multiNew(C.CONTROL, lo, hi, trig);
       }
     }
   };
@@ -311,13 +311,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "prob=0,in=0",
       ctor: function(prob, _in) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, prob, _in]);
+        return this.multiNew(C.AUDIO, prob, _in);
       }
     },
     $kr: {
       defaults: "prob=0,in=0",
       ctor: function(prob, _in) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, prob, _in]);
+        return this.multiNew(C.CONTROL, prob, _in);
       }
     }
   };

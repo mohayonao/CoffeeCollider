@@ -31,13 +31,13 @@ define(function(require, exports, module) {
         $ar: {
           defaults: "val1=1,val2=2",
           ctor: function(val1, val2) {
-            return this.init(C.AUDIO, val1, val2);
+            return this.multiNew(C.AUDIO, val1, val2);
           }
         },
         $kr: {
           defaults: "val1=1,val2=2",
           ctor: function(val1, val2) {
-            return this.init(C.CONTROL, val1, val2);
+            return this.multiNew(C.CONTROL, val1, val2);
           }
         },
       });

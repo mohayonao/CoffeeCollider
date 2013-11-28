@@ -351,14 +351,14 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: function(bus, channelsArray) {
-        cc.ugen.multiNewList(this, [C.AUDIO, bus].concat(channelsArray));
+        this.multiNewList([C.AUDIO, bus].concat(channelsArray));
         return 0; // Out has no output
       }
     },
     $kr: {
       defaults: "bus=0,channelsArray=0",
       ctor: function(bus, channelsArray) {
-        cc.ugen.multiNewList(this, [C.CONTROL, bus].concat(channelsArray));
+        this.multiNewList([C.CONTROL, bus].concat(channelsArray));
         return 0; // Out has no output
       }
     }

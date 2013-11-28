@@ -9,13 +9,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bus]);
+        return this.multiNew(C.AUDIO, numChannels, bus);
       },
     },
     $kr: {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, numChannels, bus]);
+        return this.multiNew(C.CONTROL, numChannels, bus);
       }
     },
     init: function(numChannels) {
@@ -59,7 +59,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in]);
+        return this.multiNew(C.CONTROL, _in);
       }
     }
   };
@@ -78,7 +78,7 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0",
       ctor: function(_in) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in]);
+        return this.multiNew(C.AUDIO, _in);
       }
     }
   };

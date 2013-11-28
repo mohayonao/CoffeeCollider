@@ -7,13 +7,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO]).madd(mul, add);
+        return this.multiNew(C.AUDIO).madd(mul, add);
       }
     },
     $kr: {
       defaults: "mul=1,add=0",
       ctor: function(mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL]).madd(mul, add);
+        return this.multiNew(C.CONTROL).madd(mul, add);
       }
     }
   };
@@ -89,13 +89,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, density]).madd(mul, add);
+        return this.multiNew(C.AUDIO, density).madd(mul, add);
       }
     },
     $kr: {
       defaults: "density=0,mul=1,add=0",
       ctor: function(density, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, density]).madd(mul, add);
+        return this.multiNew(C.CONTROL, density).madd(mul, add);
       }
     }
   };
@@ -162,13 +162,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, freq]).madd(mul, add);
+        return this.multiNew(C.AUDIO, freq).madd(mul, add);
       }
     },
     $kr: {
       defaults: "freq=500,mul=1,add=0",
       ctor: function(freq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, freq]).madd(mul, add);
+        return this.multiNew(C.CONTROL, freq).madd(mul, add);
       }
     }
   };

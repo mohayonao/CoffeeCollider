@@ -8,13 +8,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,dur=0.1",
       ctor: function(_in, dur) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, dur]);
+        return this.multiNew(C.AUDIO, _in, dur);
       }
     },
     $kr: {
         defaults: "in=0,dur=0.1",
       ctor: function(_in, dur) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, dur]);
+        return this.multiNew(C.CONTROL, _in, dur);
       }
     },
     signalRange: C.UNIPOLAR
@@ -163,13 +163,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,trig=0",
       ctor: function(_in, trig) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, trig]);
+        return this.multiNew(C.AUDIO, _in, trig);
       }
     },
     $kr: {
       defaults: "in=0,trig=0",
       ctor: function(_in, trig) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, trig]);
+        return this.multiNew(C.CONTROL, _in, trig);
       }
     }
   };
@@ -270,13 +270,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "trig=0",
       ctor: function(trig) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, trig]);
+        return this.multiNew(C.AUDIO, trig);
       }
     },
     $kr: {
       defaults: "trig=0",
       ctor: function(trig) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, trig]);
+        return this.multiNew(C.CONTROL, trig);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -362,24 +362,20 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "trig=0,rate=1,start=0,end=1,resetPos=0",
       ctor: function(trig, rate, start, end, resetPos) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, trig, rate, start, end, resetPos]);
+        return this.multiNew(C.AUDIO, trig, rate, start, end, resetPos);
       }
     },
     $kr: {
       defaults: "trig=0,rate=1,start=0,end=1,resetPos=0",
       ctor: function(trig, rate, start, end, resetPos) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, trig, rate, start, end, resetPos]);
+        return this.multiNew(C.CONTROL, trig, rate, start, end, resetPos);
       }
     }
   };
   
   cc.unit.specs.Phasor = (function() {
     var ctor = function() {
-      if (this.calcRate === C.AUDIO) {
-        this.process = next;
-      } else {
-        this.process = next;
-      }
+      this.process = next;
       this._prev = this.inputs[0][0];
       this.outputs[0][0] = this._level = this.inputs[2][0];
     };

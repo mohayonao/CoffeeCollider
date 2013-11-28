@@ -21,29 +21,7 @@ define(function(require, exports, module) {
   var rate2str = function(rate) {
     return ["scalar","control","audio","demand"][rate] || "scalar";
   };
-  var new1 = function(obj) {
-    var instance = new obj.constructor();
-    instance.klassName = obj.klassName;
-    return instance;
-  };
   
-  cc.ugen.multiNewList = function(ugen, args) {
-    var size = 0, i, imax;
-    args = utils.asUGenInput(args);
-    for (i = 0, imax = args.length; i < imax; ++i) {
-      if (Array.isArray(args[i]) && size < args[i].length) {
-        size = args[i].length;
-      }
-    }
-    if (size === 0) {
-      return ugen.init.apply(ugen, args);
-    }
-    var results = new Array(size);
-    for (i = 0; i < size; ++i) {
-      results[i] = cc.ugen.multiNewList(new1(ugen), args.map(newArgsWithIndex(i)));
-    }
-    return results;
-  };
   cc.ugen.checkNInputs = function(n) {
     if (this.rate === C.AUDIO) {
       for (var i = 0; i < n; ++i) {
@@ -74,6 +52,29 @@ define(function(require, exports, module) {
       this.inputs = [];
     }
     extend(UGen, cc.Object);
+    
+    UGen.multiNew = function() {
+      return this.multiNewList(slice.call(arguments));
+    };
+    
+    UGen.multiNewList = function(args) {
+      var Klass = this;
+      var size = 0, i, imax;
+      args = utils.asUGenInput(args);
+      for (i = 0, imax = args.length; i < imax; ++i) {
+        if (Array.isArray(args[i]) && size < args[i].length) {
+          size = args[i].length;
+        }
+      }
+      if (size === 0) {
+        return UGen.prototype.init.apply(new Klass(), args);
+      }
+      var results = new Array(size);
+      for (i = 0; i < size; ++i) {
+        results[i] = this.multiNewList(args.map(newArgsWithIndex(i)));
+      }
+      return results;
+    };
     
     UGen.prototype.init = function(rate) {
       this.rate = rate;
@@ -371,15 +372,16 @@ define(function(require, exports, module) {
     return Out;
   })();
   
-  var init_instance = function(instance, tag, opts) {
+  var init_instance = function(instance, klassName, tag, opts) {
     if (Array.isArray(instance)) {
       return instance.map(function(ugen) {
-        return init_instance(ugen, tag, opts);
+        return init_instance(ugen, klassName, tag, opts);
       });
     } else if (instance instanceof UGen) {
       if (opts.checkInputs) {
         opts.checkInputs.call(instance);
       }
+      instance.klassName   = klassName;
       instance.signalRange = opts.signalRange;
       instance.tag = tag || "";
       if (opts.init) {
@@ -425,8 +427,8 @@ define(function(require, exports, module) {
         ugenInterface[key.substr(1)] = fn(function() {
           var args = slice.call(arguments);
           var tag  = args.pop();
-          var instance = ctor.apply(new Klass(name), args);
-          return init_instance(instance, tag, opts);
+          var instance = ctor.apply(Klass, args);
+          return init_instance(instance, name, tag, opts);
         }).defaults(defaults).build();
       }
     });

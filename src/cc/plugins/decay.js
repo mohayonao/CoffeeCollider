@@ -8,13 +8,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, coef]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, coef).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,coef=1,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, coef]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, coef).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -89,13 +89,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, decayTime]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, decayTime).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,decayTime=1,mul=1,add=0",
       ctor: function(_in, decayTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, decayTime]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, decayTime).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -144,13 +144,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, attackTime, decayTime]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, attackTime, decayTime).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,attackTime=0.01,decayTime=1,mul=1,add=0",
       ctor: function(_in, attackTime, decayTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, attackTime, decayTime]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, attackTime, decayTime).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput

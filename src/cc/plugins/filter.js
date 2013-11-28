@@ -21,13 +21,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,bwr=1,mul=1,add=0",
       ctor: function(_in, freq, bwr, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, bwr]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, bwr).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,bwr=1,mul=1,add=0",
       ctor: function(_in, freq, bwr, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, bwr]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, bwr).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -107,13 +107,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,coef=0.5,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, coef]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, coef).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,coef=0.5,mul=1,add=0",
       ctor: function(_in, coef, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, coef]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, coef).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -228,13 +228,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, radius]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, radius).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, radius]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, radius).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -360,13 +360,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, radius]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, radius).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,radius=0.8,mul=1,add=0",
       ctor: function(_in, freq, radius, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, radius]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, radius).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -442,13 +442,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,mul=1,add=0",
       ctor: function(_in, freq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,mul=1,add=0",
       ctor: function(_in, freq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -588,13 +588,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, rq]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, rq).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, rq]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, rq).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -741,13 +741,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, rq]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, rq).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,rq=1,mul=1,add=0",
       ctor: function(_in, freq, rq, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, rq]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, rq).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -895,13 +895,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,freq=440,rq=1,db=0,mul=1,add=0",
       ctor: function(_in, freq, rq, db, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, freq, rq, db]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, freq, rq, db).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,freq=440,rq=1,db=0,mul=1,add=0",
       ctor: function(_in, freq, rq, db, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, freq, rq, db]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, freq, rq, db).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -985,13 +985,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,mul=1,add=0",
       ctor: function(_in, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,mul=1,add=0",
       ctor: function(_in, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput,
@@ -1239,13 +1239,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,lagTime=0.1,mul=1,add=0",
       ctor: function(_in, lagTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, lagTime]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, lagTime).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,lagTime=0.1,mul=1,add=0",
       ctor: function(_in, lagTime, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, lagTime]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, lagTime).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -1517,13 +1517,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
       ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, lagTimeU, lagTimeD]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, lagTimeU, lagTimeD).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,lagTimeU=0.1,lagTimeD=0.1,mul=1,add=0",
       ctor: function(_in, lagTimeU, lagTimeD, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, lagTimeU, lagTimeD]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, lagTimeU, lagTimeD).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -1733,13 +1733,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,time=0.1,curvature=0,warp=5,start=0,mul=1,add=0",
       ctor: function(_in, time, curvature, warp, start, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, time, curvature, warp, start]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, time, curvature, warp, start).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,time=0.1,curvature=0,warp=5,start=0,mul=1,add=0",
       ctor: function(_in, time, curvature, warp, start, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, time, curvature, warp, start]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, time, curvature, warp, start).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput
@@ -1833,13 +1833,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,up=1,dn=1,mul=1,add=0",
       ctor: function(_in, up, dn, mul, add) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, up, dn]).madd(mul, add);
+        return this.multiNew(C.AUDIO, _in, up, dn).madd(mul, add);
       }
     },
     $kr: {
       defaults: "in=0,up=1,dn=1,mul=1,add=0",
       ctor: function(_in, up, dn, mul, add) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, up, dn]).madd(mul, add);
+        return this.multiNew(C.CONTROL, _in, up, dn).madd(mul, add);
       }
     },
     checkInputs: cc.ugen.checkSameRateAsFirstInput

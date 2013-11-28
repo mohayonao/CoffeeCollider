@@ -84,7 +84,7 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, rate, trigger, startPos, loop, doneAction]);
+        return this.multiNew(C.AUDIO, numChannels, bufnum, rate, trigger, startPos, loop, doneAction);
       }
     },
     $kr: {
@@ -93,7 +93,7 @@ define(function(require, exports, module) {
         if (typeof numChannels !== "number") {
           throw new TypeError("PlayBuf: numChannels should be an integer.");
         }
-        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, rate, trigger, startPos, loop, doneAction]);
+        return this.multiNew(C.CONTROL, numChannels, bufnum, rate, trigger, startPos, loop, doneAction);
       }
     },
     init: function(numChannels) {
@@ -104,15 +104,10 @@ define(function(require, exports, module) {
 
   cc.unit.specs.PlayBuf = (function() {
     var ctor = function() {
-      switch (this.numOfOutput) {
-      case 1:
-        this.process = next_1ch;
-        break;
-      case 2:
-        this.process = next_2ch;
-        break;
-      default:
-        this.process = next;
+      switch (this.numOfOutputs) {
+      case 1: this.process = next_1ch; break;
+      case 2: this.process = next_2ch; break;
+      default: this.process = next;
       }
       this._samples  = null;
       this._channels = 0;
@@ -251,13 +246,19 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, numChannels, bufnum, phase, loop, interpolation]);
+        if (typeof numChannels !== "number") {
+          throw new TypeError("PlayBuf: numChannels should be an integer.");
+        }
+        return this.multiNew(C.AUDIO, numChannels, bufnum, phase, loop, interpolation);
       }
     },
     $kr: {
       defaults: "numChannels=0,bufnum=0,phase=0,loop=1,interpolation=2",
       ctor: function(numChannels, bufnum, phase, loop, interpolation) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, numChannels, bufnum, phase, loop, interpolation]);
+        if (typeof numChannels !== "number") {
+          throw new TypeError("PlayBuf: numChannels should be an integer.");
+        }
+        return this.multiNew(C.CONTROL, numChannels, bufnum, phase, loop, interpolation);
       }
     },
     init: function(numChannels) {
@@ -367,13 +368,13 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum]);
+        return this.multiNew(C.CONTROL, bufnum);
       }
     },
     $ir: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, bufnum]); // TODO: SCALAR rate
+        return this.multiNew(C.CONTROL, bufnum); // TODO: SCALAR rate
       }
     }
   };

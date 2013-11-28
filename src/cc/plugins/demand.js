@@ -37,13 +37,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "trig=0,reset=0,demandUGens=[]",
       ctor: function(trig, reset, demandUGens) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, trig, reset].concat(demandUGens));
+        return this.multiNewList([C.AUDIO, trig, reset].concat(demandUGens));
       }
     },
     $kr: {
       defaults: "trig=0,reset=0,demandUGens=[]",
       ctor: function(trig, reset, demandUGens) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, trig, reset].concat(demandUGens));
+        return this.multiNewList([C.CONTROL, trig, reset].concat(demandUGens));
       }
     },
     init: function() {
@@ -108,7 +108,7 @@ define(function(require, exports, module) {
     $new: {
       defaults: "list=[],repeats=1",
       ctor: function(list, repeats) {
-        return cc.ugen.multiNewList(this, [C.DEMAND, repeats].concat(list));
+        return this.multiNewList([C.DEMAND, repeats].concat(list));
       }
     }
   };

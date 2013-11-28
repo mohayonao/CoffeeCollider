@@ -32,14 +32,14 @@ define(function(require, exports, module) {
       defaults: "envelope,gate=1,levelScale=1,levelBias=0,timeScale=1,doneAction=0",
       ctor: function(envelope, gate, levelScale, levelBias, timeScale, doneAction) {
         envelope = convertEnv(envelope)[0]; // TODO: unbubble
-        return cc.ugen.multiNewList(this, [C.AUDIO, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
+        return this.multiNewList([C.AUDIO, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
       }
     },
     $kr: {
       defaults: "envelope,gate=1,levelScale=1,levelBias=0,timeScale=1,doneAction=0",
       ctor: function(envelope, gate, levelScale, levelBias, timeScale, doneAction) {
         envelope = convertEnv(envelope)[0]; // TODO: unbubble
-        return cc.ugen.multiNewList(this, [C.CONTROL, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
+        return this.multiNewList([C.CONTROL, gate, levelScale, levelBias, timeScale, doneAction].concat(envelope));
       }
     }
   };
@@ -486,7 +486,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "gate=1,attackTime=0.01,susLevel=1,releaseTime=1,doneAction=0",
       ctor: function(gate, attackTime, susLevel, releaseTime, doneAction) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, gate, attackTime, susLevel, releaseTime, doneAction]);
+        return this.multiNew(C.CONTROL, gate, attackTime, susLevel, releaseTime, doneAction);
       }
     }
   };

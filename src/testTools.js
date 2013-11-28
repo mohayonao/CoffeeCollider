@@ -95,6 +95,171 @@ define(function(require, exports, module) {
     return list;
   };
   
+  var registerUGen = function(name) {
+    if (cc.ugen.specs[name]) {
+      cc.ugen.register(name, cc.ugen.specs[name]);
+    } else {
+      throw new Error(name + " is not defined.")
+    }
+  };
+
+  var ugenTestSuite = (function() {
+    var str2rate = function(str) {
+      return {ar:C.AUDIO,kr:C.CONTROL,ir:C.SCALAR,demand:C.DEMAND}[str];
+    };
+    var asUGenInput = function(val) {
+      if (typeof testSuite[val] === "function") {
+        return testSuite[val]();
+      }
+      return val;
+    };
+    var args2defaults = function(args) {
+      var params = [], inputs = [];
+      for (var i = 0; i < args.length; i += 2) {
+        if (args[i].charAt(0) !== "-") {
+          var x = asUGenInput(args[i+1]);
+          if (args[i].charAt(0) === "+") {
+            params.push(x);
+          }
+          inputs.push(x);
+        }
+      }
+      return {
+        params:params, inputs:inputs
+      }
+    };
+    var args2customs = function(args) {
+      var params = {}, inputs = [];
+      for (var i = 0; i < args.length; i += 2) {
+        if (args[i].charAt(0) !== "-") {
+          var name = args[i];
+          var x    = args[i+1];
+          x = typeof x === "number" ? (x + 1) : asUGenInput(x);
+          if (name.charAt(0) === "+") {
+            name = name.substr(1);
+          }
+          inputs.push( params[name] = x );
+        }
+      }
+      return {
+        params:params, inputs:inputs
+      }
+    };
+    var testSuite = function(name, specs) {
+      if (!Array.isArray(name)) {
+        name = [ name ];
+      }
+      name.forEach(function(name) {
+        if (cc.ugen.specs[name]) {
+          cc.ugen.register(name, cc.ugen.specs[name]);
+        } else {
+          throw new Error(name + " is not defined.")
+        }
+        describe("UGen:" + name, function() {
+          var _createMulAdd, _createBinaryOpUGen;
+          before(function() {
+            _createMulAdd = cc.createMulAdd;
+            _createBinaryOpUGen = cc.createBinaryOpUGen;
+            cc.createMulAdd = function(_in) { return _in; }
+            cc.createBinaryOpUGen = function(selector, a, b) { return a; }
+          });
+          after(function() {
+            cc.createMulAdd = _createMulAdd;
+            cc.createBinaryOpUGen = _createBinaryOpUGen;
+          });
+          var tests = specs;
+          var Klass = cc.global[name];
+          if (typeof specs === "function") {
+            tests = specs(Klass);
+          }
+          Object.keys(tests).forEach(function(name) {
+            var test = tests[name];
+            if (typeof test === "function") {
+              it(name, test);
+            } else {
+              if (Array.isArray(test)) {
+                test.ok = test;
+              }
+              if (test.ok) {
+                it(name, (function(args) {
+                  var check = function(args) {
+                    var defaults = args2defaults(args);
+                    var u1 = Klass[name].apply(null, defaults.params);
+                    assert.equal(u1.rate, str2rate(name), "unexpected rate");
+                    assert.deepEqual(u1.inputs, defaults.inputs, "unexpected inputs");
+                    
+                    var customs = args2customs(args);
+                    var u2 = Klass[name](customs.params);
+                    assert.equal(u2.rate, str2rate(name), "unexpected rate");
+                    assert.deepEqual(u2.inputs, customs.inputs, "unexpected inputs");
+                  };
+                  return function() {
+                    if (Array.isArray(args[0])) {
+                      args.forEach(function(args) {
+                        check(args);
+                      });
+                    } else {
+                      check(args);
+                    }
+                  };
+                })(test.ok));
+              }
+              if (test.ng) {
+                it(name, (function(args) {
+                  var check = function(args) {
+                    assert.throws(function() {
+                      var defaults = args2defaults(args);
+                      Klass[name].apply(null, defaults);
+                    });
+                  };
+                  return function() {
+                    if (Array.isArray(args[0])) {
+                      args.forEach(function(args) {
+                        check(args);
+                      });
+                    } else {
+                      check(args);
+                    }
+                  };
+                })(test.ng));
+              }
+            }
+          });
+        });
+      });
+      return {
+        unitTestSuite: function(specs, opts) {
+          return unitTestSuite(name, specs, opts);
+        }
+      };
+    };
+    testSuite.audio = function() {
+      var instance = new cc.UGen("Audio");
+      instance.rate = C.AUDIO;
+      this.inputs   = [ 1 ];
+      return instance;
+    };
+    testSuite.control = function() {
+      var instance = new cc.UGen("Control");
+      instance.rate = C.CONTROL;
+      this.inputs   = [ 2 ];
+      return instance;
+    };
+    testSuite.scalar = function() {
+      var instance = new cc.UGen("Scalar");
+      instance.rate = C.SCALAR;
+      this.inputs   = [ 3 ];
+      return instance;
+    };
+    testSuite.demand = function() {
+      var instance = new cc.UGen("Demand");
+      instance.rate = C.DEMAND;
+      this.inputs   = [ 4 ];
+      return instance;
+    };
+    return testSuite;
+  })();
+  
   var unitTestSuite = (function() {
     var parent = {
       controls: new Float32Array(16),
@@ -224,9 +389,8 @@ define(function(require, exports, module) {
     
     var testSuite = function(name, specs, opts) {
       opts = opts || {};
-      var desc = testSuite.desc || "test";
       var _getRateInstance;
-      describe(desc, function() {
+      describe("Unit", function() {
         before(function() {
           _getRateInstance = cc.getRateInstance;
           cc.getRateInstance = function(rate) {
@@ -320,8 +484,9 @@ define(function(require, exports, module) {
     useFourArithmeticOperations  : useFourArithmeticOperations,
     unuseFourArithmeticOperations: unuseFourArithmeticOperations,
     shouldBeImplementedMethods : shouldBeImplementedMethods,
+    registerUGen : registerUGen,
+    ugenTestSuite: ugenTestSuite,
     unitTestSuite: unitTestSuite,
-    
   };
 
 });

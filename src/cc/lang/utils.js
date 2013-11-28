@@ -34,6 +34,8 @@ define(function(require, exports, module) {
       return obj.asUGenInput();
     } else if (cc.instanceOfUGen(obj)) {
       return obj;
+    } else if (Array.isArray(obj)) {
+      return obj.map(asUGenInput);
     }
     obj = +obj;
     if (isNaN(obj)) {

@@ -10,13 +10,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "in=0,pos=0,level=1",
       ctor: function(_in, pos, level) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, _in, pos, level]);
+        return this.multiNew(C.AUDIO, _in, pos, level);
       }
     },
     $kr: {
       defaults: "in=0,pos=0,level=1",
       ctor: function(_in, pos, level) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, _in, pos, level]);
+        return this.multiNew(C.CONTROL, _in, pos, level);
       }
     },
     init: function() {
@@ -124,13 +124,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, inA, inB, pan, level]);
+        return this.multiNew(C.AUDIO, inA, inB, pan, level);
       }
     },
     $kr: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan, level]);
+        return this.multiNew(C.CONTROL, inA, inB, pan, level);
       }
     },
     checkInputs: function() {
@@ -223,13 +223,13 @@ define(function(require, exports, module) {
     $ar: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return cc.ugen.multiNewList(this, [C.AUDIO, inA, inB, pan]).__mul__(level);
+        return this.multiNew(C.AUDIO, inA, inB, pan).__mul__(level);
       }
     },
     $kr: {
       defaults: "inA=0,inB=0,pan=0,level=1",
       ctor: function(inA, inB, pan, level) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, inA, inB, pan]).__mul__(level);
+        return this.multiNew(C.CONTROL, inA, inB, pan).__mul__(level);
       }
     },
     checkInputs: function() {

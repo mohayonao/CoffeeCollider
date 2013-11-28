@@ -13,7 +13,7 @@ define(function(require, exports, module) {
         } else if (typeof warp !== "number") {
           warp = 0;
         }
-        return cc.ugen.multiNewList(this, [C.CONTROL, minval, maxval, warp, lag]);
+        return this.multiNew(C.CONTROL, minval, maxval, warp, lag);
       }
     }
   };
@@ -90,7 +90,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "minval=0,maxval=1,lag=0.2",
       ctor: function(minval, maxval, lag) {
-        return cc.ugen.multiNewList(this, [C.CONTROL, minval, maxval, lag]);
+        return this.multiNew(C.CONTROL, minval, maxval, lag);
       }
     }
   };
