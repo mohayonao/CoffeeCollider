@@ -118,7 +118,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131128154300",
+    version: "0.0.0+20131201143300",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -1089,45 +1089,8 @@ define('cc/client/compiler', function(require, exports, module) {
     return val;
   };
   
-  var getLine = function(tokens, index) {
-    var depth = 0;
-    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "(": case "{": case "[":
-      case "CALL_START": case "PARAM_START": case "INDEX_START":
-        depth += 1;
-        break;
-      case "]": case "}": case ")":
-      case "CALL_END": case "PARAM_END": case "INDEX_END":
-        depth -= 1;
-        break;
-      case "TERMINATOR":
-        if (depth === 0) {
-          result.end = i;
-        }
-        break;
-      case "INDENT":
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        if (depth === -1) {
-          result.end = i - 1;
-          result.isLastLine = true;
-        }
-        break;
-      }
-      if (result.end !== -1) {
-        break;
-      }
-    }
-    if (result.end === -1) {
-      result.end = tokens.length - 1;
-    }
-    result.len = result.end - result.begin + 1;
-    return result;
-  };
+  // var getLine = function(tokens, index) {
+  // };
   var indexOfParamEnd = function(tokens, index) {
     var bracket = 0;
     for (var i = index, imax = tokens.length; i < imax; ++i) {
@@ -1411,7 +1374,7 @@ define('cc/client/compiler', function(require, exports, module) {
 
   func.setVariables = function(stack) {
     var ignored = [
-      "cc", "global"
+      "cc", "global", "console", "setInterval", "setTimeout", "clearInterval", "clearTimeout"
     ];
     return function(name) {
       if (ignored.indexOf(name) !== -1) {
@@ -1754,33 +1717,34 @@ define('cc/client/compiler', function(require, exports, module) {
     tokens.splice.apply(tokens, subtokens);
   };
   
-
-  var task = {
-    contextMethods: ["wait", "break", "continue", "redo", "recursive", "return"]
+  var segmented = {
+    target: ["Task", "do"],
   };
-  var replaceTaskFunction = function(tokens) {
+  
+  var replaceSegmentedFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 5; i >= 0; i--) {
-      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
+    var id;
+    for (var i = tokens.length - 1; i >= 0; i--) {
+      if (tokens[i][TAG] !== "IDENTIFIER" || tokens[i+1][TAG] !== "CALL_START") {
         continue;
       }
-      var index = i;
-      while (index < tokens.length) {
-        if (tokens[index][TAG] === "CALL_START") {
-          break;
-        }
-        index += 1;
+      id = getIdentifier(tokens[i]);
+      if (segmented.target.indexOf(id) === -1) {
+        continue;
       }
-      index = indexOfFunctionStart(tokens, index+1);
+      if (/^[a-z]/.test(id) && (i === 0 || tokens[i-1][TAG] !== ".")) {
+        continue;
+      }
+      var index = indexOfFunctionStart(tokens, i + 2);
       if (index === -1) {
         continue;
       }
-      task.makeSegmentedFunction(getNextOperand(tokens, index), task.contextMethods);
+      segmented.makeSegmentedFunction(getNextOperand(tokens, index));
     }
     return tokens;
   };
   
-  task.makeSegmentedFunction = function(op, contextMethods) {
+  segmented.makeSegmentedFunction = function(op) {
     var tokens = op.tokens;
     var body   = tokens.splice(op.begin, op.end-op.begin+1);
     var after  = tokens.splice(op.begin);
@@ -1797,7 +1761,7 @@ define('cc/client/compiler', function(require, exports, module) {
     } else {
       localVars = outerVars = args = [];
     }
-    
+
     if (args.length) {
       // remove default args
       body.splice(0, indexOfParamEnd(body, 0) + 1);
@@ -1805,60 +1769,46 @@ define('cc/client/compiler', function(require, exports, module) {
     body.splice(0, 2); // remove ->, INDENT
     body.pop();        // remove OUTDENT
     
-    var replaced = [];
-    task.beginOfSegmentedFunction(replaced, outerVars);
-    {
-      task.insertLocalVariables(replaced, localVars);
-      replaced.push(["["      , "[" , _],
-                    ["INDENT" , 2   , _]);
-      var numOfSegments = 0;
-      while (body.length) {
-        if (numOfSegments++) {
-          replaced.push(["TERMINATOR", "\n", _]);
-        }
-        task.beginOfSegment(replaced, args);
-        task.insertSegment(replaced, body, contextMethods);
-        task.endOfSegment(replaced, args);
-      }
-      replaced.push(["OUTDENT", 2  , _],
-                    ["]"      , "]", _]);
-    }
-    task.endOfSegmentedFunction(replaced, outerVars);
-
+    var replaced = segmented.createSegmentedFunction(body, args, localVars);
+    
     for (var i = replaced.length; i--; ) {
-      replaced[i].cc_tasked = true;
+      replaced[i].cc_segmented = true;
     }
     tokens.push.apply(tokens, replaced);
     tokens.push.apply(tokens, after);
+    
+    return op;
   };
   
-  task.beginOfSegmentedFunction = function(tokens, outerVars) {
-    if (outerVars.length) {
-      tokens.push(["UNARY"      , "do", _],
-                  ["PARAM_START", "(" , _]);
-      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
+  segmented.createSegmentedFunction = function(body, args, localVars) {
+    var tokens = [
+      ["IDENTIFIER", "SegmentedFunction", _],
+      ["CALL_START", "("                , _],
+      ["->"        , "->"               , _],
+      ["INDENT"    , 2                  , _]
+    ];
+    {
+      segmented.insertLocalVariables(tokens, localVars);
+      tokens.push(["["      , "[" , _],
+                  ["INDENT" , 2   , _]);
+      var numOfSegments = 0;
+      while (body.length) {
+        if (numOfSegments++) {
+          tokens.push(["TERMINATOR", "\n", _]);
         }
-        tokens.push(["IDENTIFIER", outerVars[i], _]);
+        segmented.beginOfSegment(tokens, args);
+        segmented.insertSegment(tokens, body);
+        segmented.endOfSegment(tokens, args);
       }
-      tokens.push(["PARAM_END"  , ")" , _],
-                  ["->"         , "->", _],
-                  ["INDENT"     , 2   , _]);
+      tokens.push(["OUTDENT", 2  , _],
+                  ["]"      , "]", _]);
     }
-    tokens.push(["->"     , "->", _],
-                ["INDENT" , 2   , _]);
+    tokens.push(["OUTDENT" , 2  , _],
+                ["CALL_END", ")", _]);
+    return tokens;
   };
-  
-  task.endOfSegmentedFunction = function(tokens, outerVars) {
-    tokens.push(["OUTDENT", 2  , _]);
-    if (outerVars.length) {
-      tokens.push(["OUTDENT", 2  , _]);
-    }
-  };
-  
-  task.insertLocalVariables = function(tokens, localVars) {
-    if (localVars.length) {
+  segmented.insertLocalVariables = function(tokens, localVars) {
+    if (localVars && localVars.length) {
       for (var i = 0, imax = localVars.length; i < imax; i++) {
         tokens.push(["IDENTIFIER", localVars[i], _],
                     ["="         , "="         , _]);
@@ -1867,9 +1817,8 @@ define('cc/client/compiler', function(require, exports, module) {
                   ["TERMINATOR", "\n", _]);
     }
   };
-  
-  task.beginOfSegment = function(tokens, args) {
-    if (args.length) {
+  segmented.beginOfSegment = function(tokens, args) {
+    if (args && args.length) {
       tokens.push(["PARAM_START", "(", _]);
       for (var i = 0, imax = args.length; i < imax; ++i) {
         if (i) {
@@ -1882,83 +1831,95 @@ define('cc/client/compiler', function(require, exports, module) {
     tokens.push(["->"    , "->", _],
                 ["INDENT", 2   , _]);
   };
-  
-  task.endOfSegment = function(tokens) {
+  segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
   };
-  
-  task.insertSegment = function(tokens, body, contextMethods) {
-    var contextMethodCalled = false;
-    
-    while (!contextMethodCalled && body.length) {
-      var line = getLine(body, 0);
-      var closureVars = task.getClosureVariables(line);
-      
-      task.beginOfLine(tokens, line, closureVars);
-      for (var i = line.len-1; i >= 0; i--) {
-        if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
-          if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
-            contextMethodCalled = true;
-          }
+  segmented.insertSegment = function(tokens, body) {
+    var line = segmented.fetchLine(body);
+    var depth = 0;
+    var cond  = false;
+    var block;
+    LOOP:
+    while (line.length) {
+      var token = line.shift();
+      tokens.push(token);
+      if (token.cc_segmented) {
+        continue;
+      }
+      switch (token[TAG]) {
+      case "INDENT":
+        if (cond) {
+          cond = false;
+          tokens.push(["BOOL"      , "true", _],
+                      ["."         , "."   , _],
+                      ["IDENTIFIER", "do"  , _],
+                      ["CALL_START", "("   , _]);
+          block = segmented.fetchBlock(line);
+          tokens.push.apply(tokens, segmented.createSegmentedFunction(block));
+          tokens.push(["CALL_END", ")", _], ["OUTDENT", 2, _]);
+          continue LOOP;
         }
-        tokens.push(body.shift());
-      }
-      task.endOfLine(tokens, line, closureVars);
-    }
-  };
-  
-  task.getClosureVariables = function(line) {
-    var tokens = line.tokens;
-    var list = [];
-    for (var i = 0, imax = line.len; i < imax; ++i) {
-      if (!tokens[i].cc_tasked && (tokens[i][TAG] === "->" || tokens[i][TAG] === "=>")) {
-        list.push.apply(list, tokens[i].cc_funcParams.outer);
-      }
-    }
-    var set = {};
-    return list.filter(function(name) {
-      return set[name] ? false : !!(set[name] = true);
-    });
-  };
-  
-  task.beginOfLine = function(tokens, line, closureVars) {
-    var i, imax;
-    if (closureVars.length) {
-      task.insertAssignment(tokens, line);
-      tokens.push(["UNARY" , "do", _],
-                  ["PARAM_START", "(", _]);
-      for (i = 0, imax = closureVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
+        depth += 1;
+        break;
+      case "OUTDENT":
+        depth -= 1;
+        break;
+      case "IF": case "ELSE":
+        if (depth === 0) {
+          cond = true;
         }
-        tokens.push(["IDENTIFIER", closureVars[i], _]);
-      }
-      tokens.push(["PARAM_END", ")" , _],
-                  ["->"       , "->", _],
-                  ["INDENT"   , 2   , _]);
-    }
-  };
-  
-  task.endOfLine = function(tokens, line, closureVars) {
-    if (closureVars.length) {
-      tokens.push(["OUTDENT"   , 2   , _],
-                  ["TERMINATOR", "\n", _]);
-    }
-  };
-  
-  // TODO: fix it ( destructuring assginment? )
-  task.insertAssignment = function(tokens, line) {
-    var list = [];
-    var line_tokens = line.tokens;
-    if (line_tokens[0][TAG] === "IDENTIFIER") {
-      var op = getNextOperand(line_tokens, 0);
-      if (line_tokens[op.end+1] && line_tokens[op.end+1][TAG] === "=") {
-        list = line_tokens.slice(0, op.end + 2);
+        break;
       }
     }
-    tokens.push.apply(tokens, list);
   };
-  
+  segmented.fetchLine = function(tokens) {
+    var depth = 0;
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "(": case "{": case "[":
+      case "CALL_START": case "PARAM_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case "]": case "}": case ")":
+      case "CALL_END": case "PARAM_END": case "INDEX_END":
+        depth -= 1;
+        break;
+      case "TERMINATOR":
+        if (depth === 0) {
+          return tokens.splice(0, i + 1);
+        }
+        break;
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        if (depth === 0) {
+          return tokens.splice(0, i);
+        }
+        depth -= 1;
+        break;
+      }
+    }
+    return tokens.splice(0);
+  };
+  segmented.fetchBlock = function(tokens) {
+    var depth = 0;
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        if (depth === 0) {
+          var block = tokens.splice(0, i + 1);
+          block.pop(); // remove OUTDENT
+          return block;
+        }
+        depth -= 1;
+      }
+    }
+    return tokens.splice(0);
+  };
   
   var replaceGlobalVariables = function(tokens) {
     for (var i = tokens.length-1; i >= 0; i--) {
@@ -2059,7 +2020,7 @@ define('cc/client/compiler', function(require, exports, module) {
         return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
       case "{":
         return "{";
-      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
+      case ",": case "RELATION": case "IF": case "ELSE": case "SWITCH": case "LEADING_WHEN":
         return token[VALUE] + " ";
       case "=": case "COMPARE": case "MATH": case "LOGIC":
         return " " + token[VALUE] + " ";
@@ -2088,7 +2049,7 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceTaskFunction(tokens);
+        tokens = replaceSegmentedFunction(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
@@ -2128,7 +2089,7 @@ define('cc/client/compiler', function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceTaskFunction      : replaceTaskFunction,
+    replaceSegmentedFunction : replaceSegmentedFunction,
     replaceGlobalVariables   : replaceGlobalVariables,
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
@@ -2456,7 +2417,7 @@ define('cc/lang/lang', function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthLang.prototype.play = function(msg) {
-      this.taskManager.play((this.bufLength / this.sampleRate) * 1000);
+      this.taskManager.start((this.bufLength / this.sampleRate) * 1000);
       this.sendToServer(msg);
     };
     SynthLang.prototype.pause = function(msg) {
@@ -2582,6 +2543,7 @@ define('cc/lang/lang', function(require, exports, module) {
   require("./boolean");
   require("./buffer");
   require("./builtin");
+  require("./bus");
   require("./date");
   require("./env");
   require("./function");
@@ -2590,6 +2552,7 @@ define('cc/lang/lang', function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
+  require("./seg");
   require("./scale");
   require("./string");
   require("./synthdef");
@@ -2679,6 +2642,7 @@ define('cc/lang/array', function(require, exports, module) {
   fn.defineProperty(Array.prototype, "copy", function() {
     return this.slice();
   });
+  
   fn.defineProperty(Array.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -2686,6 +2650,31 @@ define('cc/lang/array', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Array.prototype, "do", function(func) {
+    var list = this;
+    if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.currentSegHandler) {
+        cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsArray(list));
+      } else {
+        list.forEach(function(x, i) {
+          func.clone().perform([x, i]);
+        });
+      }
+    } else {
+      list.forEach(func);
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Array.prototype, "wait", function(logic) {
+    var list = this;
+    if (cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenArray(list, logic));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Array.prototype, "asUGenInput", function() {
     return this.map(utils.asUGenInput);
   });
@@ -3727,6 +3716,8 @@ define('cc/common/ops', function(require, exports, module) {
   var COMMONS = {
     copy: "",
     dup : "n=2",
+    "do": "",
+    wait: "",
     asUGenInput: "",
   };
   
@@ -3762,6 +3753,7 @@ define('cc/lang/boolean', function(require, exports, module) {
   fn.defineProperty(Boolean.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(Boolean.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -3769,6 +3761,31 @@ define('cc/lang/boolean', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Boolean.prototype, "do", function(func) {
+    var flag = this;
+    if (flag) {
+      if (cc.instanceOfSegmentedFunction(func)) {
+        if (cc.currentSegHandler) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+        } else {
+          func.clone().perform(flag);
+        }
+      } else {
+        func(flag);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Boolean.prototype, "wait", function() {
+    var flag = this;
+    if (flag && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenBoolean(flag));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Boolean.prototype, "asUGenInput", function() {
     return !!this;
   });
@@ -4042,6 +4059,68 @@ define('cc/lang/builtin', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/lang/bus', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var fn = require("./fn");
+  var extend = require("../common/extend");
+  
+  var bus_allocator = {
+    audio:2, control:0
+  };
+  
+  var Bus = (function() {
+    function Bus(rate, index, numChannels) {
+      this.rate  = rate;
+      this.index = index;
+      this.numChannels = numChannels;
+    }
+    extend(Bus, cc.Object);
+    
+    Bus.prototype.asUGenInput = function() {
+      return this.index;
+    };
+    
+    return Bus;
+  })();
+
+  cc.global.Bus = function() {
+  };
+  
+  cc.global.Bus.control = fn(function(numChannels) {
+    var index = bus_allocator.control;
+    if (typeof numChannels === "number") {
+      if (128 < bus_allocator.control + numChannels) {
+        throw new Error("Bus: failed to get a control bus allocated.");
+      }
+      bus_allocator.control += numChannels;
+    } else {
+      numChannels = 0;
+    }
+    return new Bus(2, index, numChannels);
+  }).defaults("numChannels=1").build();
+  
+  cc.global.Bus.audio = fn(function(numChannels) {
+    var index = bus_allocator.audio;
+    if (typeof numChannels === "number") {
+      if (16 < bus_allocator.audio + numChannels) {
+        throw new Error("Bus: failed to get an audio bus allocated.");
+      }
+      bus_allocator.audio += numChannels;
+    } else {
+      numChannels = 0;
+    }
+    return new Bus(2, index, numChannels);
+  }).defaults("numChannels=1").build();
+  
+  cc.resetBus = function() {
+    bus_allocator.audio   = 2;
+    bus_allocator.control = 0;
+  };
+  
+  module.exports = {};
+
+});
 define('cc/lang/date', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -4053,6 +4132,7 @@ define('cc/lang/date', function(require, exports, module) {
   fn.defineProperty(Date.prototype, "copy", function() {
     return new Date(+this);
   });
+  
   fn.defineProperty(Date.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -4060,6 +4140,31 @@ define('cc/lang/date', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Date.prototype, "do", function(func) {
+    var flag = Date.now() > (+this);
+    if (flag) {
+      if (cc.instanceOfSegmentedFunction(func)) {
+        if (cc.currentSegHandler) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+        } else {
+          func.clone().perform(flag);
+        }
+      } else {
+        func(flag);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Date.prototype, "wait", function() {
+    var flag = Date.now() > (+this);
+    if (flag && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenDate(this));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Date.prototype, "asUGenInput", function() {
     return +this;
   });
@@ -4298,6 +4403,7 @@ define('cc/lang/function', function(require, exports, module) {
   fn.defineProperty(Function.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);
@@ -4306,6 +4412,18 @@ define('cc/lang/function', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Function.prototype, "do", function() {
+    throw "not implemented";
+  });
+  
+  fn.defineProperty(Function.prototype, "wait", function() {
+    if (cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenFunction(this));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Function.prototype, "asUGenInput", function() {
     return utils.asUGenInput(this());
   });
@@ -4700,7 +4818,34 @@ define('cc/lang/number', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
+  
+  fn.defineProperty(Number.prototype, "do", function(func) {
+    var i, n = this;
+    if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.currentSegHandler) {
+        if (n > 0) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+        }
+      } else {
+        for (i = 0; i < n; ++i) {
+          func.clone().perform(i);
+        }
+      }
+    } else {
+      for (i = 0; i < n; ++i) {
+        func(i);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "wait", function() {
+    var n = this;
+    if (n >= 0 && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenNumber(n));
+    }
+    return this;
+  });
   fn.defineProperty(Number.prototype, "asUGenInput", function() {
     return this;
   });
@@ -5670,6 +5815,84 @@ define('cc/lang/pattern', function(require, exports, module) {
   };
 
 });
+define('cc/lang/seg', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var extend = require("../common/extend");
+  var slice = [].slice;
+  
+  var SegmentedFunction = (function() {
+    function SegmentedFunction(init) {
+      this.klassName = "SegmentedFunction";
+      if (init instanceof SegmentedFunction) {
+        this._segments = init._segments;
+      } else if (typeof init === "function") {
+        this._segments = init();
+      } else {
+        this._segments = [];
+      }
+      this._state = this._segments.length ? 1 : 2;
+      this._pc = 0;
+      this._paused = false;
+    }
+    extend(SegmentedFunction, cc.Object);
+    
+    SegmentedFunction.prototype.clone = function() {
+      return new SegmentedFunction(this);
+    };
+    
+    SegmentedFunction.prototype.reset = function() {
+      this._state = this._segments.length ? 1 : 2;
+      this._pc = 0;
+    };
+    
+    SegmentedFunction.prototype.perform = function() {
+      var segments = this._segments;
+      var pc = this._pc, pcmax = segments.length;
+      var args = slice.call(arguments);
+      
+      cc.currentSegmentedFunction = this;
+      this._paused = false;
+      while (pc < pcmax) {
+        segments[pc++].apply(null, args);
+        if (this._paused) {
+          break;
+        }
+      }
+      if (pcmax <= pc && !(this._paused)) {
+        this._state = 2;
+      }
+      this._paused = false;
+      cc.currentSegmentedFunction = null;
+      this._pc = pc;
+    };
+    
+    SegmentedFunction.prototype.performWait = function() {
+      return this._state === 1;
+    };
+    
+    SegmentedFunction.prototype.performWaitState = SegmentedFunction.prototype.performWait;
+    
+    return SegmentedFunction;
+  })();
+  
+  cc.global.SegmentedFunction = function(init) {
+    return new SegmentedFunction(init);
+  };
+  cc.instanceOfSegmentedFunction = function(obj) {
+    return obj instanceof SegmentedFunction;
+  };
+  cc.pauseSegmentedFunction = function() {
+    if (cc.currentSegmentedFunction) {
+      cc.currentSegmentedFunction._paused = true;
+    }
+  };
+  
+  module.exports = {
+    SegmentedFunction: SegmentedFunction,
+  };
+
+});
 define('cc/lang/scale', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -6530,6 +6753,7 @@ define('cc/lang/string', function(require, exports, module) {
   fn.defineProperty(String.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(String.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -6537,6 +6761,15 @@ define('cc/lang/string', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+
+  fn.defineProperty(String.prototype, "do", function() {
+    throw "not implemented";
+  });
+  
+  fn.defineProperty(String.prototype, "wait", function() {
+    return this;
+  });
+  
   fn.defineProperty(String.prototype, "asUGenInput", function() {
     return this;
   });
@@ -6928,466 +7161,508 @@ define('cc/lang/synthdef', function(require, exports, module) {
 define('cc/lang/task', function(require, exports, module) {
 
   var cc = require("./cc");
-  var extend  = require("../common/extend");
-  var emitter = require("../common/emitter");
-  var slice = [].slice;
-
+  var extend = require("../common/extend");
+  
+  var valueOf = function(obj) {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    return obj.valueOf();
+  };
+  
   var TaskManager = (function() {
     function TaskManager() {
       this.klassName = "TaskManager";
       this.tasks = [];
       this.counterIncr = 0;
     }
-    extend(TaskManager, cc.Object);
     
-    TaskManager.prototype.play = function(counterIncr) {
+    TaskManager.prototype.start = function(counterIncr) {
       this.counterIncr = Math.max(1, counterIncr);
     };
-    TaskManager.prototype.pause = function() {
+    
+    TaskManager.prototype.stop = function() {
       this.counterIncr = 0;
     };
+    
     TaskManager.prototype.reset = function() {
-      this.tasks = [];
+      this.tasks.splice(0);
     };
+    
     TaskManager.prototype.append = function(task) {
       var index = this.tasks.indexOf(task);
       if (index === -1) {
         this.tasks.push(task);
       }
     };
+    
     TaskManager.prototype.remove = function(task) {
       var index = this.tasks.indexOf(task);
       if (index !== -1) {
         this.tasks.splice(index, 1);
       }
     };
+    
     TaskManager.prototype.process = function() {
       var counterIncr = this.counterIncr;
-      var tasks = this.tasks;
-      for (var i = 0; i < tasks.length; ++i) {
-        tasks[i].process(counterIncr);
+      if (counterIncr) {
+        var tasks = this.tasks;
+        for (var i = 0; i < tasks.length; ++i) {
+          tasks[i].performWait(counterIncr);
+        }
+        this.tasks = tasks.filter(function(task) {
+          return task._state === 1;
+        });
       }
     };
     
     return TaskManager;
   })();
   
-  var TaskFunction = (function() {
-    function TaskFunction(init) {
-      emitter.mixin(this);
-      this.klassName = "TaskFunction";
-      if (arguments.length === 0) {
-        this.segments = [];
-      } else if (typeof init !== "function") {
-        throw new TypeError("TaskFunction: first argument should be a Function.");
+  var Task = (function() {
+    function Task(func, iter) {
+      this.klassName = "Task";
+      if (cc.instanceOfSegmentedFunction(func)) {
+        this._func = func;
+        this._state = 0;
       } else {
-        var segments = init();
-        if (!Array.isArray(segments)) {
-          throw new TypeError("TaskFunction: invalid initialize function");
-        }
-        this.segments = segments;
+        this._func = null;
+        this._state = 2;
       }
-      this._pc = 0;
+      this._iter = iter;
+      this._wait = null;
+      this._args = valueOf(iter);
     }
-    extend(TaskFunction, cc.Object);
+    extend(Task, cc.Object);
     
-    TaskFunction.prototype.perform = function(context) {
-      var func = this.segments[this._pc++];
-      if (func) {
-        func.apply(context, slice.call(arguments, 1));
-        return true;
+    Task.prototype.start = function() {
+      this.reset();
+      if (cc.taskManager) {
+        cc.taskManager.append(this);
       }
-      return false;
+      this._state = 1;
+      return this;
     };
     
-    TaskFunction.prototype.clone = function() {
-      var newInstance = new TaskFunction();
-      newInstance.segments = this.segments;
-      return newInstance;
+    Task.prototype.resume = function() {
+      if (cc.taskManager) {
+        cc.taskManager.append(this);
+      }
+      this._state = 1;
+      return this;
     };
     
-    TaskFunction.prototype.goTo = function(pc) {
-      this._pc = Math.max(0, Math.min(pc, this.segments.length));
+    Task.prototype.pause = function() {
+      if (cc.taskManager) {
+        cc.taskManager.remove(this);
+      }
+      this._state = 0;
+      return this;
     };
     
-    return TaskFunction;
+    Task.prototype.stop = function() {
+      if (cc.taskManager) {
+        cc.taskManager.remove(this);
+      }
+      this._state = 0;
+      return this;
+    };
+    
+    Task.prototype.reset = function() {
+      if (this._func) {
+        this._func.reset();
+        this._state = 0;
+      } else {
+        this._state = 2;
+      }
+      if (this._iter) {
+        this._iter.reset();
+      }
+      this._wait = null;
+      this._args = valueOf(this._iter);
+      return this;
+    };
+    
+    Task.prototype.wait = function() {
+      if (cc.currentTask && cc.currentTask !== this) {
+        cc.currentTask.__wait__(this);
+      }
+      return this;
+    };
+    
+    Task.prototype.__seg__ = function(func, args) {
+      return this.__wait__(new Task(func, args));
+    };
+    
+    Task.prototype.__wait__ = function(task) {
+      if (this._wait) {
+        throw new Error("Task#append: wait already exists???");
+      }
+      this._wait = cc.createTaskWaitToken(task);
+      if (task instanceof Task) {
+        task._state = 1;
+      }
+      cc.pauseSegmentedFunction();
+      return this;
+    };
+    
+    Task.prototype.performWait = function(counterIncr) {
+      var _currentSegHandler = cc.currentSegHandler;
+      var _currentTask       = cc.currentTask;
+      var func = this._func;
+      var iter = this._iter;
+      
+      cc.currentSegHandler = this;
+      cc.currentTask       = this;
+      
+      while (true) {
+        if (this._wait) {
+          if (this._wait.performWait(counterIncr)) {
+            break;
+          }
+          this._wait = null;
+        }
+        counterIncr = 0;
+        
+        func.perform.apply(func, this._args);
+        
+        if (this._wait) {
+          continue;
+        }
+        
+        if (func.performWaitState()) {
+          continue;
+        }
+        
+        if (iter) {
+          this._args = iter.next();
+          if (iter.performWaitState()) {
+            func.reset();
+            continue;
+          }
+        }
+        this._state = 2;
+        break;
+      }
+      
+      cc.currentSegHandler = _currentSegHandler;
+      cc.currentTask       = _currentTask;
+      
+      return this._state === 1;
+    };
+    
+    Task.prototype.performWaitState = function() {
+      return this._state === 1;
+    };
+    
+    return Task;
+  })();
+  
+  var TaskArguments = (function() {
+    function TaskArguments() {
+      this.klassName = "TaskArguments";
+      this._args = [ 0, 0 ];
+      this._state = 1;
+    }
+    
+    TaskArguments.prototype.next = function() {
+      if (this._state === 2) {
+        return null;
+      }
+      this._state = 2;
+      return this._args;
+    };
+    
+    TaskArguments.prototype.reset = function() {
+      this._state = 1;
+      return this;
+    };
+    
+    TaskArguments.prototype.valueOf = function() {
+      return this._args;
+    };
+    
+    TaskArguments.prototype.performWait = function() {
+      return this._state === 1;
+    };
+    
+    TaskArguments.prototype.performWaitState = function() {
+      return this._state === 1;
+    };
+    
+    return TaskArguments;
   })();
 
-  var TaskWaitToken = (function() {
-    function TaskWaitToken(item) {
-      this.klassName = "TaskWaitToken";
-      this.item = item;
-      this._blocking = true;
+  var TaskArgumentsNumber = (function() {
+    function TaskArgumentsNumber(start, end, step) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsNumber";
+      this.start = start;
+      this.end   = end;
+      this.step  = step;
+      this.index = 0;
+      this.reset();
     }
-    extend(TaskWaitToken, cc.Object);
+    extend(TaskArgumentsNumber, TaskArguments);
+    
+    TaskArgumentsNumber.prototype.next = function() {
+      if (this._state === 2) {
+        return null;
+      }
+      var value = this._args[0] + this.step;
+      if (this.step >= 0) {
+        if (value <= this.end) {
+          this._args[0] = value;
+          this._args[1] = ++this.index;
+        } else {
+          this._state = 2;
+        }
+      } else {
+        if (value >= this.end) {
+          this._args[0] = value;
+          this._args[1] = ++this.index;
+        } else {
+          this._state = 2;
+        }
+      }
+      return this._state === 2 ? null : this._args;
+    };
+    
+    TaskArguments.prototype.reset = function() {
+      this.index = 0;
+      this._args  = [ this.start, this.index ];
+      this._state = 1;
+      return this;
+    };
+    
+    return TaskArgumentsNumber;
+  })();
+  
+  var TaskArgumentsArray = (function() {
+    function TaskArgumentsArray(list, reversed) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsArray";
+      this.list     = list;
+      this.reversed = reversed;
+      this.reset();
+    }
+    extend(TaskArgumentsArray, TaskArguments);
+    
+    TaskArgumentsArray.prototype.next = function() {
+      if (this._state === 2) {
+        return null;
+      }
+      if (this.reversed) {
+        this.index -= 1;
+        if (0 <= this.index) {
+          this._args = [ this.list[this.index], this.index ];
+        } else {
+          this._state = 2;
+        }
+      } else {
+        this.index += 1;
+        if (this.index < this.list.length) {
+          this._args = [ this.list[this.index], this.index ];
+        } else {
+          this._state = 2;
+        }
+      }
+      return this._state === 2 ? null : this._args;
+    };
+    
+    TaskArgumentsArray.prototype.reset = function() {
+      this.index = this.reversed ? Math.max(0, this.list.length - 1) : 0;
+      this._args = [ this.list[this.index], this.index ];
+      this._state = 1;
+      return this;
+    };
+    
+    return TaskArgumentsArray;
+  })();
+
+  var TaskArgumentsFunction = (function() {
+    function TaskArgumentsFunction(func) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsFunction";
+      this.func  = func;
+      this.index = 0;
+      this.reset();
+    }
+    extend(TaskArgumentsFunction, TaskArguments);
+    
+    TaskArgumentsFunction.prototype.next = function() {
+      if (this._state === 2) {
+        return null;
+      }
+      var value = this.func();
+      if (!!value || value === 0) {
+        this._args[0] = value;
+        this._args[1] = ++this.index;
+      } else {
+        this._state = 2;
+      }
+      return this._state === 2 ? null : this._args;
+    };
+    
+    TaskArgumentsFunction.prototype.reset = function() {
+      this._state = 1;
+      this.uninitialized = true;
+      return this;
+    };
+    
+    TaskArgumentsFunction.prototype.valueOf = function() {
+      this.index = 0;
+      if (this.uninitialized) {
+        this.uninitialized = false;
+        this._args = [ this.func(), this.index ];
+      }
+      return this._args;
+    };
+    
+    return TaskArgumentsFunction;
+  })();
+  
+  var TaskWaitToken = (function() {
+    function TaskWaitToken() {
+      this.klassName = "TaskWaitToken";
+      this._state = 1;
+    }
     
     TaskWaitToken.prototype.performWait = function() {
-      return this._blocking;
+      return this._state === 1;
+    };
+    
+    TaskWaitToken.prototype.performWaitState = function() {
+      return this._state === 1;
     };
     
     return TaskWaitToken;
   })();
 
   var TaskWaitTokenNumber = (function() {
-    function TaskWaitTokenNumber(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenNumber(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenNumber";
-      this.item *= 1000;
+      this.token = token * 1000;
     }
     extend(TaskWaitTokenNumber, TaskWaitToken);
-    
+
     TaskWaitTokenNumber.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this.item -= counterIncr;
-        if (this.item <= 0) {
-          this._blocking = false;
+      if (this._state === 1) {
+        this.token -= counterIncr;
+        if (this.token <= 0) {
+          this._state = 2;
         }
       }
-      return this._blocking;
+      return this._state === 1;
     };
     
     return TaskWaitTokenNumber;
   })();
-
+  
+  var TaskWaitTokenLogicAND = (function() {
+    function TaskWaitTokenLogicAND(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenLogicAND";
+      this.token = token.map(cc.createTaskWaitToken);
+    }
+    extend(TaskWaitTokenLogicAND, TaskWaitToken);
+    
+    TaskWaitTokenLogicAND.prototype.performWait = function(counterIncr) {
+      if (this._state === 1) {
+        this.token = this.token.filter(function(token) {
+          return token.performWait(counterIncr);
+        });
+        if (this.token.length === 0) {
+          this._state = 2;
+        }
+      }
+      return this._state === 1;
+    };
+    
+    return TaskWaitTokenLogicAND;
+  })();
+  
+  var TaskWaitTokenLogicOR = (function() {
+    function TaskWaitTokenLogicOR(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenLogicOR";
+      this.token = token.map(cc.createTaskWaitToken);
+    }
+    extend(TaskWaitTokenLogicOR, TaskWaitToken);
+    
+    TaskWaitTokenLogicOR.prototype.performWait = function(counterIncr) {
+      if (this._state === 1) {
+        var list = this.token;
+        for (var i = 0, imax = list.length; i < imax; ++i) {
+          if (!list[i].performWait(counterIncr)) {
+            this._state = 2;
+            this.token.splice(0);
+            break;
+          }
+        }
+      }
+      return this._state === 1;
+    };
+    
+    return TaskWaitTokenLogicOR;
+  })();
+  
   var TaskWaitTokenFunction = (function() {
-    function TaskWaitTokenFunction(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenFunction(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenFunction";
+      this.token = token;
     }
     extend(TaskWaitTokenFunction, TaskWaitToken);
     
     TaskWaitTokenFunction.prototype.performWait = function() {
-      if (this._blocking) {
-        this._blocking = !!this.item();
+      if (this._state === 1) {
+        var finished = this.token();
+        if (finished) {
+          this._state = 2;
+        }
       }
-      return this._blocking;
+      return this._state === 1;
     };
     
     return TaskWaitTokenFunction;
   })();
-  
+
   var TaskWaitTokenBoolean = (function() {
-    function TaskWaitTokenBoolean(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenBoolean(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenBoolean";
-      this._blocking = item;
+      this.token = token;
+      this._state = token ? 1 : 2;
     }
     extend(TaskWaitTokenBoolean, TaskWaitToken);
     
     return TaskWaitTokenBoolean;
   })();
 
-  var TaskWaitTokenBlockable = (function() {
-    function TaskWaitTokenBlockable(item) {
-      TaskWaitToken.call(this, item);
-      this.klassName = "TaskWaitTokenBlockable";
+  var TaskWaitTokenDate = (function() {
+    function TaskWaitTokenDate(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenDate";
+      this.token = +token;
     }
-    extend(TaskWaitTokenBlockable, TaskWaitToken);
+    extend(TaskWaitTokenDate, TaskWaitToken);
     
-    TaskWaitTokenBlockable.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this._blocking = this.item.performWait(counterIncr);
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenBlockable;
-  })();
-
-  var TaskWaitTokenLogicAND = (function() {
-    function TaskWaitTokenLogicAND(list) {
-      TaskWaitToken.call(this, []);
-      this.klassName = "TaskWaitTokenLogicAND";
-      var item = [];
-      list.forEach(function(token) {
-        if (token instanceof TaskWaitTokenLogicAND) {
-          item = item.concat(token.item);
-        } else {
-          item.push(token);
-        }
-      });
-      this.item = item;
-    }
-    extend(TaskWaitTokenLogicAND, TaskWaitToken);
-    
-    TaskWaitTokenLogicAND.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this.item = this.item.filter(function(token) {
-          return token.performWait(counterIncr);
-        });
-        this._blocking = this.item.length > 0;
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenLogicAND;
-  })();
-
-  var TaskWaitTokenLogicOR = (function() {
-    function TaskWaitTokenLogicOR(list) {
-      TaskWaitToken.call(this, []);
-      var item = [];
-      list.forEach(function(token) {
-        if (token instanceof TaskWaitTokenLogicOR) {
-          item = item.concat(token.item);
-        } else {
-          item.push(token);
-        }
-      });
-      this.item = item;
-    }
-    extend(TaskWaitTokenLogicOR, TaskWaitToken);
-    
-    TaskWaitTokenLogicOR.prototype.performWait = function(counterIncr) {
-      var blocking = true;
-      this.item = this.item.filter(function(token) {
-        var _blocking = token.performWait(counterIncr);
-        blocking = _blocking && blocking;
-        return _blocking;
-      });
-      if (this._blocking) {
-        this._blocking = blocking;
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenLogicOR;
-  })();
-  
-  var TaskProcessor = (function() {
-    function TaskProcessor(func) {
-      var that = this;
-      
-      emitter.mixin(this);
-      this.klassName = "TaskProcessor";
-      this.taskManager  = cc.taskManager;
-      this._blocking = true;
-      this._func  = func;
-      this._count = 0;
-      this._prev = null;
-      this._next = null;
-      this._wait = null;
-      this._context = {
-        wait: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-        },
-        continue: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-          that._func.goTo(0);
-          that._done();
-        },
-        redo: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-          that._func.goTo(0);
-        },
-        break: function() {
-          that._func.goTo(Infinity);
-          that.stop();
-        }
-      };
-    }
-    extend(TaskProcessor, cc.Object);
-    
-    TaskProcessor.prototype.play = function() {
-      var that = this;
-      // rewind to the head task of a chain
-      while (that._prev !== null) {
-        that = that._prev;
-      }
-      if (that.taskManager) {
-        cc.taskManager.append(that);
-      }
-      this._blocking = true;
-      return this;
-    };
-    TaskProcessor.prototype.pause = function() {
-      if (this.taskManager) {
-        this.taskManager.remove(this);
-      }
-      this._blocking = false;
-      return this;
-    };
-    TaskProcessor.prototype.stop = function() {
-      if (this.taskManager) {
-        this.taskManager.remove(this);
-        this.emit("end");
-        if (this._next) {
-          this._next._prev = null;
-          this._next.play();
-          this._next = null;
+    TaskWaitTokenDate.prototype.performWait = function() {
+      if (this._state === 1) {
+        if (Date.now() > this.token) {
+          this._state = 2;
         }
       }
-      this._count    = 0;
-      this._blocking = false;
-      this.taskManager = null;
-      return this;
-    };
-    TaskProcessor.prototype.process = function(counterIncr) {
-      var blocking;
-      while (this._blocking) {
-        if (this._wait) {
-          blocking = this._wait.performWait(counterIncr);
-          if (blocking) {
-            return;
-          }
-          this._wait = null;
-        }
-        blocking = this._execute(this._count);
-        if (!blocking) {
-          this._done();
-        }
-        counterIncr  = 0;
-      }
-    };
-    TaskProcessor.prototype._execute = function() {
-      return this._func.perform(this._context, this._count);
-    };
-    TaskProcessor.prototype.performWait = function() {
-      return this._blocking;
+      return this._state === 1;
     };
     
-    // task chain methods
-    TaskProcessor.prototype["do"] = function(num, func) {
-      var next = new TaskProcessorDo(num, func);
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    TaskProcessor.prototype.loop = function(func) {
-      var next = new TaskProcessorDo(Infinity, func);
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    TaskProcessor.prototype.each = function(list, func) {
-      var next = new TaskProcessorEach(list, cc.createTaskFunction(func));
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    
-    return TaskProcessor;
-  })();
-  
-  var TaskProcessorDo = (function() {
-    function TaskProcessorDo() {
-      var num, func;
-      var i = 0;
-      if (typeof arguments[i] === "number") {
-        num = arguments[i++];
-      }
-      if (typeof arguments[i] === "function") {
-        func = cc.createTaskFunction(arguments[i++]);
-      } else if (func instanceof TaskFunction) {
-        func = arguments[i++];
-      }
-      TaskProcessor.call(this, func);
-      
-      if (num !== Infinity) {
-        num = num|0;
-      }
-      this._num = num;
-      
-      if (num === Infinity) {
-        this.klassName = "TaskProcessorLoop";
-      } else {
-        this.klassName = "TaskProcessorDo";
-      }
-    }
-    extend(TaskProcessorDo, TaskProcessor);
-    
-    TaskProcessorDo.prototype._done = function() {
-      this._count += 1;
-      if (this._count < this._num) {
-        this._func.goTo(0);
-      } else {
-        this.stop();
-      }
-    };
-    
-    return TaskProcessorDo;
-  })();
-
-  var TaskProcessorEach = (function() {
-    function TaskProcessorEach(list, func) {
-      if (!(Array.isArray(list))) {
-        throw new TypeError("Task.each: First argument must be an Array.");
-      }
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorEach";
-      this._list = list;
-    }
-    extend(TaskProcessorEach, TaskProcessor);
-    
-    TaskProcessorEach.prototype._execute = function() {
-      return this._func.perform(this._context, this._list[this._count], this._count);
-    };
-    TaskProcessorEach.prototype._done = function() {
-      this._count += 1;
-      if (this._count < this._list.length) {
-        this._func.goTo(0);
-      } else {
-        this.stop();
-      }
-    };
-    
-    return TaskProcessorEach;
-  })();
-
-  var TaskProcessorRecursive = (function() {
-    function TaskProcessorRecursive(func) {
-      var that = this;
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorRecursive";
-      this._value   = 0;
-      this._args    = [];
-      this._context.recursive = function() {
-        var next = new TaskProcessorRecursive(func.clone());
-        next.play.apply(next, slice.call(arguments));
-        that._wait = cc.createTaskWaitToken(next);
-        return next;
-      };
-      this._context["return"] = function(value) {
-        that._value = value;
-        that.stop();
-      };
-    }
-    extend(TaskProcessorRecursive, TaskProcessor);
-    
-    TaskProcessorRecursive.prototype.play = function() {
-      this._args = slice.call(arguments).map(function(value) {
-        if (value instanceof TaskProcessorRecursive) {
-          value = value._value;
-        }
-        return value;
-      });
-      TaskProcessor.prototype.play.call(this);
-      return this;
-    };
-    TaskProcessorRecursive.prototype._execute = function() {
-      return this._func.perform.apply(this._func, [this._context].concat(this._args));
-    };
-    TaskProcessorRecursive.prototype._done = function() {
-      this.stop();
-    };
-    
-    return TaskProcessorRecursive;
+    return TaskWaitTokenDate;
   })();
   
   cc.global.Task = function(func) {
-    return cc.createTaskFunction(func);
-  };
-  cc.global.Task["do"] = function(num, func) {
-    return new TaskProcessorDo(num, func);
-  };
-  cc.global.Task.loop = function(func) {
-    return new TaskProcessorDo(Infinity, func);
-  };
-  cc.global.Task.each = function(list, func) {
-    return new TaskProcessorEach(list, cc.createTaskFunction(func));
-  };
-  cc.global.Task.recursive = function(func) {
-    return new TaskProcessorRecursive(cc.createTaskFunction(func));
+    return new Task(func);
   };
   
   cc.createTaskManager = function() {
@@ -7397,59 +7672,81 @@ define('cc/lang/task', function(require, exports, module) {
   cc.instanceOfTaskManager = function(obj) {
     return obj instanceof TaskManager;
   };
-  cc.createTaskFunction = function(init) {
-    return new TaskFunction(init);
+  cc.createTask = function(func, iter) {
+    return new Task(func, iter);
   };
-  cc.instanceOfTaskFunction = function(obj) {
-    return obj instanceof TaskFunction;
+  cc.instanceOfTask = function(obj) {
+    return obj instanceof Task;
   };
-  cc.createTaskWaitToken = function(item) {
-    if (item instanceof TaskWaitToken) {
-      return item;
+  cc.instanceOfTaskArguments = function(obj) {
+    return obj instanceof TaskArguments;
+  };
+  cc.createTaskArgumentsNumber = function(start, end, step) {
+    return new TaskArgumentsNumber(start, end, step);
+  };
+  cc.createTaskArgumentsArray = function(list, reversed) {
+    return new TaskArgumentsArray(list, !!reversed);
+  };
+  cc.createTaskArgumentsFunction = function(func) {
+    return new TaskArgumentsFunction(func);
+  };
+  cc.createTaskArgumentsBoolean = function(flag) {
+    return new TaskArgumentsArray([flag]);
+  };
+  cc.createTaskWaitToken = function(token, logic) {
+    if (token && typeof token.performWait === "function") {
+      return token;
     }
-    switch (typeof item) {
-    case "number":
-      return new TaskWaitTokenNumber(item);
-    case "function":
-      return new TaskWaitTokenFunction(item);
-    case "boolean":
-      return new TaskWaitTokenBoolean(item);
-    default:
-      if (Array.isArray(item)) {
-        return cc.createTaskWaitLogic("and", item);
-      } else if (item && typeof item.performWait === "function") {
-        return new TaskWaitTokenBlockable(item);
-      }
+    switch (typeof token) {
+    case "number"  : return new TaskWaitTokenNumber(token);
+    case "function": return new TaskWaitTokenFunction(token);
+    case "boolean" : return new TaskWaitTokenBoolean(token);
     }
-    throw new TypeError("TaskWaitToken: Invalid type");
+    if (Array.isArray(token)) {
+      return cc.createTaskWaitTokenArray(token, logic);
+    }
+    if (token instanceof Date) {
+      return new TaskWaitTokenDate(token);
+    }
+    return new TaskWaitTokenBoolean(false);
   };
   cc.instanceOfTaskWaitToken = function(obj) {
     return obj instanceof TaskWaitToken;
   };
-  cc.createTaskWaitLogic = function(logic, list) {
-    list = list.map(function(token) {
-      return cc.createTaskWaitToken(token);
-    });
-    if (logic === "and") {
-      return new TaskWaitTokenLogicAND(list);
+  cc.createTaskWaitTokenNumber = function(token) {
+    return new TaskWaitTokenNumber(token);
+  };
+  cc.createTaskWaitTokenArray = function(token, logic) {
+    if (logic === "or") {
+      return new TaskWaitTokenLogicOR(token);
+    } else {
+      return new TaskWaitTokenLogicAND(token);
     }
-    return new TaskWaitTokenLogicOR(list);
+  };
+  cc.createTaskWaitTokenFunction = function(token) {
+    return new TaskWaitTokenFunction(token);
+  };
+  cc.createTaskWaitTokenBoolean = function(token) {
+    return new TaskWaitTokenBoolean(token);
+  };
+  cc.createTaskWaitTokenDate = function(token) {
+    return new TaskWaitTokenDate(token);
   };
   
   module.exports = {
-    TaskManager  : TaskManager,
-    TaskFunction : TaskFunction,
-    TaskWaitToken         : TaskWaitToken,
-    TaskWaitTokenNumber   : TaskWaitTokenNumber,
-    TaskWaitTokenFunction : TaskWaitTokenFunction,
-    TaskWaitTokenBoolean  : TaskWaitTokenBoolean,
-    TaskWaitTokenBlockable: TaskWaitTokenBlockable,
-    TaskWaitTokenLogicAND : TaskWaitTokenLogicAND,
-    TaskWaitTokenLogicOR  : TaskWaitTokenLogicOR,
-    TaskProcessor         : TaskProcessor,
-    TaskProcessorDo       : TaskProcessorDo,
-    TaskProcessorEach     : TaskProcessorEach,
-    TaskProcessorRecursive: TaskProcessorRecursive,
+    TaskManager : TaskManager,
+    Task        : Task,
+    TaskArguments        : TaskArguments,
+    TaskArgumentsNumber  : TaskArgumentsNumber,
+    TaskArgumentsArray   : TaskArgumentsArray,
+    TaskArgumentsFunction: TaskArgumentsFunction,
+    TaskWaitToken        : TaskWaitToken,
+    TaskWaitTokenNumber  : TaskWaitTokenNumber,
+    TaskWaitTokenLogicAND: TaskWaitTokenLogicAND,
+    TaskWaitTokenLogicOR : TaskWaitTokenLogicOR,
+    TaskWaitTokenFunction: TaskWaitTokenFunction,
+    TaskWaitTokenBoolean : TaskWaitTokenBoolean,
+    TaskWaitTokenDate    : TaskWaitTokenDate,
   };
 
 });
@@ -7544,6 +7841,7 @@ define('cc/lang/ugen', function(require, exports, module) {
     UGen.prototype.copy = function() {
       return this;
     };
+    
     UGen.prototype.dup = fn(function(n) {
       var a = new Array(n|0);
       for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -7551,9 +7849,19 @@ define('cc/lang/ugen', function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
+
+    UGen.prototype["do"] = function() {
+      return this;
+    };
+    
+    UGen.prototype.wait = function() {
+      return this;
+    };
+    
     UGen.prototype.asUGenInput = function() {
       return this;
     };
+    
     UGen.prototype.toString = function() {
       return this.klassName;
     };
@@ -8971,63 +9279,29 @@ define('cc/plugins/decay', function(require, exports, module) {
   
   cc.unit.specs.Integrator = (function() {
     var ctor = function() {
-      if (this.inRates[1] === 0) {
-        this.process = next_i;
-      } else {
-        this.process = next;
-      }
+      this.process = next;
       this._b1 = this.inputs[1][0];
       this._y1 = 0;
       next.call(this, 1);
     };
-    var next_i = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var inIn = this.inputs[0];
-      var b1 = this._b1;
-      var y1 = this._y1;
-      var i;
-      if (b1 === 1) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + y1);
-        }
-      } else if (b1 === 0) {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = inIn[i];
-        }
-      } else {
-        for (i = 0; i < inNumSamples; ++i) {
-          out[i] = y1 = (inIn[i] + b1 * y1);
-        }
-      }
-      this._y1 = y1;
-    };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
       var inIn = this.inputs[0];
-      var b1 = this.inputs[1][0];
+      var nextB1 = this.inputs[1][0];
+      var b1 = this._b1;
       var y1 = this._y1;
       var i;
-      if (this._b1 === b1) {
-        if (b1 === 1) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + y1);
-          }
-        } else if (b1 === 0) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i];
-          }
-        } else {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1);
-          }
+      if (b1 === nextB1) {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       } else {
-        var b1_slope = (b1 - this._b1) * this.rate.slopeFactor;
+        var b1_slope = (nextB1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
-        this._b1 = b1;
+        this._b1 = nextB1;
       }
       this._y1 = y1;
     };
@@ -9066,23 +9340,18 @@ define('cc/plugins/decay', function(require, exports, module) {
       var y1 = this._y1;
       var i;
       if (decayTime === this._decayTime) {
-        if (b1 === 0) {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = inIn[i];
-          }
-        } else {
-          for (i = 0; i < inNumSamples; ++i) {
-            out[i] = y1 = (inIn[i] + b1 * y1);
-          }
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = y1 = (inIn[i] + b1 * y1);
         }
       } else {
-        this._b1 = decayTime === 0 ? 0 : Math.exp(log001 / (decayTime * this.rate.sampleRate));
+        var next_b1 = decayTime === 0 ? 0 : Math.exp(log001 / (decayTime * this.rate.sampleRate));
         this._decayTime = decayTime;
-        var b1_slope = (this._b1 - b1) * this.rate.slopeFactor;
+        var b1_slope = (next_b1 - b1) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           out[i] = y1 = (inIn[i] + b1 * y1);
           b1 += b1_slope;
         }
+        this._b1 = next_b1;
       }
       this._y1 = y1;
     };
@@ -9137,8 +9406,8 @@ define('cc/plugins/decay', function(require, exports, module) {
         this._attackTime = attackTime;
         var next_b1a = decayTime  === 0 ? 0 : Math.exp(log001 / (decayTime  * this.rate.sampleRate));
         var next_b1b = attackTime === 0 ? 0 : Math.exp(log001 / (attackTime * this.rate.sampleRate));
-        var b1a_slope = (this._b1a - next_b1a) * this.rate.slopeFactor;
-        var b1b_slope = (this._b1b - next_b1b) * this.rate.slopeFactor;
+        var b1a_slope = (next_b1a - b1a) * this.rate.slopeFactor;
+        var b1b_slope = (next_b1b - b1b) * this.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           y1a = inIn[i] + b1a * y1a;
           y1b = inIn[i] + b1b * y1b;
@@ -11465,7 +11734,7 @@ define('cc/plugins/filter', function(require, exports, module) {
       }
       for (i = inNumSamples & 3; i--; ) {
         x0 = inIn[j];
-        out[j++] = 0.5 * (x0 - x1);
+        out[j++] = sr * (x0 - x1);
         x1 = x0;
       }
       this._x1 = x1;
@@ -16133,11 +16402,6 @@ define('cc/plugins/ui', function(require, exports, module) {
     $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
-        if (warp === "exponential") {
-          warp = 1;
-        } else if (typeof warp !== "number") {
-          warp = 0;
-        }
         return this.multiNew(1, minval, maxval, warp, lag);
       }
     }
@@ -16147,13 +16411,13 @@ define('cc/plugins/ui', function(require, exports, module) {
   
   cc.unit.specs.MouseX = (function() {
     var ctor = function() {
-      this.process = next_kkkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -16181,13 +16445,13 @@ define('cc/plugins/ui', function(require, exports, module) {
 
   cc.unit.specs.MouseY = (function() {
     var ctor = function() {
-      this.process = next_kkkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0] || 0.01;
       var maxval = this.inputs[1][0];
       var warp   = this.inputs[2][0];
@@ -16222,13 +16486,13 @@ define('cc/plugins/ui', function(require, exports, module) {
   
   cc.unit.specs.MouseButton = (function() {
     var ctor = function() {
-      this.process = next_kkk;
+      this.process = next;
       this._y1  = 0;
       this._b1  = 0;
       this._lag = 0;
       this.process(1);
     };
-    var next_kkk = function(inNumSamples, instance) {
+    var next = function(inNumSamples, instance) {
       var minval = this.inputs[0][0];
       var maxval = this.inputs[1][0];
       var lag    = this.inputs[2][0];

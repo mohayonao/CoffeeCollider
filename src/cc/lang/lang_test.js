@@ -22,8 +22,8 @@ define(function(require, exports, module) {
       cc.createWebWorker = nop;
       cc.createTaskManager = function() {
         return {
-          play: function() {
-            called.push("tl.play");
+          start: function() {
+            called.push("tl.start");
           },
           reset: function() {
             called.push("tl.reset");
@@ -87,7 +87,7 @@ define(function(require, exports, module) {
         });
         it("#play", function() {
           instance.play(["/play"]);
-          assert.deepEqual(called, ["tl.play"]);
+          assert.deepEqual(called, ["tl.start"]);
           assert.deepEqual(sendToServer, ["/play"]);
         });
         it("#pause", function() {

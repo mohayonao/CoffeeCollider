@@ -2,604 +2,603 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
+  var cc = require("./cc");
+  var seg  = require("./seg");
   var task = require("./task");
   
-  var cc   = require("./cc");
-  var slice = [].slice;
-  var nop = function() {};
-  var nil;
+  var Timer = (function() {
+    function Timer(task) {
+      this.task = task;
+    }
+    Timer.prototype.process = function(msec) {
+      var i;
+      if (this.task.process) {
+        for (i = 0; i < msec; ++i) {
+          this.task.process();
+        }
+      } else {
+        for (i = 0; i < msec; ++i) {
+          this.task.performWait(1);
+        }
+      }
+    };
+    return Timer;
+  })();
   
   describe("lang/task.js", function() {
-    var func, cmd, actual;
-    before(function() {
-      func = function() {
-        return [
-          function() {
-            cmd[0].apply(this, slice.call(arguments));
-          },
-          function() {
-            cmd[1].apply(this, slice.call(arguments));
-          },
-          function() {
-            cmd[2].apply(this, slice.call(arguments));
-          },
-        ];
-      };
-    });
+    var m, f, t, w, iter, actual, expected;
+    var timer, passed;
     beforeEach(function() {
-      actual = [];
-      cmd    = [
-        function(i) {
-          actual.push([i, 1]);
-        },
-        function(i) {
-          actual.push([i, 2]);
-        },
-        function(i) {
-          actual.push([i, 3]);
-        },
-      ];
+      global.indent = 0;
+      passed = [];
     });
-    describe("TaskManager", function() {
-      it("whole", function() {
-        var tm = cc.createTaskManager();
-        assert.instanceOf(tm, task.TaskManager);
-        assert.isTrue(cc.instanceOfTaskManager(tm));
-      });      
-      it("play/pause", function() {
-        var tm = cc.createTaskManager();
-        tm.play(16);
-        assert.equal(tm.counterIncr, 16);
-        tm.play(0);
-        assert.equal(tm.counterIncr, 1);
-        tm.pause()
-        assert.equal(tm.counterIncr, 0);
+    describe("TaskArguments", function() {
+      describe("TaskArgumentsNumber", function() {
+        it("create", function() {
+          iter = cc.createTaskArgumentsNumber(0, 10, 1);
+          assert.instanceOf(iter, task.TaskArgumentsNumber);
+          assert.isTrue(cc.instanceOfTaskArguments(iter));
+        });
+        it("next(incr)", function() {
+          iter = cc.createTaskArgumentsNumber(0, 10, 2);
+          assert.deepEqual(iter.valueOf(), [ 0, 0]);
+          assert.deepEqual(iter.next()   , [ 2, 1]);
+          assert.deepEqual(iter.next()   , [ 4, 2]);
+          assert.deepEqual(iter.next()   , [ 6, 3]);
+          assert.deepEqual(iter.next()   , [ 8, 4]);
+          assert.deepEqual(iter.next()   , [10, 5]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          assert.isNull(iter.next());
+
+          iter = cc.createTaskArgumentsNumber(100, 10, 2);
+          assert.deepEqual(iter.valueOf(), [100, 0]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+        });
+        it("next(decr)", function() {
+          iter = cc.createTaskArgumentsNumber(10, 0, -2);
+          assert.deepEqual(iter.valueOf(), [10, 0]);
+          assert.deepEqual(iter.next()   , [ 8, 1]);
+          assert.deepEqual(iter.next()   , [ 6, 2]);
+          assert.deepEqual(iter.next()   , [ 4, 3]);
+          assert.deepEqual(iter.next()   , [ 2, 4]);
+          assert.deepEqual(iter.next()   , [ 0, 5]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          assert.isNull(iter.next());
+          
+          iter = cc.createTaskArgumentsNumber(10, 100, -2);
+          assert.deepEqual(iter.valueOf(), [10, 0]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+        });
+        it("reset", function() {
+          iter = cc.createTaskArgumentsNumber(0, 10, 4);
+          assert.deepEqual(iter.valueOf(), [ 0, 0]);
+          assert.deepEqual(iter.next()   , [ 4, 1]);
+          assert.deepEqual(iter.next()   , [ 8, 2]);
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          
+          iter.reset();
+          assert.isTrue(iter.performWaitState());
+          assert.deepEqual(iter.valueOf(), [ 0, 0]);
+          assert.deepEqual(iter.next()   , [ 4, 1]);
+          assert.deepEqual(iter.next()   , [ 8, 2]);
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+        });
       });
-      it("append", function() {
-        var task = {};
-        var tm = cc.createTaskManager();
-        tm.append(task);
-        assert.equal(tm.tasks.length,1);
-        tm.append(task);
-        assert.equal(tm.tasks.length,1);
-        tm.remove(task);
-        assert.equal(tm.tasks.length,0);
-        tm.remove(task);
-        assert.equal(tm.tasks.length,0);
+      describe("TaskArgumentsArray", function() {
+        it("create", function() {
+          iter = cc.createTaskArgumentsArray(["A", "B", "C"]);
+          assert.instanceOf(iter, task.TaskArgumentsArray);
+          assert.isTrue(cc.instanceOfTaskArguments(iter));
+        });
+        it("next", function() {
+          iter = cc.createTaskArgumentsArray(["A", "B", "C"]);
+          assert.deepEqual(iter.valueOf(), ["A", 0]);
+          assert.deepEqual(iter.next()   , ["B", 1]);
+          assert.deepEqual(iter.next()   , ["C", 2]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          assert.isNull(iter.next());
+        });
+        it("next(reversed)", function() {
+          iter = cc.createTaskArgumentsArray(["A", "B", "C"], true);
+          assert.deepEqual(iter.valueOf(), ["C", 2]);
+          assert.deepEqual(iter.next()   , ["B", 1]);
+          assert.deepEqual(iter.next()   , ["A", 0]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          assert.isNull(iter.next());
+        });
+        it("reset", function() {
+          iter = cc.createTaskArgumentsArray(["A", "B", "C"]);
+          assert.deepEqual(iter.valueOf(), ["A", 0]);
+          assert.deepEqual(iter.next()   , ["B", 1]);
+          assert.deepEqual(iter.next()   , ["C", 2]);
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          
+          iter.reset();
+          assert.isTrue(iter.performWaitState());
+          assert.deepEqual(iter.valueOf(), ["A", 0]);
+          assert.deepEqual(iter.next()   , ["B", 1]);
+          assert.deepEqual(iter.next()   , ["C", 2]);
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+        });
       });
-      it("process", function() {
-        var actual = 0;
-        var task = {
-          process: function(counterIncr) {
-            actual += counterIncr;
-          }
-        };
-        var tm = cc.createTaskManager();
-        tm.append(task);
-        
-        tm.process();
-        assert.equal(actual, 0);
-        
-        tm.play(16);
-        tm.process();
-        assert.equal(actual, 16);
-        
-        tm.process();
-        assert.equal(actual, 32);
-        
-        tm.pause();
-        
-        tm.process();
-        assert.equal(actual, 32);
-        
-        tm.process();
-        assert.equal(actual, 32);
+      describe("TaskArgumentsFunction", function() {
+        it("create", function() {
+          iter = cc.createTaskArgumentsFunction(function() {
+            return 1;
+          });
+          assert.instanceOf(iter, task.TaskArgumentsFunction);
+          assert.isTrue(cc.instanceOfTaskArguments(iter));
+        });
+        it("next", function() {
+          var block = true;
+          var index = 0, list = [ 10, 20, 30 ];
+          iter = cc.createTaskArgumentsFunction(function() {
+            if (block) {
+              throw "should not be called";
+            }
+            return list[index++];
+          });
+          block = false;
+          assert.deepEqual(iter.valueOf(), [10, 0]);
+          assert.deepEqual(iter.valueOf(), [10, 0]);
+          assert.deepEqual(iter.next()   , [20, 1]);
+          assert.deepEqual(iter.next()   , [30, 2]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+          assert.isNull(iter.next());
+        });
       });
-    });
-    describe("TaskFunction", function() {
-      it("create", function() {
-        var f = cc.global.Task(func);
-        assert.instanceOf(f, task.TaskFunction);
-        assert.isTrue(cc.instanceOfTaskFunction(f));
-        assert.throws(function() {
-          cc.createTaskFunction("func");
-        }, TypeError);
-        assert.throws(function() {
-          cc.createTaskFunction(function() {});
-        }, TypeError);
-      });
-      it("perform", function() {
-        var b;
-        var f = cc.global.Task(func);
-        b = f.perform(null, 10);
-        assert.isTrue(b);
-        assert.deepEqual(actual, [[10,1]]);
-        
-        b = f.perform(null, 20);
-        assert.isTrue(b);
-        assert.deepEqual(actual, [[10,1], [20,2]]);
-        
-        b = f.perform(null, 30);
-        assert.isTrue(b);
-        assert.deepEqual(actual, [[10,1], [20,2], [30, 3]]);
-        
-        b = f.perform(null, 40);
-        assert.isFalse(b);
-        assert.deepEqual(actual, [[10,1], [20,2], [30, 3]]);
+      describe("TaskArgumentsBoolean", function() {
+        it("create", function() {
+          iter = cc.createTaskArgumentsBoolean(true);
+          assert.isTrue(cc.instanceOfTaskArguments(iter));
+        });
+        it("next", function() {
+          iter = cc.createTaskArgumentsBoolean(true);
+          assert.deepEqual(iter.valueOf(), [true, 0]);
+          assert.isTrue(iter.performWaitState());
+          assert.isNull(iter.next());
+          assert.isFalse(iter.performWaitState());
+        });
       });
     });
     describe("TaskWaitToken", function() {
-      it("number", function() {
-        var b;
-        var t = cc.createTaskWaitToken(2);
-        assert.instanceOf(t, task.TaskWaitTokenNumber);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
+      it("create", function() {
+        w = cc.createTaskWaitToken(0);
+        assert.instanceOf(w, task.TaskWaitToken);
+        assert.isTrue(cc.instanceOfTaskWaitToken(w));
         
-        b = t.performWait(1000);
-        assert.isTrue(b);
+        w = cc.createTaskWaitToken(function() {});
+        assert.instanceOf(w, task.TaskWaitTokenFunction);
 
-        b = t.performWait(1000);
-        assert.isFalse(b);
+        w = cc.createTaskWaitToken(true);
+        assert.instanceOf(w, task.TaskWaitTokenBoolean);
         
-        b = t.performWait(0);
-        assert.isFalse(b);
+        w = cc.createTaskWaitToken();
+        assert.instanceOf(w, task.TaskWaitTokenBoolean);
+        
+        assert.equal(w, cc.createTaskWaitToken(w));
       });
-      it("function", function() {
-        var b, flag;
-        var t = cc.createTaskWaitToken(function() {
-          return flag;
+      describe("TaskWaitTokenNumber", function() {
+        it("create", function() {
+          w = cc.createTaskWaitToken(1);
+          assert.instanceOf(w, task.TaskWaitTokenNumber);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
         });
-        assert.instanceOf(t, task.TaskWaitTokenFunction);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
-
-        flag = true;
-        b = t.performWait(1000);
-        assert.isTrue(b);
-
-        b = t.performWait(1000);
-        assert.isTrue(b);
-
-        flag = false;
-        b = t.performWait(1000);
-        assert.isFalse(b);
-
-        flag = true;
-        b = t.performWait(1);
-        assert.isFalse(b);
+        it("performWait", function() {
+          w = cc.createTaskWaitTokenNumber(1);
+          assert.isTrue(w.performWaitState());
+          
+          timer = new Timer(w);
+          
+          timer.process(500);
+          assert.isTrue(w.performWaitState());
+          
+          timer.process(500);
+          assert.isFalse(w.performWaitState());
+          
+          timer.process(500);
+          assert.isFalse(w.performWaitState());
+        });
       });
-      it("bool", function() {
-        var t, b;
-        
-        t = cc.createTaskWaitToken(true);
-        assert.instanceOf(t, task.TaskWaitTokenBoolean);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
+      describe("TaskWaitTokenLogicAND", function() {
+        it("create", function() {
+          w = cc.createTaskWaitToken([1, 2]);
+          assert.instanceOf(w, task.TaskWaitTokenLogicAND);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
+        });
+        it("performWait", function() {
+          var w0 = cc.createTaskWaitTokenNumber(1);
+          w = cc.createTaskWaitTokenArray([w0, 2], "and");
+          assert.isTrue(w .performWaitState());
+          assert.isTrue(w0.performWaitState());
+          
+          timer = new Timer(w);
 
-        b = t.performWait(1000);
-        assert.isTrue(b);
-        b = t.performWait(1000);
-        assert.isTrue(b);
+          timer.process(1000);
+          assert.isTrue (w .performWaitState());
+          assert.isFalse(w0.performWaitState());
 
-        t = cc.createTaskWaitToken(false);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
-        
-        b = t.performWait(1000);
-        assert.isFalse(b);
-        b = t.performWait(1000);
-        assert.isFalse(b);
+          timer.process(1000);
+          assert.isFalse(w .performWaitState());
+          assert.isFalse(w0.performWaitState());
+        });
       });
-      it("array", function() {
-        var t, b;
-        
-        t = cc.createTaskWaitToken([10,30,20]);
-        assert.instanceOf(t, task.TaskWaitTokenLogicAND);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
+      describe("TaskWaitTokenLogicOR", function() {
+        it("create", function() {
+          w = cc.createTaskWaitToken([1, 2], "or");
+          assert.instanceOf(w, task.TaskWaitTokenLogicOR);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
+        });
+        it("performWait", function() {
+          var w0 = cc.createTaskWaitTokenNumber(1);
+          w = cc.createTaskWaitTokenArray([w0, 2], "or");
+          assert.isTrue(w .performWaitState());
+          assert.isTrue(w0.performWaitState());
+          
+          timer = new Timer(w);
 
-        b = t.performWait(10000);
-        assert.isTrue(b);
-        b = t.performWait(10000);
-        assert.isTrue(b);
-        b = t.performWait(10000);
-        assert.isFalse(b);
+          timer.process(1000);
+          assert.isFalse(w .performWaitState());
+          assert.isFalse(w0.performWaitState());
+        });
       });
-      it("blockable", function() {
-        var b, flag;
-        var blockable = {
-          performWait: function() {
-            return flag;
-          }
-        };
-        
-        var t = cc.createTaskWaitToken(blockable);
-        assert.instanceOf(t, task.TaskWaitTokenBlockable);
-        assert.isTrue(cc.instanceOfTaskWaitToken(t));
-        
-        flag = true;
-        b = t.performWait(1);
-        assert.isTrue(b);
+      describe("TaskWaitTokenFunction", function() {
+        it("create", function() {
+          w = cc.createTaskWaitTokenFunction(function() {});
+          assert.instanceOf(w, task.TaskWaitTokenFunction);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
+        });
+        it("performWait", function() {
+          var flag = false, bang = false;
+          w = cc.createTaskWaitTokenFunction(function() {
+            if (bang) {
+              throw "should not be called";
+            }
+            return flag; // true if finished
+          });
+          assert.isTrue(w.performWaitState());
+          
+          timer = new Timer(w);
+          
+          timer.process(500);
+          assert.isTrue(w.performWaitState());
+          
+          flag = true;
+          timer.process(500);
+          assert.isFalse(w.performWaitState());
 
-        b = t.performWait(1);
-        assert.isTrue(b);
-
-        flag = false;
-        b = t.performWait(1);
-        assert.isFalse(b);
-
-        flag = true;
-        b = t.performWait(1);
-        assert.isFalse(b);
+          bang = true;
+          timer.process(500);
+          assert.isFalse(w.performWaitState());
+        });
       });
-      it("invalid", function() {
-        assert.throws(function() {
-          cc.createTaskWaitToken(null);
-        }, TypeError);
-        assert.throws(function() {
-          cc.createTaskWaitToken({});
-        }, TypeError);
+      describe("TaskWaitTokenBoolean", function() {
+        it("create", function() {
+          w = cc.createTaskWaitTokenBoolean(true);
+          assert.instanceOf(w, task.TaskWaitTokenBoolean);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
+        });
+        it("performWait", function() {
+          w = cc.createTaskWaitTokenBoolean(true);
+          assert.isTrue(w.performWaitState());
+
+          timer = new Timer(w);
+          timer.process(500);
+          
+          assert.isTrue(w.performWaitState());
+        });
       });
-      it("and", function() {
-        var b;
-        var t0 = cc.createTaskWaitToken(20);
-        var t1 = cc.createTaskWaitToken(10);
-        var t2 = cc.createTaskWaitToken(30);
-        var t3 = cc.createTaskWaitLogic("and", [t0, t1]);
-        var t  = cc.createTaskWaitLogic("and", [t2, t3]);
-        assert.instanceOf(t, task.TaskWaitTokenLogicAND);
-
-        b = t.performWait(1);
-        assert.isTrue(b);
-        assert.isTrue(t0.performWait(0));
-        assert.isTrue(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-
-        b = t.performWait(10000);
-        assert.isTrue(b);
-        assert.isTrue(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-
-        b = t.performWait(10000);
-        assert.isTrue(b);
-        assert.isFalse(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-
-        b = t.performWait(10000);
-        assert.isFalse(b);
-        assert.isFalse(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isFalse(t2.performWait(0));
-        
-        b = t.performWait(0);
-        assert.isFalse(b);
-      });
-      it("or", function() {
-        var b;
-        var t0 = cc.createTaskWaitToken(20);
-        var t1 = cc.createTaskWaitToken(10);
-        var t2 = cc.createTaskWaitToken(30);
-        var t3 = cc.createTaskWaitLogic("or", [t0, t1]);
-        var t  = cc.createTaskWaitLogic("or", [t2, t3]);
-        assert.instanceOf(t, task.TaskWaitTokenLogicOR);
-
-        b = t.performWait(1);
-        assert.isTrue(b);
-        assert.isTrue(t0.performWait(0));
-        assert.isTrue(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-        
-        b = t.performWait(10000);
-        assert.isFalse(b);
-        assert.isTrue(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-        
-        b = t.performWait(10000);
-        assert.isFalse(b);
-        assert.isFalse(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isTrue(t2.performWait(0));
-        
-        b = t.performWait(10000);
-        assert.isFalse(b);
-        assert.isFalse(t0.performWait(0));
-        assert.isFalse(t1.performWait(0));
-        assert.isFalse(t2.performWait(0));
-        
-        b = t.performWait(0);
-        assert.isFalse(b);
+      describe("TaskWaitTokenDate", function() {
+        it("create", function() {
+          w = cc.createTaskWaitTokenDate(new Date());
+          assert.instanceOf(w, task.TaskWaitTokenDate);
+          assert.isTrue(cc.instanceOfTaskWaitToken(w));
+        });
+        it("performWait (backward)", function() {
+          w = cc.createTaskWaitTokenDate(new Date(0));
+          assert.isTrue(w.performWaitState());
+          
+          timer = new Timer(w);
+          timer.process(500);
+          
+          assert.isFalse(w.performWaitState());
+        });
+        it("performWait (forward)", function() {
+          w = cc.createTaskWaitTokenDate(new Date(Date.now() + 60000));
+          assert.isTrue(w.performWaitState());
+          
+          timer = new Timer(w);
+          timer.process(500);
+          
+          assert.isTrue(w.performWaitState());
+        });
       });
     });
-    describe("Processor", function() {
-      beforeEach(function() {
-        cc.createTaskManager();
-        cmd = [
-          function(n, i) {
-            actual.push([n, i, 1]);
-            this.wait(16);
-          },
-          function(n, i) {
-            actual.push([n, i, 2]);
-            this.wait(16);
-          },
-          function(n, i) {
-            actual.push([n, i, 3]);
-            this.wait(16);
-          },
-        ];
+    describe("Task", function() {
+      it("create", function() {
+        t = cc.global.Task();
+        assert.instanceOf(t, task.Task);
+        assert.isTrue(cc.instanceOfTask(t));
       });
-      it("Task.do", function() {
-        var passed = false;
-        var t = cc.global.Task.do(func).on("end", function() {
-          passed = true;
-        });
-        assert.instanceOf(t, task.TaskProcessorDo);
-        
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1]]);
-
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2]]);
-
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-
-        t.process(16000);
-        assert.isTrue(passed);
-        
-        t.stop();
+      it("start", function() {
+        t = cc.global.Task();
+        assert.equal(t.start(), t, "start should be return self");
       });
-      it("Task.loop", function() {
-        var passed = false;
-        var t = cc.global.Task.loop(func).on("end", function() {
-          passed = true;
-        });
-        assert.instanceOf(t, task.TaskProcessorDo);
-        
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1]]);
-
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2]]);
-
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3]]);
-        
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[0, nil, 1], [0, nil, 2], [0, nil, 3], [1, nil, 1]]);
+      it("resume", function() {
+        t = cc.global.Task();
+        assert.equal(t.resume(), t, "resume should be return self");
       });
-      it("Task.each", function() {
-        var passed = false;
-        var t = cc.global.Task.each([10,20,30], func).on("end", function() {
-          passed = true;
-        });
-        assert.instanceOf(t, task.TaskProcessorEach);
-        
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1]]);
-
-        t.process(16000);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3]]);
-        
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
-                                  [20, 1, 1]]);
-        t.process(16000);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
-                                  [20, 1, 1], [20, 1, 2], [20, 1, 3]]);          
-        t.process(16000);
-        t.process(16000);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2], [10, 0, 3],
-                                  [20, 1, 1], [20, 1, 2], [20, 1, 3],
-                                  [30, 2, 1], [30, 2, 2], [30, 2, 3]]);
-        t.process(0);
-        assert.isFalse(passed);
-        
-        t.process(16000);
-        assert.isTrue(passed);
-        
+      it("pause", function() {
+        t = cc.global.Task();
+        assert.equal(t.pause(), t, "pause should be return self");
+      });
+      it("pause", function() {
+        t = cc.global.Task();
+        assert.equal(t.pause(), t, "pause should be return self");
+      });
+      it("reset", function() {
+        t = cc.global.Task();
+        assert.equal(t.reset(), t, "reset should be return self");
+      });
+      it("stop", function() {
+        t = cc.global.Task();
+        assert.equal(t.stop(), t, "stop should be return self");
+      });
+      it("__wait__", function() {
+        t = cc.global.Task();
+        t.__wait__({ performWait:function(){} });
         assert.throws(function() {
-          cc.global.Task.each("invalid", func);
-        }, TypeError);
+          t.__wait__({ performWait:function(){} });
+        });
+        
+        t.reset();
+        assert.equal(t.__wait__(0), t, "wait should be return self");
       });
-      it("continue", function() {
-        var passed = false;
-        var t = cc.global.Task.each([10,20,30], func).on("end", function() {
-          passed = true;
-        });
-
-        cmd[1] = function(n, i) {
-          actual.push([n, i, 2]);
-          this.continue(16);
-        };
-        
-        t.process(0);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
-        
-        t.process(16000);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2],
-                                  [20, 1, 1], [20, 1, 2]]);
+      it("perform", function() {
+        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+          var i = 0;
+          return [
+            function() { passed.push(i++); },
+            function() { passed.push(i++); },
+            function() { passed.push(i++); },
+          ];
+        }));
+        timer = new Timer(t);
+        timer.process(1);
+        assert.deepEqual(passed, [ 0, 1, 2 ]);
       });
-      it("redo", function() {
-        var passed = false;
-        var t = cc.global.Task.each([10,20,30], func).on("end", function() {
-          passed = true;
-        });
-
-        cmd[1] = function(n, i) {
-          actual.push([n, i, 2]);
-          this.redo(16);
-        };
-        
-        t.process(0);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
-        
-        t.process(16000);
-        t.process(16000);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2],
-                                  [10, 0, 1], [10, 0, 2]]);
+    });
+    describe("TaskManager", function() {
+      it("create", function() {
+        m = cc.createTaskManager();
+        assert.instanceOf(m, task.TaskManager);
+        assert.isTrue(cc.instanceOfTaskManager(m));
       });
-      it("break", function() {
-        var passed = false;
-        var t = cc.global.Task.each([10,20,30], func).on("end", function() {
-          passed = true;
-        });
-
-        cmd[1] = function(n, i) {
-          actual.push([n, i, 2]);
-          this.break();
-        };
+      it("start/stop", function() {
+        m = cc.createTaskManager();
+        assert.equal(m.counterIncr, 0);
         
-        t.process(0);
-        assert.isFalse(passed);
-        assert.deepEqual(actual, [[10, 0, 1]]);
+        m.start(1);
+        assert.equal(m.counterIncr, 1);
         
-        t.process(16000);
-        assert.isTrue(passed);
-        assert.deepEqual(actual, [[10, 0, 1], [10, 0, 2]]);
+        m.stop();
+        assert.equal(m.counterIncr, 0);
       });
-      it("chain", function() {
-        var passed = [];
-        var tm = cc.createTaskManager();
-        var t0 = cc.global.Task.do(func).on("end", function() {
-          passed.push("do");
-        });
-        var t1 = t0.each([10, 20], func).on("end", function() {
-          passed.push("each");
-        });
-        var t2 = t1.loop(func).on("end", function() {
-          passed.push("loop");
-        });
-        var t3 = t2.do(func).on("end", function() {
-          passed.push("end");
-        });
-
-        tm.play(16000);
-        t3.play();
-        
-        cmd[1] = function() {
-          this.break();
-        };
-        
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1]]);
-        assert.deepEqual(passed, []);
-        
-        // do
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1]]);
-        assert.deepEqual(passed, ["do"]);
-        
-        // each
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [10,   0, 1]]);
-        assert.deepEqual(passed, ["do"]);
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [10,   0, 1]]);
-        assert.deepEqual(passed, ["do", "each"]);
-
-        // loop
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["do", "each"]);
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["do", "each", "loop"]);
-        
-        tm.process();
-        assert.deepEqual(actual, [[ 0, nil, 1],
-                                  [10,   0, 1],
-                                  [ 0, nil, 1],
-                                  [ 0, nil, 1]]);
-        assert.deepEqual(passed, ["do", "each", "loop"]);
-        
-        tm.process();
-        assert.deepEqual(passed, ["do", "each", "loop", "end"]);
+      it("reset", function() {
+        m = cc.createTaskManager();
+        assert.deepEqual(m.tasks, []);
+        m.tasks.push(1, 2, 3);
+        m.reset();
+        assert.deepEqual(m.tasks, []);
       });
-      it("play/pause/stop", function() {
-        var passed = false;
-        var tm = cc.createTaskManager();
-        var t0 = cc.global.Task.loop(func).play().play().on("end", function() {
-          passed = true;
+      it("append/remove", function() {
+        m = cc.createTaskManager();
+        assert.deepEqual(m.tasks, []);
+        t = cc.createTask();
+        m.append(t);
+        m.append(t);
+        assert.deepEqual(m.tasks, [ t ]);
+        m.remove(t);
+        m.remove(t);
+        assert.deepEqual(m.tasks, []);
+      });
+    });
+    describe("combined", function() {
+      before(function() {
+        testTools.replaceTempNumberPrototype("do", function(func) {
+          var i, n = this;
+          if (cc.instanceOfSegmentedFunction(func)) {
+            if (cc.currentSegHandler) {
+              if (n > 0) {
+                cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+              }
+            } else {
+              for (i = 0; i < n; ++i) {
+                func.clone().perform(i);
+              }
+            }
+          } else {
+            for (i = 0; i < n; ++i) {
+              func(i);
+            }
+          }
+          return this;
         });
-        var wt = cc.createTaskWaitToken(t0);
-        assert.isTrue(cc.instanceOfTaskWaitToken(wt));
-        assert.isTrue(wt.performWait(0));
+        testTools.replaceTempNumberPrototype("wait", function() {
+          var n = this;
+          if (n >= 0 && cc.currentTask) {
+            cc.currentTask.__wait__(cc.createTaskWaitTokenNumber(n));
+          }
+          return this;
+        });
+      });
+      after(function() {
+        testTools.restoreTempNumberPrototype("do");
+        testTools.restoreTempNumberPrototype("wait");
+      });
+      it("case 1", function() {
+        (5).do(cc.global.SegmentedFunction(function() {
+          return [
+            function(i) { passed.push(+i); },
+            function(i) { passed.push(-i); },
+          ];
+        }));
+        assert.deepEqual(passed, [ 0, -0, 1, -1, 2, -2, 3, -3, 4, -4 ]);
+      });
+      it("case 2", function() {
+        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+          return [
+            function() { passed.push("begin"); },
+            function() {
+              (5).do(cc.global.SegmentedFunction(function() {
+                return [
+                  function(i) { passed.push(+i); },
+                  function(i) { passed.push(-i); },
+                ];
+              }));
+            },
+            function() { passed.push("end"); },
+          ];
+        }));
+        timer = new Timer(t);
         
-        tm.play(16000);
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1]]);
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 2]]);
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
+      });
+      it("case 3", function() {
+        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+          return [
+            function() { passed.push("begin"); },
+            function() {
+              (0).do(cc.global.SegmentedFunction(function() {
+                return [
+                  function(i) { passed.push(i); },
+                ];
+              }));
+            },
+            function() { passed.push("end"); },
+          ];
+        }));
+        timer = new Timer(t);
         
-        t0.pause().pause();
-        tm.process();
-        tm.process();
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 2]]);
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin", "end" ]);
+      });
+      it("case 4", function() {
+        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+          return [
+            function() { passed.push("begin"); },
+            function() { (1).wait(); },
+            function() {
+              (5).do(cc.global.SegmentedFunction(function() {
+                return [
+                  function(i) { passed.push(+i); },
+                  function(i) { (0.1).wait(); },
+                  function(i) { passed.push(-i); },
+                  function(i) { (0.1).wait(); },
+                ];
+              }));
+            },
+            function() { passed.push("end"); },
+          ];
+        }));
+        
+        timer = new Timer(t);
+        
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin" ]);
+        
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0 ]);
+        
+        timer.process(100);
+        assert.deepEqual(passed, [ "begin", 0, -0 ]);
 
-        t0.play();
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
+      });
+      it("case 5", function() {
+        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+          return [
+            function() { passed.push("begin"); },
+            function() { (1).wait(); },
+            function() {
+              (5).do(cc.global.SegmentedFunction(function() {
+                return [
+                  function(i) { passed.push(+i); },
+                  function(i) { (0.1).wait(); },
+                  function(i) { passed.push(-i); },
+                  function(i) { (0.1).wait(); },
+                ];
+              }));
+            },
+            function() { passed.push("end"); },
+          ];
+        }));
+        m = cc.createTaskManager();
+        m.start(1);
         
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 2],
-                                  [0, nil, 3]]);
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 2],
-                                  [0, nil, 3],
-                                  [1, nil, 1]]);
-        assert.isFalse(passed);
-        t0.stop();
-        t0.play();
-        assert.isTrue(passed);
+        timer = new Timer(m);
+        t.start();
         
-        tm.process();
-        tm.process();
-        tm.process();
-        tm.process();
-        assert.deepEqual(actual, [[0, nil, 1],
-                                  [0, nil, 2],
-                                  [0, nil, 3],
-                                  [1, nil, 1]]);
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin" ]);
+        
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0 ]);
+        
+        timer.process(100);
+        assert.deepEqual(passed, [ "begin", 0, -0 ]);
 
-        passed = false;
-        t0.pause();
-        t0.stop();
-        assert.isFalse(passed); // emit once
+        t.start(1);
         
-        assert.isFalse(wt.performWait(0));
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin" ]);
+        
+        t.pause();
+        
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin" ]);
+
+        t.resume();
+        
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin", 0 ]);
+
+        t.stop();
+
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin", 0 ]);
+
+        t.resume();
+        
+        m.stop();
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin", 0 ]);
+        
+        m.start(1);
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", 0, -0, "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
       });
     });
   });

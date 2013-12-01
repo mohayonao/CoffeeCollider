@@ -10,6 +10,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Boolean.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(Boolean.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -17,6 +18,31 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Boolean.prototype, "do", function(func) {
+    var flag = this;
+    if (flag) {
+      if (cc.instanceOfSegmentedFunction(func)) {
+        if (cc.currentSegHandler) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+        } else {
+          func.clone().perform(flag);
+        }
+      } else {
+        func(flag);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Boolean.prototype, "wait", function() {
+    var flag = this;
+    if (flag && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenBoolean(flag));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Boolean.prototype, "asUGenInput", function() {
     return !!this;
   });

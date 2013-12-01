@@ -19,6 +19,7 @@ define(function(require, exports, module) {
   fn.defineProperty(String.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(String.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -26,6 +27,15 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+
+  fn.defineProperty(String.prototype, "do", function() {
+    throw "not implemented";
+  });
+  
+  fn.defineProperty(String.prototype, "wait", function() {
+    return this;
+  });
+  
   fn.defineProperty(String.prototype, "asUGenInput", function() {
     return this;
   });

@@ -69,45 +69,8 @@ define(function(require, exports, module) {
     return val;
   };
   
-  var getLine = function(tokens, index) {
-    var depth = 0;
-    var result = { tokens:tokens, begin:index, end:-1, len:0, isLastLine:false };
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "(": case "{": case "[":
-      case "CALL_START": case "PARAM_START": case "INDEX_START":
-        depth += 1;
-        break;
-      case "]": case "}": case ")":
-      case "CALL_END": case "PARAM_END": case "INDEX_END":
-        depth -= 1;
-        break;
-      case "TERMINATOR":
-        if (depth === 0) {
-          result.end = i;
-        }
-        break;
-      case "INDENT":
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        if (depth === -1) {
-          result.end = i - 1;
-          result.isLastLine = true;
-        }
-        break;
-      }
-      if (result.end !== -1) {
-        break;
-      }
-    }
-    if (result.end === -1) {
-      result.end = tokens.length - 1;
-    }
-    result.len = result.end - result.begin + 1;
-    return result;
-  };
+  // var getLine = function(tokens, index) {
+  // };
   var indexOfParamEnd = function(tokens, index) {
     var bracket = 0;
     for (var i = index, imax = tokens.length; i < imax; ++i) {
@@ -391,7 +354,7 @@ define(function(require, exports, module) {
 
   func.setVariables = function(stack) {
     var ignored = [
-      "cc", "global"
+      "cc", "global", "console", "setInterval", "setTimeout", "clearInterval", "clearTimeout"
     ];
     return function(name) {
       if (ignored.indexOf(name) !== -1) {
@@ -734,33 +697,34 @@ define(function(require, exports, module) {
     tokens.splice.apply(tokens, subtokens);
   };
   
-
-  var task = {
-    contextMethods: ["wait", "break", "continue", "redo", "recursive", "return"]
+  var segmented = {
+    target: ["Task", "do"],
   };
-  var replaceTaskFunction = function(tokens) {
+  
+  var replaceSegmentedFunction = function(tokens) {
     tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 5; i >= 0; i--) {
-      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "Task") {
+    var id;
+    for (var i = tokens.length - 1; i >= 0; i--) {
+      if (tokens[i][TAG] !== "IDENTIFIER" || tokens[i+1][TAG] !== "CALL_START") {
         continue;
       }
-      var index = i;
-      while (index < tokens.length) {
-        if (tokens[index][TAG] === "CALL_START") {
-          break;
-        }
-        index += 1;
+      id = getIdentifier(tokens[i]);
+      if (segmented.target.indexOf(id) === -1) {
+        continue;
       }
-      index = indexOfFunctionStart(tokens, index+1);
+      if (/^[a-z]/.test(id) && (i === 0 || tokens[i-1][TAG] !== ".")) {
+        continue;
+      }
+      var index = indexOfFunctionStart(tokens, i + 2);
       if (index === -1) {
         continue;
       }
-      task.makeSegmentedFunction(getNextOperand(tokens, index), task.contextMethods);
+      segmented.makeSegmentedFunction(getNextOperand(tokens, index));
     }
     return tokens;
   };
   
-  task.makeSegmentedFunction = function(op, contextMethods) {
+  segmented.makeSegmentedFunction = function(op) {
     var tokens = op.tokens;
     var body   = tokens.splice(op.begin, op.end-op.begin+1);
     var after  = tokens.splice(op.begin);
@@ -777,7 +741,7 @@ define(function(require, exports, module) {
     } else {
       localVars = outerVars = args = [];
     }
-    
+
     if (args.length) {
       // remove default args
       body.splice(0, indexOfParamEnd(body, 0) + 1);
@@ -785,60 +749,46 @@ define(function(require, exports, module) {
     body.splice(0, 2); // remove ->, INDENT
     body.pop();        // remove OUTDENT
     
-    var replaced = [];
-    task.beginOfSegmentedFunction(replaced, outerVars);
-    {
-      task.insertLocalVariables(replaced, localVars);
-      replaced.push(["["      , "[" , _],
-                    ["INDENT" , 2   , _]);
-      var numOfSegments = 0;
-      while (body.length) {
-        if (numOfSegments++) {
-          replaced.push(["TERMINATOR", "\n", _]);
-        }
-        task.beginOfSegment(replaced, args);
-        task.insertSegment(replaced, body, contextMethods);
-        task.endOfSegment(replaced, args);
-      }
-      replaced.push(["OUTDENT", 2  , _],
-                    ["]"      , "]", _]);
-    }
-    task.endOfSegmentedFunction(replaced, outerVars);
-
+    var replaced = segmented.createSegmentedFunction(body, args, localVars);
+    
     for (var i = replaced.length; i--; ) {
-      replaced[i].cc_tasked = true;
+      replaced[i].cc_segmented = true;
     }
     tokens.push.apply(tokens, replaced);
     tokens.push.apply(tokens, after);
+    
+    return op;
   };
   
-  task.beginOfSegmentedFunction = function(tokens, outerVars) {
-    if (outerVars.length) {
-      tokens.push(["UNARY"      , "do", _],
-                  ["PARAM_START", "(" , _]);
-      for (var i = 0, imax = outerVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
+  segmented.createSegmentedFunction = function(body, args, localVars) {
+    var tokens = [
+      ["IDENTIFIER", "SegmentedFunction", _],
+      ["CALL_START", "("                , _],
+      ["->"        , "->"               , _],
+      ["INDENT"    , 2                  , _]
+    ];
+    {
+      segmented.insertLocalVariables(tokens, localVars);
+      tokens.push(["["      , "[" , _],
+                  ["INDENT" , 2   , _]);
+      var numOfSegments = 0;
+      while (body.length) {
+        if (numOfSegments++) {
+          tokens.push(["TERMINATOR", "\n", _]);
         }
-        tokens.push(["IDENTIFIER", outerVars[i], _]);
+        segmented.beginOfSegment(tokens, args);
+        segmented.insertSegment(tokens, body);
+        segmented.endOfSegment(tokens, args);
       }
-      tokens.push(["PARAM_END"  , ")" , _],
-                  ["->"         , "->", _],
-                  ["INDENT"     , 2   , _]);
+      tokens.push(["OUTDENT", 2  , _],
+                  ["]"      , "]", _]);
     }
-    tokens.push(["->"     , "->", _],
-                ["INDENT" , 2   , _]);
+    tokens.push(["OUTDENT" , 2  , _],
+                ["CALL_END", ")", _]);
+    return tokens;
   };
-  
-  task.endOfSegmentedFunction = function(tokens, outerVars) {
-    tokens.push(["OUTDENT", 2  , _]);
-    if (outerVars.length) {
-      tokens.push(["OUTDENT", 2  , _]);
-    }
-  };
-  
-  task.insertLocalVariables = function(tokens, localVars) {
-    if (localVars.length) {
+  segmented.insertLocalVariables = function(tokens, localVars) {
+    if (localVars && localVars.length) {
       for (var i = 0, imax = localVars.length; i < imax; i++) {
         tokens.push(["IDENTIFIER", localVars[i], _],
                     ["="         , "="         , _]);
@@ -847,9 +797,8 @@ define(function(require, exports, module) {
                   ["TERMINATOR", "\n", _]);
     }
   };
-  
-  task.beginOfSegment = function(tokens, args) {
-    if (args.length) {
+  segmented.beginOfSegment = function(tokens, args) {
+    if (args && args.length) {
       tokens.push(["PARAM_START", "(", _]);
       for (var i = 0, imax = args.length; i < imax; ++i) {
         if (i) {
@@ -862,83 +811,95 @@ define(function(require, exports, module) {
     tokens.push(["->"    , "->", _],
                 ["INDENT", 2   , _]);
   };
-  
-  task.endOfSegment = function(tokens) {
+  segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
   };
-  
-  task.insertSegment = function(tokens, body, contextMethods) {
-    var contextMethodCalled = false;
-    
-    while (!contextMethodCalled && body.length) {
-      var line = getLine(body, 0);
-      var closureVars = task.getClosureVariables(line);
-      
-      task.beginOfLine(tokens, line, closureVars);
-      for (var i = line.len-1; i >= 0; i--) {
-        if (!body[0].cc_tasked && body[0][TAG] === "@" && body[1]) {
-          if (contextMethods.indexOf(getIdentifier(body[1])) !== -1) {
-            contextMethodCalled = true;
-          }
+  segmented.insertSegment = function(tokens, body) {
+    var line = segmented.fetchLine(body);
+    var depth = 0;
+    var cond  = false;
+    var block;
+    LOOP:
+    while (line.length) {
+      var token = line.shift();
+      tokens.push(token);
+      if (token.cc_segmented) {
+        continue;
+      }
+      switch (token[TAG]) {
+      case "INDENT":
+        if (cond) {
+          cond = false;
+          tokens.push(["BOOL"      , "true", _],
+                      ["."         , "."   , _],
+                      ["IDENTIFIER", "do"  , _],
+                      ["CALL_START", "("   , _]);
+          block = segmented.fetchBlock(line);
+          tokens.push.apply(tokens, segmented.createSegmentedFunction(block));
+          tokens.push(["CALL_END", ")", _], ["OUTDENT", 2, _]);
+          continue LOOP;
         }
-        tokens.push(body.shift());
-      }
-      task.endOfLine(tokens, line, closureVars);
-    }
-  };
-  
-  task.getClosureVariables = function(line) {
-    var tokens = line.tokens;
-    var list = [];
-    for (var i = 0, imax = line.len; i < imax; ++i) {
-      if (!tokens[i].cc_tasked && (tokens[i][TAG] === "->" || tokens[i][TAG] === "=>")) {
-        list.push.apply(list, tokens[i].cc_funcParams.outer);
-      }
-    }
-    var set = {};
-    return list.filter(function(name) {
-      return set[name] ? false : !!(set[name] = true);
-    });
-  };
-  
-  task.beginOfLine = function(tokens, line, closureVars) {
-    var i, imax;
-    if (closureVars.length) {
-      task.insertAssignment(tokens, line);
-      tokens.push(["UNARY" , "do", _],
-                  ["PARAM_START", "(", _]);
-      for (i = 0, imax = closureVars.length; i < imax; ++i) {
-        if (i) {
-          tokens.push([",", ",", _]);
+        depth += 1;
+        break;
+      case "OUTDENT":
+        depth -= 1;
+        break;
+      case "IF": case "ELSE":
+        if (depth === 0) {
+          cond = true;
         }
-        tokens.push(["IDENTIFIER", closureVars[i], _]);
-      }
-      tokens.push(["PARAM_END", ")" , _],
-                  ["->"       , "->", _],
-                  ["INDENT"   , 2   , _]);
-    }
-  };
-  
-  task.endOfLine = function(tokens, line, closureVars) {
-    if (closureVars.length) {
-      tokens.push(["OUTDENT"   , 2   , _],
-                  ["TERMINATOR", "\n", _]);
-    }
-  };
-  
-  // TODO: fix it ( destructuring assginment? )
-  task.insertAssignment = function(tokens, line) {
-    var list = [];
-    var line_tokens = line.tokens;
-    if (line_tokens[0][TAG] === "IDENTIFIER") {
-      var op = getNextOperand(line_tokens, 0);
-      if (line_tokens[op.end+1] && line_tokens[op.end+1][TAG] === "=") {
-        list = line_tokens.slice(0, op.end + 2);
+        break;
       }
     }
-    tokens.push.apply(tokens, list);
   };
-  
+  segmented.fetchLine = function(tokens) {
+    var depth = 0;
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "(": case "{": case "[":
+      case "CALL_START": case "PARAM_START": case "INDEX_START":
+        depth += 1;
+        break;
+      case "]": case "}": case ")":
+      case "CALL_END": case "PARAM_END": case "INDEX_END":
+        depth -= 1;
+        break;
+      case "TERMINATOR":
+        if (depth === 0) {
+          return tokens.splice(0, i + 1);
+        }
+        break;
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        if (depth === 0) {
+          return tokens.splice(0, i);
+        }
+        depth -= 1;
+        break;
+      }
+    }
+    return tokens.splice(0);
+  };
+  segmented.fetchBlock = function(tokens) {
+    var depth = 0;
+    for (var i = 0, imax = tokens.length; i < imax; ++i) {
+      switch (tokens[i][TAG]) {
+      case "INDENT":
+        depth += 1;
+        break;
+      case "OUTDENT":
+        if (depth === 0) {
+          var block = tokens.splice(0, i + 1);
+          block.pop(); // remove OUTDENT
+          return block;
+        }
+        depth -= 1;
+      }
+    }
+    return tokens.splice(0);
+  };
   
   var replaceGlobalVariables = function(tokens) {
     for (var i = tokens.length-1; i >= 0; i--) {
@@ -1039,7 +1000,7 @@ define(function(require, exports, module) {
         return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
       case "{":
         return "{";
-      case ",": case "RELATION": case "IF": case "SWITCH": case "LEADING_WHEN":
+      case ",": case "RELATION": case "IF": case "ELSE": case "SWITCH": case "LEADING_WHEN":
         return token[VALUE] + " ";
       case "=": case "COMPARE": case "MATH": case "LOGIC":
         return " " + token[VALUE] + " ";
@@ -1068,7 +1029,7 @@ define(function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceTaskFunction(tokens);
+        tokens = replaceSegmentedFunction(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
@@ -1108,7 +1069,7 @@ define(function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceTaskFunction      : replaceTaskFunction,
+    replaceSegmentedFunction : replaceSegmentedFunction,
     replaceGlobalVariables   : replaceGlobalVariables,
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,

@@ -11,6 +11,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "copy", function() {
     return this.slice();
   });
+  
   fn.defineProperty(Array.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -18,6 +19,31 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Array.prototype, "do", function(func) {
+    var list = this;
+    if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.currentSegHandler) {
+        cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsArray(list));
+      } else {
+        list.forEach(function(x, i) {
+          func.clone().perform([x, i]);
+        });
+      }
+    } else {
+      list.forEach(func);
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Array.prototype, "wait", function(logic) {
+    var list = this;
+    if (cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenArray(list, logic));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Array.prototype, "asUGenInput", function() {
     return this.map(utils.asUGenInput);
   });

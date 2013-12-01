@@ -10,6 +10,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Date.prototype, "copy", function() {
     return new Date(+this);
   });
+  
   fn.defineProperty(Date.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -17,6 +18,31 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Date.prototype, "do", function(func) {
+    var flag = Date.now() > (+this);
+    if (flag) {
+      if (cc.instanceOfSegmentedFunction(func)) {
+        if (cc.currentSegHandler) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+        } else {
+          func.clone().perform(flag);
+        }
+      } else {
+        func(flag);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Date.prototype, "wait", function() {
+    var flag = Date.now() > (+this);
+    if (flag && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenDate(this));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Date.prototype, "asUGenInput", function() {
     return +this;
   });

@@ -19,6 +19,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Function.prototype, "copy", function() {
     return this;
   });
+  
   fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);
@@ -27,6 +28,18 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Function.prototype, "do", function() {
+    throw "not implemented";
+  });
+  
+  fn.defineProperty(Function.prototype, "wait", function() {
+    if (cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenFunction(this));
+    }
+    return this;
+  });
+  
   fn.defineProperty(Function.prototype, "asUGenInput", function() {
     return utils.asUGenInput(this());
   });

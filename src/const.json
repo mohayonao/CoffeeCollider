@@ -58,5 +58,9 @@
   "ADD_TO_TAIL": 1,
   "ADD_BEFORE" : 2,
   "ADD_AFTER"  : 3,
-  "REPLACE"    : 4
+  "REPLACE"    : 4,
+  
+  "PENDING" : 0,
+  "PLAYING" : 1,
+  "FINISHED": 2
 }

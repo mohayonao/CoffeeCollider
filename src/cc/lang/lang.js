@@ -54,7 +54,7 @@ define(function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthLang.prototype.play = function(msg) {
-      this.taskManager.play((this.bufLength / this.sampleRate) * 1000);
+      this.taskManager.start((this.bufLength / this.sampleRate) * 1000);
       this.sendToServer(msg);
     };
     SynthLang.prototype.pause = function(msg) {
@@ -189,6 +189,7 @@ define(function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
+  require("./seg");
   require("./scale");
   require("./string");
   require("./synthdef");

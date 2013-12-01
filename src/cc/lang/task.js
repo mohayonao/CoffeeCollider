@@ -2,466 +2,508 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var extend  = require("../common/extend");
-  var emitter = require("../common/emitter");
-  var slice = [].slice;
-
+  var extend = require("../common/extend");
+  
+  var valueOf = function(obj) {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    return obj.valueOf();
+  };
+  
   var TaskManager = (function() {
     function TaskManager() {
       this.klassName = "TaskManager";
       this.tasks = [];
       this.counterIncr = 0;
     }
-    extend(TaskManager, cc.Object);
     
-    TaskManager.prototype.play = function(counterIncr) {
+    TaskManager.prototype.start = function(counterIncr) {
       this.counterIncr = Math.max(1, counterIncr);
     };
-    TaskManager.prototype.pause = function() {
+    
+    TaskManager.prototype.stop = function() {
       this.counterIncr = 0;
     };
+    
     TaskManager.prototype.reset = function() {
-      this.tasks = [];
+      this.tasks.splice(0);
     };
+    
     TaskManager.prototype.append = function(task) {
       var index = this.tasks.indexOf(task);
       if (index === -1) {
         this.tasks.push(task);
       }
     };
+    
     TaskManager.prototype.remove = function(task) {
       var index = this.tasks.indexOf(task);
       if (index !== -1) {
         this.tasks.splice(index, 1);
       }
     };
+    
     TaskManager.prototype.process = function() {
       var counterIncr = this.counterIncr;
-      var tasks = this.tasks;
-      for (var i = 0; i < tasks.length; ++i) {
-        tasks[i].process(counterIncr);
+      if (counterIncr) {
+        var tasks = this.tasks;
+        for (var i = 0; i < tasks.length; ++i) {
+          tasks[i].performWait(counterIncr);
+        }
+        this.tasks = tasks.filter(function(task) {
+          return task._state === C.PLAYING;
+        });
       }
     };
     
     return TaskManager;
   })();
   
-  var TaskFunction = (function() {
-    function TaskFunction(init) {
-      emitter.mixin(this);
-      this.klassName = "TaskFunction";
-      if (arguments.length === 0) {
-        this.segments = [];
-      } else if (typeof init !== "function") {
-        throw new TypeError("TaskFunction: first argument should be a Function.");
+  var Task = (function() {
+    function Task(func, iter) {
+      this.klassName = "Task";
+      if (cc.instanceOfSegmentedFunction(func)) {
+        this._func = func;
+        this._state = C.PENDING;
       } else {
-        var segments = init();
-        if (!Array.isArray(segments)) {
-          throw new TypeError("TaskFunction: invalid initialize function");
-        }
-        this.segments = segments;
+        this._func = null;
+        this._state = C.FINISHED;
       }
-      this._pc = 0;
+      this._iter = iter;
+      this._wait = null;
+      this._args = valueOf(iter);
     }
-    extend(TaskFunction, cc.Object);
+    extend(Task, cc.Object);
     
-    TaskFunction.prototype.perform = function(context) {
-      var func = this.segments[this._pc++];
-      if (func) {
-        func.apply(context, slice.call(arguments, 1));
-        return true;
+    Task.prototype.start = function() {
+      this.reset();
+      if (cc.taskManager) {
+        cc.taskManager.append(this);
       }
-      return false;
+      this._state = C.PLAYING;
+      return this;
     };
     
-    TaskFunction.prototype.clone = function() {
-      var newInstance = new TaskFunction();
-      newInstance.segments = this.segments;
-      return newInstance;
+    Task.prototype.resume = function() {
+      if (cc.taskManager) {
+        cc.taskManager.append(this);
+      }
+      this._state = C.PLAYING;
+      return this;
     };
     
-    TaskFunction.prototype.goTo = function(pc) {
-      this._pc = Math.max(0, Math.min(pc, this.segments.length));
+    Task.prototype.pause = function() {
+      if (cc.taskManager) {
+        cc.taskManager.remove(this);
+      }
+      this._state = C.PENDING;
+      return this;
     };
     
-    return TaskFunction;
+    Task.prototype.stop = function() {
+      if (cc.taskManager) {
+        cc.taskManager.remove(this);
+      }
+      this._state = C.PENDING;
+      return this;
+    };
+    
+    Task.prototype.reset = function() {
+      if (this._func) {
+        this._func.reset();
+        this._state = C.PENDING;
+      } else {
+        this._state = C.FINISHED;
+      }
+      if (this._iter) {
+        this._iter.reset();
+      }
+      this._wait = null;
+      this._args = valueOf(this._iter);
+      return this;
+    };
+    
+    Task.prototype.wait = function() {
+      if (cc.currentTask && cc.currentTask !== this) {
+        cc.currentTask.__wait__(this);
+      }
+      return this;
+    };
+    
+    Task.prototype.__seg__ = function(func, args) {
+      return this.__wait__(new Task(func, args));
+    };
+    
+    Task.prototype.__wait__ = function(task) {
+      if (this._wait) {
+        throw new Error("Task#append: wait already exists???");
+      }
+      this._wait = cc.createTaskWaitToken(task);
+      if (task instanceof Task) {
+        task._state = C.PLAYING;
+      }
+      cc.pauseSegmentedFunction();
+      return this;
+    };
+    
+    Task.prototype.performWait = function(counterIncr) {
+      var _currentSegHandler = cc.currentSegHandler;
+      var _currentTask       = cc.currentTask;
+      var func = this._func;
+      var iter = this._iter;
+      
+      cc.currentSegHandler = this;
+      cc.currentTask       = this;
+      
+      while (true) {
+        if (this._wait) {
+          if (this._wait.performWait(counterIncr)) {
+            break;
+          }
+          this._wait = null;
+        }
+        counterIncr = 0;
+        
+        func.perform.apply(func, this._args);
+        
+        if (this._wait) {
+          continue;
+        }
+        
+        if (func.performWaitState()) {
+          continue;
+        }
+        
+        if (iter) {
+          this._args = iter.next();
+          if (iter.performWaitState()) {
+            func.reset();
+            continue;
+          }
+        }
+        this._state = C.FINISHED;
+        break;
+      }
+      
+      cc.currentSegHandler = _currentSegHandler;
+      cc.currentTask       = _currentTask;
+      
+      return this._state === C.PLAYING;
+    };
+    
+    Task.prototype.performWaitState = function() {
+      return this._state === C.PLAYING;
+    };
+    
+    return Task;
+  })();
+  
+  var TaskArguments = (function() {
+    function TaskArguments() {
+      this.klassName = "TaskArguments";
+      this._args = [ 0, 0 ];
+      this._state = C.PLAYING;
+    }
+    
+    TaskArguments.prototype.next = function() {
+      if (this._state === C.FINISHED) {
+        return null;
+      }
+      this._state = C.FINISHED;
+      return this._args;
+    };
+    
+    TaskArguments.prototype.reset = function() {
+      this._state = C.PLAYING;
+      return this;
+    };
+    
+    TaskArguments.prototype.valueOf = function() {
+      return this._args;
+    };
+    
+    TaskArguments.prototype.performWait = function() {
+      return this._state === C.PLAYING;
+    };
+    
+    TaskArguments.prototype.performWaitState = function() {
+      return this._state === C.PLAYING;
+    };
+    
+    return TaskArguments;
   })();
 
-  var TaskWaitToken = (function() {
-    function TaskWaitToken(item) {
-      this.klassName = "TaskWaitToken";
-      this.item = item;
-      this._blocking = true;
+  var TaskArgumentsNumber = (function() {
+    function TaskArgumentsNumber(start, end, step) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsNumber";
+      this.start = start;
+      this.end   = end;
+      this.step  = step;
+      this.index = 0;
+      this.reset();
     }
-    extend(TaskWaitToken, cc.Object);
+    extend(TaskArgumentsNumber, TaskArguments);
+    
+    TaskArgumentsNumber.prototype.next = function() {
+      if (this._state === C.FINISHED) {
+        return null;
+      }
+      var value = this._args[0] + this.step;
+      if (this.step >= 0) {
+        if (value <= this.end) {
+          this._args[0] = value;
+          this._args[1] = ++this.index;
+        } else {
+          this._state = C.FINISHED;
+        }
+      } else {
+        if (value >= this.end) {
+          this._args[0] = value;
+          this._args[1] = ++this.index;
+        } else {
+          this._state = C.FINISHED;
+        }
+      }
+      return this._state === C.FINISHED ? null : this._args;
+    };
+    
+    TaskArguments.prototype.reset = function() {
+      this.index = 0;
+      this._args  = [ this.start, this.index ];
+      this._state = C.PLAYING;
+      return this;
+    };
+    
+    return TaskArgumentsNumber;
+  })();
+  
+  var TaskArgumentsArray = (function() {
+    function TaskArgumentsArray(list, reversed) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsArray";
+      this.list     = list;
+      this.reversed = reversed;
+      this.reset();
+    }
+    extend(TaskArgumentsArray, TaskArguments);
+    
+    TaskArgumentsArray.prototype.next = function() {
+      if (this._state === C.FINISHED) {
+        return null;
+      }
+      if (this.reversed) {
+        this.index -= 1;
+        if (0 <= this.index) {
+          this._args = [ this.list[this.index], this.index ];
+        } else {
+          this._state = C.FINISHED;
+        }
+      } else {
+        this.index += 1;
+        if (this.index < this.list.length) {
+          this._args = [ this.list[this.index], this.index ];
+        } else {
+          this._state = C.FINISHED;
+        }
+      }
+      return this._state === C.FINISHED ? null : this._args;
+    };
+    
+    TaskArgumentsArray.prototype.reset = function() {
+      this.index = this.reversed ? Math.max(0, this.list.length - 1) : 0;
+      this._args = [ this.list[this.index], this.index ];
+      this._state = C.PLAYING;
+      return this;
+    };
+    
+    return TaskArgumentsArray;
+  })();
+
+  var TaskArgumentsFunction = (function() {
+    function TaskArgumentsFunction(func) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsFunction";
+      this.func  = func;
+      this.index = 0;
+      this.reset();
+    }
+    extend(TaskArgumentsFunction, TaskArguments);
+    
+    TaskArgumentsFunction.prototype.next = function() {
+      if (this._state === C.FINISHED) {
+        return null;
+      }
+      var value = this.func();
+      if (!!value || value === 0) {
+        this._args[0] = value;
+        this._args[1] = ++this.index;
+      } else {
+        this._state = C.FINISHED;
+      }
+      return this._state === C.FINISHED ? null : this._args;
+    };
+    
+    TaskArgumentsFunction.prototype.reset = function() {
+      this._state = C.PLAYING;
+      this.uninitialized = true;
+      return this;
+    };
+    
+    TaskArgumentsFunction.prototype.valueOf = function() {
+      this.index = 0;
+      if (this.uninitialized) {
+        this.uninitialized = false;
+        this._args = [ this.func(), this.index ];
+      }
+      return this._args;
+    };
+    
+    return TaskArgumentsFunction;
+  })();
+  
+  var TaskWaitToken = (function() {
+    function TaskWaitToken() {
+      this.klassName = "TaskWaitToken";
+      this._state = C.PLAYING;
+    }
     
     TaskWaitToken.prototype.performWait = function() {
-      return this._blocking;
+      return this._state === C.PLAYING;
+    };
+    
+    TaskWaitToken.prototype.performWaitState = function() {
+      return this._state === C.PLAYING;
     };
     
     return TaskWaitToken;
   })();
 
   var TaskWaitTokenNumber = (function() {
-    function TaskWaitTokenNumber(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenNumber(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenNumber";
-      this.item *= 1000;
+      this.token = token * 1000;
     }
     extend(TaskWaitTokenNumber, TaskWaitToken);
-    
+
     TaskWaitTokenNumber.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this.item -= counterIncr;
-        if (this.item <= 0) {
-          this._blocking = false;
+      if (this._state === C.PLAYING) {
+        this.token -= counterIncr;
+        if (this.token <= 0) {
+          this._state = C.FINISHED;
         }
       }
-      return this._blocking;
+      return this._state === C.PLAYING;
     };
     
     return TaskWaitTokenNumber;
   })();
-
+  
+  var TaskWaitTokenLogicAND = (function() {
+    function TaskWaitTokenLogicAND(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenLogicAND";
+      this.token = token.map(cc.createTaskWaitToken);
+    }
+    extend(TaskWaitTokenLogicAND, TaskWaitToken);
+    
+    TaskWaitTokenLogicAND.prototype.performWait = function(counterIncr) {
+      if (this._state === C.PLAYING) {
+        this.token = this.token.filter(function(token) {
+          return token.performWait(counterIncr);
+        });
+        if (this.token.length === 0) {
+          this._state = C.FINISHED;
+        }
+      }
+      return this._state === C.PLAYING;
+    };
+    
+    return TaskWaitTokenLogicAND;
+  })();
+  
+  var TaskWaitTokenLogicOR = (function() {
+    function TaskWaitTokenLogicOR(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenLogicOR";
+      this.token = token.map(cc.createTaskWaitToken);
+    }
+    extend(TaskWaitTokenLogicOR, TaskWaitToken);
+    
+    TaskWaitTokenLogicOR.prototype.performWait = function(counterIncr) {
+      if (this._state === C.PLAYING) {
+        var list = this.token;
+        for (var i = 0, imax = list.length; i < imax; ++i) {
+          if (!list[i].performWait(counterIncr)) {
+            this._state = C.FINISHED;
+            this.token.splice(0);
+            break;
+          }
+        }
+      }
+      return this._state === C.PLAYING;
+    };
+    
+    return TaskWaitTokenLogicOR;
+  })();
+  
   var TaskWaitTokenFunction = (function() {
-    function TaskWaitTokenFunction(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenFunction(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenFunction";
+      this.token = token;
     }
     extend(TaskWaitTokenFunction, TaskWaitToken);
     
     TaskWaitTokenFunction.prototype.performWait = function() {
-      if (this._blocking) {
-        this._blocking = !!this.item();
+      if (this._state === C.PLAYING) {
+        var finished = this.token();
+        if (finished) {
+          this._state = C.FINISHED;
+        }
       }
-      return this._blocking;
+      return this._state === C.PLAYING;
     };
     
     return TaskWaitTokenFunction;
   })();
-  
+
   var TaskWaitTokenBoolean = (function() {
-    function TaskWaitTokenBoolean(item) {
-      TaskWaitToken.call(this, item);
+    function TaskWaitTokenBoolean(token) {
+      TaskWaitToken.call(this);
       this.klassName = "TaskWaitTokenBoolean";
-      this._blocking = item;
+      this.token = token;
+      this._state = token ? C.PLAYING : C.FINISHED;
     }
     extend(TaskWaitTokenBoolean, TaskWaitToken);
     
     return TaskWaitTokenBoolean;
   })();
 
-  var TaskWaitTokenBlockable = (function() {
-    function TaskWaitTokenBlockable(item) {
-      TaskWaitToken.call(this, item);
-      this.klassName = "TaskWaitTokenBlockable";
+  var TaskWaitTokenDate = (function() {
+    function TaskWaitTokenDate(token) {
+      TaskWaitToken.call(this);
+      this.klassName = "TaskWaitTokenDate";
+      this.token = +token;
     }
-    extend(TaskWaitTokenBlockable, TaskWaitToken);
+    extend(TaskWaitTokenDate, TaskWaitToken);
     
-    TaskWaitTokenBlockable.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this._blocking = this.item.performWait(counterIncr);
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenBlockable;
-  })();
-
-  var TaskWaitTokenLogicAND = (function() {
-    function TaskWaitTokenLogicAND(list) {
-      TaskWaitToken.call(this, []);
-      this.klassName = "TaskWaitTokenLogicAND";
-      var item = [];
-      list.forEach(function(token) {
-        if (token instanceof TaskWaitTokenLogicAND) {
-          item = item.concat(token.item);
-        } else {
-          item.push(token);
-        }
-      });
-      this.item = item;
-    }
-    extend(TaskWaitTokenLogicAND, TaskWaitToken);
-    
-    TaskWaitTokenLogicAND.prototype.performWait = function(counterIncr) {
-      if (this._blocking) {
-        this.item = this.item.filter(function(token) {
-          return token.performWait(counterIncr);
-        });
-        this._blocking = this.item.length > 0;
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenLogicAND;
-  })();
-
-  var TaskWaitTokenLogicOR = (function() {
-    function TaskWaitTokenLogicOR(list) {
-      TaskWaitToken.call(this, []);
-      var item = [];
-      list.forEach(function(token) {
-        if (token instanceof TaskWaitTokenLogicOR) {
-          item = item.concat(token.item);
-        } else {
-          item.push(token);
-        }
-      });
-      this.item = item;
-    }
-    extend(TaskWaitTokenLogicOR, TaskWaitToken);
-    
-    TaskWaitTokenLogicOR.prototype.performWait = function(counterIncr) {
-      var blocking = true;
-      this.item = this.item.filter(function(token) {
-        var _blocking = token.performWait(counterIncr);
-        blocking = _blocking && blocking;
-        return _blocking;
-      });
-      if (this._blocking) {
-        this._blocking = blocking;
-      }
-      return this._blocking;
-    };
-    
-    return TaskWaitTokenLogicOR;
-  })();
-  
-  var TaskProcessor = (function() {
-    function TaskProcessor(func) {
-      var that = this;
-      
-      emitter.mixin(this);
-      this.klassName = "TaskProcessor";
-      this.taskManager  = cc.taskManager;
-      this._blocking = true;
-      this._func  = func;
-      this._count = 0;
-      this._prev = null;
-      this._next = null;
-      this._wait = null;
-      this._context = {
-        wait: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-        },
-        continue: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-          that._func.goTo(0);
-          that._done();
-        },
-        redo: function(token) {
-          that._wait = cc.createTaskWaitToken(token||0);
-          that._func.goTo(0);
-        },
-        break: function() {
-          that._func.goTo(Infinity);
-          that.stop();
-        }
-      };
-    }
-    extend(TaskProcessor, cc.Object);
-    
-    TaskProcessor.prototype.play = function() {
-      var that = this;
-      // rewind to the head task of a chain
-      while (that._prev !== null) {
-        that = that._prev;
-      }
-      if (that.taskManager) {
-        cc.taskManager.append(that);
-      }
-      this._blocking = true;
-      return this;
-    };
-    TaskProcessor.prototype.pause = function() {
-      if (this.taskManager) {
-        this.taskManager.remove(this);
-      }
-      this._blocking = false;
-      return this;
-    };
-    TaskProcessor.prototype.stop = function() {
-      if (this.taskManager) {
-        this.taskManager.remove(this);
-        this.emit("end");
-        if (this._next) {
-          this._next._prev = null;
-          this._next.play();
-          this._next = null;
+    TaskWaitTokenDate.prototype.performWait = function() {
+      if (this._state === C.PLAYING) {
+        if (Date.now() > this.token) {
+          this._state = C.FINISHED;
         }
       }
-      this._count    = 0;
-      this._blocking = false;
-      this.taskManager = null;
-      return this;
-    };
-    TaskProcessor.prototype.process = function(counterIncr) {
-      var blocking;
-      while (this._blocking) {
-        if (this._wait) {
-          blocking = this._wait.performWait(counterIncr);
-          if (blocking) {
-            return;
-          }
-          this._wait = null;
-        }
-        blocking = this._execute(this._count);
-        if (!blocking) {
-          this._done();
-        }
-        counterIncr  = 0;
-      }
-    };
-    TaskProcessor.prototype._execute = function() {
-      return this._func.perform(this._context, this._count);
-    };
-    TaskProcessor.prototype.performWait = function() {
-      return this._blocking;
+      return this._state === C.PLAYING;
     };
     
-    // task chain methods
-    TaskProcessor.prototype["do"] = function(num, func) {
-      var next = new TaskProcessorDo(num, func);
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    TaskProcessor.prototype.loop = function(func) {
-      var next = new TaskProcessorDo(Infinity, func);
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    TaskProcessor.prototype.each = function(list, func) {
-      var next = new TaskProcessorEach(list, cc.createTaskFunction(func));
-      next._prev = this;
-      this._next = next;
-      return next;
-    };
-    
-    return TaskProcessor;
-  })();
-  
-  var TaskProcessorDo = (function() {
-    function TaskProcessorDo() {
-      var num, func;
-      var i = 0;
-      if (typeof arguments[i] === "number") {
-        num = arguments[i++];
-      }
-      if (typeof arguments[i] === "function") {
-        func = cc.createTaskFunction(arguments[i++]);
-      } else if (func instanceof TaskFunction) {
-        func = arguments[i++];
-      }
-      TaskProcessor.call(this, func);
-      
-      if (num !== Infinity) {
-        num = num|0;
-      }
-      this._num = num;
-      
-      if (num === Infinity) {
-        this.klassName = "TaskProcessorLoop";
-      } else {
-        this.klassName = "TaskProcessorDo";
-      }
-    }
-    extend(TaskProcessorDo, TaskProcessor);
-    
-    TaskProcessorDo.prototype._done = function() {
-      this._count += 1;
-      if (this._count < this._num) {
-        this._func.goTo(0);
-      } else {
-        this.stop();
-      }
-    };
-    
-    return TaskProcessorDo;
-  })();
-
-  var TaskProcessorEach = (function() {
-    function TaskProcessorEach(list, func) {
-      if (!(Array.isArray(list))) {
-        throw new TypeError("Task.each: First argument must be an Array.");
-      }
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorEach";
-      this._list = list;
-    }
-    extend(TaskProcessorEach, TaskProcessor);
-    
-    TaskProcessorEach.prototype._execute = function() {
-      return this._func.perform(this._context, this._list[this._count], this._count);
-    };
-    TaskProcessorEach.prototype._done = function() {
-      this._count += 1;
-      if (this._count < this._list.length) {
-        this._func.goTo(0);
-      } else {
-        this.stop();
-      }
-    };
-    
-    return TaskProcessorEach;
-  })();
-
-  var TaskProcessorRecursive = (function() {
-    function TaskProcessorRecursive(func) {
-      var that = this;
-      TaskProcessor.call(this, func);
-      this.klassName = "TaskProcessorRecursive";
-      this._value   = 0;
-      this._args    = [];
-      this._context.recursive = function() {
-        var next = new TaskProcessorRecursive(func.clone());
-        next.play.apply(next, slice.call(arguments));
-        that._wait = cc.createTaskWaitToken(next);
-        return next;
-      };
-      this._context["return"] = function(value) {
-        that._value = value;
-        that.stop();
-      };
-    }
-    extend(TaskProcessorRecursive, TaskProcessor);
-    
-    TaskProcessorRecursive.prototype.play = function() {
-      this._args = slice.call(arguments).map(function(value) {
-        if (value instanceof TaskProcessorRecursive) {
-          value = value._value;
-        }
-        return value;
-      });
-      TaskProcessor.prototype.play.call(this);
-      return this;
-    };
-    TaskProcessorRecursive.prototype._execute = function() {
-      return this._func.perform.apply(this._func, [this._context].concat(this._args));
-    };
-    TaskProcessorRecursive.prototype._done = function() {
-      this.stop();
-    };
-    
-    return TaskProcessorRecursive;
+    return TaskWaitTokenDate;
   })();
   
   cc.global.Task = function(func) {
-    return cc.createTaskFunction(func);
-  };
-  cc.global.Task["do"] = function(num, func) {
-    return new TaskProcessorDo(num, func);
-  };
-  cc.global.Task.loop = function(func) {
-    return new TaskProcessorDo(Infinity, func);
-  };
-  cc.global.Task.each = function(list, func) {
-    return new TaskProcessorEach(list, cc.createTaskFunction(func));
-  };
-  cc.global.Task.recursive = function(func) {
-    return new TaskProcessorRecursive(cc.createTaskFunction(func));
+    return new Task(func);
   };
   
   cc.createTaskManager = function() {
@@ -471,59 +513,81 @@ define(function(require, exports, module) {
   cc.instanceOfTaskManager = function(obj) {
     return obj instanceof TaskManager;
   };
-  cc.createTaskFunction = function(init) {
-    return new TaskFunction(init);
+  cc.createTask = function(func, iter) {
+    return new Task(func, iter);
   };
-  cc.instanceOfTaskFunction = function(obj) {
-    return obj instanceof TaskFunction;
+  cc.instanceOfTask = function(obj) {
+    return obj instanceof Task;
   };
-  cc.createTaskWaitToken = function(item) {
-    if (item instanceof TaskWaitToken) {
-      return item;
+  cc.instanceOfTaskArguments = function(obj) {
+    return obj instanceof TaskArguments;
+  };
+  cc.createTaskArgumentsNumber = function(start, end, step) {
+    return new TaskArgumentsNumber(start, end, step);
+  };
+  cc.createTaskArgumentsArray = function(list, reversed) {
+    return new TaskArgumentsArray(list, !!reversed);
+  };
+  cc.createTaskArgumentsFunction = function(func) {
+    return new TaskArgumentsFunction(func);
+  };
+  cc.createTaskArgumentsBoolean = function(flag) {
+    return new TaskArgumentsArray([flag]);
+  };
+  cc.createTaskWaitToken = function(token, logic) {
+    if (token && typeof token.performWait === "function") {
+      return token;
     }
-    switch (typeof item) {
-    case "number":
-      return new TaskWaitTokenNumber(item);
-    case "function":
-      return new TaskWaitTokenFunction(item);
-    case "boolean":
-      return new TaskWaitTokenBoolean(item);
-    default:
-      if (Array.isArray(item)) {
-        return cc.createTaskWaitLogic("and", item);
-      } else if (item && typeof item.performWait === "function") {
-        return new TaskWaitTokenBlockable(item);
-      }
+    switch (typeof token) {
+    case "number"  : return new TaskWaitTokenNumber(token);
+    case "function": return new TaskWaitTokenFunction(token);
+    case "boolean" : return new TaskWaitTokenBoolean(token);
     }
-    throw new TypeError("TaskWaitToken: Invalid type");
+    if (Array.isArray(token)) {
+      return cc.createTaskWaitTokenArray(token, logic);
+    }
+    if (token instanceof Date) {
+      return new TaskWaitTokenDate(token);
+    }
+    return new TaskWaitTokenBoolean(false);
   };
   cc.instanceOfTaskWaitToken = function(obj) {
     return obj instanceof TaskWaitToken;
   };
-  cc.createTaskWaitLogic = function(logic, list) {
-    list = list.map(function(token) {
-      return cc.createTaskWaitToken(token);
-    });
-    if (logic === "and") {
-      return new TaskWaitTokenLogicAND(list);
+  cc.createTaskWaitTokenNumber = function(token) {
+    return new TaskWaitTokenNumber(token);
+  };
+  cc.createTaskWaitTokenArray = function(token, logic) {
+    if (logic === "or") {
+      return new TaskWaitTokenLogicOR(token);
+    } else {
+      return new TaskWaitTokenLogicAND(token);
     }
-    return new TaskWaitTokenLogicOR(list);
+  };
+  cc.createTaskWaitTokenFunction = function(token) {
+    return new TaskWaitTokenFunction(token);
+  };
+  cc.createTaskWaitTokenBoolean = function(token) {
+    return new TaskWaitTokenBoolean(token);
+  };
+  cc.createTaskWaitTokenDate = function(token) {
+    return new TaskWaitTokenDate(token);
   };
   
   module.exports = {
-    TaskManager  : TaskManager,
-    TaskFunction : TaskFunction,
-    TaskWaitToken         : TaskWaitToken,
-    TaskWaitTokenNumber   : TaskWaitTokenNumber,
-    TaskWaitTokenFunction : TaskWaitTokenFunction,
-    TaskWaitTokenBoolean  : TaskWaitTokenBoolean,
-    TaskWaitTokenBlockable: TaskWaitTokenBlockable,
-    TaskWaitTokenLogicAND : TaskWaitTokenLogicAND,
-    TaskWaitTokenLogicOR  : TaskWaitTokenLogicOR,
-    TaskProcessor         : TaskProcessor,
-    TaskProcessorDo       : TaskProcessorDo,
-    TaskProcessorEach     : TaskProcessorEach,
-    TaskProcessorRecursive: TaskProcessorRecursive,
+    TaskManager : TaskManager,
+    Task        : Task,
+    TaskArguments        : TaskArguments,
+    TaskArgumentsNumber  : TaskArgumentsNumber,
+    TaskArgumentsArray   : TaskArgumentsArray,
+    TaskArgumentsFunction: TaskArgumentsFunction,
+    TaskWaitToken        : TaskWaitToken,
+    TaskWaitTokenNumber  : TaskWaitTokenNumber,
+    TaskWaitTokenLogicAND: TaskWaitTokenLogicAND,
+    TaskWaitTokenLogicOR : TaskWaitTokenLogicOR,
+    TaskWaitTokenFunction: TaskWaitTokenFunction,
+    TaskWaitTokenBoolean : TaskWaitTokenBoolean,
+    TaskWaitTokenDate    : TaskWaitTokenDate,
   };
 
 });

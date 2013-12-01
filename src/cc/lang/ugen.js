@@ -90,6 +90,7 @@ define(function(require, exports, module) {
     UGen.prototype.copy = function() {
       return this;
     };
+    
     UGen.prototype.dup = fn(function(n) {
       var a = new Array(n|0);
       for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -97,9 +98,19 @@ define(function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
+
+    UGen.prototype["do"] = function() {
+      return this;
+    };
+    
+    UGen.prototype.wait = function() {
+      return this;
+    };
+    
     UGen.prototype.asUGenInput = function() {
       return this;
     };
+    
     UGen.prototype.toString = function() {
       return this.klassName;
     };

@@ -41,25 +41,66 @@ define(function(require, exports, module) {
       return token[TAG]
     });
   };
+
+  var getIdentifier = function(token) {
+    var val = token[VALUE];
+    if (Array.isArray(val)) {
+      return val.map(function(x) {
+        return x != null ? x : "";
+      }).join("");
+    }
+    if (val.reserved) {
+      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
+        (val[5]||"") + (val[6]||"") + (val[7]||"");
+    }
+    if (typeof val === "number") {
+      val = 2;
+    }
+    return val;
+  };
+  
+  var testSuite = function(func, code1, code2, show) {
+    if (Array.isArray(code1)) { code1 = code1.join("\n"); }
+    if (Array.isArray(code2)) { code2 = code2.join("\n"); }
+    
+    var tokens1 = func(coffee.tokens(code1));
+    var result  = compiler.prettyPrint(tokens1);
+    if (show & 1) {
+      console.log("----- actual -----");
+      console.log(result);
+    }
+    var tokens2 = coffee.tokens(code2);
+    
+    var actual = coffee.tokens(result).map(function(token) {
+      return [ token[0], getIdentifier(token) ];
+    });
+    var expected = tokens2.map(function(token) {
+      return [ token[0], getIdentifier(token) ];
+    });
+    
+    if (show & 1) {
+      console.log("==== expected ====");
+      console.log(compiler.prettyPrint(tokens2));
+      console.log("------------------");
+    }
+    
+    if (show & 2) {
+      for (var i = 0, imax = actual.length; i < imax; ++i) {
+        console.log("<<" + i + ">>");
+        console.log("  ", actual[i])
+        console.log("  ", expected[i]);
+      }
+    }    
+    assert.deepEqual(actual, expected);
+    
+    // assert.doesNotThrow(function() {
+    //   coffee.nodes(tokens1).compile();
+    // }, code1, "compile error");
+  };
   
   describe("client/compiler/coffee.js", function() {
-    var testSuite;
-    before(function() {
-      testSuite = function(func, code, expected, show) {
-        var tokens = func(coffee.tokens(code));
-        var actual = compiler.prettyPrint(tokens);
-        if (show) {
-          console.log(actual);
-          console.log("-----");
-        }
-        assert.equal(actual, expected, code);
-        assert.doesNotThrow(function() {
-          coffee.nodes(tokens).compile();
-        }, code);
-      };
-    });
+    var actual, expected, tokens, code1, code2;
     describe("detectPlusMinusOperator", function() {
-      var tokens;
       it("case 1", function() {
         tokens = coffee.tokens("+10");
         tokens = compiler.detectPlusMinusOperator(tokens);
@@ -166,7 +207,7 @@ define(function(require, exports, module) {
       });
     });
     describe("getPrevOperand", function() {
-      var tokens, op;
+      var op;
       it("empty", function() {
         tokens = coffee.tokens("");
         op = compiler.getPrevOperand(tokens, 0);
@@ -288,7 +329,7 @@ define(function(require, exports, module) {
       });
     });
     describe("getNextOperand", function() {
-      var tokens, code, op;
+      var op;
       it("empty", function() {
         tokens = coffee.tokens("");
         op = compiler.getNextOperand(tokens, 0);
@@ -388,31 +429,30 @@ define(function(require, exports, module) {
         assert.equal(tokens[op.end][TAG], "INDEX_END");
       });
       it("FUNCTION 1", function() {
-        code = [
+        code1 = [
           "Synth.def ->",
           "  1000",
           ".play()"
         ].join("\n");
-        tokens = coffee.tokens(code);
+        tokens = coffee.tokens(code1);
         op = compiler.getNextOperand(tokens, 4); // ->
         assert.equal(tokens[op.end  ][TAG], "OUTDENT");
         assert.equal(tokens[op.end+1][TAG], "CALL_END");
       });
       it("FUCTION 2", function() {
-        code = [
+        code1 = [
           "a (a=0)->",
           "  @f 1",
           "  @g 2",
           "b = 0"
         ].join("\n");
-        tokens = coffee.tokens(code);
+        tokens = coffee.tokens(code1);
         op = compiler.getNextOperand(tokens, 1); // from ->
         assert.equal(tokens[op.end  ][TAG], "OUTDENT");
         assert.equal(tokens[op.end+1][TAG], "CALL_END");
       });
     });
     describe("detectFunctionParameters", function() {
-      var tokens, code, actual;
       var crawlLocalVars = function(tokens) {
         var list = [ tokens.cc_funcParams.local ];
         tokens.forEach(function(token) {
@@ -441,7 +481,7 @@ define(function(require, exports, module) {
         return list;
       };
       it("basic", function() {
-        code = [
+        code1 = [
           "a = b = c = d = e = f = 10",
           "g = ([h], i=10, j=20)->",
           "  k = a + b",
@@ -453,7 +493,7 @@ define(function(require, exports, module) {
           "  q = 10",
           "k = t = 10"
         ].join("\n");
-        tokens = coffee.tokens(code);
+        tokens = coffee.tokens(code1);
         tokens = compiler.detectFunctionParameters(tokens);
         actual = crawlLocalVars(tokens);
         assert.deepEqual(actual, [
@@ -470,7 +510,6 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceFixedTimeValue", function() {
-      var tokens;
       it("basic", function() {
         tokens = coffee.tokens('"10min"');
         tokens = compiler.replaceFixedTimeValue(tokens);
@@ -490,355 +529,292 @@ define(function(require, exports, module) {
       });
     });
     describe("replaceStrictlyPrecedence", function() {
-      var code, expected;
       it("basis", function() {
-        code     = "0 * (10 + 20 * 30 - 40 / 50)";
-        expected = "(0 * (10 + (20 * 30) - (40 / 50)))";
-        testSuite(compiler.replaceStrictlyPrecedence, code, expected);
+        code1 = "0 * (10 + 20 * 30 - 40 / 50)";
+        code2 = "(0 * (10 + (20 * 30) - (40 / 50)))";
+        testSuite(compiler.replaceStrictlyPrecedence, code1, code2);
       });
     });
     it("replaceUnaryOperator", function() {
-      var code, expected;
-      code     = "+10 + -[20]";
-      expected = "10.__plus__() + [20].__minus__()";
-      testSuite(compiler.replaceUnaryOperator, code, expected);
+      code1 = "+10 + -[20]";
+      code2 = "10.__plus__() + [20].__minus__()";
+      testSuite(compiler.replaceUnaryOperator, code1, code2);
     });
     it("replaceTextBinaryAdverb (issue-33)", function() {
-      var code, actual, expected;
-      code     = "1 +S+ 2";
+      code1    = "1 +S+ 2";
       expected = '1 + "#!S" + 2';
-      actual = compiler.replaceTextBinaryAdverb(code);
+      actual = compiler.replaceTextBinaryAdverb(code1);
       assert.equal(actual, expected);
 
-      code     = "1 *CLIP* 2";
+      code1    = "1 *CLIP* 2";
       expected = '1 * "#!C" * 2';
-      actual = compiler.replaceTextBinaryAdverb(code);
+      actual = compiler.replaceTextBinaryAdverb(code1);
       assert.equal(actual, expected);
 
-      code     = "1 *CLI* 2";
+      code1    = "1 *CLI* 2";
       expected = "1 *CLI* 2";
-      actual = compiler.replaceTextBinaryAdverb(code);
+      actual = compiler.replaceTextBinaryAdverb(code1);
       assert.equal(actual, expected);
 
-      code     = "1 *S+ 2";
+      code1    = "1 *S+ 2";
       expected = "1 *S+ 2";
-      actual = compiler.replaceTextBinaryAdverb(code);
+      actual = compiler.replaceTextBinaryAdverb(code1);
       assert.equal(actual, expected);
     });
     describe("replaceBinaryOperator", function() {
-      var code, expected;
       it("basis", function() {
-        code     = "+10 + -[20]";
-        expected = "+10.__add__(-[20])";
-        testSuite(compiler.replaceBinaryOperator, code, expected);
+        code1 = "+10 + -[20]";
+        code2 = "+10.__add__(-[20])";
+        testSuite(compiler.replaceBinaryOperator, code1, code2);
       });
       it("issue-33", function() {
-        code     = "+10 +F+ -[20]";
-        code     = compiler.replaceTextBinaryAdverb(code);
-        expected = "+10.__add__(-[20], FOLD)";
-        testSuite(compiler.replaceBinaryOperator, code, expected);
+        code1 = "+10 +F+ -[20]";
+        code1 = compiler.replaceTextBinaryAdverb(code1);
+        code2 = "+10.__add__(-[20], FOLD)";
+        testSuite(compiler.replaceBinaryOperator, code1, code2);
         
-        code     = '+10 +"#!F"+ -[20]';
-        expected = "+10.__add__(-[20], FOLD)";
-        testSuite(compiler.replaceBinaryOperator, code, expected);
+        code1 = '+10 +"#!F"+ -[20]';
+        code2 = "+10.__add__(-[20], FOLD)";
+        testSuite(compiler.replaceBinaryOperator, code1, code2);
       });
     });
     it("replaceCompoundAssign", function() {
-      var code, expected;
-      code     = "a.a += 10";
-      expected = "a.a = a.a.__add__(10)";
-      testSuite(compiler.replaceCompoundAssign, code, expected);
+      code1 = "a.a += 10";
+      code2 = "a.a = a.a.__add__(10)";
+      testSuite(compiler.replaceCompoundAssign, code1, code2);
     });
     it("replaceLogicOperator", function() {
-      var code, expected;
-      code     = "10 && 20 || 30";
-      expected = "10 && 20 || 30";
-      testSuite(compiler.replaceLogicOperator, code, expected);
+      code1 = "10 && 20 || 30";
+      code2 = "10 && 20 || 30";
+      testSuite(compiler.replaceLogicOperator, code1, code2);
+      
+      code1 = "@wait 10 && 20 || 30";
+      code2 = "@wait(10.__and__(20).__or__(30))";
+      testSuite(compiler.replaceLogicOperator, code1, code2);
 
-      code     = "@wait 10 && 20 || 30";
-      expected = "@wait(10.__and__(20).__or__(30))";
-      testSuite(compiler.replaceLogicOperator, code, expected);
-
-      code     = "@wait 10 && (20||30), 40 || 50";
-      expected = "@wait(10.__and__((20 || 30)), 40 || 50)";
-      testSuite(compiler.replaceLogicOperator, code, expected);
+      code1 = "@wait 10 && (20||30), 40 || 50";
+      code2 = "@wait(10.__and__((20 || 30)), 40 || 50)";
+      testSuite(compiler.replaceLogicOperator, code1, code2);
     });
     describe("replaceSynthDefinition", function() {
-      var code, expected;
       it("basis", function() {
-        code = [
+        code1 = [
           "SynthDef ->",
           "  1000",
           ".play()"
-        ].join("\n");
-        expected = [
+        ];
+        code2 = [
           "SynthDef(->",
           "  1000",
           ", []).play()"
-        ].join("\n");
-        testSuite(compiler.replaceSynthDefinition, code, expected);
+        ];
+        testSuite(compiler.replaceSynthDefinition, code1, code2);
       });
       it("with def args", function() {
-        code = [
+        code1 = [
           "SynthDef (out, freq=440, amp=[1,2])->",
           "  1000",
           ".play()"
-        ].join("\n");
-        expected = [
+        ];
+        code2 = [
           "SynthDef((out, freq, amp)->",
           "  1000",
           ", ['out', '0', 'freq', '440', 'amp', '[1,2]']).play()"
-        ].join("\n");
-        testSuite(compiler.replaceSynthDefinition, code, expected);
+        ];
+        testSuite(compiler.replaceSynthDefinition, code1, code2);
       });
       it("with other args", function() {
-        code = [
+        code1 = [
           "SynthDef('test', (a={}, b='')->",
           "  1000",
           ", 1000).play()"
-        ].join("\n");
-        expected = [
+        ];
+        code2 = [
           "SynthDef('test', (a, b)->",
           "  1000",
           ", ['a', '{}', 'b', '\"\"'], 1000).play()"
-        ].join("\n");
-        testSuite(compiler.replaceSynthDefinition, code, expected);
+        ];
+        testSuite(compiler.replaceSynthDefinition, code1, code2);
       });
       it("issue-30", function() {
-        code = [
+        code1 = [
           "SynthDef ->",
           "  func(->",
           "    SinOsc.ar(440)",
           "  ) * 0"
-        ].join("\n");
-        expected = [
+        ];
+        code2 = [
           "SynthDef(->",
           "  func(->",
           "    SinOsc.ar(440)",
           "  ) * 0",
           ", [])"
-        ].join("\n");
-        testSuite(compiler.replaceSynthDefinition, code, expected);
+        ];
+        testSuite(compiler.replaceSynthDefinition, code1, code2);
       });
     });
-    describe("replaceTaskFunction", function() {
-      var code, actual, expected;
-      it("case 1", function() {
-        code = [
-          "t = Task (i)->",
-          "  @func(a:0)",
-          "  @wait 100",
-          "  @break()",
-          "  @continue()",
-          "  @redo()",
-          "  @func()",
-          "  @func()",
-        ].join("\n");
-        expected = [
-          "t = Task(->",
-          "  [",
-          "    (i)->",
-          "      @func({a:0})",
-          "      @wait(100)",
-          "    (i)->",
-          "      @break()",
-          "    (i)->",
-          "      @continue()",
-          "    (i)->",
-          "      @redo()",
-          "    (i)->",
-          "      @func()",
-          "      @func()",
-          "  ]",
-          ")"
-        ].join("\n");
-        testSuite(compiler.replaceTaskFunction, code, expected);
-      });
-      it("case 2", function() {
-        code = [
-          "Task.do (i)->",
+    describe("replaceSegmentedFunction", function() {
+      it("case 1 (Task)", function() {
+        code1 = [
+          "t = Task ->",
           "  a = 100",
-          "  if true",
-          "    @wait 100",
-          "  [b, c] = [200, 300]",
-          "  @break()",
-          ".play()"
-        ].join("\n");
-        expected = [
-          "Task.do(->",
+          "  b = [ 1, 2, 3 ].map (x)->",
+          "    a * x",
+        ];
+        code2 = [
+          "t = Task SegmentedFunction ->",
+          "  a = b = undefined",
+          "  [",
+          "    -> a = 100",
+          "    -> b = [ 1, 2, 3 ].map (x)->",
+          "      a * x",
+          "  ]",
+        ];
+        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+      });
+      it("case 2 (num.do)", function() {
+        code1 = [
+          "s = Synth()",
+          "[ 1, 2, 3 ].do (i)->",
+          "  s.set freq:(60+i).midicps()",
+          "  0.1.wait()",
+        ];
+        code2 = [
+          "s = Synth()",
+          "[ 1, 2, 3 ].do SegmentedFunction ->",
+          "  [",
+          "    (i)-> s.set freq:(60+i).midicps()",
+          "    (i)-> 0.1.wait()",
+          "  ]",
+        ];
+        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+      });
+      it("case 3 (nesting)", function() {
+        code1 = [
+          "t = Task ->",
+          "  a = 100",
+          "  1.wait()",
+          "  s = Synth('test').on 'end', ->",
+          "    s.stop()",
+          "  [ 1, 2, 3 ].do (i)->",
+          "    s.set freq:(60+i).midicps()",
+          "    0.1.wait()",
+          "t.start()",
+        ];
+        code2 = [
+          "t = Task SegmentedFunction ->",
+          "  a = s = undefined",
+          "  [",
+          "    -> a = 100",
+          "    -> 1.wait()",
+          "    -> s = Synth('test').on 'end', ->",
+          "      s.stop()",
+          "    -> [ 1, 2, 3 ].do SegmentedFunction ->",
+          "      [",
+          "        (i)-> s.set freq:(60+i).midicps()",
+          "        (i)-> 0.1.wait()",
+          "      ]",
+          "  ]",
+          "t.start()",
+        ];
+        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+      });
+      it("case 4 (if)", function() {
+        code1 = [
+          "Task ->",
+          "  a = b = c = false",
+          "  if a",
+          "    0.1.wait()",
+          "  else if b",
+          "    0.2.wait()",
+          "  else",
+          "    if c",
+          "      console.log c",
+          "      0.3.wait()",
+        ];
+        code2 = [
+          "Task SegmentedFunction ->",
           "  a = b = c = undefined",
           "  [",
-          "    (i)->",
-          "      a = 100",
-          "      if true",
-          "        @wait(100)",
-          "    (i)->",
-          "      [b, c] = [200, 300]",
-          "      @break()",
-          "  ]",
-          ").play()"
-        ].join("\n");
-        testSuite(compiler.replaceTaskFunction, code, expected);
-      });
-      it("case 3", function() {
-        code = [
-          "func = Task func",
-          "func = (i)->",
-          "  100",
-        ].join("\n");
-        expected = [
-          "func = Task(func)",
-          "func = (i)->",
-          "  100",
-        ].join("\n");
-        testSuite(compiler.replaceTaskFunction, code, expected);
-      });
-      it("case 4", function() {
-        code = [
-          "func = Task.do(func).on 'end', ->",
-          "  100"
-        ].join("\n");
-        expected = [
-          "func = Task.do(func).on('end', ->",
-          "  100",
-          ")"
-        ].join("\n");
-        testSuite(compiler.replaceTaskFunction, code, expected);
-      });
-      it("case 5", function() {
-        code = [
-          "def = make()",
-          "Task.do (i)->", // outer:[def], local:[s1, t]
-          "  s1 = def.play()",
-          "  @wait Task.each [500, 250, 500], (n, i)->", // outer:[s1, def], local:[t, x]
-          "    s1.set()",
-          "    x = n",
-          "    t = Task.interval 100, (i)->", // outer:[x, def], local:[s2, y]
-          "      x = i",
-          "      y = i * 2",
-          "      s2 = def.play(x, y).on 'end', (i)->", // outer:[s2, y], local:[z]
-          "        y = 10",
-          "        z = 20",
-          "        s2.stop()",
-          "    .play()",
-          "    @wait x",
-          "    t.stop()",
-          "  .play()",
-          "  @wait Task.do ->", // outer:[], local:[]
-          "    @wait 50",
-          "  .play()",
-          "  t = 1000",
-          "  @wait t",
-          ".play()"
-        ].join("\n");
-        
-        expected = [
-          "def = make()",
-          "Task.do(do (def)->", // outer:[def], local:[s1, t]
-          "  ->",
-          "    s1 = t = undefined",
-          "    [",
-          "      (i)->",
-          "        s1 = def.play()",
-          "        @wait(Task.each([500, 250, 500], do (s1, def)->", // outer:[s1, def], local:[t, x]
-          "          ->",
-          "            x = t = undefined",
-          "            [",
-          "              (n, i)->",
-          "                s1.set()",
-          "                x = n",
-          "                t = Task.interval(100, do (x, def)->", // outer:[x, def], local:[s2, y]
-          "                  ->",
-          "                    y = s2 = undefined",
-          "                    [",
-          "                      (i)->",
-          "                        x = i",
-          "                        y = i * 2",
-          "                        s2 = do (y, s2)->", // outer:[s2, y], local:[z]
-          "                          s2 = def.play(x, y).on('end', (i)->",
-          "                            y = 10",
-          "                            z = 20",
-          "                            s2.stop()",
-          "                          )",
-          "                    ]",
-          "                ).play()",
-          "                @wait(x)",
-          "              (n, i)->",
-          "                t.stop()",
-          "            ]",
-          "        ).play())",
-          "      (i)->",
-          "        @wait(Task.do(->", // outer:[], local:[]
+          "    -> a = b = c = false",
+          "    -> if a",
+          "        true.do SegmentedFunction ->",
           "          [",
-          "            ->",
-          "              @wait(50)",
+          "            -> 0.1.wait()",
           "          ]",
-          "        ).play())",
-          "      (i)->",
-          "        t = 1000",
-          "        @wait(t)",
-          "    ]",
-          ").play()"
-        ].join("\n");
-        testSuite(compiler.replaceTaskFunction, code, expected);
+          "      else if b",
+          "        true.do SegmentedFunction ->",
+          "          [",
+          "            -> 0.2.wait()",
+          "          ]",
+          "      else",
+          "        true.do SegmentedFunction ->",
+          "          [",
+          "            -> if c",
+          "              true.do SegmentedFunction ->",
+          "                [",
+          "                  -> console.log c",
+          "                  -> 0.3.wait()",
+          "                ]",
+          "          ]",
+          "  ]",
+        ];
+        testSuite(compiler.replaceSegmentedFunction, code1, code2);
       });
     });
     describe("replaceGlobalVariables", function() {
-      var code, actual, expected;
       it("basis", function() {
-        code     = "[$, $123, $__, $isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
-        expected = "[$, $123, $__, global.isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
-        testSuite(compiler.replaceGlobalVariables, code, expected);
+        code1 = "[$, $123, $__, $isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
+        code2 = "[$, $123, $__, global.isGlobal, a.$isNotGlobal, @$isNotGlobal, $IsNotGlobal]";
+        testSuite(compiler.replaceGlobalVariables, code1, code2);
       });
       it("object-key", function() {
-        code     = "{$key:$val}";
-        expected = "{$key:global.val}";
-        testSuite(compiler.replaceGlobalVariables, code, expected);
+        code1 = "{$key:$val}";
+        code2 = "{$key:global.val}";
+        testSuite(compiler.replaceGlobalVariables, code1, code2);
       });
     });
     describe("replaceCCVariables", function() {
-      var code, actual, expected;
       before(function() {
         cc.global.Global = true;
       });
       it("basis", function() {
-        code     = "[Global, NotGlobal]";
-        expected = "[cc.Global, NotGlobal]";
-        testSuite(compiler.replaceCCVariables, code, expected);
+        code1 = "[ Global   , NotGlobal ]";
+        code2 = "[ cc.Global, NotGlobal ]";
+        testSuite(compiler.replaceCCVariables, code1, code2);
       });
       it("member", function() {
-        code     = "[a.Global, @Global]";
-        expected = "[a.Global, @Global]";
-        testSuite(compiler.replaceCCVariables, code, expected);
+        code1 = "[ a.Global, @Global ]";
+        code2 = "[ a.Global, @Global ]";
+        testSuite(compiler.replaceCCVariables, code1, code2);
       });
       it("object-key", function() {
-        code     = "{Global:Global}";
-        expected = "{Global:cc.Global}";
-        testSuite(compiler.replaceCCVariables, code, expected);
+        code1 = "{ Global: Global    }";
+        code2 = "{ Global: cc.Global }";
+        testSuite(compiler.replaceCCVariables, code1, code2);
       });
     });
     describe("finalize", function() {
       var code, actual, expected;
       it("basis", function() {
-        code     = "100";
-        expected = [
+        code1 = "100";
+        code2 = [
           "((global)->",
           "  100",
           ").call(cc.__context__, this.self || global)",
-        ].join("\n");
-        testSuite(compiler.finalize, code, expected);
+        ];
+        testSuite(compiler.finalize, code1, code2);
       });
     });
     describe("Compiler", function() {
       it("compile", function() {
-        var code, c, actual;
-        code = [
-          "[1,2,3]"
+        code1 = [
+          "[ 1, 2, 3 ]"
         ].join("\n");
         
-        c = cc.createCompiler();
-        actual = eval(c.compile(code));
-        assert.deepEqual(actual, [1,2,3]);
+        var c = cc.createCompiler();
+        actual = eval(c.compile(code1));
+        assert.deepEqual(actual, [ 1, 2, 3 ]);
         
         actual = eval(c.compile(""));
         assert.isUndefined(actual);

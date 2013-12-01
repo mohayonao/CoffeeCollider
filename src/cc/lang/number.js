@@ -21,7 +21,34 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
+  
+  fn.defineProperty(Number.prototype, "do", function(func) {
+    var i, n = this;
+    if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.currentSegHandler) {
+        if (n > 0) {
+          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+        }
+      } else {
+        for (i = 0; i < n; ++i) {
+          func.clone().perform(i);
+        }
+      }
+    } else {
+      for (i = 0; i < n; ++i) {
+        func(i);
+      }
+    }
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "wait", function() {
+    var n = this;
+    if (n >= 0 && cc.currentTask) {
+      cc.currentTask.__wait__(cc.createTaskWaitTokenNumber(n));
+    }
+    return this;
+  });
   fn.defineProperty(Number.prototype, "asUGenInput", function() {
     return this;
   });

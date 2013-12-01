@@ -48,6 +48,8 @@ define(function(require, exports, module) {
   var COMMONS = {
     copy: "",
     dup : "n=2",
+    "do": "",
+    wait: "",
     asUGenInput: "",
   };
   
