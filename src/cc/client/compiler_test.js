@@ -799,9 +799,9 @@ define(function(require, exports, module) {
       it("basis", function() {
         code1 = "100";
         code2 = [
-          "((global)->",
+          "((global, cc, undefined)->",
           "  100",
-          ").call(cc.__context__, this.self || global)",
+          ").call(cc.__context__, this.self || global, cc)",
         ];
         testSuite(compiler.finalize, code1, code2);
       });

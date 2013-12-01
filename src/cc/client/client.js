@@ -157,7 +157,8 @@ define(function(require, exports, module) {
       this.syncItemsUInt32[C.SYNC_COUNT] = this.syncCount;
       this.sendToLang(this.syncItems);
     };
-    SynthClientImpl.prototype.execute = function(code) {
+    SynthClientImpl.prototype.execute = function(code, opts) {
+      opts = opts || {};
       var append, callback;
       var i = 1;
       if (typeof arguments[i] === "boolean") {
@@ -169,7 +170,9 @@ define(function(require, exports, module) {
         callback = arguments[i++];
       }
       if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
+        if (!opts.js) {
+          code = this.compiler.compile(code.trim());
+        }
         if (callback) {
           this.execCallbacks[this.execId] = callback;
         }

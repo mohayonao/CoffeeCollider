@@ -24,7 +24,10 @@
   "engines": {
     "node": ">=0.8.0"
   },
-  "main": "./build/coffee-collider.js",
+  "main": "./build/coffee-collider",
+  "bin": {
+    "coffeecollider": "./bin/coffeecollider"
+  },
   "dependencies": {
     "coffee-script": "~1.6.3",
     "ws": "~0.4.31",

@@ -22,6 +22,7 @@ define(function(require, exports, module) {
     global.CoffeeCollider = function(opts) {
       return cc.createSynthClient(opts);
     };
+    global.CoffeeCollider.version = cc.version;
   } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#socket") {
       cc.opmode  = "socket";
@@ -63,6 +64,7 @@ define(function(require, exports, module) {
       cc.server = cc.createSynthServer();
       return cc.server.exports.createServer(opts);
     };
+    cc.global.version = cc.version;
     module.exports = cc.global;
   }
 

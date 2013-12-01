@@ -36,6 +36,10 @@ define(function(require, exports, module) {
         this.strmList = new Array(8);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
+        var strmList = this.strmList;
+        for (var i = strmList.length; i--; ) {
+          strmList[i] = new Int16Array(this._strm);
+        }
         if (!this.api.isPlaying) {
           this.api.play();
         }

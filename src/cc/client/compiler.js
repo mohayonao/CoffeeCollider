@@ -949,13 +949,16 @@ define(function(require, exports, module) {
   };
   
   var finalize = function(tokens) {
-    tokens.unshift(["("          , "("        , _],
-                   ["PARAM_START", "("        , _],
-                   ["IDENTIFIER" , "global"   , _],
-                   ["PARAM_END"  , ")"        , _],
-                   ["->"         , "->"       , _],
-                   ["INDENT"     , 2          , _]);
-    
+    tokens.unshift(["("          , "("       , _],
+                   ["PARAM_START", "("       , _],
+                   ["IDENTIFIER" , "global"  , _],
+                   [","         , ","        , _],
+                   ["IDENTIFIER", "cc"       , _],
+                   [","         , ","        , _],
+                   ["IDENTIFIER", "undefined", _],
+                   ["PARAM_END"  , ")"       , _],
+                   ["->"         , "->"      , _],
+                   ["INDENT"     , 2         , _]);
     tokens.push(["OUTDENT"   , 2            , _],
                 [")"         , ")"          , _],
                 ["."         , "."          , _],
@@ -970,6 +973,8 @@ define(function(require, exports, module) {
                 ["IDENTIFIER", "self"       , _],
                 ["LOGIC"     , "||"         , _],
                 ["IDENTIFIER", "global"     , _],
+                [","         , ","          , _],
+                ["IDENTIFIER", "cc"         , _],
                 ["CALL_END"  , ")"          , _]);
     return tokens;
   };
