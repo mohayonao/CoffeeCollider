@@ -62,12 +62,10 @@ define(function(require, exports, module) {
         list: [ 1, 2, 3, 4, 5 ],
         dict: {
           a: 10, b: 20, c: 30
-        },
-        func: function() {}
+        }
       };
       var actual = pack.unpack(pack.pack(object));
       assert.equal(JSON.stringify(actual), JSON.stringify(object));
-      assert.isFunction(actual.func);
     });
   });
 

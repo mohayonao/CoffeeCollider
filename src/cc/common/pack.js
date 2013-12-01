@@ -9,9 +9,6 @@ define(function(require, exports, module) {
       if (stack.indexOf(data) !== -1) {
         return { klassName:"Circular" };
       }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
       var result;
       if (typeof data === "object") {
         if (data.buffer instanceof ArrayBuffer) {
@@ -19,13 +16,15 @@ define(function(require, exports, module) {
         }
         stack.push(data);
         if (Array.isArray(data)) {
-          result = data.map(function(data) {
+          result = data.filter(function(data) {
+            return typeof data !== "function";
+          }).map(function(data) {
             return _pack(data, stack);
           });
         } else {
           result = {};
           Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
+            if (key.charAt(0) !== "_" && typeof data[key] !== "function") {
               result[key] = _pack(data[key], stack);
             }
           });
@@ -42,15 +41,11 @@ define(function(require, exports, module) {
   })();
 
   var unpack = (function() {
-    var func = function() {};
     var _unpack = function(data) {
       if (!data) {
         return data;
       }
       if (typeof data === "string") {
-        if (data === "[Function]") {
-          return func;
-        }
         return data;
       }
       var result;
