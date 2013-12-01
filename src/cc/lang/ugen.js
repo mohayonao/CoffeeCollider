@@ -9,6 +9,7 @@ define(function(require, exports, module) {
   var slice  = [].slice;
   
   var addToSynthDef = null;
+  var newKlassOpts  = {}; // TODO: ...
   
   var newArgsWithIndex = function(index) {
     return function(item) {
@@ -40,11 +41,12 @@ define(function(require, exports, module) {
   };
   
   var UGen = (function() {
-    function UGen(name) {
+    function UGen(name, opts) {
+      opts = opts || {};
       this.klassName = name;
       this.tag  = "";
       this.rate = C.AUDIO;
-      this.signalRange = C.BIPOLAR;
+      this.signalRange = opts.signalRange || C.BIPOLAR;
       this.specialIndex = 0;
       this.outputIndex  = 0;
       this.numOfInputs  = 0;
@@ -67,7 +69,7 @@ define(function(require, exports, module) {
         }
       }
       if (size === 0) {
-        return UGen.prototype.init.apply(new Klass(), args);
+        return UGen.prototype.init.apply(new Klass(newKlassOpts.name, newKlassOpts), args);
       }
       var results = new Array(size);
       for (i = 0; i < size; ++i) {
@@ -383,17 +385,15 @@ define(function(require, exports, module) {
     return Out;
   })();
   
-  var init_instance = function(instance, klassName, tag, opts) {
+  var init_instance = function(instance, tag, opts) {
     if (Array.isArray(instance)) {
       return instance.map(function(ugen) {
-        return init_instance(ugen, klassName, tag, opts);
+        return init_instance(ugen, tag, opts);
       });
     } else if (instance instanceof UGen) {
       if (opts.checkInputs) {
         opts.checkInputs.call(instance);
       }
-      instance.klassName   = klassName;
-      instance.signalRange = opts.signalRange;
       instance.tag = tag || "";
       if (opts.init) {
         return opts.init.apply(instance, instance.inputs);
@@ -438,8 +438,11 @@ define(function(require, exports, module) {
         ugenInterface[key.substr(1)] = fn(function() {
           var args = slice.call(arguments);
           var tag  = args.pop();
+          newKlassOpts.name        = name;
+          newKlassOpts.signalRange = opts.signalRange;
           var instance = ctor.apply(Klass, args);
-          return init_instance(instance, name, tag, opts);
+          newKlassOpts = {};
+          return init_instance(instance, tag, opts);
         }).defaults(defaults).build();
       }
     });
