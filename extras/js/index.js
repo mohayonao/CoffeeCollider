@@ -65,7 +65,12 @@ $(function() {
   });
   
   $("#run").on("click", function() {
-    var code = editor.getValue().trim();
+    var code;
+    if (isCoffee) {
+      code = editor.getValue().trim();
+    } else {
+      code = coffeeSource;
+    }
     cc.execute(code, function(res) {
       if (res !== undefined) {
         console.log(res);
@@ -85,45 +90,50 @@ $(function() {
   $("a", "#example-list").each(function(i, a) {
     var $a = $(a);
     $a.on("click", function() {
-      var path = "./extras/examples/";
-      if (isEdge) {
-        path = "../examples/";
-      }
-      $.get(path + $(this).attr("data-path")).then(function(res) {
-        editor.setValue(res);
-        editor.clearSelection();
-      });
+      window.location = "#" + loadFragment + $(this).attr("data-path");
       return false;
     });
   });
   
   $("#version").text(cc.version);
+
+  var isCoffee = true, coffeeSource = "";
+  $("#compile-js").on("click", function() {
+    var jsSource = "";
+    isCoffee = !isCoffee;
+    if (isCoffee) {
+      editor.setReadOnly(false);
+      editor.setValue(coffeeSource);
+      editor.getSession().setMode("ace/mode/coffee");
+    } else {
+      coffeeSource = editor.getValue().trim();
+      jsSource     = cc.compile(coffeeSource);
+      editor.setValue(jsSource);
+      editor.setReadOnly(true);
+      editor.getSession().setMode("ace/mode/javascript");
+    }
+    editor.clearSelection();
+  });
   
-  cc.dev = function() {
-    $("#compile-js").on("click", function() {
-      console.log(cc.compile(editor.getValue().trim()));
-    }).show();
+  window.onhashchange = function() {
+    var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+    if (hash.indexOf(srcFragment) === 0) {
+      editor.setValue(hash.substr(srcFragment.length));
+      editor.clearSelection();
+    } else if (hash.indexOf(loadFragment) === 0) {
+      var path = "./extras/examples/";
+      if (isEdge) {
+        path = "../examples/";
+      }
+      $.get(path + hash.substr(loadFragment.length)).then(function(res) {
+        editor.setValue(res);
+        editor.clearSelection();
+      });
+    }
   };
   
-  var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
-  if (hash.indexOf(srcFragment) === 0) {
-    editor.setValue(hash.substr(srcFragment.length));
-    editor.clearSelection();
-  } else if (hash.indexOf(loadFragment) === 0) {
-    var path = "./extras/examples/";
-    if (isEdge) {
-      path = "../examples/";
-    }
-    $.get(path + hash.substr(loadFragment.length)).then(function(res) {
-      editor.setValue(res);
-      editor.clearSelection();
-    });
-  }
+  window.onhashchange();
   
-  if (isEdge) {
-    cc.dev();
-  }
-
   editor.focus();
 
 });
