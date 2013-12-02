@@ -5,7 +5,7 @@ decayPink = SynthDef (outBus=0, effectBus=0, direct=0.5)->
   Out.ar(outBus, source * direct)
   # this will be our effects output
   Out.ar(effectBus, source * (1 - direct))
-.build()
+.send()
 
 decaySin = SynthDef (outBus=0, effectBus=0, direct=0.5)->
   # Decaying pulses of a modulating Sine wave. We'll add reverb later.
@@ -14,7 +14,7 @@ decaySin = SynthDef (outBus=0, effectBus=0, direct=0.5)->
   Out.ar(outBus, source * direct)
   # this will be our effects output
   Out.ar(effectBus, source * (1 - direct))
-.build()
+.send()
 
 reverb = SynthDef (outBus=0, inBus=0)->
   input = In.ar(inBus, 1)
@@ -27,7 +27,7 @@ reverb = SynthDef (outBus=0, inBus=0)->
   for i in [0...16]
     input = AllpassC.ar(input, 0.04, (-> Rand(0.001, 0.04)).dup(), 3)
     Out.ar(outBus, input)
-.build()
+.send()
 
 x = Synth(reverb, {inBus:0})
 y = Synth.before(x, decayPink, {effectBus:0})

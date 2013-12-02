@@ -1,7 +1,7 @@
 tone = SynthDef (freq=440, amp=1)->
   amp *= Line.kr(0.4, 0, dur:2.5, doneAction:2)
   Out.ar(2, Pulse.ar([freq, freq * 0.5.midiratio()]) * amp)
-.build()  
+.send()  
 
 SynthDef ->
   Out.ar(0, CombL.ar(In.ar([2, 3]), decaytime:2.5))
