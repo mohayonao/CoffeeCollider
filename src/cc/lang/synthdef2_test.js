@@ -380,8 +380,8 @@ define(function(require, exports, module) {
               values : [ 1, 880, 882, 0.5 ],
             },
             defList: [
-              [ "Control"    , kr, 0, [ -1, 2, -1, 3, -1, 0 ], [ kr, kr, kr ] ],
-              [ "TrigControl", kr, 3, [ -1, 1               ], [ kr         ] ],
+              [ "Control"    , kr, 1, [ -1, 2, -1, 3, -1, 0 ], [ kr, kr, kr ] ],
+              [ "TrigControl", kr, 0, [ -1, 1               ], [ kr         ] ],
               [ "TSinOsc"    , ar, 0, [  1, 0,  0, 1,  0, 1 ], [ ar         ] ],
               [ "TSinOsc"    , ar, 0, [  1, 0,  0, 0,  0, 1 ], [ ar         ] ],
               [ "Out"        , ar, 0, [  3, 0,  2, 0        ], [            ] ],

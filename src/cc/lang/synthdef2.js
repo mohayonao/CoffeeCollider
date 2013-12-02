@@ -306,9 +306,17 @@ define(function(require, exports, module) {
       });
     });
     consts.sort();
+
+    var specialIndex = 0;
+    children.forEach(function(ugen) {
+      if (cc.instanceOfControlUGen(ugen)) {
+        ugen.specialIndex = specialIndex;
+        specialIndex += ugen.channels.length;
+      }
+    });
     
     var ugenList = topoSort(children).filter(filterUGen);
-    var specialIndex = 0;
+    
     var defList = ugenList.map(function(ugen) {
       var inputs = [];
       ugen.inputs.forEach(function(x) {
@@ -318,10 +326,6 @@ define(function(require, exports, module) {
       });
       var outputs = [];
       if (ugen.channels) {
-        if (cc.instanceOfControlUGen(ugen)) {
-          ugen.specialIndex = specialIndex;
-          specialIndex += ugen.channels.length;
-        }
         outputs = ugen.channels.map(getRate);
       } else if (ugen.numOfOutputs === 1) {
         outputs = [ ugen.rate ];
