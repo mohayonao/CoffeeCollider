@@ -23,20 +23,53 @@ define(function(require, exports, module) {
   };
   
   var Control = (function() {
-    function Control(rate) {
-      cc.MultiOutUGen.call(this, "Control");
+    function Control(rate, klassName) {
+      cc.MultiOutUGen.call(this, klassName || "Control");
       this.rate   = rate;
       this.values = null;
     }
     extend(Control, cc.MultiOutUGen);
     
-    Control.prototype.init = function(list) {
-      cc.UGen.prototype.init.apply(this, [this.rate].concat(list));
-      this.values = list.slice();
+    Control.prototype.init = function(values) {
+      cc.UGen.prototype.init.apply(this, [this.rate]);
+      this.values = values.slice();
       return this.initOutputs(this.values.length, this.rate);
     };
     
     return Control;
+  })();
+
+  var AudioControl = (function() {
+    function AudioControl() {
+      Control.call(this, C.AUDIO, "AudioControl");
+    }
+    extend(AudioControl, Control);
+    
+    return AudioControl;
+  })();
+
+  var TrigControl = (function() {
+    function TrigControl() {
+      Control.call(this, C.CONTROL, "TrigControl");
+    }
+    extend(TrigControl, Control);
+    
+    return TrigControl;
+  })();
+  
+  var LagControl = (function() {
+    function LagControl() {
+      Control.call(this, C.CONTROL, "LagControl");
+    }
+    extend(LagControl, Control);
+    
+    LagControl.prototype.init = function(values, lags) {
+      cc.UGen.prototype.init.apply(this, [this.rate].concat(lags));
+      this.values = values;
+      return this.initOutputs(values.length, this.rate);
+    };
+    
+    return LagControl;
   })();
   
   var UnaryOpUGen = (function() {
@@ -366,6 +399,15 @@ define(function(require, exports, module) {
   
   cc.createControl = function(rate) {
     return new Control(rate);
+  };
+  cc.createAudioControl = function() {
+    return new AudioControl();
+  };
+  cc.createTrigControl = function() {
+    return new TrigControl();
+  };
+  cc.createLagControl = function() {
+    return new LagControl();
   };
   cc.instanceOfControlUGen = function(obj) {
     return obj instanceof Control;

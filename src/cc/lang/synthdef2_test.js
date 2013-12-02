@@ -11,9 +11,9 @@ define(function(require, exports, module) {
   var kr = C.CONTROL, ar = C.AUDIO;
   
   var Control = (function() {
-    function Control(klassName) {
+    function Control(klassName, rate) {
       this.klassName = klassName;
-      this.rate = C.CONTROL;
+      this.rate = rate;
       this.channels = [];
       this.inputs   = [];
       this.numOfOutputs = 0;
@@ -21,9 +21,13 @@ define(function(require, exports, module) {
     Control.prototype.init = function(values, lags) {
       lags = Array.isArray(lags) ? lags : [];
       this.channels = values.map(function(value, index) {
-        return { klassName:this.klassName,
-                 value:value, index:index,
-                 lag:lags[index]||0 };
+        return {
+          klassName: this.klassName,
+          rate     : this.rate,
+          value    : value,
+          index    : index,
+          lag      : lags[index]||0
+        };
       }, this);
       this.numOfOutputs = values.length;
       return this.channels.length === 1 ? this.channels[0] : this.channels;
@@ -34,7 +38,7 @@ define(function(require, exports, module) {
   describe("lang/synthdef.js", function() {
     var actual, expected;
     var _lang, _instanceOfNode, _Synth;
-    var _setSynthDef, _createScalarControl, _createTriggerControl;
+    var _setSynthDef, _createScalarControl, _createTrigControl;
     var _createAudioControl, _createLagControl, _createControl;
     var _instanceOfOut, _instanceOfOutputProxy, _instanceOfControlUGen;
     var addToSynth;
@@ -44,7 +48,7 @@ define(function(require, exports, module) {
       _Synth = cc.global.Synth;
       _setSynthDef = cc.setSynthDef;
       _createScalarControl   = cc.createScalarControl;
-      _createTriggerControl  = cc.createTriggerControl;
+      _createTrigControl     = cc.createTrigControl;
       _createAudioControl    = cc.createAudioControl;
       _createLagControl      = cc.createLagControl;
       _createControl         = cc.createControl;
@@ -66,20 +70,17 @@ define(function(require, exports, module) {
       cc.setSynthDef = function(func) {
         addToSynth = func;
       };
-      cc.createScalarControl = function() {
-        return new Control("ScalarControl");
-      };
-      cc.createTriggerControl = function() {
-        return new Control("TriggerControl");
+      cc.createTrigControl = function() {
+        return new Control("TrigControl", C.CONTROL);
       };
       cc.createAudioControl = function() {
-        return new Control("AudioControl");
+        return new Control("AudioControl", C.AUDIO);
       };
       cc.createLagControl = function() {
-        return new Control("LagControl");
+        return new Control("LagControl", C.CONTROL);
       };
-      cc.createControl = function() {
-        return new Control("Control");
+      cc.createControl = function(rate) {
+        return new Control("Control", rate);
       };
       cc.instanceOfOut = function(obj) {
         return obj.klassName === "Out";
@@ -97,7 +98,7 @@ define(function(require, exports, module) {
       cc.global.Synth = _Synth;
       cc.setSynthDef = _setSynthDef;
       cc.createScalarControl   = _createScalarControl;
-      cc.createTriggerControl  = _createTriggerControl;
+      cc.createTrigControl     = _createTrigControl;
       cc.createAudioControl    = _createAudioControl;
       cc.createLagControl      = _createLagControl;
       cc.createControl         = _createControl;
@@ -198,9 +199,9 @@ define(function(require, exports, module) {
         ];
         actual   = synthdef.controls2args(controls);
         expected = [
-          { klassName:'Control', value:0, index:0, lag:0 },
-          { klassName:'Control', value:1, index:1, lag:0 },
-          { klassName:'Control', value:2, index:2, lag:0 },
+          { klassName:'Control', rate:C.CONTROL, value:0, index:0, lag:0 },
+          { klassName:'Control', rate:C.CONTROL, value:1, index:1, lag:0 },
+          { klassName:'Control', rate:C.CONTROL, value:2, index:2, lag:0 },
         ];
         assert.deepEqual(actual, expected);
         
@@ -218,29 +219,29 @@ define(function(require, exports, module) {
         actual   = synthdef.controls2args(controls);
         expected = [
           [
-            { klassName:'ScalarControl' , value: 1, index:0, lag:0 },
-            { klassName:'ScalarControl' , value:10, index:1, lag:0 },
+            { klassName:"Control"     , rate:C.SCALAR , value: 1, index:0, lag:0 },
+            { klassName:"Control"     , rate:C.SCALAR , value:10, index:1, lag:0 },
           ],
           [
-            { klassName:'TriggerControl', value: 2, index:0, lag:0 },
-            { klassName:'TriggerControl', value:20, index:1, lag:0 },
+            { klassName:"TrigControl" , rate:C.CONTROL, value: 2, index:0, lag:0 },
+            { klassName:"TrigControl" , rate:C.CONTROL, value:20, index:1, lag:0 },
           ],
           [
-            { klassName:'AudioControl'  , value: 3, index:0, lag:0 },
-            { klassName:'AudioControl'  , value:30, index:1, lag:0 },
+            { klassName:"AudioControl", rate:C.AUDIO  , value: 3, index:0, lag:0 },
+            { klassName:"AudioControl", rate:C.AUDIO  , value:30, index:1, lag:0 },
           ],
           [
-            { klassName:'LagControl'    , value: 4, index:0, lag:0.5 },
-            { klassName:'LagControl'    , value:40, index:1, lag:0.5 },
+            { klassName:"LagControl"  , rate:C.CONTROL, value: 4, index:0, lag:0.5 },
+            { klassName:"LagControl"  , rate:C.CONTROL, value:40, index:1, lag:0.5 },
           ],
           [
-            { klassName:'LagControl'    , value: 5, index:2, lag:0 },
-            { klassName:'LagControl'    , value:50, index:3, lag:0 },
+            { klassName:"LagControl"  , rate:C.CONTROL, value: 5, index:2, lag:0 },
+            { klassName:"LagControl"  , rate:C.CONTROL, value:50, index:3, lag:0 },
           ],
-          { klassName:'ScalarControl' , value:100, index:2, lag:0 },
-          { klassName:'TriggerControl', value:200, index:2, lag:0 },
-          { klassName:'AudioControl'  , value:300, index:2, lag:0 },
-          { klassName:'LagControl'    , value:500, index:4, lag:0 },
+          { klassName:"Control"     , rate:C.SCALAR , value:100, index:2, lag:0 },
+          { klassName:"TrigControl" , rate:C.CONTROL, value:200, index:2, lag:0 },
+          { klassName:"AudioControl", rate:C.AUDIO  , value:300, index:2, lag:0 },
+          { klassName:"LagControl"  , rate:C.CONTROL, value:500, index:4, lag:0 },
         ];
         assert.deepEqual(actual, expected);
       });
@@ -298,7 +299,7 @@ define(function(require, exports, module) {
         });
         it("with args", function() {
           children[0] = {
-            klassName   : "TriggerControl",
+            klassName   : "TrigControl",
             rate        : C.CONTROL,
             inputs      : [ 1 ],
             numOfOutputs: 1,
@@ -379,11 +380,11 @@ define(function(require, exports, module) {
               values : [ 1, 880, 882, 0.5 ],
             },
             defList: [
-              [ "Control"       , kr, 0, [ -1, 2, -1, 3, -1, 0 ], [ kr, kr, kr ] ],
-              [ "TriggerControl", kr, 3, [ -1, 1               ], [ kr         ] ],
-              [ "TSinOsc"       , ar, 0, [  1, 0,  0, 1,  0, 1 ], [ ar         ] ],
-              [ "TSinOsc"       , ar, 0, [  1, 0,  0, 0,  0, 1 ], [ ar         ] ],
-              [ "Out"           , ar, 0, [  3, 0,  2, 0        ], [            ] ],
+              [ "Control"    , kr, 0, [ -1, 2, -1, 3, -1, 0 ], [ kr, kr, kr ] ],
+              [ "TrigControl", kr, 3, [ -1, 1               ], [ kr         ] ],
+              [ "TSinOsc"    , ar, 0, [  1, 0,  0, 1,  0, 1 ], [ ar         ] ],
+              [ "TSinOsc"    , ar, 0, [  1, 0,  0, 0,  0, 1 ], [ ar         ] ],
+              [ "Out"        , ar, 0, [  3, 0,  2, 0        ], [            ] ],
             ],
             variants: {}
           };

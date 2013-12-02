@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   var ops = require("../common/ops");
+  var log001 = Math.log(0.001);
   
   var avoidzero = function(a) {
     if (a < 0) {
@@ -887,16 +888,85 @@ define(function(require, exports, module) {
     };
     var next_k = function() {
       var controls = this.parent.controls;
-      var outputs = this.outputs;
-      var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outputs.length; i < imax; ++i) {
-        outputs[i][0] = controls[i + specialIndex];
+      var outputs  = this.outputs;
+      var numChannels = outputs.length;
+      for (var i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        outputs[i][0] = controls[j];
       }
     };
     return ctor;
   })();
-
   
+  cc.unit.specs.LagControl = (function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      var numChannels = this.numOfOutputs;
+      var y1 = this._y1 = new Float32Array(numChannels);
+      var b1 = this._b1 = new Float32Array(numChannels);
+      var controls = this.parent.controls;
+      var inputs   = this.inputs;
+      var sampleRate = this.rate.sampleRate;
+      var lag;
+      for (var i = 0; i < numChannels; ++i) {
+        y1[i] = controls[i];
+        lag   = inputs[i][0];
+        b1[i] = lag === 0 ? 0 : Math.exp(log001 / (lag * sampleRate));
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var z = this.parent.controls[this.specialIndex];
+      var x = z + b1[0] * (y1[0] - z);
+      this.outputs[0][0] = y1[0] = x;
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outputs  = this.outputs;
+      var numChannels = this.outputs.length;
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var z, x, i, j;
+      for (i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        z = controls[j];
+        x = z + b1[i] * (y1[i] - z);
+        outputs[i][0] = y1[i] = x;
+      }
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TrigControl = (function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      var controls     = this.parent.controls;
+      var specialIndex = this.specialIndex;
+      this.outputs[0][0] = controls[specialIndex];
+      controls[specialIndex] = 0;
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outputs  = this.outputs;
+      var numChannels = outputs.length;
+      for (var i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        outputs[i][0] = controls[j];
+        controls[j] = 0;
+      }
+    };
+    return ctor;
+  })();
   
   cc.unit.specs.Out = (function() {
     var ctor = function() {

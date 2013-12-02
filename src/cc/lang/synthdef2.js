@@ -213,13 +213,13 @@ define(function(require, exports, module) {
     };
     if (irControlNames.length) {
       values = irControlNames.map(getValue);
-      controlUGens = cc.createScalarControl().init(utils.flatten(values));
+      controlUGens = cc.createControl(C.SCALAR).init(utils.flatten(values));
       controlUGens = reshape(values, utils.asArray(controlUGens));
       irControlNames.forEach(setToArgs);
     }
     if (trControlNames.length) {
       values = trControlNames.map(getValue);
-      controlUGens = cc.createTriggerControl().init(utils.flatten(values));
+      controlUGens = cc.createTrigControl().init(utils.flatten(values));
       controlUGens = reshape(values, utils.asArray(controlUGens));
       trControlNames.forEach(setToArgs);
     }
@@ -239,7 +239,7 @@ define(function(require, exports, module) {
       if (lagFlag) {
         controlUGens = cc.createLagControl().init(utils.flatten(values), lags);
       } else {
-        controlUGens = cc.createControl().init(utils.flatten(values));
+        controlUGens = cc.createControl(C.CONTROL).init(utils.flatten(values));
       }
       controlUGens = reshape(values, utils.asArray(controlUGens));
       krControlNames.forEach(setToArgs);
