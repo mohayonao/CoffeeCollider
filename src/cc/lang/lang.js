@@ -20,7 +20,8 @@ define(function(require, exports, module) {
       this.bufferRequestCallback = {};
       this.phase = 0;
       this.random = new random.Random();
-
+      this.currentTime = 0;
+      
       this.extendCommands(commands);
     }
     
@@ -54,13 +55,15 @@ define(function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthLang.prototype.play = function(msg) {
-      this.taskManager.start((this.bufLength / this.sampleRate) * 1000);
+      this.currentTimeIncr = (this.bufLength / this.sampleRate) * 1000;
+      this.taskManager.start(this.currentTimeIncr);
       this.sendToServer(msg);
     };
     SynthLang.prototype.pause = function(msg) {
       this.sendToServer(msg);
     };
     SynthLang.prototype.reset = function(msg) {
+      this.currentTime = 0;
       cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
@@ -205,6 +208,11 @@ define(function(require, exports, module) {
   Object.keys(cc.ugen.specs).forEach(function(name) {
     cc.ugen.register(name, cc.ugen.specs[name]);
   });
+  
+  cc.global.System = {};
+  cc.global.System.currentTime = function() {
+    return cc.lang.currentTime;
+  };
   
   module.exports = {};
 

@@ -18,6 +18,7 @@ define(function(require, exports, module) {
     extend(NodeJSSynthLang, cc.SynthLang);
 
     NodeJSSynthLang.prototype.process = function() {
+      this.currentTime += this.currentTimeIncr;
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
       this.sendToServer(["/processed", timelineResult]);

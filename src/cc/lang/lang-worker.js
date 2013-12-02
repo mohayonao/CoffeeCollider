@@ -21,6 +21,7 @@ define(function(require, exports, module) {
       postMessage(msg);
     };
     WorkerSynthLang.prototype.process = function() {
+      this.currentTime += this.currentTimeIncr;
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
       this.sendToServer(["/processed", timelineResult]);

@@ -79,7 +79,9 @@ define(function(require, exports, module) {
       var taskManager = this.taskManager;
       var n = this.strmLength / this.bufLength;
       var timelineResult = [];
+      var currentTimeIncr = this.currentTimeIncr;
       while (n--) {
+        this.currentTime += currentTimeIncr;
         taskManager.process();
         timelineResult = timelineResult.concat(
           this.timelineResult.splice(0), C.DO_NOTHING
