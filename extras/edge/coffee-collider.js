@@ -70,6 +70,7 @@ define('cc/loader', function(require, exports, module) {
     global.CoffeeCollider = function(opts) {
       return cc.createSynthClient(opts);
     };
+    global.CoffeeCollider.version = cc.version;
   } else if (typeof WorkerLocation !== "undefined") {
     if (location.hash === "#socket") {
       cc.opmode  = "socket";
@@ -111,6 +112,7 @@ define('cc/loader', function(require, exports, module) {
       cc.server = cc.createSynthServer();
       return cc.server.exports.createServer(opts);
     };
+    cc.global.version = cc.version;
     module.exports = cc.global;
   }
 
@@ -118,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131201143300",
+    version: "0.0.0+20131203072300",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -284,7 +286,8 @@ define('cc/client/client', function(require, exports, module) {
       this.syncItemsUInt32[1] = this.syncCount;
       this.sendToLang(this.syncItems);
     };
-    SynthClientImpl.prototype.execute = function(code) {
+    SynthClientImpl.prototype.execute = function(code, opts) {
+      opts = opts || {};
       var append, callback;
       var i = 1;
       if (typeof arguments[i] === "boolean") {
@@ -296,7 +299,9 @@ define('cc/client/client', function(require, exports, module) {
         callback = arguments[i++];
       }
       if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
+        if (!opts.js) {
+          code = this.compiler.compile(code.trim());
+        }
         if (callback) {
           this.execCallbacks[this.execId] = callback;
         }
@@ -555,9 +560,6 @@ define('cc/common/pack', function(require, exports, module) {
       if (stack.indexOf(data) !== -1) {
         return { klassName:"Circular" };
       }
-      if (typeof data === "function") {
-        return "[Function]";
-      }
       var result;
       if (typeof data === "object") {
         if (data.buffer instanceof ArrayBuffer) {
@@ -565,13 +567,15 @@ define('cc/common/pack', function(require, exports, module) {
         }
         stack.push(data);
         if (Array.isArray(data)) {
-          result = data.map(function(data) {
+          result = data.filter(function(data) {
+            return typeof data !== "function";
+          }).map(function(data) {
             return _pack(data, stack);
           });
         } else {
           result = {};
           Object.keys(data).forEach(function(key) {
-            if (key.charAt(0) !== "_") {
+            if (key.charAt(0) !== "_" && typeof data[key] !== "function") {
               result[key] = _pack(data[key], stack);
             }
           });
@@ -588,15 +592,11 @@ define('cc/common/pack', function(require, exports, module) {
   })();
 
   var unpack = (function() {
-    var func = function() {};
     var _unpack = function(data) {
       if (!data) {
         return data;
       }
       if (typeof data === "string") {
-        if (data === "[Function]") {
-          return func;
-        }
         return data;
       }
       var result;
@@ -1969,13 +1969,16 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var finalize = function(tokens) {
-    tokens.unshift(["("          , "("        , _],
-                   ["PARAM_START", "("        , _],
-                   ["IDENTIFIER" , "global"   , _],
-                   ["PARAM_END"  , ")"        , _],
-                   ["->"         , "->"       , _],
-                   ["INDENT"     , 2          , _]);
-    
+    tokens.unshift(["("          , "("       , _],
+                   ["PARAM_START", "("       , _],
+                   ["IDENTIFIER" , "global"  , _],
+                   [","         , ","        , _],
+                   ["IDENTIFIER", "cc"       , _],
+                   [","         , ","        , _],
+                   ["IDENTIFIER", "undefined", _],
+                   ["PARAM_END"  , ")"       , _],
+                   ["->"         , "->"      , _],
+                   ["INDENT"     , 2         , _]);
     tokens.push(["OUTDENT"   , 2            , _],
                 [")"         , ")"          , _],
                 ["."         , "."          , _],
@@ -1990,6 +1993,8 @@ define('cc/client/compiler', function(require, exports, module) {
                 ["IDENTIFIER", "self"       , _],
                 ["LOGIC"     , "||"         , _],
                 ["IDENTIFIER", "global"     , _],
+                [","         , ","          , _],
+                ["IDENTIFIER", "cc"         , _],
                 ["CALL_END"  , ")"          , _]);
     return tokens;
   };
@@ -2383,7 +2388,8 @@ define('cc/lang/lang', function(require, exports, module) {
       this.bufferRequestCallback = {};
       this.phase = 0;
       this.random = new random.Random();
-
+      this.currentTime = 0;
+      
       this.extendCommands(commands);
     }
     
@@ -2417,13 +2423,15 @@ define('cc/lang/lang', function(require, exports, module) {
       this.timelineResult.push(cmd);
     };
     SynthLang.prototype.play = function(msg) {
-      this.taskManager.start((this.bufLength / this.sampleRate) * 1000);
+      this.currentTimeIncr = (this.bufLength / this.sampleRate) * 1000;
+      this.taskManager.start(this.currentTimeIncr);
       this.sendToServer(msg);
     };
     SynthLang.prototype.pause = function(msg) {
       this.sendToServer(msg);
     };
     SynthLang.prototype.reset = function(msg) {
+      this.currentTime = 0;
       cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
@@ -2508,21 +2516,6 @@ define('cc/lang/lang', function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-  commands["/emit/n_end"] = function(msg) {
-    var nodeId = msg[1]|0;
-    var n = cc.getNode(nodeId);
-    if (n) {
-      n.emit("end");
-    }
-  };
-  commands["/emit/n_done"] = function(msg) {
-    var nodeId = msg[1]|0;
-    var tag    = msg[2];
-    var n = cc.getNode(nodeId);
-    if (n) {
-      n.emit("done", tag);
-    }
-  };
   
   cc.SynthLang = SynthLang;
   
@@ -2568,6 +2561,11 @@ define('cc/lang/lang', function(require, exports, module) {
   Object.keys(cc.ugen.specs).forEach(function(name) {
     cc.ugen.register(name, cc.ugen.specs[name]);
   });
+  
+  cc.global.System = {};
+  cc.global.System.currentTime = function() {
+    return cc.lang.currentTime;
+  };
   
   module.exports = {};
 
@@ -3536,6 +3534,14 @@ define('cc/lang/utils', function(require, exports, module) {
     return !!(obj && obj.constructor === Object);
   };
 
+  var asNumber = function(obj) {
+    obj = +obj;
+    if (isNaN(obj)) {
+      obj = 0;
+    }
+    return obj;
+  };
+  
   var asString = function(obj) {
     if (obj === "null") {
       return "null";
@@ -3550,7 +3556,9 @@ define('cc/lang/utils', function(require, exports, module) {
   };
   
   var asArray = function(obj) {
-    if (!Array.isArray(obj)) {
+    if (obj === null || obj === undefined) {
+      obj = [];
+    } else if (!Array.isArray(obj)) {
       obj = [ obj ];
     }
     return obj;
@@ -3654,6 +3662,7 @@ define('cc/lang/utils', function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
+    asNumber   : asNumber,
     asString   : asString,
     asArray    : asArray,
     asUGenInput: asUGenInput,
@@ -4563,20 +4572,19 @@ define('cc/lang/node', function(require, exports, module) {
   var cc = require("./cc");
   var utils   = require("./utils");
   var extend  = require("../common/extend");
-  var emitter = require("../common/emitter");
   
   var nodes = {};
   
   var Node = (function() {
     var nodeId = 0;
     function Node() {
-      emitter.mixin(this);
       this.klassName = "Node";
       this.nodeId    = nodeId++;
       this._blocking  = true;
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
+    
     Node.prototype.play = function() {
       cc.lang.pushToTimeline([
         "/n_run", this.nodeId, true
@@ -4599,9 +4607,10 @@ define('cc/lang/node', function(require, exports, module) {
     Node.prototype.performWait = function() {
       return this._blocking;
     };
+    
     return Node;
   })();
-
+  
   var Group = (function() {
     function Group(target, addAction) {
       Node.call(this);
@@ -6853,27 +6862,26 @@ define('cc/lang/string', function(require, exports, module) {
 define('cc/lang/synthdef', function(require, exports, module) {
 
   var cc = require("./cc");
-  var fn = require("./fn");
   var utils  = require("./utils");
   var extend = require("../common/extend");
+  var push = [].push;
   
   var defId = 0;
   
   var SynthDef = (function() {
-    function SynthDef(func, args) {
+    function SynthDef(name) {
       this.klassName = "SynthDef";
+      this.name = name;
+      this._sent = false;
       this._defId = defId++;
-      
-      this.func   = func;
-      this.args   = args2keyValues(args);
-      this.params = args2params(this.args);
-      this.specs  = null;
+      this._children = [];
+      this._args = [];
+      this.specs = {};
     }
     extend(SynthDef, cc.Object);
     
-    SynthDef.prototype.build = function() {
-      if (!this.specs) {
-        build.call(this);
+    SynthDef.prototype.send = function() {
+      if (!this._sent) {
         var consts = this.specs.consts;
         if (consts[0] === -Infinity) {
           consts[0] = "-Infinity";
@@ -6884,14 +6892,13 @@ define('cc/lang/synthdef', function(require, exports, module) {
         cc.lang.pushToTimeline([
           "/s_def", this._defId, JSON.stringify(this.specs)
         ]);
+        this._sent = true;
       }
       return this;
     };
-    
-    SynthDef.prototype.play = fn(function() {
-      if (this.specs === null) {
-        this.build();
-      }
+
+    SynthDef.prototype.play = function() {
+      this.send();
       
       var list = getSynthDefPlayArguments.apply(null, arguments);
       var target = list[0];
@@ -6909,45 +6916,11 @@ define('cc/lang/synthdef', function(require, exports, module) {
       default:
         return cc.global.Synth(this, args, target, 0);
       }
-    }).multiCall().build();
-    
-    var build = function() {
-      var args   = this.args;
-      var params = this.params;
-      
-      var children = [];
-      cc.setSynthDef(function(ugen) {
-        children.push(ugen);
-      });
-      
-      var controls = cc.createControl(1).init(params.flatten);
-      if (!Array.isArray(controls)) {
-        controls = [ controls ];
-      }
-      
-      try {
-        this.func.apply(null, reshapeArgs(args.vals, controls));
-      } catch (e) {
-        throw e.toString();
-      } finally {
-        cc.setSynthDef(null);
-      }
-      var consts  = getConstValues(children);
-      var defList = makeDefList(topoSort(children), consts);
-      
-      var specs = {
-        consts : consts,
-        defList: defList,
-        params : params.params
-      };
-      this.specs = specs;
-      // console.log(specs);
     };
     
     return SynthDef;
   })();
   
-  // private methods
   var getSynthDefPlayArguments = function() {
     var target, args, addAction;
     var i = 0;
@@ -6977,6 +6950,55 @@ define('cc/lang/synthdef', function(require, exports, module) {
     return [target, args, addAction];
   };
   
+  var build = function(that, func, args, rates, prependArgs, variants) {
+    try {
+      initBuild(that);
+      buildUGenGraph(that, func, args, rates, prependArgs);
+      finishBuild(that, variants);
+      that.func = func;
+    } finally {
+      cc.setSynthDef(null);
+    }
+  };
+  
+  var initBuild = function(that) {
+    var children = that._children = [];
+    cc.setSynthDef(function(ugen) {
+      children.push(ugen);
+    });
+    that._args = [];
+  };
+  var buildUGenGraph = function(that, func, args, rates, prependArgs) {
+    var controls = args2controls(args, rates, prependArgs.length);
+    push.apply(that._args, controls);
+    args = prependArgs.concat(controls2args(controls));
+    return func.apply(null, args);
+  };
+  var finishBuild = function(that) {
+    cc.setSynthDef(null);
+    that.specs = asJSON(that.name, that._args, that._children);
+  };
+  
+  var asNumber = function(val) {
+    if (Array.isArray(val)) {
+      return val.map(asNumber);
+    }
+    return +val;
+  };
+  
+  var args2controls = function(args, rates, skipArgs) {
+    if (args.length === 0) {
+      return [];
+    }
+    var keyValues = args2keyValues(args);
+    var keys = keyValues.keys.slice(skipArgs);
+    var vals = keyValues.vals.slice(skipArgs).map(asNumber);
+    
+    checkValidArgs(vals);
+    
+    return keyValueRates2args(keys, vals, rates);
+  };
+  
   var args2keyValues = function(args) {
     var keys = [], vals = [];
     if (args && args.length) {
@@ -6987,52 +7009,105 @@ define('cc/lang/synthdef', function(require, exports, module) {
     }
     return { keys:keys, vals:vals };
   };
-
-  var args2params = function(args) {
-    var params  = { names:[], indices:[], length:[], values:[] };
-    var flatten = [];
-    var opts    = null;
-    for (var i = 0, imax = args.vals.length; i < imax; ++i) {
-      var value;
-      try {
-        value = JSON.parse(args.vals[i]);
-      } catch (e) {
-        throw new TypeError("SynthDefFunction's arguments should be a JSONable: " + args.vals[i]);
-      }
-      if (isValidDefArg(value)) {
-        var length = Array.isArray(value) ? value.length : 1;
-        params.names  .push(args.keys[i]);
-        params.indices.push(flatten.length);
-        params.length .push(length);
-        params.values .push(value);
-        flatten = flatten.concat(value);
-      } else if (i === imax - 1 && utils.isDict(value)) {
-        // allow a dictionary be put the last
-        opts = value;
-      } else {
-        throw new TypeError("SynthDefFunction's arguments should be a constant number or an array that contains it.");
-      }
-      if (opts) {
-        args.keys.pop();
-        args.vals.pop();
-      }
-    }
-    return { params:params, flatten:flatten, opts:opts };
-  };
-
-  var isValidDefArg = function(obj) {
-    if (typeof obj === "number") {
-      return true;
-    }
-    if (Array.isArray(obj)) {
-      return obj.every(function(obj) {
-        return typeof obj === "number";
-      });
-    }
-    return false;
+  
+  var checkNumber = function(val) {
+    return typeof val === "number" && !isNaN(val);
   };
   
-  var reshapeArgs = function(shape, flatten) {
+  var checkValidArgs = function(vals) {
+    for (var i = 0, imax = vals.length; i < imax; ++i) {
+      var val = vals[i];
+      if (val === null || val === undefined) {
+        continue;
+      }
+      if (checkNumber(val) || (Array.isArray(val) && val.every(checkNumber))) {
+        continue;
+      }
+      throw "bad arguments";
+    }
+    return true;
+  };
+  
+  var IR = 0, TR = 1, KR = 2, AR = 3;
+  
+  var keyValueRates2args = function(keys, vals, rates) {
+    var args = [];
+    for (var i = 0, imax = keys.length; i < imax; ++i) {
+      var key   = keys[i];
+      var value = vals[i];
+      var rate  = rates[i];
+      var keyAt01 = key.substr(0, 2);
+      args[i] = { index:i, name:key, value:value, lag:0 };
+      if (rate === "ir" || keyAt01 === "i_") {
+        args[i].type = IR;
+      } else if (rate === "tr" || key === "trig" || keyAt01 === "t_") {
+        args[i].type = TR;
+      } else if (rate === "ar" || keyAt01 === "a_") {
+        args[i].type = AR;
+      } else {
+        rate = utils.asNumber(rate);
+        args[i].type = KR;
+        args[i].lag  = rate;
+      }
+    }
+    return args;
+  };
+
+  var getValue = function(items) {
+    return items.value;
+  };
+  
+  var controls2args = function(controls) {
+    var args = new Array(controls.length);
+    var values, lags, lagFlag, controlUGens;
+    var controlNames = [];
+    var irControlNames = controlNames[IR] = [];
+    var trControlNames = controlNames[TR] = [];
+    var arControlNames = controlNames[AR] = [];
+    var krControlNames = controlNames[KR] = [];
+    controls.forEach(function(cn) {
+      controlNames[cn.type].push(cn);
+    });
+    var setToArgs = function(cn, index) {
+      args[cn.index] = controlUGens[index];
+    };
+    if (irControlNames.length) {
+      values = irControlNames.map(getValue);
+      controlUGens = cc.createControl(0).init(utils.flatten(values));
+      controlUGens = reshape(values, utils.asArray(controlUGens));
+      irControlNames.forEach(setToArgs);
+    }
+    if (trControlNames.length) {
+      values = trControlNames.map(getValue);
+      controlUGens = cc.createTrigControl().init(utils.flatten(values));
+      controlUGens = reshape(values, utils.asArray(controlUGens));
+      trControlNames.forEach(setToArgs);
+    }
+    if (arControlNames.length) {
+      values = arControlNames.map(getValue);
+      controlUGens = cc.createAudioControl().init(utils.flatten(values));
+      controlUGens = reshape(values, utils.asArray(controlUGens));
+      arControlNames.forEach(setToArgs);
+    }
+    if (krControlNames.length) {
+      values = []; lags = []; lagFlag = false;
+      krControlNames.forEach(function(cn) {
+        values.push(cn.value);
+        utils.asArray(cn.value).forEach(function() { lags.push(cn.lag); });
+        if (cn.lag !== 0) { lagFlag = true; }
+      });
+      if (lagFlag) {
+        controlUGens = cc.createLagControl().init(utils.flatten(values), lags);
+      } else {
+        controlUGens = cc.createControl(1).init(utils.flatten(values));
+      }
+      controlUGens = reshape(values, utils.asArray(controlUGens));
+      krControlNames.forEach(setToArgs);
+    }
+    return args;
+  };
+  
+  var reshape = function(shape, flatten) {
     var result = [];
     var saved = flatten.slice();
     for (var i = 0, imax = shape.length; i < imax; ++i) {
@@ -7045,18 +7120,79 @@ define('cc/lang/synthdef', function(require, exports, module) {
     return result;
   };
 
-  var getConstValues = function(list) {
+  var sort = function(a, b) {
+    return (a.type - b.type) || (a.index - b.index);
+  };
+
+  var filterUGen = function(ugen) {
+    return !(typeof ugen === "number" || cc.instanceOfOutputProxy(ugen));
+  };
+  
+  var getRate = function(ugen) {
+    return ugen.rate;
+  };
+  
+  var asJSON = function(name, args, children) {
+    var sortedArgs = args.slice().sort(sort);
+    
+    var param = {};
+    var sortedIndex = 0;
+    var values  = param.values  = [];
+    var names   = param.names   = [];
+    var indices = param.indices = [];
+    var length  = param.length  = [];
+    sortedArgs.forEach(function(cn) {
+      cn.sortedIndex = sortedIndex;
+      if (Array.isArray(cn.value)) {
+        push.apply(values, cn.value);
+        cn.length = cn.value.length;
+      } else {
+        values.push(cn.value);
+        cn.length = 1;
+      }
+      sortedIndex += cn.length;
+    });
+    args.forEach(function(cn) {
+      names  .push(cn.name);
+      indices.push(cn.sortedIndex);
+      length .push(cn.length);
+    });
     var consts = [];
-    list.forEach(function(x) {
-      if (x.inputs) {
-        x.inputs.forEach(function(_in) {
-          if (typeof _in === "number" && consts.indexOf(_in) === -1) {
-            consts.push(_in);
-          }
-        });
+    children.forEach(function(ugen) {
+      ugen.inputs.forEach(function(x) {
+        if (typeof x === "number" && consts.indexOf(x) === -1) {
+          consts.push(x);
+        }
+      });
+    });
+    consts.sort();
+
+    var specialIndex = 0;
+    children.forEach(function(ugen) {
+      if (cc.instanceOfControlUGen(ugen)) {
+        ugen.specialIndex = specialIndex;
+        specialIndex += ugen.channels.length;
       }
     });
-    return consts.sort();
+    
+    var ugenList = topoSort(children).filter(filterUGen);
+    
+    var defList = ugenList.map(function(ugen) {
+      var inputs = [];
+      ugen.inputs.forEach(function(x) {
+        var index = ugenList.indexOf(cc.instanceOfOutputProxy(x) ? x.inputs[0] : x);
+        var subindex = (index !== -1) ? x.outputIndex : consts.indexOf(x);
+        inputs.push(index, subindex);
+      });
+      var outputs = [];
+      if (ugen.channels) {
+        outputs = ugen.channels.map(getRate);
+      } else if (ugen.numOfOutputs === 1) {
+        outputs = [ ugen.rate ];
+      }
+      return [ ugen.klassName, ugen.rate, ugen.specialIndex|0, inputs, outputs ];
+    });
+    return { name:name, consts:consts, params:param, defList:defList, variants:{} };
   };
   
   var topoSort = (function() {
@@ -7099,48 +7235,27 @@ define('cc/lang/synthdef', function(require, exports, module) {
     };
   })();
   
-  var getRate = function(ugen) {
-    return ugen.rate;
-  };
-  var discard = function(ugen) {
-    return typeof ugen !== "number" && !cc.instanceOfOutputProxy(ugen);
-  };
-  var makeDefList = function(list, consts) {
-    var result = [];
-    list = list.filter(discard);
-    for (var i = 0, imax = list.length; i < imax; ++i) {
-      var ugen = list[i];
-      var inputs = [], outputs;
-      for (var j = 0, jmax = ugen.inputs.length; j < jmax; ++j) {
-        var index, subindex;
-        if (cc.instanceOfOutputProxy(ugen.inputs[j])) {
-          index = list.indexOf(ugen.inputs[j].inputs[0]);
-        } else {
-          index = list.indexOf(ugen.inputs[j]);
-        }
-        if (index !== -1) {
-          subindex = ugen.inputs[j].outputIndex|0;
-        } else {
-          subindex = consts.indexOf(ugen.inputs[j]);
-        }
-        inputs.push(index, subindex);
-      }
-      if (cc.instanceOfMultiOutUGen(ugen)) {
-        outputs = ugen.channels.map(getRate);
-      } else if (ugen.numOfOutputs === 1) {
-        outputs = [ ugen.rate ];
-      } else {
-        outputs = [];
-      }
-      result.push(
-        [ ugen.klassName, ugen.rate, ugen.specialIndex|0, inputs, outputs, ugen.tag||"" ]
-      );
+  cc.global.SynthDef = function() {
+    var name, func, args, rates, prependArgs, variants;
+    var i = 0;
+    if (typeof arguments[i] === "string") {
+      name = arguments[i++];
+    } else {
+      name = "synth";
     }
-    return result;
-  };
-
-  cc.global.SynthDef = function(func, args) {
-    return new SynthDef(func, args);
+    if (typeof arguments[i] !== "function") {
+      throw new Error("SynthDef requires build function");
+    }
+    func = arguments[i++];
+    
+    args        = utils.asArray(arguments[i++]);
+    rates       = utils.asArray(arguments[i++]);
+    prependArgs = utils.asArray(arguments[i++]);
+    variants    = {};
+    
+    var instance = new SynthDef(name, func, args, rates, prependArgs, variants);
+    build(instance, func, args, rates, prependArgs, variants);
+    return instance;
   };
   cc.instanceOfSynthDef = function(obj) {
     return obj instanceof SynthDef;
@@ -7148,13 +7263,24 @@ define('cc/lang/synthdef', function(require, exports, module) {
   
   module.exports = {
     SynthDef: SynthDef,
-    args2keyValues: args2keyValues,
-    args2params   : args2params,
-    isValidDefArg : isValidDefArg,
-    reshapeArgs   : reshapeArgs,
-    getConstValues: getConstValues,
-    topoSort      : topoSort,
-    makeDefList   : makeDefList,
+    
+    build: build,
+    
+    initBuild     : initBuild,
+    buildUGenGraph: buildUGenGraph,
+    finishBuild   : finishBuild,
+    
+    args2keyValues    : args2keyValues,
+    args2controls     : args2controls,
+    checkValidArgs    : checkValidArgs,
+    keyValueRates2args: keyValueRates2args,
+    
+    controls2args: controls2args,
+    
+    asJSON: asJSON,
+    
+    reshape : reshape,
+    topoSort: topoSort,
   };
 
 });
@@ -7760,6 +7886,7 @@ define('cc/lang/ugen', function(require, exports, module) {
   var slice  = [].slice;
   
   var addToSynthDef = null;
+  var newKlassOpts  = {}; // TODO: ...
   
   var newArgsWithIndex = function(index) {
     return function(item) {
@@ -7791,11 +7918,11 @@ define('cc/lang/ugen', function(require, exports, module) {
   };
   
   var UGen = (function() {
-    function UGen(name) {
+    function UGen(name, opts) {
+      opts = opts || {};
       this.klassName = name;
-      this.tag  = "";
       this.rate = 2;
-      this.signalRange = 2;
+      this.signalRange = opts.signalRange || 2;
       this.specialIndex = 0;
       this.outputIndex  = 0;
       this.numOfInputs  = 0;
@@ -7818,7 +7945,7 @@ define('cc/lang/ugen', function(require, exports, module) {
         }
       }
       if (size === 0) {
-        return UGen.prototype.init.apply(new Klass(), args);
+        return UGen.prototype.init.apply(new Klass(newKlassOpts.name, newKlassOpts), args);
       }
       var results = new Array(size);
       for (i = 0; i < size; ++i) {
@@ -8134,18 +8261,15 @@ define('cc/lang/ugen', function(require, exports, module) {
     return Out;
   })();
   
-  var init_instance = function(instance, klassName, tag, opts) {
+  var init_instance = function(instance, opts) {
     if (Array.isArray(instance)) {
       return instance.map(function(ugen) {
-        return init_instance(ugen, klassName, tag, opts);
+        return init_instance(ugen, opts);
       });
     } else if (instance instanceof UGen) {
       if (opts.checkInputs) {
         opts.checkInputs.call(instance);
       }
-      instance.klassName   = klassName;
-      instance.signalRange = opts.signalRange;
-      instance.tag = tag || "";
       if (opts.init) {
         return opts.init.apply(instance, instance.inputs);
       }
@@ -8181,16 +8305,15 @@ define('cc/lang/ugen', function(require, exports, module) {
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "$") {
-        var defaults = spec[key].defaults || "tag";
+        var defaults = spec[key].defaults;
         var ctor     = spec[key].ctor;
-        if (defaults !== "tag") {
-          defaults += ",tag";
-        }
         ugenInterface[key.substr(1)] = fn(function() {
           var args = slice.call(arguments);
-          var tag  = args.pop();
+          newKlassOpts.name        = name;
+          newKlassOpts.signalRange = opts.signalRange;
           var instance = ctor.apply(Klass, args);
-          return init_instance(instance, name, tag, opts);
+          newKlassOpts = {};
+          return init_instance(instance, opts);
         }).defaults(defaults).build();
       }
     });
@@ -8260,20 +8383,53 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
   };
   
   var Control = (function() {
-    function Control(rate) {
-      cc.MultiOutUGen.call(this, "Control");
+    function Control(rate, klassName) {
+      cc.MultiOutUGen.call(this, klassName || "Control");
       this.rate   = rate;
       this.values = null;
     }
     extend(Control, cc.MultiOutUGen);
     
-    Control.prototype.init = function(list) {
-      cc.UGen.prototype.init.apply(this, [this.rate].concat(list));
-      this.values = list.slice();
+    Control.prototype.init = function(values) {
+      cc.UGen.prototype.init.apply(this, [this.rate]);
+      this.values = values.slice();
       return this.initOutputs(this.values.length, this.rate);
     };
     
     return Control;
+  })();
+
+  var AudioControl = (function() {
+    function AudioControl() {
+      Control.call(this, 2, "AudioControl");
+    }
+    extend(AudioControl, Control);
+    
+    return AudioControl;
+  })();
+
+  var TrigControl = (function() {
+    function TrigControl() {
+      Control.call(this, 1, "TrigControl");
+    }
+    extend(TrigControl, Control);
+    
+    return TrigControl;
+  })();
+  
+  var LagControl = (function() {
+    function LagControl() {
+      Control.call(this, 1, "LagControl");
+    }
+    extend(LagControl, Control);
+    
+    LagControl.prototype.init = function(values, lags) {
+      cc.UGen.prototype.init.apply(this, [this.rate].concat(lags));
+      this.values = values;
+      return this.initOutputs(values.length, this.rate);
+    };
+    
+    return LagControl;
   })();
   
   var UnaryOpUGen = (function() {
@@ -8604,6 +8760,18 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
   cc.createControl = function(rate) {
     return new Control(rate);
   };
+  cc.createAudioControl = function() {
+    return new AudioControl();
+  };
+  cc.createTrigControl = function() {
+    return new TrigControl();
+  };
+  cc.createLagControl = function() {
+    return new LagControl();
+  };
+  cc.instanceOfControlUGen = function(obj) {
+    return obj instanceof Control;
+  };
   cc.createUnaryOpUGen = function(selector, a) {
     return new UnaryOpUGen().init(selector, a);
   };
@@ -8803,7 +8971,7 @@ define('cc/plugins/bufio', function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };
@@ -8848,7 +9016,7 @@ define('cc/plugins/bufio', function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };
@@ -8887,7 +9055,7 @@ define('cc/plugins/bufio', function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };
@@ -16534,6 +16702,7 @@ define('cc/lang/lang-worker', function(require, exports, module) {
       postMessage(msg);
     };
     WorkerSynthLang.prototype.process = function() {
+      this.currentTime += this.currentTimeIncr;
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
       this.sendToServer(["/processed", timelineResult]);
@@ -16570,6 +16739,7 @@ define('cc/lang/lang-nodejs', function(require, exports, module) {
     extend(NodeJSSynthLang, cc.SynthLang);
 
     NodeJSSynthLang.prototype.process = function() {
+      this.currentTime += this.currentTimeIncr;
       this.taskManager.process();
       var timelineResult = this.timelineResult.splice(0);
       this.sendToServer(["/processed", timelineResult]);
@@ -16666,7 +16836,9 @@ define('cc/lang/lang-socket', function(require, exports, module) {
       var taskManager = this.taskManager;
       var n = this.strmLength / this.bufLength;
       var timelineResult = [];
+      var currentTimeIncr = this.currentTimeIncr;
       while (n--) {
+        this.currentTime += currentTimeIncr;
         taskManager.process();
         timelineResult = timelineResult.concat(
           this.timelineResult.splice(0), 0
@@ -17374,9 +17546,6 @@ define('cc/server/node', function(require, exports, module) {
       if (this.instance) {
         userId = this.instance.userId;
       }
-      cc.server.sendToLang([
-        "/emit/n_end", this.nodeId
-      ], userId);
     }
     this.prev = null;
     this.next = null;
@@ -17428,7 +17597,7 @@ define('cc/server/node', function(require, exports, module) {
     Node.prototype.stop = function() {
       free.call(this);
     };
-    Node.prototype.doneAction = function(action, tag) {
+    Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
         func.call(this);
@@ -17436,9 +17605,6 @@ define('cc/server/node', function(require, exports, module) {
         if (this.instance) {
           userId = this.instance.userId;
         }
-        cc.server.sendToLang([
-          "/emit/n_done", this.nodeId, tag
-        ], userId);
       }
     };
     return Node;
@@ -17504,7 +17670,6 @@ define('cc/server/node', function(require, exports, module) {
         var inRates   = unit.inRates;
         var fromUnits = unit.fromUnits;
         var inSpec  = unit.specs[3];
-        var tag     = unit.specs[5];
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
@@ -17516,7 +17681,7 @@ define('cc/server/node', function(require, exports, module) {
             fromUnits[i] = unitList[inSpec[i2]];
           }
         }
-        unit.init(tag);
+        unit.init();
         return !!unit.process;
       });
       return this;
@@ -17968,20 +18133,19 @@ define('cc/server/unit', function(require, exports, module) {
       this.bufLength  = bufLength;
       this.done       = false;
     }
-    Unit.prototype.init = function(tag) {
+    Unit.prototype.init = function() {
       var ctor = cc.unit.specs[this.name];
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
         throw new Error(this.name + "'s ctor is not found.");
       }
-      this.tag = tag || "";
       return this;
     };
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent.doneAction(action, this.tag);
+        this.parent.doneAction(action);
       }
       action = 0;
     };
@@ -18097,6 +18261,10 @@ define('cc/server/server-nodejs', function(require, exports, module) {
         this.strmList = new Array(8);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
+        var strmList = this.strmList;
+        for (var i = strmList.length; i--; ) {
+          strmList[i] = new Int16Array(this._strm);
+        }
         if (!this.api.isPlaying) {
           this.api.play();
         }
@@ -18337,6 +18505,7 @@ define('cc/server/basic_unit', function(require, exports, module) {
 
   var cc = require("../cc");
   var ops = require("../common/ops");
+  var log001 = Math.log(0.001);
   
   var avoidzero = function(a) {
     if (a < 0) {
@@ -19221,16 +19390,85 @@ define('cc/server/basic_unit', function(require, exports, module) {
     };
     var next_k = function() {
       var controls = this.parent.controls;
-      var outputs = this.outputs;
-      var specialIndex = this.specialIndex;
-      for (var i = 0, imax = outputs.length; i < imax; ++i) {
-        outputs[i][0] = controls[i + specialIndex];
+      var outputs  = this.outputs;
+      var numChannels = outputs.length;
+      for (var i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        outputs[i][0] = controls[j];
       }
     };
     return ctor;
   })();
-
   
+  cc.unit.specs.LagControl = (function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      var numChannels = this.numOfOutputs;
+      var y1 = this._y1 = new Float32Array(numChannels);
+      var b1 = this._b1 = new Float32Array(numChannels);
+      var controls = this.parent.controls;
+      var inputs   = this.inputs;
+      var sampleRate = this.rate.sampleRate;
+      var lag;
+      for (var i = 0; i < numChannels; ++i) {
+        y1[i] = controls[i];
+        lag   = inputs[i][0];
+        b1[i] = lag === 0 ? 0 : Math.exp(log001 / (lag * sampleRate));
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var z = this.parent.controls[this.specialIndex];
+      var x = z + b1[0] * (y1[0] - z);
+      this.outputs[0][0] = y1[0] = x;
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outputs  = this.outputs;
+      var numChannels = this.outputs.length;
+      var y1 = this._y1;
+      var b1 = this._b1;
+      var z, x, i, j;
+      for (i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        z = controls[j];
+        x = z + b1[i] * (y1[i] - z);
+        outputs[i][0] = y1[i] = x;
+      }
+    };
+    return ctor;
+  })();
+  
+  cc.unit.specs.TrigControl = (function() {
+    var ctor = function() {
+      if (this.numOfOutputs === 1) {
+        this.process = next_1;
+      } else {
+        this.process = next_k;
+      }
+      this.process(1);
+    };
+    var next_1 = function() {
+      var controls     = this.parent.controls;
+      var specialIndex = this.specialIndex;
+      this.outputs[0][0] = controls[specialIndex];
+      controls[specialIndex] = 0;
+    };
+    var next_k = function() {
+      var controls = this.parent.controls;
+      var outputs  = this.outputs;
+      var numChannels = outputs.length;
+      for (var i = 0, j = this.specialIndex; i < numChannels; ++i, ++j) {
+        outputs[i][0] = controls[j];
+        controls[j] = 0;
+      }
+    };
+    return ctor;
+  })();
   
   cc.unit.specs.Out = (function() {
     var ctor = function() {
