@@ -7,6 +7,14 @@ define(function(require, exports, module) {
     return !!(obj && obj.constructor === Object);
   };
 
+  var asNumber = function(obj) {
+    obj = +obj;
+    if (isNaN(obj)) {
+      obj = 0;
+    }
+    return obj;
+  };
+  
   var asString = function(obj) {
     if (obj === "null") {
       return "null";
@@ -21,7 +29,9 @@ define(function(require, exports, module) {
   };
   
   var asArray = function(obj) {
-    if (!Array.isArray(obj)) {
+    if (obj === null || obj === undefined) {
+      obj = [];
+    } else if (!Array.isArray(obj)) {
       obj = [ obj ];
     }
     return obj;
@@ -125,6 +135,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
+    asNumber   : asNumber,
     asString   : asString,
     asArray    : asArray,
     asUGenInput: asUGenInput,

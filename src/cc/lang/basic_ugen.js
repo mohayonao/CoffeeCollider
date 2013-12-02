@@ -367,6 +367,9 @@ define(function(require, exports, module) {
   cc.createControl = function(rate) {
     return new Control(rate);
   };
+  cc.instanceOfControlUGen = function(obj) {
+    return obj instanceof Control;
+  };
   cc.createUnaryOpUGen = function(selector, a) {
     return new UnaryOpUGen().init(selector, a);
   };

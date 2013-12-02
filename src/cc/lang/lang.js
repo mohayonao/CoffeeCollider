@@ -195,7 +195,7 @@ define(function(require, exports, module) {
   require("./seg");
   require("./scale");
   require("./string");
-  require("./synthdef");
+  require("./synthdef2");
   require("./task");
   require("./ugen");
   require("./basic_ugen");
