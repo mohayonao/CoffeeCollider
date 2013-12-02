@@ -32,20 +32,19 @@ define(function(require, exports, module) {
       this.bufLength  = bufLength;
       this.done       = false;
     }
-    Unit.prototype.init = function(tag) {
+    Unit.prototype.init = function() {
       var ctor = cc.unit.specs[this.name];
       if (typeof ctor === "function") {
         ctor.call(this);
       } else {
         throw new Error(this.name + "'s ctor is not found.");
       }
-      this.tag = tag || "";
       return this;
     };
     Unit.prototype.doneAction = function(action) {
       if (!this.done) {
         this.done = true;
-        this.parent.doneAction(action, this.tag);
+        this.parent.doneAction(action);
       }
       action = 0;
     };

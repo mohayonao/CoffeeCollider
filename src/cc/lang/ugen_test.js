@@ -64,10 +64,9 @@ define(function(require, exports, module) {
         assert.equal(C.CONTROL, cc.global.Test.kr().rate);
       });
       it("args", function() {
-        var instance = cc.global.Test.ar(10, {tag:"TEST"});
+        var instance = cc.global.Test.ar(10);
         assert.equal(2, instance.numOfInputs);
         assert.deepEqual([10, 2], instance.inputs);
-        assert.equal("TEST", instance.tag);
       });
     });
     

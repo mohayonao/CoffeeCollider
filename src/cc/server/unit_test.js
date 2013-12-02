@@ -10,7 +10,7 @@ define(function(require, exports, module) {
     var parent, _getRateInstance;
     before(function() {
       parent = {
-        doneAction: function(action, tag) {
+        doneAction: function(action) {
           parent.doneAction.result = action;
         }
       };
@@ -48,16 +48,15 @@ define(function(require, exports, module) {
         "TestUnit", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
       ];
       cc.unit.specs.TestUnit.called = false;
-      var u = cc.createUnit(parent, specs).init("tag");
+      var u = cc.createUnit(parent, specs).init();
       assert.isTrue(cc.unit.specs.TestUnit.called);
-      assert.equal(u.tag, "tag");
     });
     it("init(not exist)", function() {
       var specs = [
         "TestUnit(not exist)", C.AUDIO, 0, [ 0, 0, 0, 1 ], [ 2 ], ""
       ];
       assert.throws(function() {
-        cc.createUnit(parent, specs).init("tag");
+        cc.createUnit(parent, specs).init();
       }, "TestUnit(not exist)'s ctor is not found.");
     });
     it("doneAction", function() {

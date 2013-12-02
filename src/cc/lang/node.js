@@ -4,20 +4,19 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var utils   = require("./utils");
   var extend  = require("../common/extend");
-  var emitter = require("../common/emitter");
   
   var nodes = {};
   
   var Node = (function() {
     var nodeId = 0;
     function Node() {
-      emitter.mixin(this);
       this.klassName = "Node";
       this.nodeId    = nodeId++;
       this._blocking  = true;
       nodes[this.nodeId] = this;
     }
     extend(Node, cc.Object);
+    
     Node.prototype.play = function() {
       cc.lang.pushToTimeline([
         "/n_run", this.nodeId, true
@@ -40,9 +39,10 @@ define(function(require, exports, module) {
     Node.prototype.performWait = function() {
       return this._blocking;
     };
+    
     return Node;
   })();
-
+  
   var Group = (function() {
     function Group(target, addAction) {
       Node.call(this);

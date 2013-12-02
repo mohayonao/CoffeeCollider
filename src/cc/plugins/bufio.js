@@ -149,7 +149,7 @@ define(function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };
@@ -194,7 +194,7 @@ define(function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };
@@ -233,7 +233,7 @@ define(function(require, exports, module) {
         phase += rate;
       }
       if (this.done) {
-        this.doneAction(this.inputs[5][0]|0, this.tag);
+        this.doneAction(this.inputs[5][0]|0);
       }
       this._phase = phase;
     };

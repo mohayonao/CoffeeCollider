@@ -44,7 +44,6 @@ define(function(require, exports, module) {
     function UGen(name, opts) {
       opts = opts || {};
       this.klassName = name;
-      this.tag  = "";
       this.rate = C.AUDIO;
       this.signalRange = opts.signalRange || C.BIPOLAR;
       this.specialIndex = 0;
@@ -385,16 +384,15 @@ define(function(require, exports, module) {
     return Out;
   })();
   
-  var init_instance = function(instance, tag, opts) {
+  var init_instance = function(instance, opts) {
     if (Array.isArray(instance)) {
       return instance.map(function(ugen) {
-        return init_instance(ugen, tag, opts);
+        return init_instance(ugen, opts);
       });
     } else if (instance instanceof UGen) {
       if (opts.checkInputs) {
         opts.checkInputs.call(instance);
       }
-      instance.tag = tag || "";
       if (opts.init) {
         return opts.init.apply(instance, instance.inputs);
       }
@@ -430,19 +428,15 @@ define(function(require, exports, module) {
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "$") {
-        var defaults = spec[key].defaults || "tag";
+        var defaults = spec[key].defaults;
         var ctor     = spec[key].ctor;
-        if (defaults !== "tag") {
-          defaults += ",tag";
-        }
         ugenInterface[key.substr(1)] = fn(function() {
           var args = slice.call(arguments);
-          var tag  = args.pop();
           newKlassOpts.name        = name;
           newKlassOpts.signalRange = opts.signalRange;
           var instance = ctor.apply(Klass, args);
           newKlassOpts = {};
-          return init_instance(instance, tag, opts);
+          return init_instance(instance, opts);
         }).defaults(defaults).build();
       }
     });

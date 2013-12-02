@@ -231,9 +231,6 @@ define(function(require, exports, module) {
       if (this.instance) {
         userId = this.instance.userId;
       }
-      cc.server.sendToLang([
-        "/emit/n_end", this.nodeId
-      ], userId);
     }
     this.prev = null;
     this.next = null;
@@ -285,7 +282,7 @@ define(function(require, exports, module) {
     Node.prototype.stop = function() {
       free.call(this);
     };
-    Node.prototype.doneAction = function(action, tag) {
+    Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
         func.call(this);
@@ -293,9 +290,6 @@ define(function(require, exports, module) {
         if (this.instance) {
           userId = this.instance.userId;
         }
-        cc.server.sendToLang([
-          "/emit/n_done", this.nodeId, tag
-        ], userId);
       }
     };
     return Node;
@@ -361,7 +355,6 @@ define(function(require, exports, module) {
         var inRates   = unit.inRates;
         var fromUnits = unit.fromUnits;
         var inSpec  = unit.specs[3];
-        var tag     = unit.specs[5];
         for (var i = 0, imax = inputs.length; i < imax; ++i) {
           var i2 = i << 1;
           if (inSpec[i2] === -1) {
@@ -373,7 +366,7 @@ define(function(require, exports, module) {
             fromUnits[i] = unitList[inSpec[i2]];
           }
         }
-        unit.init(tag);
+        unit.init();
         return !!unit.process;
       });
       return this;

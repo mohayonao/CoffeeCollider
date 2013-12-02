@@ -148,21 +148,6 @@ define(function(require, exports, module) {
   commands["/importScripts"] = function(msg) {
     importScripts(msg[1]);
   };
-  commands["/emit/n_end"] = function(msg) {
-    var nodeId = msg[1]|0;
-    var n = cc.getNode(nodeId);
-    if (n) {
-      n.emit("end");
-    }
-  };
-  commands["/emit/n_done"] = function(msg) {
-    var nodeId = msg[1]|0;
-    var tag    = msg[2];
-    var n = cc.getNode(nodeId);
-    if (n) {
-      n.emit("done", tag);
-    }
-  };
   
   cc.SynthLang = SynthLang;
   
