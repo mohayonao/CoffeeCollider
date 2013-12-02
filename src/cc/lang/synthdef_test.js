@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var assert = require("chai").assert;
 
-  var synthdef = require("./synthdef2");
+  var synthdef = require("./synthdef");
   
   var cc = require("./cc");
   

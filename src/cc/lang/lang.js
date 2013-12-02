@@ -180,7 +180,7 @@ define(function(require, exports, module) {
   require("./seg");
   require("./scale");
   require("./string");
-  require("./synthdef2");
+  require("./synthdef");
   require("./task");
   require("./ugen");
   require("./basic_ugen");
