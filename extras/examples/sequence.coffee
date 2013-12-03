@@ -35,8 +35,7 @@ efx = SynthDef ->
 
 Task ->
   freqs = [ 880, 440, 880*2, 220, 880*2, 660, 880*2, 660 ]
-  
-  Infinity.do (i)->
+  Infinity.do syncblock (i)->
     switch pattern[0].wrapAt(i)
       when 'x' then Synth(seq1, freq:freqs.wrapAt(i))
       when 'X' then Synth(seq2)

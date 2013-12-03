@@ -8,10 +8,10 @@ SynthDef ->
 .play()
  
 Task ->
-  Infinity.do ->
+  Infinity.do syncblock ->
     root  = rrand(220, 880)
     synth = Synth(tone)
-    [ 1, 4, 3, 2, 8, 4, 3, 2 ].do (x, i)->
+    [ 1, 4, 3, 2, 8, 4, 3, 2 ].do syncblock (x, i)->
       freq = root * x
       amp  = 1 - (i / 8)
       synth.set freq:freq, amp:amp
