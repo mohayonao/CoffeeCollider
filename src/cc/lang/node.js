@@ -2,8 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var utils   = require("./utils");
-  var extend  = require("../common/extend");
+  var utils  = require("./utils");
+  var extend = require("../common/extend");
   
   var nodes = {};
   
@@ -23,12 +23,14 @@ define(function(require, exports, module) {
       ]);
       return this;
     };
+    
     Node.prototype.pause = function() {
       cc.lang.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
     };
+    
     Node.prototype.stop = function() {
       cc.lang.pushToTimeline([
         "/n_free", this.nodeId
@@ -36,6 +38,28 @@ define(function(require, exports, module) {
       this._blocking = false;
       return this;
     };
+
+    Node.prototype.set = function(args) {
+      var controls = args2controls(args, this.params);
+      if (controls.length) {
+        cc.lang.pushToTimeline([
+          "/n_set", this.nodeId, controls
+        ]);
+      }
+      return this;
+    };
+    
+    Node.prototype.release = function(releaseTime) {
+      releaseTime = -1 - utils.asNumber(releaseTime);
+      var controls = args2controls({ gate:releaseTime }, this.params);
+      if (controls.length) {
+        cc.lang.pushToTimeline([
+          "/n_set", this.nodeId, controls
+        ]);
+      }
+      return this;
+    };
+    
     Node.prototype.performWait = function() {
       return this._blocking;
     };
@@ -72,15 +96,6 @@ define(function(require, exports, module) {
       }
     }
     extend(Synth, Node);
-    
-    Synth.prototype.set = function(args) {
-      var controls = args2controls(args, this.params);
-      if (controls.length) {
-        cc.lang.pushToTimeline([
-          "/n_set", this.nodeId, controls
-        ]);
-      }
-    };
     
     return Synth;
   })();
