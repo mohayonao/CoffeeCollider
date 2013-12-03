@@ -159,7 +159,63 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
-    
+    describe("Pn", function() {
+      it("create", function() {
+        p = cc.global.Pn();
+        assert.instanceOf(p, pattern.Pn);
+      });
+      it("next", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pn(p, 2);
+        actual   = p.nextN(11);
+        expected = [
+          1, 2, 3, 1, 2, 1, 2, 3, 1, 2, null
+        ];
+        assert.deepEqual(actual, expected);
+      });
+      it("reset", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pn(p, 2);
+        
+        p.nextN(2);
+        p.reset();
+        
+        actual   = p.nextN(11);
+        expected = [
+          1, 2, 3, 1, 2, 1, 2, 3, 1, 2, null
+        ];
+        assert.deepEqual(actual, expected);
+      });
+    });
+    describe("Pstutter", function() {
+      it("create", function() {
+        p = cc.global.Pstutter();
+        assert.instanceOf(p, pattern.Pstutter);
+      });
+      it("next", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pstutter(2, p);
+        actual   = p.nextN(11);
+        expected = [
+          1, 1, 2, 2, 3, 3, 1, 1, 2, 2, null
+        ];
+        assert.deepEqual(actual, expected);
+      });
+      it("reset", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pstutter(2, p);
+        
+        p.nextN(2);
+        p.reset();
+        
+        actual   = p.nextN(11);
+        expected = [
+          1, 1, 2, 2, 3, 3, 1, 1, 2, 2, null
+        ];
+        assert.deepEqual(actual, expected);
+        
+      });
+    });
     describe("Puop", function() {
       it("midicps", function() {
         testTools.replaceTempNumberPrototype("midicps", function() {

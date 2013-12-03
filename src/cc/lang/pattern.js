@@ -16,6 +16,13 @@ define(function(require, exports, module) {
     }
     return item;
   };
+
+  var asPattern = function(item) {
+    if (item instanceof Pattern) {
+      return item;
+    }
+    return new Pseq(utils.asArray(item), 1, 0);
+  };
   
   var Pattern = (function() {
     function Pattern() {
@@ -366,6 +373,90 @@ define(function(require, exports, module) {
     
     return Prand;
   })();
+
+  var Pn = (function() {
+    function Pn(pattern, repeats) {
+      Pattern.call(this);
+      this._pattern = asPattern(pattern);
+      this._repeats = utils.asNumber(repeats);
+      this._i = 0;
+    }
+    extend(Pn, Pattern);
+    
+    Pn.prototype.clone = function() {
+      return new Pn(this._pattern.clone(), this._repeats);
+    };
+    
+    Pn.prototype.next = function() {
+      if (!this._finished) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          return val;
+        }
+        this._i += 1;
+        if (this._i !== this._repeats) {
+          this._pattern.reset();
+          return this.next();
+        }
+        this._finished = true;
+      }
+      return null;
+    };
+    
+    Pn.prototype.reset = function() {
+      this._i = 0;
+      this._pattern.reset();
+      return this;
+    };
+    
+    return Pn;
+  })();
+  
+  var Pstutter = (function() {
+    function Pstutter(n, pattern) {
+      Pattern.call(this);
+      this.klassName = "Pstutter";
+      this._n = utils.asNumber(n);
+      this._pattern = asPattern(pattern);
+      this._i = n;
+      this._val = null;
+      if (this._n === 0) {
+        this._finished = true;
+      }
+    }
+    extend(Pstutter, Pattern);
+
+    Pstutter.prototype.clone = function() {
+      return new Pstutter(this._n, this._p.clone());
+    };
+
+    Pstutter.prototype.next = function() {
+      if (!this._finished) {
+        if (this._i >= this._n) {
+          var val = this._pattern.next();
+          if (isNotNull(val)) {
+            this._val = val;
+            this._i = 1;
+            return val;
+          } else {
+            this._finished = true;
+          }
+        } else {
+          this._i += 1;
+          return this._val;
+        }
+      }
+      return null;
+    };
+    
+    Pstutter.prototype.reset = function() {
+      this._i = this._n;
+      this._pattern.reset();
+      return this;
+    };
+    
+    return Pstutter;
+  })();
   
   cc.global.Pgeom = fn(function(start, grow, length) {
     return new Pgeom(start, grow, length);
@@ -395,6 +486,14 @@ define(function(require, exports, module) {
     return new Prand(list, repeats);
   }).defaults("list=[],repeats=1").build();
   
+  cc.global.Pn = fn(function(pattern, repeats) {
+    return new Pn(pattern, repeats);
+  }).defaults("pattern=[],repeats=Infinity").build();
+  
+  cc.global.Pstutter = fn(function(n, pattern) {
+    return new Pstutter(n, pattern);
+  }).defaults("n=1,pattern=[]").build();
+  
   module.exports = {
     Pattern: Pattern,
     Puop   : Puop,
@@ -409,6 +508,9 @@ define(function(require, exports, module) {
     Pseq : Pseq,
     Pshuf: Pshuf,
     Prand: Prand,
+
+    Pn      : Pn,
+    Pstutter: Pstutter,
   };
 
 });
