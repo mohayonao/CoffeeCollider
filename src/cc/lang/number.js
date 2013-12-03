@@ -776,6 +776,96 @@ define(function(require, exports, module) {
     }
     return a * Math.exp(Math.log(b / a) * drand());
   }).defaults(ops.ARITY_OPS.exprand).multiCall().build());
+
+  // chord
+  var chord_tensions = {
+    ""      : [4, 7],
+    "major" : [4, 7],
+    "minor" : [3, 7],
+    "major7": [4, 7, 11],
+    "dom7"  : [4, 7, 10],
+    "minor7": [3, 7, 10],
+    "aug"   : [4, 8],
+    "dim"   : [3, 6],
+    "dim7"  : [3, 6, 9],
+    "1"     : [],
+    "5"     : [7],
+    "+5"    : [4, 8],
+    "m+5"   : [3, 8],
+    "sus2"  : [2, 7],
+    "sus4"  : [5, 7],
+    "6"     : [4, 7, 9],
+    "m6"    : [3, 7, 9],
+    "7sus2" : [2, 7, 10],
+    "7sus4" : [5, 7, 10],
+    "7-5"   : [4, 6, 10],
+    "m7-5"  : [3, 6, 10],
+    "7+5"   : [4, 8, 10],
+    "m7+5"  : [3, 8, 10],
+    "9"     : [4, 7, 10, 14],
+    "m9"    : [3, 7, 10, 14],
+    "m7+9"  : [3, 7, 10, 14],
+    "maj9"  : [4, 7, 11, 14],
+    "9sus4" : [5, 7, 10, 14],
+    "6*9"   : [4, 7, 9, 14],
+    "m6*9"  : [3, 9, 7, 14],
+    "7-9"   : [4, 7, 10, 13],
+    "m7-9"  : [3, 7, 10, 13],
+    "7-10"  : [4, 7, 10, 15],
+    "9+5"   : [10, 13],
+    "m9+5"  : [10, 14],
+    "7+5-9" : [4, 8, 10, 13],
+    "m7+5-9": [3, 8, 10, 13],
+    "11"    : [4, 7, 10, 14, 17],
+    "m11"   : [3, 7, 10, 14, 17],
+    "maj11" : [4, 7, 11, 14, 17],
+    "11+"   : [4, 7, 10, 14, 18],
+    "m11+"  : [3, 7, 10, 14, 18],
+    "13"    : [4, 7, 10, 14, 17, 21],
+    "m13"   : [3, 7, 10, 14, 17, 21],
+  };
+  chord_tensions.M           = chord_tensions.major;
+  chord_tensions.m           = chord_tensions.minor;
+  chord_tensions["7"]        = chord_tensions.dom7;
+  chord_tensions.M7          = chord_tensions.major7;
+  chord_tensions.m7          = chord_tensions.minor7;
+  chord_tensions.augmented   = chord_tensions.aug;
+  chord_tensions.a           = chord_tensions.aug;
+  chord_tensions.diminished  = chord_tensions.dim;
+  chord_tensions.i           = chord_tensions.dim;
+  chord_tensions.diminished7 = chord_tensions.dim7;
+  chord_tensions.i7          = chord_tensions.dim7;
+  
+  var chord = function(num, name, inversion) {
+    var tensions = chord_tensions[name] || [];
+    var list = [ num ];
+    for (var i = 0, imax = tensions.length; i < imax; ++i) {
+      list.push(num + tensions[i]);
+    }
+    inversion = Math.max(0, Math.min(inversion, list.length - 1));
+    while (inversion--) {
+      list.push( list.shift() + 12 );
+    }
+    return list;
+  };
+  
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion) {
+    return chord(this, name, inversion);
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+
+  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion) {
+    var num = this;
+    return chord(0, name, inversion).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion) {
+    var num = Math.pow(2, this * 1/12);
+    return chord(0, name, inversion).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
   module.exports = {};
 

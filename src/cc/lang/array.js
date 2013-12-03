@@ -155,7 +155,34 @@ define(function(require, exports, module) {
       });
     }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
   });
+
+  // chord
+  fn.defineProperty(Array.prototype, "chord", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chord(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+
+  fn.defineProperty(Array.prototype, "chordcps", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chordcps(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
+  fn.defineProperty(Array.prototype, "chordratio", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chordratio(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
   // Array methods
   // utils

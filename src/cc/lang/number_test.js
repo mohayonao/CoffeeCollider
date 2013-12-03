@@ -1031,6 +1031,33 @@ define(function(require, exports, module) {
         });
         
       });
+      describe("chord", function() {
+        it("default", function() {
+          actual   = (60).chord();
+          expected = [ 60, 64, 67 ]; // C
+          assert.deepEqual(actual, expected);
+        });
+        it("minor", function() {
+          actual   = (60).chord("m");
+          expected = [ 60, 63, 67 ]; // Cm
+          assert.deepEqual(actual, expected);
+        });
+        it("inversion", function() {
+          actual   = (60).chord("m", 1);
+          expected = [ 63, 67, 72 ]; // Cm
+          assert.deepEqual(actual, expected);
+        });
+        it("chordcps", function() {
+          actual   = (261.6255653006).chordcps("m");
+          expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
+          assert.deepCloseTo(expected, expected, 1e-6);
+        });
+        it("chordratio", function() {
+          actual   = (12).chordcps("m7");
+          expected = [ 1 * 2, 1.1892071150019 * 2, 1.4983070768743 * 2,  1.7817974362766 * 2 ];
+          assert.deepCloseTo(expected, expected, 1e-6);
+        });
+      });
     });
   });
 
