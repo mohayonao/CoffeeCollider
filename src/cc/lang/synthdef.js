@@ -120,10 +120,12 @@ define(function(require, exports, module) {
   };
   
   var asNumber = function(val) {
-    if (Array.isArray(val)) {
-      return val.map(asNumber);
+    if (val === "Infinity") {
+      return Infinity;
+    } else if (val === "-Infinity") {
+      return -Infinity;
     }
-    return +val;
+    return JSON.parse(val);
   };
   
   var args2controls = function(args, rates, skipArgs) {
