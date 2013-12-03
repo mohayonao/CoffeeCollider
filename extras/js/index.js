@@ -121,9 +121,9 @@ $(function() {
       editor.setValue(hash.substr(srcFragment.length));
       editor.clearSelection();
     } else if (hash.indexOf(loadFragment) === 0) {
-      var path = "./extras/examples/";
+      var path = "./examples/";
       if (isEdge) {
-        path = "../examples/";
+        path = "../../examples/";
       }
       $.get(path + hash.substr(loadFragment.length)).then(function(res) {
         editor.setValue(res);
