@@ -110,8 +110,8 @@ define(function(require, exports, module) {
         if (index === -1) {
           return;
         }
-        index = params.indices[index];
         var length = params.length[index];
+        index = params.indices[index];
         if (Array.isArray(value)) {
           value.forEach(function(value, i) {
             if (i < length) {
