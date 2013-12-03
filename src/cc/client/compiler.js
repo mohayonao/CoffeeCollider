@@ -776,7 +776,7 @@ define(function(require, exports, module) {
           tokens.push(["TERMINATOR", "\n", _]);
         }
         segmented.beginOfSegment(tokens, args);
-        push.apply(tokens, segmented.fetchLine(body));
+        segmented.insertSegment(tokens, body);
         segmented.endOfSegment(tokens, args);
       }
       tokens.push(["OUTDENT", 2  , _],
@@ -811,6 +811,19 @@ define(function(require, exports, module) {
     }
     tokens.push(["->"    , "->", _],
                 ["INDENT", 2   , _]);
+  };
+  segmented.splitIdentifiers = [ "Task", "syncblock", "wait" ];
+  segmented.insertSegment = function(tokens, body) {
+    while (body.length) {
+      var line = segmented.fetchLine(body);
+      push.apply(tokens, line);
+      for (var i = 0, imax = line.length; i < imax; ++i) {
+        var t = line[i];
+        if (t[TAG] === "IDENTIFIER" && segmented.splitIdentifiers.indexOf(t[VALUE]) !== -1) {
+          return;
+        }
+      }
+    }
   };
   segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
