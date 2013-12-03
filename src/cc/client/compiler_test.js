@@ -509,23 +509,84 @@ define(function(require, exports, module) {
         ]);
       });
     });
-    describe("replaceFixedTimeValue", function() {
+    describe("replaceNumericString", function() {
       it("basic", function() {
         tokens = coffee.tokens('"10min"');
-        tokens = compiler.replaceFixedTimeValue(tokens);
+        tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "600");
       });
       it("pass", function() {
         tokens = coffee.tokens('"str"');
-        tokens = compiler.replaceFixedTimeValue(tokens);
+        tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "STRING");
         assert.equal(tokens[0][VALUE], '"str"', "not replace");
       });
       it("single quotation", function() {
         tokens = coffee.tokens("'10min'");
-        tokens = compiler.replaceFixedTimeValue(tokens);
+        tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][VALUE], "'10min'", "not replace when use single quotation");
+      });
+      it("note value", function() {
+        tokens = coffee.tokens('"A4"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "69");
+        
+        tokens = coffee.tokens('"C0"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "12");
+
+        tokens = coffee.tokens('"D1"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "26");
+
+        tokens = coffee.tokens('"E2"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "40");
+
+        tokens = coffee.tokens('"F3"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "53");
+
+        tokens = coffee.tokens('"G4"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "67");
+        
+        tokens = coffee.tokens('"A5"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "81");
+
+        tokens = coffee.tokens('"B6"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "95");
+        
+        tokens = coffee.tokens('"A7+"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "106");
+
+        tokens = coffee.tokens('"A8#"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "118");
+
+        tokens = coffee.tokens('"A9-"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "128");
+
+        tokens = coffee.tokens('"A9b"');
+        tokens = compiler.replaceNumericString(tokens);
+        assert.equal(tokens[0][TAG]  , "NUMBER");
+        assert.equal(tokens[0][VALUE], "128");
       });
     });
     describe("replaceStrictlyPrecedence", function() {

@@ -434,18 +434,38 @@ define(function(require, exports, module) {
   };
   
   
-  var replaceFixedTimeValue = function(tokens) {
+  var replaceNumericString = function(tokens) {
+    var str, val;
     for (var i = 0, imax = tokens.length; i < imax; ++i) {
       var token = tokens[i];
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
-        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
-        if (typeof time === "number") {
+        str = token[VALUE].substr(1, token[VALUE].length-2);
+        val = timevalue(str);
+        if (typeof val !== "number") {
+          val = notevalue(str);
+        }
+        if (typeof val === "number") {
           token[TAG] = "NUMBER";
-          token[VALUE] = time.toString();
+          token[VALUE] = val.toString();
         }
       }
     }
     return tokens;
+  };
+  
+  var notevalue = function(str) {
+    var m = /^([CDEFGAB])(\d)([-+#b])?$/.exec(str);
+    if (m) {
+      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] * 12) + 12;
+      var acc = m[3];
+      if (acc === "-" || acc === "b") {
+        midi--;
+      } else if (acc === "+" || acc === "#") {
+        midi++;
+      }
+      return midi;
+    }
+    return str;
   };
   
   var replaceStrictlyPrecedence = function(tokens) {
@@ -1003,7 +1023,7 @@ define(function(require, exports, module) {
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
         tokens = replaceGlobalVariables(tokens);
-        tokens = replaceFixedTimeValue(tokens);
+        tokens = replaceNumericString(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
         tokens = replaceBinaryOperator(tokens);
@@ -1043,7 +1063,7 @@ define(function(require, exports, module) {
     detectFunctionParameters: detectFunctionParameters,
 
     replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
-    replaceFixedTimeValue    : replaceFixedTimeValue,
+    replaceNumericString     : replaceNumericString,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
     replaceBinaryOperator    : replaceBinaryOperator,
@@ -1055,6 +1075,8 @@ define(function(require, exports, module) {
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
     prettyPrint              : prettyPrint,
+    
+    notevalue: notevalue,
   };
 
 });
