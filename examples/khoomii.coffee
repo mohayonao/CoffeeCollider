@@ -1,11 +1,10 @@
 khoomii = SynthDef((formant=[700, 1200, 2900])->
-  freq = 174.61412048339844
-  freq = freq + LFPar.kr(3, mul:0.8)
+  freq = 53.midicps() + LFPar.kr(3, mul:0.8)
   
   synth = Saw.ar(freq) * 0.5
   synth = Mix(BPF.ar(synth, formant, rq:[0.2, 0.1, 0.05]))
   
-  Out.ar(0, synth)
+  Out.ar(0, [ synth, DelayL.ar(synth, 0.2) ])
 , [0.25]).play()
 
 Task ->
