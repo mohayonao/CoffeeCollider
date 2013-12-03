@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131203111900",
+    version: "0.0.0+20131204071300",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -1454,18 +1454,38 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   
-  var replaceFixedTimeValue = function(tokens) {
+  var replaceNumericString = function(tokens) {
+    var str, val;
     for (var i = 0, imax = tokens.length; i < imax; ++i) {
       var token = tokens[i];
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
-        var time = timevalue(token[VALUE].substr(1, token[VALUE].length-2));
-        if (typeof time === "number") {
+        str = token[VALUE].substr(1, token[VALUE].length-2);
+        val = timevalue(str);
+        if (typeof val !== "number") {
+          val = notevalue(str);
+        }
+        if (typeof val === "number") {
           token[TAG] = "NUMBER";
-          token[VALUE] = time.toString();
+          token[VALUE] = val.toString();
         }
       }
     }
     return tokens;
+  };
+  
+  var notevalue = function(str) {
+    var m = /^([CDEFGAB])(\d)([-+#b])?$/.exec(str);
+    if (m) {
+      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] * 12) + 12;
+      var acc = m[3];
+      if (acc === "-" || acc === "b") {
+        midi--;
+      } else if (acc === "+" || acc === "#") {
+        midi++;
+      }
+      return midi;
+    }
+    return str;
   };
   
   var replaceStrictlyPrecedence = function(tokens) {
@@ -1796,7 +1816,7 @@ define('cc/client/compiler', function(require, exports, module) {
           tokens.push(["TERMINATOR", "\n", _]);
         }
         segmented.beginOfSegment(tokens, args);
-        push.apply(tokens, segmented.fetchLine(body));
+        segmented.insertSegment(tokens, body);
         segmented.endOfSegment(tokens, args);
       }
       tokens.push(["OUTDENT", 2  , _],
@@ -1831,6 +1851,19 @@ define('cc/client/compiler', function(require, exports, module) {
     }
     tokens.push(["->"    , "->", _],
                 ["INDENT", 2   , _]);
+  };
+  segmented.splitIdentifiers = [ "Task", "syncblock", "wait" ];
+  segmented.insertSegment = function(tokens, body) {
+    while (body.length) {
+      var line = segmented.fetchLine(body);
+      push.apply(tokens, line);
+      for (var i = 0, imax = line.length; i < imax; ++i) {
+        var t = line[i];
+        if (t[TAG] === "IDENTIFIER" && segmented.splitIdentifiers.indexOf(t[VALUE]) !== -1) {
+          return;
+        }
+      }
+    }
   };
   segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
@@ -2010,7 +2043,7 @@ define('cc/client/compiler', function(require, exports, module) {
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
         tokens = replaceGlobalVariables(tokens);
-        tokens = replaceFixedTimeValue(tokens);
+        tokens = replaceNumericString(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
         tokens = replaceBinaryOperator(tokens);
@@ -2050,7 +2083,7 @@ define('cc/client/compiler', function(require, exports, module) {
     detectFunctionParameters: detectFunctionParameters,
 
     replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
-    replaceFixedTimeValue    : replaceFixedTimeValue,
+    replaceNumericString     : replaceNumericString,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
     replaceBinaryOperator    : replaceBinaryOperator,
@@ -2062,6 +2095,8 @@ define('cc/client/compiler', function(require, exports, module) {
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
     prettyPrint              : prettyPrint,
+    
+    notevalue: notevalue,
   };
 
 });
@@ -2747,7 +2782,34 @@ define('cc/lang/array', function(require, exports, module) {
       });
     }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
   });
+
+  // chord
+  fn.defineProperty(Array.prototype, "chord", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chord(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+
+  fn.defineProperty(Array.prototype, "chordcps", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chordcps(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
+  fn.defineProperty(Array.prototype, "chordratio", fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.chordratio(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
   // Array methods
   // utils
@@ -4533,8 +4595,8 @@ define('cc/lang/mix', function(require, exports, module) {
 define('cc/lang/node', function(require, exports, module) {
 
   var cc = require("./cc");
-  var utils   = require("./utils");
-  var extend  = require("../common/extend");
+  var utils  = require("./utils");
+  var extend = require("../common/extend");
   
   var nodes = {};
   
@@ -4554,12 +4616,14 @@ define('cc/lang/node', function(require, exports, module) {
       ]);
       return this;
     };
+    
     Node.prototype.pause = function() {
       cc.lang.pushToTimeline([
         "/n_run", this.nodeId, false
       ]);
       return this;
     };
+    
     Node.prototype.stop = function() {
       cc.lang.pushToTimeline([
         "/n_free", this.nodeId
@@ -4567,6 +4631,28 @@ define('cc/lang/node', function(require, exports, module) {
       this._blocking = false;
       return this;
     };
+
+    Node.prototype.set = function(args) {
+      var controls = args2controls(args, this.params);
+      if (controls.length) {
+        cc.lang.pushToTimeline([
+          "/n_set", this.nodeId, controls
+        ]);
+      }
+      return this;
+    };
+    
+    Node.prototype.release = function(releaseTime) {
+      releaseTime = -1 - utils.asNumber(releaseTime);
+      var controls = args2controls({ gate:releaseTime }, this.params);
+      if (controls.length) {
+        cc.lang.pushToTimeline([
+          "/n_set", this.nodeId, controls
+        ]);
+      }
+      return this;
+    };
+    
     Node.prototype.performWait = function() {
       return this._blocking;
     };
@@ -4604,15 +4690,6 @@ define('cc/lang/node', function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.set = function(args) {
-      var controls = args2controls(args, this.params);
-      if (controls.length) {
-        cc.lang.pushToTimeline([
-          "/n_set", this.nodeId, controls
-        ]);
-      }
-    };
-    
     return Synth;
   })();
   
@@ -4626,8 +4703,8 @@ define('cc/lang/node', function(require, exports, module) {
         if (index === -1) {
           return;
         }
-        index = params.indices[index];
         var length = params.length[index];
+        index = params.indices[index];
         if (Array.isArray(value)) {
           value.forEach(function(value, i) {
             if (i < length) {
@@ -5545,6 +5622,96 @@ define('cc/lang/number', function(require, exports, module) {
     }
     return a * Math.exp(Math.log(b / a) * drand());
   }).defaults(ops.ARITY_OPS.exprand).multiCall().build());
+
+  // chord
+  var chord_tensions = {
+    ""      : [4, 7],
+    "major" : [4, 7],
+    "minor" : [3, 7],
+    "major7": [4, 7, 11],
+    "dom7"  : [4, 7, 10],
+    "minor7": [3, 7, 10],
+    "aug"   : [4, 8],
+    "dim"   : [3, 6],
+    "dim7"  : [3, 6, 9],
+    "1"     : [],
+    "5"     : [7],
+    "+5"    : [4, 8],
+    "m+5"   : [3, 8],
+    "sus2"  : [2, 7],
+    "sus4"  : [5, 7],
+    "6"     : [4, 7, 9],
+    "m6"    : [3, 7, 9],
+    "7sus2" : [2, 7, 10],
+    "7sus4" : [5, 7, 10],
+    "7-5"   : [4, 6, 10],
+    "m7-5"  : [3, 6, 10],
+    "7+5"   : [4, 8, 10],
+    "m7+5"  : [3, 8, 10],
+    "9"     : [4, 7, 10, 14],
+    "m9"    : [3, 7, 10, 14],
+    "m7+9"  : [3, 7, 10, 14],
+    "maj9"  : [4, 7, 11, 14],
+    "9sus4" : [5, 7, 10, 14],
+    "6*9"   : [4, 7, 9, 14],
+    "m6*9"  : [3, 9, 7, 14],
+    "7-9"   : [4, 7, 10, 13],
+    "m7-9"  : [3, 7, 10, 13],
+    "7-10"  : [4, 7, 10, 15],
+    "9+5"   : [10, 13],
+    "m9+5"  : [10, 14],
+    "7+5-9" : [4, 8, 10, 13],
+    "m7+5-9": [3, 8, 10, 13],
+    "11"    : [4, 7, 10, 14, 17],
+    "m11"   : [3, 7, 10, 14, 17],
+    "maj11" : [4, 7, 11, 14, 17],
+    "11+"   : [4, 7, 10, 14, 18],
+    "m11+"  : [3, 7, 10, 14, 18],
+    "13"    : [4, 7, 10, 14, 17, 21],
+    "m13"   : [3, 7, 10, 14, 17, 21],
+  };
+  chord_tensions.M           = chord_tensions.major;
+  chord_tensions.m           = chord_tensions.minor;
+  chord_tensions["7"]        = chord_tensions.dom7;
+  chord_tensions.M7          = chord_tensions.major7;
+  chord_tensions.m7          = chord_tensions.minor7;
+  chord_tensions.augmented   = chord_tensions.aug;
+  chord_tensions.a           = chord_tensions.aug;
+  chord_tensions.diminished  = chord_tensions.dim;
+  chord_tensions.i           = chord_tensions.dim;
+  chord_tensions.diminished7 = chord_tensions.dim7;
+  chord_tensions.i7          = chord_tensions.dim7;
+  
+  var chord = function(num, name, inversion) {
+    var tensions = chord_tensions[name] || [];
+    var list = [ num ];
+    for (var i = 0, imax = tensions.length; i < imax; ++i) {
+      list.push(num + tensions[i]);
+    }
+    inversion = Math.max(0, Math.min(inversion, list.length - 1));
+    while (inversion--) {
+      list.push( list.shift() + 12 );
+    }
+    return list;
+  };
+  
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion) {
+    return chord(this, name, inversion);
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+
+  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion) {
+    var num = this;
+    return chord(0, name, inversion).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion) {
+    var num = Math.pow(2, this * 1/12);
+    return chord(0, name, inversion).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build());
   
   module.exports = {};
 
@@ -5578,21 +5745,37 @@ define('cc/lang/pattern', function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend  = require("../common/extend");
-  var emitter = require("../common/emitter");
   var ops = require("../common/ops");
+  var utils = require("./utils");
+  
+  var isNotNull = function(obj) {
+    return obj !== null && obj !== undefined;
+  };
+  var valueOf = function(item) {
+    if (item instanceof Pattern) {
+      return item.next();
+    }
+    return item;
+  };
+
+  var asPattern = function(item) {
+    if (item instanceof Pattern) {
+      return item;
+    }
+    return new Pseq(utils.asArray(item), 1, 0);
+  };
   
   var Pattern = (function() {
     function Pattern() {
-      emitter.mixin(this);
       this.klassName = "Pattern";
-      this._blocking = true;
+      this._finished = false;
     }
     extend(Pattern, cc.Object);
-    
+
+    Pattern.prototype.clone = function() {
+      return this;
+    };
     Pattern.prototype.next = function() {
-      if (this._blocking) {
-        this.emit("end");
-      }
       return null;
     };
     Pattern.prototype.nextN = function(n, inVal) {
@@ -5602,25 +5785,45 @@ define('cc/lang/pattern', function(require, exports, module) {
       }
       return a;
     };
-    Pattern.prototype.valueOf = function(item) {
-      if (item instanceof Pattern) {
-        return item.next();
-      }
-      return item;
-    };
     Pattern.prototype.reset = function() {
-      this._blocking = false;
+      return this;
     };
     Pattern.prototype.performWait = function() {
-      return this._blocking;
+      return !this._finished;
+    };
+    Pattern.prototype.concat = function(item) {
+      return new Pseq([this, item.clone()], 1);
     };
 
-
+    Pattern.prototype["do"] = function(func) {
+      var i = 0, val = true;
+      if (cc.instanceOfSyncBlock(func)) {
+        if (cc.currentSyncBlockHandler) {
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsPattern(this));
+        } else {
+          while (val) {
+            val = this.next();
+            if (isNotNull(val)) {
+              func.clone().perform([val, i++]);
+            }
+          }
+        }
+      } else {
+        while (val) {
+          val = this.next();
+          if (isNotNull(val)) {
+            func.clone().perform([val, i++]);
+          }
+        }
+      }
+      return this;
+    };
+    
     // unary operators
     ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
       if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function() {
-          return new PUnaryOp(this, selector);
+          return new Puop(this, selector);
         };
       }
     });
@@ -5629,161 +5832,473 @@ define('cc/lang/pattern', function(require, exports, module) {
     ["__add__","__sub__","__mul__","__div__","__mod__"].concat(Object.keys(ops.BINARY_OPS)).forEach(function(selector) {
       if (/^[a-z_][a-zA-Z0-9_]*$/.test(selector)) {
         Pattern.prototype[selector] = function(b) {
-          return new PBinaryOp(this, selector, b);
+          return new Pbop(this, selector, b);
         };
       }
     });
     
     return Pattern;
   })();
-  
-  var PSequence = (function() {
-    function PSequence(list, repeats, offset) {
-      if (!(Array.isArray(list) || list instanceof Pattern)) {
-        throw new TypeError("PSequence: the first argument is invalid");
-      }
-      if (typeof repeats !== "number") {
-        throw new TypeError("PSequence: the second argument must be a Number");
-      }
-      if (typeof offset !== "number") {
-        throw new TypeError("PSequence: the third argument must be a Number");
+
+  var Puop = (function() {
+    function Puop(pattern, selector) {
+      if (!Number.prototype.hasOwnProperty(selector)) {
+        throw new TypeError("Puop: operator '" + selector + "' not supported");
       }
       Pattern.call(this);
-      this.klassName = "PSequence";
-      this.list    = list;
-      this.repeats = repeats;
-      this.offset  = offset;
-      this._pos = 0;
+      this.klassName = "Puop";
+      this._pattern   = pattern;
+      this._selector  = selector;
     }
-    extend(PSequence, Pattern);
+    extend(Puop, Pattern);
     
-    PSequence.prototype.next = function() {
-      if (this._blocking) {
-        if (this._pos < this.repeats * this.list.length) {
-          var index = (this._pos + this.offset) % this.list.length;
-          var item  = this.list[index];
-          var value = this.valueOf(item);
-          if (!(value === null || value === undefined)) {
-            if (!(item instanceof Pattern)) {
-              this._pos += 1;
-            }
-            return value;
-          }
-          if (item instanceof Pattern) {
-            item.reset();
-          }
-          this._pos += 1;
-          return this.next();
-        } else {
-          this.emit("end");
-          this._blocking = false;
+    Puop.prototype.clone = function() {
+      return new Puop(this._pattern.clone(), this._selector);
+    };
+    
+    Puop.prototype.next = function() {
+      if (!this._finished) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          return val[this._selector].call(val);
         }
+        this._finished = true;
       }
       return null;
     };
-    PSequence.prototype.reset = function() {
+    
+    return Puop;
+  })();
+  
+  var Pbop = (function() {
+    function Pbop(pattern, selector, b) {
+      if (!Number.prototype.hasOwnProperty(selector)) {
+        throw new TypeError("Pbop: operator '" + selector + "' not supported");
+      }
+      Pattern.call(this);
+      this.klassName = "Pbop";
+      this._pattern   = pattern;
+      this._selector  = selector;
+      this._b = b;
+    }
+    extend(Pbop, Pattern);
+    
+    Pbop.prototype.clone = function() {
+      return new Pbop(this._pattern.clone(), this._selector);
+    };
+    
+    Pbop.prototype.next = function() {
+      if (!this._finished) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          return val[this._selector].call(val, this._b);
+        }
+        this._finished = true;
+      }
+      return null;
+    };
+    
+    return Pbop;
+  })();
+  
+  var Pgeom = (function() {
+    function Pgeom(start, grow, length) {
+      Pattern.call(this);
+      this.klassName = "Pgeom";
+      this._start = utils.asNumber(start);
+      this._grow  = utils.asNumber(grow);
+      this._length = utils.asNumber(length);
+      this._pos    = 0;
+      this._value  = this._start;
+    }
+    extend(Pgeom, Pattern);
+
+    Pgeom.prototype.clone = function() {
+      return new Pgeom(this._start, this._grow, this._length);
+    };
+    
+    Pgeom.prototype.next = function() {
+      if (this._pos < this._length) {
+        var value = this._value;
+        this._value *= this._grow;
+        this._pos += 1;
+        return value;
+      } else {
+        this._pos = Infinity;
+        this._finished = true;
+      }
+      return null;
+    };
+
+    Pgeom.prototype.reset = function() {
       this._pos = 0;
-      this._blocking = true;
+      this._value = this._start;
+      this._finished = false;
+      return this;
+    };
+    
+    return Pgeom;
+  })();
+  
+  var Pseries = (function() {
+    function Pseries(start, step, length) {
+      Pattern.call(this);
+      this.klassName = "Pseries";
+      this._start = utils.asNumber(start);
+      this._step  = utils.asNumber(step);
+      this._length = utils.asNumber(length);
+      this._pos    = 0;
+      this._value  = this._start;
+    }
+    extend(Pseries, Pattern);
+
+    Pseries.prototype.clone = function() {
+      return new Pseries(this._start, this._start, this._length);
+    };
+    
+    Pseries.prototype.next = function() {
+      if (this._pos < this._length) {
+        var value = this._value;
+        this._value += this._step;
+        this._pos += 1;
+        return value;
+      } else {
+        this._pos = Infinity;
+        this._finished = true;
+      }
+      return null;
+    };
+
+    Pseries.prototype.reset = function() {
+      this._pos = 0;
+      this._value = this._start;
+      this._finished = false;
+      return this;
+    };
+    
+    return Pseries;
+  })();
+
+  var Pwhite = (function() {
+    function Pwhite(lo, hi, length) {
+      Pattern.call(this);
+      this.klassName = "Pwhite";
+      this._lo = utils.asNumber(lo);
+      this._hi = utils.asNumber(hi);
+      this._length = utils.asNumber(length);
+      this._pos    = 0;
+    }
+    extend(Pwhite, Pattern);
+
+    Pwhite.prototype.clone = function() {
+      return new Pwhite(this._lo, this._hi, this._length);
+    };
+    
+    Pwhite.prototype.next = function() {
+      if (this._pos < this._length) {
+        this._pos += 1;
+        return Math.random() * (this._hi - this._lo) + this._lo;
+      } else {
+        this._pos = Infinity;
+        this._finished = true;
+      }
+      return null;
+    };
+    
+    return Pwhite;
+  })();
+  
+  var ListPattern = (function() {
+    function ListPattern(list, repeats, offset) {
+      Pattern.call(this);
+      this.klassName = "ListPattern";
+      this.list    = utils.asArray(list);
+      this.repeats = utils.asNumber(repeats);
+      this.offset  = utils.asNumber(offset);
+      this._pos = 0;
+      this._posMax = this.repeats;
+      this._list   = this.list;
+    }
+    extend(ListPattern, Pattern);
+    
+    ListPattern.prototype.clone = function() {
+      return new this.constructor(this.list, this.repeats, this.offset);
+    };
+    
+    ListPattern.prototype.next = function() {
+      if (this._pos < this._posMax) {
+        var index = this._calcIndex();
+        var item  = this._list[index];
+        var val   = valueOf(item);
+        if (isNotNull(val)) {
+          if (!(item instanceof Pattern)) {
+            this._pos += 1;
+          }
+          return val;
+        }
+        if (item instanceof Pattern) {
+          item.reset();
+        }
+        this._pos += 1;
+        return this.next();
+      } else {
+        this._pos = Infinity;
+        this._finished = true;
+      }
+      return null;
+    };
+    
+    ListPattern.prototype.reset = function() {
+      this._pos = 0;
+      this._finished = false;
       var list = this.list;
       for (var i = 0, imax = list.length; i < imax; ++i) {
         if (list[i] instanceof Pattern) {
           list[i].reset();
         }
       }
+      return this;
     };
     
-    return PSequence;
+    return ListPattern;
   })();
-
-  var PShuffle = (function() {
-    function PShuffle(list, repeats) {
-      if (!(Array.isArray(list) || list instanceof Pattern)) {
-        throw new TypeError("PShuffle: the first argument is invalid");
-      }
-      if (typeof repeats !== "number") {
-        throw new TypeError("PShuffle: the second argument must be a Number");
-      }
-      list.sort(shuffle);
-      PSequence.call(this, list, repeats, 0);
-      this.klassName = "PShuffle";
+  
+  var Pser = (function() {
+    function Pser(list, repeats, offset) {
+      ListPattern.call(this, list, repeats, offset);
+      this.klassName = "Pser";
     }
-    extend(PShuffle, PSequence);
-    var shuffle = function() {
-      return Math.random() - 0.5;
+    extend(Pser, ListPattern);
+    
+    Pser.prototype._calcIndex = function() {
+      return (this._pos + this.offset) % this.list.length;
     };
-    return PShuffle;
+    
+    return Pser;
+  })();
+  
+  var Pseq = (function() {
+    function Pseq(list, repeats, offset) {
+      Pser.call(this, list, repeats, offset);
+      this.klassName = "Pseq";
+      this._posMax = this.repeats * this.list.length;
+    }
+    extend(Pseq, Pser);
+    
+    return Pseq;
+  })();
+  
+  var Pshuf = (function() {
+    function Pshuf(list, repeats) {
+      Pseq.call(this, list, repeats, 0);
+      this.klassName = "Pshuf";
+      this._list = this.list.slice().sort(shuffle);
+    }
+    extend(Pshuf, Pseq);
+    
+    var shuffle = function() { return Math.random() - 0.5; };
+    
+    return Pshuf;
   })();
 
-  var PUnaryOp = (function() {
-    function PUnaryOp(pattern, selector) {
-      if (!Number.prototype.hasOwnProperty(selector)) {
-        throw new TypeError("PUnaryOp: operator '" + selector + "' not supported");
-      }
+  var Prand = (function() {
+    function Prand(list, repeats) {
+      ListPattern.call(this, list, repeats, 0);
+      this.klassName = "Prand";
+    }
+    extend(Prand, ListPattern);
+    
+    Prand.prototype._calcIndex = function() {
+      return (this.list.length * Math.random())|0;
+    };
+    
+    return Prand;
+  })();
+
+  var Pn = (function() {
+    function Pn(pattern, repeats) {
       Pattern.call(this);
-      this.klassName = "PUnaryOp";
-      this.pattern   = pattern;
-      this.selector  = selector;
+      this._pattern = asPattern(pattern);
+      this._repeats = utils.asNumber(repeats);
+      this._i = 0;
     }
-    extend(PUnaryOp, Pattern);
+    extend(Pn, Pattern);
     
-    PUnaryOp.prototype.next = function() {
-      if (this._blocking) {
-        var val = this.pattern.next();
-        if (val === null || val === undefined) {
-          this.emit("end");
-          this._blocking = false;
+    Pn.prototype.clone = function() {
+      return new Pn(this._pattern.clone(), this._repeats);
+    };
+    
+    Pn.prototype.next = function() {
+      if (!this._finished) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          return val;
+        }
+        this._i += 1;
+        if (this._i !== this._repeats) {
+          this._pattern.reset();
+          return this.next();
+        }
+        this._finished = true;
+      }
+      return null;
+    };
+    
+    Pn.prototype.reset = function() {
+      this._finished = false;
+      this._i = 0;
+      this._pattern.reset();
+      return this;
+    };
+    
+    return Pn;
+  })();
+  
+  var Pfin = (function() {
+    function Pfin(count, pattern) {
+      Pattern.call(this);
+      this.klassName = "Pfin";
+      this._count = utils.asNumber(count);
+      this._pattern = asPattern(pattern);
+      this._pos = 0;
+    }
+    extend(Pfin, Pattern);
+
+    Pfin.prototype.clone = function() {
+      return new Pfin(this._count, this._pattern.clone());
+    };
+
+    Pfin.prototype.next = function() {
+      if (this._pos < this._count) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          this._pos += 1;
+          return val;
         } else {
-          return val[this.selector].call(val);
+          this._pos = Infinity;
+          this._finished = true;
+        }
+      }
+      return null;
+    };
+
+    Pfin.prototype.reset = function() {
+      this._finished = false;
+      this._pos = 0;
+      this._pattern.reset();
+      return this;
+    };
+    
+    return Pfin;
+  })();
+  
+  var Pstutter = (function() {
+    function Pstutter(n, pattern) {
+      Pattern.call(this);
+      this.klassName = "Pstutter";
+      this._n = utils.asNumber(n);
+      this._pattern = asPattern(pattern);
+      this._i = n;
+      this._val = null;
+      if (this._n === 0) {
+        this._finished = true;
+      }
+    }
+    extend(Pstutter, Pattern);
+
+    Pstutter.prototype.clone = function() {
+      return new Pstutter(this._n, this._p.clone());
+    };
+
+    Pstutter.prototype.next = function() {
+      if (!this._finished) {
+        if (this._i >= this._n) {
+          var val = this._pattern.next();
+          if (isNotNull(val)) {
+            this._val = val;
+            this._i = 1;
+            return val;
+          } else {
+            this._finished = true;
+          }
+        } else {
+          this._i += 1;
+          return this._val;
         }
       }
       return null;
     };
     
-    return PUnaryOp;
-  })();
-
-  var PBinaryOp = (function() {
-    function PBinaryOp(pattern, selector, b) {
-      if (!Number.prototype.hasOwnProperty(selector)) {
-        throw new TypeError("PBinaryOp: operator '" + selector + "' not supported");
+    Pstutter.prototype.reset = function() {
+      this._i = this._n;
+      this._pattern.reset();
+      if (this._n !== 0) {
+        this._finished = false;
       }
-      Pattern.call(this);
-      this.klassName = "PBinaryOp";
-      this.pattern   = pattern;
-      this.selector  = selector;
-      this.b = b;
-    }
-    extend(PBinaryOp, Pattern);
-    
-    PBinaryOp.prototype.next = function() {
-      if (this._blocking) {
-        var val = this.pattern.next();
-        if (val === null || val === undefined) {
-          this.emit("end");
-          this._blocking = false;
-        } else {
-          return val[this.selector].call(val, this.b);
-        }
-      }
-      return null;
+      return this;
     };
     
-    return PBinaryOp;
+    return Pstutter;
   })();
-
-  cc.global.PSequence = fn(function(list, repeats, offset) {
-    return new PSequence(list, repeats, offset);
+  
+  cc.global.Pgeom = fn(function(start, grow, length) {
+    return new Pgeom(start, grow, length);
+  }).defaults("start=0,grow=1,length=Infinity").build();
+  
+  cc.global.Pseries = fn(function(start, step, length) {
+    return new Pseries(start, step, length);
+  }).defaults("start=0,step=1,length=Infinity").build();
+  
+  cc.global.Pwhite = fn(function(lo, hi, length) {
+    return new Pwhite(lo, hi, length);
+  }).defaults("lo=0,hi=1,length=Infinity").build();
+  
+  cc.global.Pser = fn(function(list, repeats, offset) {
+    return new Pser(list, repeats, offset);
+  }).defaults("list=[],repeats=1,offset=0").build();
+  
+  cc.global.Pseq = fn(function(list, repeats, offset) {
+    return new Pseq(list, repeats, offset);
   }).defaults("list,repeats=1,offset=0").build();
-  cc.global.PShuffle = fn(function(list, repeats) {
-    return new PShuffle(list, repeats);
-  }).defaults("list,repeats=1").build();
+
+  cc.global.Pshuf = fn(function(list, repeats) {
+    return new Pshuf(list, repeats);
+  }).defaults("list=[],repeats=1").build();
+  
+  cc.global.Prand = fn(function(list, repeats) {
+    return new Prand(list, repeats);
+  }).defaults("list=[],repeats=1").build();
+  
+  cc.global.Pn = fn(function(pattern, repeats) {
+    return new Pn(pattern, repeats);
+  }).defaults("pattern=[],repeats=Infinity").build();
+  
+  cc.global.Pfin = fn(function(count, pattern) {
+    return new Pfin(count, pattern);
+  }).defaults("count=1,pattern=[]").build();
+  
+  cc.global.Pstutter = fn(function(n, pattern) {
+    return new Pstutter(n, pattern);
+  }).defaults("n=1,pattern=[]").build();
   
   module.exports = {
-    Pattern  : Pattern,
-    PSequence: PSequence,
-    PShuffle : PShuffle,
-    PUnaryOp : PUnaryOp,
-    PBinaryOp: PBinaryOp,
+    Pattern: Pattern,
+    Puop   : Puop,
+    Pbop   : Pbop,
+    
+    Pgeom  : Pgeom,
+    Pseries: Pseries,
+    Pwhite : Pwhite,
+    
+    ListPattern: ListPattern,
+    Pser : Pser,
+    Pseq : Pseq,
+    Pshuf: Pshuf,
+    Prand: Prand,
+
+    Pn      : Pn,
+    Pfin    : Pfin,
+    Pstutter: Pstutter,
   };
 
 });
@@ -6957,10 +7472,12 @@ define('cc/lang/synthdef', function(require, exports, module) {
   };
   
   var asNumber = function(val) {
-    if (Array.isArray(val)) {
-      return val.map(asNumber);
+    if (val === "Infinity") {
+      return Infinity;
+    } else if (val === "-Infinity") {
+      return -Infinity;
     }
-    return +val;
+    return JSON.parse(val);
   };
   
   var args2controls = function(args, rates, skipArgs) {
@@ -7625,6 +8142,38 @@ define('cc/lang/task', function(require, exports, module) {
     return TaskArgumentsFunction;
   })();
   
+  var TaskArgumentsPattern = (function() {
+    function TaskArgumentsPattern(pattern) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsPattern";
+      this.pattern   = pattern;
+      this.reset();
+    }
+    extend(TaskArgumentsPattern, TaskArguments);
+    
+    TaskArgumentsPattern.prototype.next = function() {
+      if (this._state === 2) {
+        return null;
+      }
+      var val = this.pattern.next();
+      if (val !== null && val !== undefined) {
+        this._args = [ val, this.index++ ];
+      } else {
+        this._state = 2;
+      }
+      return this._state === 2 ? null : this._args;
+    };
+    
+    TaskArgumentsPattern.prototype.reset = function() {
+      this.index = 0;
+      this._args = [ this.pattern.reset().next(), this.index++ ];
+      this._state = 1;
+      return this;
+    };
+    
+    return TaskArgumentsPattern;
+  })();
+  
   var TaskWaitToken = (function() {
     function TaskWaitToken() {
       this.klassName = "TaskWaitToken";
@@ -7795,6 +8344,9 @@ define('cc/lang/task', function(require, exports, module) {
   };
   cc.createTaskArgumentsBoolean = function(flag) {
     return new TaskArgumentsArray([flag]);
+  };
+  cc.createTaskArgumentsPattern = function(p) {
+    return new TaskArgumentsPattern(p);
   };
   cc.createTaskWaitToken = function(token, logic) {
     if (token && typeof token.performWait === "function") {
@@ -10162,7 +10714,185 @@ define('cc/plugins/demand', function(require, exports, module) {
     return ctor;
   })();
 
-  cc.ugen.specs.Dseq = {
+  cc.ugen.specs.Dgeom = {
+    $new: {
+      defaults: "start=1,grow=2,length=Infinity",
+      ctor: function(start, grow, length) {
+        return this.multiNew(3, length, start, grow);
+      }
+    }
+  };
+
+  cc.unit.specs.Dgeom = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._grow  = 0;
+      this._value = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var grow, x;
+      if (inNumSamples) {
+        grow = demand_input_a(this, 2, inNumSamples);
+        if (!isNaN(grow)) {
+          this._grow = grow;
+        }
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+          this._value   = demand_input_a(this, 1, inNumSamples);
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this.outputs[0][0] = this._value;
+        this._value *= this._grow;
+        this._repeatCount++;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dseries = {
+    $new: {
+      defaults: "start=1,step=1,length=Infinity",
+      ctor: function(start, step, length) {
+        return this.multiNew(3, length, start, step);
+      }
+    }
+  };
+
+  cc.unit.specs.Dseries = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._step  = 0;
+      this._value = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var step, x;
+      if (inNumSamples) {
+        step = demand_input_a(this, 2, inNumSamples);
+        if (!isNaN(step)) {
+          this._step = step;
+        }
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+          this._value   = demand_input_a(this, 1, inNumSamples);
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this.outputs[0][0] = this._value;
+        this._value += this._step;
+        this._repeatCount++;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dwhite = {
+    $new: {
+      defaults: "lo=1,hi=1,length=Infinity",
+      ctor: function(lo, hi, length) {
+        return this.multiNew(3, length, lo, hi);
+      }
+    }
+  };
+
+  cc.unit.specs.Dwhite = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lo = 0;
+      this._hi = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var lo, hi, x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this._repeatCount++;
+        lo = demand_input_a(this, 1, inNumSamples);
+        hi = demand_input_a(this, 2, inNumSamples);
+        
+        if (!isNaN(lo)) { this._lo = lo; }
+        if (!isNaN(hi)) { this._hi = hi; }
+        this.outputs[0][0] = Math.random() * (this._hi - this._lo) + this._lo;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Diwhite = {
+    $new: {
+      defaults: "lo=1,hi=1,length=Infinity",
+      ctor: function(lo, hi, length) {
+        return this.multiNew(3, length, lo, hi);
+      }
+    }
+  };
+  
+  cc.unit.specs.Diwhite = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lo = 0;
+      this._hi = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var lo, hi, x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this._repeatCount++;
+        lo = demand_input_a(this, 1, inNumSamples);
+        hi = demand_input_a(this, 2, inNumSamples);
+        
+        if (!isNaN(lo)) { this._lo = lo|0; }
+        if (!isNaN(hi)) { this._hi = hi|0; }
+        this.outputs[0][0] = (Math.random() * (this._hi - this._lo) + this._lo)|0;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  var ListDUGen = {
     $new: {
       defaults: "list=[],repeats=1",
       ctor: function(list, repeats) {
@@ -10170,6 +10900,65 @@ define('cc/plugins/demand', function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Dser = ListDUGen;
+
+  cc.unit.specs.Dser = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        while (true) {
+          if (this._index >= this.numOfInputs) {
+            this._index = 1;
+          }
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            return;
+          }
+          if (isDemandInput(this, this._index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, this._index);
+            }
+            x = demand_input_a(this, this._index, inNumSamples);
+            if (isNaN(x)) {
+              this._index++;
+              this._repeatCount++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = this.inputs[this._index][0];
+            this._index++;
+            this._repeatCount++;
+            this._needToResetChild = true;
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Dseq = ListDUGen;
 
   cc.unit.specs.Dseq = (function() {
     var ctor = function() {
@@ -10225,6 +11014,128 @@ define('cc/plugins/demand', function(require, exports, module) {
         this._index = 1;
       }
     };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dshuf = ListDUGen;
+  
+  cc.unit.specs.Dshuf = (function() {
+    var ctor = function() {
+      this.process = next;
+      var indices = new Array(this.numOfInputs - 1);
+      for (var i = 0, imax = indices.length; i < imax; ++i) {
+        indices[i] = i + 1;
+      }
+      this._indices = indices.sort(scramble);
+      next.call(this, 0);
+    };
+    var scramble = function() {
+      return Math.random() - 0.5;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x, attempts;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        attempts = 0;
+        while (true) {
+          if (this._index >= this.numOfInputs - 1) {
+            this._index = 0;
+            this._repeatCount++;
+          }
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            this._index = 0;
+            return;
+          }
+          var index = this._indices[this._index];
+          if (isDemandInput(this, index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, index);
+            }
+            x = demand_input_a(this, index, inNumSamples);
+            if (isNaN(x)) {
+              this._index++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = demand_input_a(this, index, inNumSamples);
+            this._index++;
+            this._needToResetChild = true;
+            return;
+          }
+          if (attempts++ > this.numOfInputs) {
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Drand = ListDUGen;
+  
+  cc.unit.specs.Drand = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        while (true) {
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            return;
+          }
+          if (isDemandInput(this, this._index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, this._index);
+            }
+            x = demand_input_a(this, this._index, inNumSamples);
+            if (isNaN(x)) {
+              this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+              this._repeatCount++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = this.inputs[this._index][0];
+            this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+            this._repeatCount++;
+            this._needToResetChild = true;
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+
     return ctor;
   })();
   
@@ -12913,7 +13824,9 @@ define('cc/plugins/line', function(require, exports, module) {
 define('cc/plugins/noise', function(require, exports, module) {
 
   var cc = require("../cc");
-
+  var utils = require("./utils");
+  var cubicinterp = utils.cubicinterp;
+  
   cc.ugen.specs.WhiteNoise = {
     $ar: {
       defaults: "mul=1,add=0",
@@ -13238,6 +14151,250 @@ define('cc/plugins/noise', function(require, exports, module) {
     return ctor;
   })();
   
+  cc.ugen.specs.LFDNoise0 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise0 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._level = 0;
+      this._phase = 0;
+      next.call(this, 1);
+    };
+    
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() * 2 - 1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = smpdur * freq;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() * 2 - 1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDNoise1 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise1 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._phase = 0;
+      this._prevLevel = 0;
+      this._nextLevel = 0;
+      next.call(this, 1);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var prevLevel = this._prevLevel;
+      var nextLevel = this._nextLevel;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          prevLevel = nextLevel;
+          nextLevel = Math.random() * 2 - 1;
+        }
+        out[i] = nextLevel + ( phase * (prevLevel - nextLevel) );
+      }
+      this._prevLevel = prevLevel;
+      this._nextLevel = nextLevel;
+      this._phase     = phase;
+    };
+
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var prevLevel = this._prevLevel;
+      var nextLevel = this._nextLevel;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = freq * smpdur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          prevLevel = nextLevel;
+          nextLevel = Math.random() * 2 - 1;
+        }
+        out[i] = nextLevel + ( phase * (prevLevel - nextLevel) );
+      }
+      this._prevLevel = prevLevel;
+      this._nextLevel = nextLevel;
+      this._phase     = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDNoise3 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise3 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._phase  = 0;
+      this._levelA = 0;
+      this._levelB = 0;
+      this._levelC = 0;
+      this._levelD = 0;
+      next.call(this, 1);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var a = this._levelA;
+      var b = this._levelB;
+      var c = this._levelC;
+      var d = this._levelD;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          a = b;
+          b = c;
+          c = d;
+          d = Math.random() * 2 - 1;
+        }
+        out[i] = cubicinterp(1 - phase, a, b, c, d);
+      }
+      this._levelA = a;
+      this._levelB = b;
+      this._levelC = c;
+      this._levelD = d;
+      this._phase  = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var a = this._levelA;
+      var b = this._levelB;
+      var c = this._levelC;
+      var d = this._levelD;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = freq * smpdur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          a = b;
+          b = c;
+          c = d;
+          d = Math.random() * 2 - 1;
+        }
+        out[i] = cubicinterp(1 - phase, a, b, c, d);
+      }
+      this._levelA = a;
+      this._levelB = b;
+      this._levelC = c;
+      this._levelD = d;
+      this._phase  = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDClipNoise = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDClipNoise = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === 2) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._level = 0;
+      this._phase = 0;
+      next.call(this, 1);
+    };
+    
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = smpdur * freq;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    return ctor;
+  })();
+
   module.exports = {};
 
 });
