@@ -104,7 +104,185 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
-  cc.ugen.specs.Dseq = {
+  cc.ugen.specs.Dgeom = {
+    $new: {
+      defaults: "start=1,grow=2,length=Infinity",
+      ctor: function(start, grow, length) {
+        return this.multiNew(C.DEMAND, length, start, grow);
+      }
+    }
+  };
+
+  cc.unit.specs.Dgeom = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._grow  = 0;
+      this._value = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var grow, x;
+      if (inNumSamples) {
+        grow = demand_input_a(this, 2, inNumSamples);
+        if (!isNaN(grow)) {
+          this._grow = grow;
+        }
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+          this._value   = demand_input_a(this, 1, inNumSamples);
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this.outputs[0][0] = this._value;
+        this._value *= this._grow;
+        this._repeatCount++;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dseries = {
+    $new: {
+      defaults: "start=1,step=1,length=Infinity",
+      ctor: function(start, step, length) {
+        return this.multiNew(C.DEMAND, length, start, step);
+      }
+    }
+  };
+
+  cc.unit.specs.Dseries = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._step  = 0;
+      this._value = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var step, x;
+      if (inNumSamples) {
+        step = demand_input_a(this, 2, inNumSamples);
+        if (!isNaN(step)) {
+          this._step = step;
+        }
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+          this._value   = demand_input_a(this, 1, inNumSamples);
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this.outputs[0][0] = this._value;
+        this._value += this._step;
+        this._repeatCount++;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dwhite = {
+    $new: {
+      defaults: "lo=1,hi=1,length=Infinity",
+      ctor: function(lo, hi, length) {
+        return this.multiNew(C.DEMAND, length, lo, hi);
+      }
+    }
+  };
+
+  cc.unit.specs.Dwhite = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lo = 0;
+      this._hi = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var lo, hi, x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this._repeatCount++;
+        lo = demand_input_a(this, 1, inNumSamples);
+        hi = demand_input_a(this, 2, inNumSamples);
+        
+        if (!isNaN(lo)) { this._lo = lo; }
+        if (!isNaN(hi)) { this._hi = hi; }
+        this.outputs[0][0] = Math.random() * (this._hi - this._lo) + this._lo;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Diwhite = {
+    $new: {
+      defaults: "lo=1,hi=1,length=Infinity",
+      ctor: function(lo, hi, length) {
+        return this.multiNew(C.DEMAND, length, lo, hi);
+      }
+    }
+  };
+  
+  cc.unit.specs.Diwhite = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._lo = 0;
+      this._hi = 0;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var lo, hi, x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = x|0;
+        }
+        if (this._repeatCount >= this._repeats) {
+          this.outputs[0][0] = NaN;
+          return;
+        }
+        this._repeatCount++;
+        lo = demand_input_a(this, 1, inNumSamples);
+        hi = demand_input_a(this, 2, inNumSamples);
+        
+        if (!isNaN(lo)) { this._lo = lo|0; }
+        if (!isNaN(hi)) { this._hi = hi|0; }
+        this.outputs[0][0] = (Math.random() * (this._hi - this._lo) + this._lo)|0;
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+      }
+    };
+    
+    return ctor;
+  })();
+  
+  var ListDUGen = {
     $new: {
       defaults: "list=[],repeats=1",
       ctor: function(list, repeats) {
@@ -112,6 +290,65 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.ugen.specs.Dser = ListDUGen;
+
+  cc.unit.specs.Dser = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        while (true) {
+          if (this._index >= this.numOfInputs) {
+            this._index = 1;
+          }
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            return;
+          }
+          if (isDemandInput(this, this._index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, this._index);
+            }
+            x = demand_input_a(this, this._index, inNumSamples);
+            if (isNaN(x)) {
+              this._index++;
+              this._repeatCount++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = this.inputs[this._index][0];
+            this._index++;
+            this._repeatCount++;
+            this._needToResetChild = true;
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Dseq = ListDUGen;
 
   cc.unit.specs.Dseq = (function() {
     var ctor = function() {
@@ -167,6 +404,128 @@ define(function(require, exports, module) {
         this._index = 1;
       }
     };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Dshuf = ListDUGen;
+  
+  cc.unit.specs.Dshuf = (function() {
+    var ctor = function() {
+      this.process = next;
+      var indices = new Array(this.numOfInputs - 1);
+      for (var i = 0, imax = indices.length; i < imax; ++i) {
+        indices[i] = i + 1;
+      }
+      this._indices = indices.sort(scramble);
+      next.call(this, 0);
+    };
+    var scramble = function() {
+      return Math.random() - 0.5;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x, attempts;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        attempts = 0;
+        while (true) {
+          if (this._index >= this.numOfInputs - 1) {
+            this._index = 0;
+            this._repeatCount++;
+          }
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            this._index = 0;
+            return;
+          }
+          var index = this._indices[this._index];
+          if (isDemandInput(this, index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, index);
+            }
+            x = demand_input_a(this, index, inNumSamples);
+            if (isNaN(x)) {
+              this._index++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = demand_input_a(this, index, inNumSamples);
+            this._index++;
+            this._needToResetChild = true;
+            return;
+          }
+          if (attempts++ > this.numOfInputs) {
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Drand = ListDUGen;
+  
+  cc.unit.specs.Drand = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 0);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var x;
+      if (inNumSamples) {
+        if (this._repeats < 0) {
+          x = demand_input_a(this, 0, inNumSamples);
+          this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
+        }
+        while (true) {
+          if (this._repeatCount >= this._repeats) {
+            out[0] = NaN;
+            return;
+          }
+          if (isDemandInput(this, this._index)) {
+            if (this._needToResetChild) {
+              this._needToResetChild = false;
+              resetDemandInput(this, this._index);
+            }
+            x = demand_input_a(this, this._index, inNumSamples);
+            if (isNaN(x)) {
+              this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+              this._repeatCount++;
+              this._needToResetChild = true;
+            } else {
+              out[0] = x;
+              return;
+            }
+          } else {
+            out[0] = this.inputs[this._index][0];
+            this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+            this._repeatCount++;
+            this._needToResetChild = true;
+            return;
+          }
+        }
+      } else {
+        this._repeats = -1;
+        this._repeatCount = 0;
+        this._needToResetChild = true;
+        this._index = 1;
+      }
+    };
+
     return ctor;
   })();
   
