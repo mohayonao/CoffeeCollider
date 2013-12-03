@@ -404,12 +404,51 @@ define(function(require, exports, module) {
     };
     
     Pn.prototype.reset = function() {
+      this._finished = false;
       this._i = 0;
       this._pattern.reset();
       return this;
     };
     
     return Pn;
+  })();
+  
+  var Pfin = (function() {
+    function Pfin(count, pattern) {
+      Pattern.call(this);
+      this.klassName = "Pfin";
+      this._count = utils.asNumber(count);
+      this._pattern = asPattern(pattern);
+      this._pos = 0;
+    }
+    extend(Pfin, Pattern);
+
+    Pfin.prototype.clone = function() {
+      return new Pfin(this._count, this._pattern.clone());
+    };
+
+    Pfin.prototype.next = function() {
+      if (this._pos < this._count) {
+        var val = this._pattern.next();
+        if (isNotNull(val)) {
+          this._pos += 1;
+          return val;
+        } else {
+          this._pos = Infinity;
+          this._finished = true;
+        }
+      }
+      return null;
+    };
+
+    Pfin.prototype.reset = function() {
+      this._finished = false;
+      this._pos = 0;
+      this._pattern.reset();
+      return this;
+    };
+    
+    return Pfin;
   })();
   
   var Pstutter = (function() {
@@ -452,6 +491,9 @@ define(function(require, exports, module) {
     Pstutter.prototype.reset = function() {
       this._i = this._n;
       this._pattern.reset();
+      if (this._n !== 0) {
+        this._finished = false;
+      }
       return this;
     };
     
@@ -490,6 +532,10 @@ define(function(require, exports, module) {
     return new Pn(pattern, repeats);
   }).defaults("pattern=[],repeats=Infinity").build();
   
+  cc.global.Pfin = fn(function(count, pattern) {
+    return new Pfin(count, pattern);
+  }).defaults("count=1,pattern=[]").build();
+  
   cc.global.Pstutter = fn(function(n, pattern) {
     return new Pstutter(n, pattern);
   }).defaults("n=1,pattern=[]").build();
@@ -510,6 +556,7 @@ define(function(require, exports, module) {
     Prand: Prand,
 
     Pn      : Pn,
+    Pfin    : Pfin,
     Pstutter: Pstutter,
   };
 

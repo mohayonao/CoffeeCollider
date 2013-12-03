@@ -187,6 +187,34 @@ define(function(require, exports, module) {
         assert.deepEqual(actual, expected);
       });
     });
+    describe("Pfin", function() {
+      it("create", function() {
+        p = cc.global.Pfin();
+        assert.instanceOf(p, pattern.Pfin);
+      });
+      it("next", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pfin(4, p);
+        actual   = p.nextN(5);
+        expected = [
+          1, 2, 3, 1, null
+        ];
+        assert.deepEqual(actual, expected);
+      });
+      it("reset", function() {
+        p = cc.global.Pser([1, 2, 3], 5);
+        p = cc.global.Pfin(4, p);
+        
+        p.nextN(2);
+        p.reset();
+        
+        actual   = p.nextN(5);
+        expected = [
+          1, 2, 3, 1, null
+        ];
+        assert.deepEqual(actual, expected);
+      });
+    });
     describe("Pstutter", function() {
       it("create", function() {
         p = cc.global.Pstutter();
