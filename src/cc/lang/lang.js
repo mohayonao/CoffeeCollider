@@ -177,9 +177,9 @@ define(function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
-  require("./seg");
   require("./scale");
   require("./string");
+  require("./syncblock");
   require("./synthdef");
   require("./task");
   require("./ugen");

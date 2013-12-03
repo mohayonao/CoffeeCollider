@@ -1025,6 +1025,7 @@ define('cc/client/compiler', function(require, exports, module) {
   
   var cc = require("../cc");
   var timevalue = require("../common/timevalue").calc;
+  var push = [].push;
   
   // CoffeeScript tags
   // IDENTIFIER
@@ -1718,10 +1719,10 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   
   var segmented = {
-    target: ["Task", "do"],
+    target: ["Task", "syncblock"],
   };
   
-  var replaceSegmentedFunction = function(tokens) {
+  var replaceSyncBlock = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     var id;
     for (var i = tokens.length - 1; i >= 0; i--) {
@@ -1732,19 +1733,16 @@ define('cc/client/compiler', function(require, exports, module) {
       if (segmented.target.indexOf(id) === -1) {
         continue;
       }
-      if (/^[a-z]/.test(id) && (i === 0 || tokens[i-1][TAG] !== ".")) {
-        continue;
-      }
       var index = indexOfFunctionStart(tokens, i + 2);
       if (index === -1) {
         continue;
       }
-      segmented.makeSegmentedFunction(getNextOperand(tokens, index));
+      segmented.makeSyncBlock(getNextOperand(tokens, index), id === "syncblock");
     }
     return tokens;
   };
   
-  segmented.makeSegmentedFunction = function(op) {
+  segmented.makeSyncBlock = function(op, syncblock) {
     var tokens = op.tokens;
     var body   = tokens.splice(op.begin, op.end-op.begin+1);
     var after  = tokens.splice(op.begin);
@@ -1769,24 +1767,25 @@ define('cc/client/compiler', function(require, exports, module) {
     body.splice(0, 2); // remove ->, INDENT
     body.pop();        // remove OUTDENT
     
-    var replaced = segmented.createSegmentedFunction(body, args, localVars);
+    var replaced = segmented.createSyncBlock(body, args, localVars, syncblock);
     
     for (var i = replaced.length; i--; ) {
       replaced[i].cc_segmented = true;
     }
-    tokens.push.apply(tokens, replaced);
-    tokens.push.apply(tokens, after);
+    push.apply(tokens, replaced);
+    push.apply(tokens, after);
     
     return op;
   };
   
-  segmented.createSegmentedFunction = function(body, args, localVars) {
-    var tokens = [
-      ["IDENTIFIER", "SegmentedFunction", _],
-      ["CALL_START", "("                , _],
-      ["->"        , "->"               , _],
-      ["INDENT"    , 2                  , _]
-    ];
+  segmented.createSyncBlock = function(body, args, localVars, syncblock) {
+    var tokens = [];
+    if (!syncblock) {
+      tokens.push(["IDENTIFIER", "syncblock", _],
+                  ["CALL_START", "("        , _]);
+    }
+    tokens.push(["->"        , "->"       , _],
+                ["INDENT"    , 2          , _]);
     {
       segmented.insertLocalVariables(tokens, localVars);
       tokens.push(["["      , "[" , _],
@@ -1797,14 +1796,16 @@ define('cc/client/compiler', function(require, exports, module) {
           tokens.push(["TERMINATOR", "\n", _]);
         }
         segmented.beginOfSegment(tokens, args);
-        segmented.insertSegment(tokens, body);
+        push.apply(tokens, segmented.fetchLine(body));
         segmented.endOfSegment(tokens, args);
       }
       tokens.push(["OUTDENT", 2  , _],
                   ["]"      , "]", _]);
     }
-    tokens.push(["OUTDENT" , 2  , _],
-                ["CALL_END", ")", _]);
+    tokens.push(["OUTDENT" , 2  , _]);
+    if (!syncblock) {
+      tokens.push(["CALL_END", ")", _]);
+    }
     return tokens;
   };
   segmented.insertLocalVariables = function(tokens, localVars) {
@@ -1833,44 +1834,6 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
-  };
-  segmented.insertSegment = function(tokens, body) {
-    var line = segmented.fetchLine(body);
-    var depth = 0;
-    var cond  = false;
-    var block;
-    LOOP:
-    while (line.length) {
-      var token = line.shift();
-      tokens.push(token);
-      if (token.cc_segmented) {
-        continue;
-      }
-      switch (token[TAG]) {
-      case "INDENT":
-        if (cond) {
-          cond = false;
-          tokens.push(["BOOL"      , "true", _],
-                      ["."         , "."   , _],
-                      ["IDENTIFIER", "do"  , _],
-                      ["CALL_START", "("   , _]);
-          block = segmented.fetchBlock(line);
-          tokens.push.apply(tokens, segmented.createSegmentedFunction(block));
-          tokens.push(["CALL_END", ")", _], ["OUTDENT", 2, _]);
-          continue LOOP;
-        }
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        break;
-      case "IF": case "ELSE":
-        if (depth === 0) {
-          cond = true;
-        }
-        break;
-      }
-    }
   };
   segmented.fetchLine = function(tokens) {
     var depth = 0;
@@ -2054,7 +2017,7 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceSegmentedFunction(tokens);
+        tokens = replaceSyncBlock(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
@@ -2094,7 +2057,7 @@ define('cc/client/compiler', function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceSegmentedFunction : replaceSegmentedFunction,
+    replaceSyncBlock         : replaceSyncBlock,
     replaceGlobalVariables   : replaceGlobalVariables,
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,
@@ -2545,9 +2508,9 @@ define('cc/lang/lang', function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
-  require("./seg");
   require("./scale");
   require("./string");
+  require("./syncblock");
   require("./synthdef");
   require("./task");
   require("./ugen");
@@ -2651,9 +2614,9 @@ define('cc/lang/array', function(require, exports, module) {
   
   fn.defineProperty(Array.prototype, "do", function(func) {
     var list = this;
-    if (cc.instanceOfSegmentedFunction(func)) {
-      if (cc.currentSegHandler) {
-        cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsArray(list));
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsArray(list));
       } else {
         list.forEach(function(x, i) {
           func.clone().perform([x, i]);
@@ -3774,9 +3737,9 @@ define('cc/lang/boolean', function(require, exports, module) {
   fn.defineProperty(Boolean.prototype, "do", function(func) {
     var flag = this;
     if (flag) {
-      if (cc.instanceOfSegmentedFunction(func)) {
-        if (cc.currentSegHandler) {
-          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+      if (cc.instanceOfSyncBlock(func)) {
+        if (cc.currentSyncBlockHandler) {
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
         } else {
           func.clone().perform(flag);
         }
@@ -4153,9 +4116,9 @@ define('cc/lang/date', function(require, exports, module) {
   fn.defineProperty(Date.prototype, "do", function(func) {
     var flag = Date.now() > (+this);
     if (flag) {
-      if (cc.instanceOfSegmentedFunction(func)) {
-        if (cc.currentSegHandler) {
-          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+      if (cc.instanceOfSyncBlock(func)) {
+        if (cc.currentSyncBlockHandler) {
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
         } else {
           func.clone().perform(flag);
         }
@@ -4830,10 +4793,10 @@ define('cc/lang/number', function(require, exports, module) {
   
   fn.defineProperty(Number.prototype, "do", function(func) {
     var i, n = this;
-    if (cc.instanceOfSegmentedFunction(func)) {
-      if (cc.currentSegHandler) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
         if (n > 0) {
-          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
         }
       } else {
         for (i = 0; i < n; ++i) {
@@ -5824,84 +5787,6 @@ define('cc/lang/pattern', function(require, exports, module) {
   };
 
 });
-define('cc/lang/seg', function(require, exports, module) {
-
-  var cc = require("./cc");
-  var extend = require("../common/extend");
-  var slice = [].slice;
-  
-  var SegmentedFunction = (function() {
-    function SegmentedFunction(init) {
-      this.klassName = "SegmentedFunction";
-      if (init instanceof SegmentedFunction) {
-        this._segments = init._segments;
-      } else if (typeof init === "function") {
-        this._segments = init();
-      } else {
-        this._segments = [];
-      }
-      this._state = this._segments.length ? 1 : 2;
-      this._pc = 0;
-      this._paused = false;
-    }
-    extend(SegmentedFunction, cc.Object);
-    
-    SegmentedFunction.prototype.clone = function() {
-      return new SegmentedFunction(this);
-    };
-    
-    SegmentedFunction.prototype.reset = function() {
-      this._state = this._segments.length ? 1 : 2;
-      this._pc = 0;
-    };
-    
-    SegmentedFunction.prototype.perform = function() {
-      var segments = this._segments;
-      var pc = this._pc, pcmax = segments.length;
-      var args = slice.call(arguments);
-      
-      cc.currentSegmentedFunction = this;
-      this._paused = false;
-      while (pc < pcmax) {
-        segments[pc++].apply(null, args);
-        if (this._paused) {
-          break;
-        }
-      }
-      if (pcmax <= pc && !(this._paused)) {
-        this._state = 2;
-      }
-      this._paused = false;
-      cc.currentSegmentedFunction = null;
-      this._pc = pc;
-    };
-    
-    SegmentedFunction.prototype.performWait = function() {
-      return this._state === 1;
-    };
-    
-    SegmentedFunction.prototype.performWaitState = SegmentedFunction.prototype.performWait;
-    
-    return SegmentedFunction;
-  })();
-  
-  cc.global.SegmentedFunction = function(init) {
-    return new SegmentedFunction(init);
-  };
-  cc.instanceOfSegmentedFunction = function(obj) {
-    return obj instanceof SegmentedFunction;
-  };
-  cc.pauseSegmentedFunction = function() {
-    if (cc.currentSegmentedFunction) {
-      cc.currentSegmentedFunction._paused = true;
-    }
-  };
-  
-  module.exports = {
-    SegmentedFunction: SegmentedFunction,
-  };
-
-});
 define('cc/lang/scale', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -6859,6 +6744,98 @@ define('cc/lang/string', function(require, exports, module) {
   module.exports = {};
 
 });
+define('cc/lang/syncblock', function(require, exports, module) {
+
+  var cc = require("./cc");
+  var extend = require("../common/extend");
+  var slice = [].slice;
+  
+  var SyncBlock = (function() {
+    function SyncBlock(init) {
+      this.klassName = "SyncBlock";
+      if (init instanceof SyncBlock) {
+        this._segments = init._segments;
+      } else if (typeof init === "function") {
+        this._segments = init();
+      } else {
+        this._segments = [];
+      }
+      this._state = this._segments.length ? 1 : 2;
+      this._pc = 0;
+      this._paused = false;
+      this._child  = null;
+    }
+    extend(SyncBlock, cc.Object);
+    
+    SyncBlock.prototype.clone = function() {
+      return new SyncBlock(this);
+    };
+    
+    SyncBlock.prototype.reset = function() {
+      this._state = this._segments.length ? 1 : 2;
+      this._pc = 0;
+    };
+    
+    SyncBlock.prototype.perform = function() {
+      var segments = this._segments;
+      var pc = this._pc, pcmax = segments.length;
+      var args = slice.call(arguments);
+      var result;
+
+      if (this._child) {
+        this.perform.apply(this._child, args);
+        if (this._child._state === 1) {
+          return;
+        }
+        this._child = null;
+      }
+      
+      cc.currentSyncBlock = this;
+      this._paused = false;
+      while (pc < pcmax) {
+        result = segments[pc++].apply(null, args);
+        if (this._paused) {
+          break;
+        }
+        if (result instanceof SyncBlock) {
+          this._child = result;
+          break;
+        }
+      }
+      if (pcmax <= pc && !(this._paused)) {
+        this._state = 2;
+      }
+      this._paused = false;
+      cc.currentSyncBlock = null;
+      this._pc = pc;
+    };
+    
+    SyncBlock.prototype.performWait = function() {
+      return this._state === 1;
+    };
+    
+    SyncBlock.prototype.performWaitState = SyncBlock.prototype.performWait;
+    
+    return SyncBlock;
+  })();
+  
+  cc.global.syncblock = function(init) {
+    return new SyncBlock(init);
+  };
+  cc.instanceOfSyncBlock = function(obj) {
+    return obj instanceof SyncBlock;
+  };
+  cc.pauseSyncBlock = function() {
+    if (cc.currentSyncBlock) {
+      cc.currentSyncBlock._paused = true;
+    }
+  };
+  
+  module.exports = {
+    SyncBlock: SyncBlock,
+  };
+
+});
 define('cc/lang/synthdef', function(require, exports, module) {
 
   var cc = require("./cc");
@@ -7348,7 +7325,7 @@ define('cc/lang/task', function(require, exports, module) {
   var Task = (function() {
     function Task(func, iter) {
       this.klassName = "Task";
-      if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.instanceOfSyncBlock(func)) {
         this._func = func;
         this._state = 0;
       } else {
@@ -7416,7 +7393,7 @@ define('cc/lang/task', function(require, exports, module) {
       return this;
     };
     
-    Task.prototype.__seg__ = function(func, args) {
+    Task.prototype.__sync__ = function(func, args) {
       return this.__wait__(new Task(func, args));
     };
     
@@ -7428,18 +7405,18 @@ define('cc/lang/task', function(require, exports, module) {
       if (task instanceof Task) {
         task._state = 1;
       }
-      cc.pauseSegmentedFunction();
+      cc.pauseSyncBlock();
       return this;
     };
     
     Task.prototype.performWait = function(counterIncr) {
-      var _currentSegHandler = cc.currentSegHandler;
-      var _currentTask       = cc.currentTask;
+      var _currentSyncBlockHandler = cc.currentSyncBlockHandler;
+      var _currentTask             = cc.currentTask;
       var func = this._func;
       var iter = this._iter;
       
-      cc.currentSegHandler = this;
-      cc.currentTask       = this;
+      cc.currentSyncBlockHandler = this;
+      cc.currentTask             = this;
       
       while (true) {
         if (this._wait) {
@@ -7471,8 +7448,8 @@ define('cc/lang/task', function(require, exports, module) {
         break;
       }
       
-      cc.currentSegHandler = _currentSegHandler;
-      cc.currentTask       = _currentTask;
+      cc.currentSyncBlockHandler = _currentSyncBlockHandler;
+      cc.currentTask             = _currentTask;
       
       return this._state === 1;
     };

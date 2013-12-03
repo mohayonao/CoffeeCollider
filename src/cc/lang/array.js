@@ -22,9 +22,9 @@ define(function(require, exports, module) {
   
   fn.defineProperty(Array.prototype, "do", function(func) {
     var list = this;
-    if (cc.instanceOfSegmentedFunction(func)) {
-      if (cc.currentSegHandler) {
-        cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsArray(list));
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsArray(list));
       } else {
         list.forEach(function(x, i) {
           func.clone().perform([x, i]);

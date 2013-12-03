@@ -63,7 +63,7 @@ define(function(require, exports, module) {
   var Task = (function() {
     function Task(func, iter) {
       this.klassName = "Task";
-      if (cc.instanceOfSegmentedFunction(func)) {
+      if (cc.instanceOfSyncBlock(func)) {
         this._func = func;
         this._state = C.PENDING;
       } else {
@@ -131,7 +131,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    Task.prototype.__seg__ = function(func, args) {
+    Task.prototype.__sync__ = function(func, args) {
       return this.__wait__(new Task(func, args));
     };
     
@@ -143,18 +143,18 @@ define(function(require, exports, module) {
       if (task instanceof Task) {
         task._state = C.PLAYING;
       }
-      cc.pauseSegmentedFunction();
+      cc.pauseSyncBlock();
       return this;
     };
     
     Task.prototype.performWait = function(counterIncr) {
-      var _currentSegHandler = cc.currentSegHandler;
-      var _currentTask       = cc.currentTask;
+      var _currentSyncBlockHandler = cc.currentSyncBlockHandler;
+      var _currentTask             = cc.currentTask;
       var func = this._func;
       var iter = this._iter;
       
-      cc.currentSegHandler = this;
-      cc.currentTask       = this;
+      cc.currentSyncBlockHandler = this;
+      cc.currentTask             = this;
       
       while (true) {
         if (this._wait) {
@@ -186,8 +186,8 @@ define(function(require, exports, module) {
         break;
       }
       
-      cc.currentSegHandler = _currentSegHandler;
-      cc.currentTask       = _currentTask;
+      cc.currentSyncBlockHandler = _currentSyncBlockHandler;
+      cc.currentTask             = _currentTask;
       
       return this._state === C.PLAYING;
     };

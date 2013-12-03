@@ -5,7 +5,7 @@ define(function(require, exports, module) {
   var testTools = require("../../testTools");
   
   var cc = require("./cc");
-  var seg  = require("./seg");
+  var syncblock = require("./syncblock");
   var task = require("./task");
   
   var Timer = (function() {
@@ -375,7 +375,7 @@ define(function(require, exports, module) {
         assert.equal(t.__wait__(0), t, "wait should be return self");
       });
       it("perform", function() {
-        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
           var i = 0;
           return [
             function() { passed.push(i++); },
@@ -427,10 +427,10 @@ define(function(require, exports, module) {
       before(function() {
         testTools.replaceTempNumberPrototype("do", function(func) {
           var i, n = this;
-          if (cc.instanceOfSegmentedFunction(func)) {
-            if (cc.currentSegHandler) {
+          if (cc.instanceOfSyncBlock(func)) {
+            if (cc.currentSyncBlockHandler) {
               if (n > 0) {
-                cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+                cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
               }
             } else {
               for (i = 0; i < n; ++i) {
@@ -457,7 +457,7 @@ define(function(require, exports, module) {
         testTools.restoreTempNumberPrototype("wait");
       });
       it("case 1", function() {
-        (5).do(cc.global.SegmentedFunction(function() {
+        (5).do(cc.global.syncblock(function() {
           return [
             function(i) { passed.push(+i); },
             function(i) { passed.push(-i); },
@@ -466,11 +466,11 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ 0, -0, 1, -1, 2, -2, 3, -3, 4, -4 ]);
       });
       it("case 2", function() {
-        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
           return [
             function() { passed.push("begin"); },
             function() {
-              (5).do(cc.global.SegmentedFunction(function() {
+              (5).do(cc.global.syncblock(function() {
                 return [
                   function(i) { passed.push(+i); },
                   function(i) { passed.push(-i); },
@@ -486,11 +486,11 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
       });
       it("case 3", function() {
-        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
           return [
             function() { passed.push("begin"); },
             function() {
-              (0).do(cc.global.SegmentedFunction(function() {
+              (0).do(cc.global.syncblock(function() {
                 return [
                   function(i) { passed.push(i); },
                 ];
@@ -505,12 +505,12 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ "begin", "end" ]);
       });
       it("case 4", function() {
-        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
           return [
             function() { passed.push("begin"); },
             function() { (1).wait(); },
             function() {
-              (5).do(cc.global.SegmentedFunction(function() {
+              (5).do(cc.global.syncblock(function() {
                 return [
                   function(i) { passed.push(+i); },
                   function(i) { (0.1).wait(); },
@@ -538,12 +538,12 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
       });
       it("case 5", function() {
-        t = cc.global.Task(cc.global.SegmentedFunction(function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
           return [
             function() { passed.push("begin"); },
             function() { (1).wait(); },
             function() {
-              (5).do(cc.global.SegmentedFunction(function() {
+              (5).do(cc.global.syncblock(function() {
                 return [
                   function(i) { passed.push(+i); },
                   function(i) { (0.1).wait(); },
@@ -600,6 +600,42 @@ define(function(require, exports, module) {
         timer.process(1000);
         assert.deepEqual(passed, [ "begin", 0, -0, "begin", 0, -0, 1, -1, 2, -2, 3, -3, 4, -4, "end" ]);
       });
+      it("case 6", function() {
+        t = cc.global.Task(cc.global.syncblock(function() {
+          return [
+            function() { passed.push("begin"); },
+            function() { (1).wait(); },
+            function() {
+              return cc.global.syncblock(function() {
+                return [
+                  function() { passed.push("a"); },
+                  function() { (0.1).wait(); },
+                  function() { passed.push("b"); },
+                  function() { (0.1).wait(); },
+                ];
+              });
+            },
+            function() { passed.push("end"); },
+          ];
+        }));
+        m = cc.createTaskManager();
+        m.start(1);
+
+        timer = new Timer(m);
+        t.start();
+        
+        timer.process(1);
+        assert.deepEqual(passed, [ "begin" ]);
+        
+        timer.process(1000);
+        assert.deepEqual(passed, [ "begin", "a" ]);
+
+        timer.process(100);
+        assert.deepEqual(passed, [ "begin", "a", "b" ]);
+
+        timer.process(100);
+        assert.deepEqual(passed, [ "begin", "a", "b", "end" ]);
+      });      
     });
   });
 

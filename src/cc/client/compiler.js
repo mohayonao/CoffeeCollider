@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   
   var cc = require("../cc");
   var timevalue = require("../common/timevalue").calc;
+  var push = [].push;
   
   // CoffeeScript tags
   // IDENTIFIER
@@ -698,10 +699,10 @@ define(function(require, exports, module) {
   };
   
   var segmented = {
-    target: ["Task", "do"],
+    target: ["Task", "syncblock"],
   };
   
-  var replaceSegmentedFunction = function(tokens) {
+  var replaceSyncBlock = function(tokens) {
     tokens = detectFunctionParameters(tokens);
     var id;
     for (var i = tokens.length - 1; i >= 0; i--) {
@@ -712,19 +713,16 @@ define(function(require, exports, module) {
       if (segmented.target.indexOf(id) === -1) {
         continue;
       }
-      if (/^[a-z]/.test(id) && (i === 0 || tokens[i-1][TAG] !== ".")) {
-        continue;
-      }
       var index = indexOfFunctionStart(tokens, i + 2);
       if (index === -1) {
         continue;
       }
-      segmented.makeSegmentedFunction(getNextOperand(tokens, index));
+      segmented.makeSyncBlock(getNextOperand(tokens, index), id === "syncblock");
     }
     return tokens;
   };
   
-  segmented.makeSegmentedFunction = function(op) {
+  segmented.makeSyncBlock = function(op, syncblock) {
     var tokens = op.tokens;
     var body   = tokens.splice(op.begin, op.end-op.begin+1);
     var after  = tokens.splice(op.begin);
@@ -749,24 +747,25 @@ define(function(require, exports, module) {
     body.splice(0, 2); // remove ->, INDENT
     body.pop();        // remove OUTDENT
     
-    var replaced = segmented.createSegmentedFunction(body, args, localVars);
+    var replaced = segmented.createSyncBlock(body, args, localVars, syncblock);
     
     for (var i = replaced.length; i--; ) {
       replaced[i].cc_segmented = true;
     }
-    tokens.push.apply(tokens, replaced);
-    tokens.push.apply(tokens, after);
+    push.apply(tokens, replaced);
+    push.apply(tokens, after);
     
     return op;
   };
   
-  segmented.createSegmentedFunction = function(body, args, localVars) {
-    var tokens = [
-      ["IDENTIFIER", "SegmentedFunction", _],
-      ["CALL_START", "("                , _],
-      ["->"        , "->"               , _],
-      ["INDENT"    , 2                  , _]
-    ];
+  segmented.createSyncBlock = function(body, args, localVars, syncblock) {
+    var tokens = [];
+    if (!syncblock) {
+      tokens.push(["IDENTIFIER", "syncblock", _],
+                  ["CALL_START", "("        , _]);
+    }
+    tokens.push(["->"        , "->"       , _],
+                ["INDENT"    , 2          , _]);
     {
       segmented.insertLocalVariables(tokens, localVars);
       tokens.push(["["      , "[" , _],
@@ -777,14 +776,16 @@ define(function(require, exports, module) {
           tokens.push(["TERMINATOR", "\n", _]);
         }
         segmented.beginOfSegment(tokens, args);
-        segmented.insertSegment(tokens, body);
+        push.apply(tokens, segmented.fetchLine(body));
         segmented.endOfSegment(tokens, args);
       }
       tokens.push(["OUTDENT", 2  , _],
                   ["]"      , "]", _]);
     }
-    tokens.push(["OUTDENT" , 2  , _],
-                ["CALL_END", ")", _]);
+    tokens.push(["OUTDENT" , 2  , _]);
+    if (!syncblock) {
+      tokens.push(["CALL_END", ")", _]);
+    }
     return tokens;
   };
   segmented.insertLocalVariables = function(tokens, localVars) {
@@ -813,44 +814,6 @@ define(function(require, exports, module) {
   };
   segmented.endOfSegment = function(tokens) {
     tokens.push(["OUTDENT", 2, _]);
-  };
-  segmented.insertSegment = function(tokens, body) {
-    var line = segmented.fetchLine(body);
-    var depth = 0;
-    var cond  = false;
-    var block;
-    LOOP:
-    while (line.length) {
-      var token = line.shift();
-      tokens.push(token);
-      if (token.cc_segmented) {
-        continue;
-      }
-      switch (token[TAG]) {
-      case "INDENT":
-        if (cond) {
-          cond = false;
-          tokens.push(["BOOL"      , "true", _],
-                      ["."         , "."   , _],
-                      ["IDENTIFIER", "do"  , _],
-                      ["CALL_START", "("   , _]);
-          block = segmented.fetchBlock(line);
-          tokens.push.apply(tokens, segmented.createSegmentedFunction(block));
-          tokens.push(["CALL_END", ")", _], ["OUTDENT", 2, _]);
-          continue LOOP;
-        }
-        depth += 1;
-        break;
-      case "OUTDENT":
-        depth -= 1;
-        break;
-      case "IF": case "ELSE":
-        if (depth === 0) {
-          cond = true;
-        }
-        break;
-      }
-    }
   };
   segmented.fetchLine = function(tokens) {
     var depth = 0;
@@ -1034,7 +997,7 @@ define(function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        tokens = replaceSegmentedFunction(tokens);
+        tokens = replaceSyncBlock(tokens);
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
@@ -1074,7 +1037,7 @@ define(function(require, exports, module) {
     replaceCompoundAssign    : replaceCompoundAssign,
     replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
-    replaceSegmentedFunction : replaceSegmentedFunction,
+    replaceSyncBlock         : replaceSyncBlock,
     replaceGlobalVariables   : replaceGlobalVariables,
     replaceCCVariables       : replaceCCVariables,
     finalize                 : finalize,

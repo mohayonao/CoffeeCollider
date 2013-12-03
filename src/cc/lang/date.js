@@ -22,9 +22,9 @@ define(function(require, exports, module) {
   fn.defineProperty(Date.prototype, "do", function(func) {
     var flag = Date.now() > (+this);
     if (flag) {
-      if (cc.instanceOfSegmentedFunction(func)) {
-        if (cc.currentSegHandler) {
-          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsBoolean(true));
+      if (cc.instanceOfSyncBlock(func)) {
+        if (cc.currentSyncBlockHandler) {
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
         } else {
           func.clone().perform(flag);
         }

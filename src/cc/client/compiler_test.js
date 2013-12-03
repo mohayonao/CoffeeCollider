@@ -653,7 +653,7 @@ define(function(require, exports, module) {
         testSuite(compiler.replaceSynthDefinition, code1, code2);
       });
     });
-    describe("replaceSegmentedFunction", function() {
+    describe("replaceSyncBlock", function() {
       it("case 1 (Task)", function() {
         code1 = [
           "t = Task ->",
@@ -662,7 +662,7 @@ define(function(require, exports, module) {
           "    a * x",
         ];
         code2 = [
-          "t = Task SegmentedFunction ->",
+          "t = Task syncblock ->",
           "  a = b = undefined",
           "  [",
           "    -> a = 100",
@@ -670,24 +670,24 @@ define(function(require, exports, module) {
           "      a * x",
           "  ]",
         ];
-        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+        testSuite(compiler.replaceSyncBlock, code1, code2);
       });
       it("case 2 (num.do)", function() {
         code1 = [
           "s = Synth()",
-          "[ 1, 2, 3 ].do (i)->",
+          "[ 1, 2, 3 ].do syncblock (i)->",
           "  s.set freq:(60+i).midicps()",
           "  0.1.wait()",
         ];
         code2 = [
           "s = Synth()",
-          "[ 1, 2, 3 ].do SegmentedFunction ->",
+          "[ 1, 2, 3 ].do syncblock ->",
           "  [",
           "    (i)-> s.set freq:(60+i).midicps()",
           "    (i)-> 0.1.wait()",
           "  ]",
         ];
-        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+        testSuite(compiler.replaceSyncBlock, code1, code2);
       });
       it("case 3 (nesting)", function() {
         code1 = [
@@ -696,20 +696,20 @@ define(function(require, exports, module) {
           "  1.wait()",
           "  s = Synth('test').on 'end', ->",
           "    s.stop()",
-          "  [ 1, 2, 3 ].do (i)->",
+          "  [ 1, 2, 3 ].do syncblock (i)->",
           "    s.set freq:(60+i).midicps()",
           "    0.1.wait()",
           "t.start()",
         ];
         code2 = [
-          "t = Task SegmentedFunction ->",
+          "t = Task syncblock ->",
           "  a = s = undefined",
           "  [",
           "    -> a = 100",
           "    -> 1.wait()",
           "    -> s = Synth('test').on 'end', ->",
           "      s.stop()",
-          "    -> [ 1, 2, 3 ].do SegmentedFunction ->",
+          "    -> [ 1, 2, 3 ].do syncblock ->",
           "      [",
           "        (i)-> s.set freq:(60+i).midicps()",
           "        (i)-> 0.1.wait()",
@@ -717,7 +717,7 @@ define(function(require, exports, module) {
           "  ]",
           "t.start()",
         ];
-        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+        testSuite(compiler.replaceSyncBlock, code1, code2);
       });
       it("case 4 (if)", function() {
         code1 = [
@@ -733,25 +733,55 @@ define(function(require, exports, module) {
           "      0.3.wait()",
         ];
         code2 = [
-          "Task SegmentedFunction ->",
+          "Task syncblock ->",
           "  a = b = c = undefined",
           "  [",
           "    -> a = b = c = false",
           "    -> if a",
-          "        true.do SegmentedFunction ->",
+          "        0.1.wait()",
+          "      else if b",
+          "        0.2.wait()",
+          "      else",
+          "        if c",
+          "          console.log c",
+          "          0.3.wait()",
+          "  ]",
+        ];
+        testSuite(compiler.replaceSyncBlock, code1, code2);
+      });
+      it("case 5 (if syncblock)", function() {
+        code1 = [
+          "Task ->",
+          "  a = b = c = false",
+          "  if a then syncblock ->",
+          "    0.1.wait()",
+          "  else if b then syncblock ->",
+          "    0.2.wait()",
+          "  else syncblock ->",
+          "    if c then syncblock ->",
+          "      console.log c",
+          "      0.3.wait()",
+        ];
+        code2 = [
+          "Task syncblock ->",
+          "  a = b = c = undefined",
+          "  [",
+          "    -> a = b = c = false",
+          "    -> if a",
+          "        syncblock ->",
           "          [",
           "            -> 0.1.wait()",
           "          ]",
           "      else if b",
-          "        true.do SegmentedFunction ->",
+          "        syncblock ->",
           "          [",
           "            -> 0.2.wait()",
           "          ]",
           "      else",
-          "        true.do SegmentedFunction ->",
+          "        syncblock ->",
           "          [",
           "            -> if c",
-          "              true.do SegmentedFunction ->",
+          "              syncblock ->",
           "                [",
           "                  -> console.log c",
           "                  -> 0.3.wait()",
@@ -759,7 +789,7 @@ define(function(require, exports, module) {
           "          ]",
           "  ]",
         ];
-        testSuite(compiler.replaceSegmentedFunction, code1, code2);
+        testSuite(compiler.replaceSyncBlock, code1, code2);
       });
     });
     describe("replaceGlobalVariables", function() {

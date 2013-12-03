@@ -24,10 +24,10 @@ define(function(require, exports, module) {
   
   fn.defineProperty(Number.prototype, "do", function(func) {
     var i, n = this;
-    if (cc.instanceOfSegmentedFunction(func)) {
-      if (cc.currentSegHandler) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
         if (n > 0) {
-          cc.currentSegHandler.__seg__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
         }
       } else {
         for (i = 0; i < n; ++i) {
