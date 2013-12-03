@@ -363,6 +363,38 @@ define(function(require, exports, module) {
     return TaskArgumentsFunction;
   })();
   
+  var TaskArgumentsPattern = (function() {
+    function TaskArgumentsPattern(pattern) {
+      TaskArguments.call(this);
+      this.klassName = "TaskArgumentsPattern";
+      this.pattern   = pattern;
+      this.reset();
+    }
+    extend(TaskArgumentsPattern, TaskArguments);
+    
+    TaskArgumentsPattern.prototype.next = function() {
+      if (this._state === C.FINISHED) {
+        return null;
+      }
+      var val = this.pattern.next();
+      if (val !== null && val !== undefined) {
+        this._args = [ val, this.index++ ];
+      } else {
+        this._state = C.FINISHED;
+      }
+      return this._state === C.FINISHED ? null : this._args;
+    };
+    
+    TaskArgumentsPattern.prototype.reset = function() {
+      this.index = 0;
+      this._args = [ this.pattern.reset().next(), this.index++ ];
+      this._state = C.PLAYING;
+      return this;
+    };
+    
+    return TaskArgumentsPattern;
+  })();
+  
   var TaskWaitToken = (function() {
     function TaskWaitToken() {
       this.klassName = "TaskWaitToken";
@@ -533,6 +565,9 @@ define(function(require, exports, module) {
   };
   cc.createTaskArgumentsBoolean = function(flag) {
     return new TaskArgumentsArray([flag]);
+  };
+  cc.createTaskArgumentsPattern = function(p) {
+    return new TaskArgumentsPattern(p);
   };
   cc.createTaskWaitToken = function(token, logic) {
     if (token && typeof token.performWait === "function") {

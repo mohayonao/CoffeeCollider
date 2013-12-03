@@ -8,6 +8,20 @@ define(function(require, exports, module) {
   var slice = [].slice;
   var _random = Math.random;
   
+  var Random = function() {
+    var s1 = 1243598713, s2 = 3093459404, s3 = 1821928721;
+    return function() {
+      s1 = ((s1 & 4294967294) << 12) ^ (((s1 << 13) ^  s1) >>> 19);
+      s2 = ((s2 & 4294967288) <<  4) ^ (((s2 <<  2) ^  s2) >>> 25);
+      s3 = ((s3 & 4294967280) << 17) ^ (((s3 <<  3) ^  s3) >>> 11);
+      return ((s1 ^ s2 ^ s3) >>> 0) / 4294967296;
+    };
+  };
+  
+  var revertRandom = function() {
+    return _random;
+  };
+  
   var defineProperty = function(object, selector, value) {
     var ret = object[selector];
     Object.defineProperty(object, selector, {
@@ -278,16 +292,6 @@ define(function(require, exports, module) {
     
     var audio_rate   = create_rate(64);
     var control_rate = create_rate( 1);
-    
-    var Random = function() {
-      var s1 = 1243598713, s2 = 3093459404, s3 = 1821928721;
-      return function() {
-        s1 = ((s1 & 4294967294) << 12) ^ (((s1 << 13) ^  s1) >>> 19);
-        s2 = ((s2 & 4294967288) <<  4) ^ (((s2 <<  2) ^  s2) >>> 25);
-        s3 = ((s3 & 4294967280) << 17) ^ (((s3 <<  3) ^  s3) >>> 11);
-        return ((s1 ^ s2 ^ s3) >>> 0) / 4294967296;
-      };
-    };
     
     Float32Array.prototype.setScalar = function(value) {
       for (var i = this.length; i--;) {
@@ -560,6 +564,8 @@ define(function(require, exports, module) {
   
   
   module.exports = {
+    Random: Random,
+    revertRandom: revertRandom,
     replaceTempNumberPrototype : replaceTempNumberPrototype,
     restoreTempNumberPrototype : restoreTempNumberPrototype,
     useFourArithmeticOperations  : useFourArithmeticOperations,
