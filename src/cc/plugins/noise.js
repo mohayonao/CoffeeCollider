@@ -2,7 +2,9 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-
+  var utils = require("./utils");
+  var cubicinterp = utils.cubicinterp;
+  
   cc.ugen.specs.WhiteNoise = {
     $ar: {
       defaults: "mul=1,add=0",
@@ -327,6 +329,250 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
+  cc.ugen.specs.LFDNoise0 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise0 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._level = 0;
+      this._phase = 0;
+      next.call(this, 1);
+    };
+    
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() * 2 - 1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = smpdur * freq;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() * 2 - 1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDNoise1 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise1 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._phase = 0;
+      this._prevLevel = 0;
+      this._nextLevel = 0;
+      next.call(this, 1);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var prevLevel = this._prevLevel;
+      var nextLevel = this._nextLevel;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          prevLevel = nextLevel;
+          nextLevel = Math.random() * 2 - 1;
+        }
+        out[i] = nextLevel + ( phase * (prevLevel - nextLevel) );
+      }
+      this._prevLevel = prevLevel;
+      this._nextLevel = nextLevel;
+      this._phase     = phase;
+    };
+
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var prevLevel = this._prevLevel;
+      var nextLevel = this._nextLevel;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = freq * smpdur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          prevLevel = nextLevel;
+          nextLevel = Math.random() * 2 - 1;
+        }
+        out[i] = nextLevel + ( phase * (prevLevel - nextLevel) );
+      }
+      this._prevLevel = prevLevel;
+      this._nextLevel = nextLevel;
+      this._phase     = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDNoise3 = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDNoise3 = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._phase  = 0;
+      this._levelA = 0;
+      this._levelB = 0;
+      this._levelC = 0;
+      this._levelD = 0;
+      next.call(this, 1);
+    };
+
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var a = this._levelA;
+      var b = this._levelB;
+      var c = this._levelC;
+      var d = this._levelD;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          a = b;
+          b = c;
+          c = d;
+          d = Math.random() * 2 - 1;
+        }
+        out[i] = cubicinterp(1 - phase, a, b, c, d);
+      }
+      this._levelA = a;
+      this._levelB = b;
+      this._levelC = c;
+      this._levelD = d;
+      this._phase  = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var a = this._levelA;
+      var b = this._levelB;
+      var c = this._levelC;
+      var d = this._levelD;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = freq * smpdur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          a = b;
+          b = c;
+          c = d;
+          d = Math.random() * 2 - 1;
+        }
+        out[i] = cubicinterp(1 - phase, a, b, c, d);
+      }
+      this._levelA = a;
+      this._levelB = b;
+      this._levelC = c;
+      this._levelD = d;
+      this._phase  = phase;
+    };
+    
+    return ctor;
+  })();
+  
+  cc.ugen.specs.LFDClipNoise = cc.ugen.specs.LFNoise0;
+  
+  cc.unit.specs.LFDClipNoise = (function() {
+    var ctor = function() {
+      if (this.inRates[0] === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_k;
+      }
+      this._level = 0;
+      this._phase = 0;
+      next.call(this, 1);
+    };
+    
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freqIn = this.inputs[0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= freqIn[i] * smpdur;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var freq = this.inputs[0][0];
+      var level = this._level;
+      var phase = this._phase;
+      var smpdur = this.rate.sampleDur;
+      var dphase = smpdur * freq;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase -= dphase;
+        if (phase < 0) {
+          phase = 1 + (phase % 1);
+          level = Math.random() < 0.5 ? -1 : +1;
+        }
+        out[i] = level;
+      }
+      this._level = level;
+      this._phase = phase;
+    };
+    
+    return ctor;
+  })();
+
   module.exports = {};
 
 });

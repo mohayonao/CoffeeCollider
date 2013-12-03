@@ -46,7 +46,10 @@ define(function(require, exports, module) {
       }
     });
 
-    ugenTestSuite(["LFNoise0", "LFNoise1", "LFNoise2", "LFClipNoise"], {
+    ugenTestSuite([
+      "LFNoise0", "LFNoise1", "LFNoise2", "LFClipNoise",
+      "LFDNoise0", "LFDNoise1", "LFDNoise3", "LFDClipNoise"
+    ], {
       ar: ["freq",500],
       kr: ["freq",500],
     }).unitTestSuite([
