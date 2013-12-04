@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.1.0+20131204173000",
+    version: "0.1.0+20131205070600",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -1024,7 +1024,9 @@ define('cc/client/compiler', function(require, exports, module) {
   var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
   
   var cc = require("../cc");
-  var timevalue = require("../common/timevalue").calc;
+  var numericstring = require("../common/numericstring");
+  var timevalue = numericstring.timevalue;
+  var notevalue = numericstring.notevalue;
   var push = [].push;
   
   // CoffeeScript tags
@@ -1473,21 +1475,6 @@ define('cc/client/compiler', function(require, exports, module) {
     return tokens;
   };
   
-  var notevalue = function(str) {
-    var m = /^([CDEFGAB])(\d)([-+#b])?$/.exec(str);
-    if (m) {
-      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] * 12) + 12;
-      var acc = m[3];
-      if (acc === "-" || acc === "b") {
-        midi--;
-      } else if (acc === "+" || acc === "#") {
-        midi++;
-      }
-      return midi;
-    }
-    return str;
-  };
-  
   var replaceStrictlyPrecedence = function(tokens) {
     tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i > 0; i--) {
@@ -1775,6 +1762,10 @@ define('cc/client/compiler', function(require, exports, module) {
       outerVars = ref.cc_funcParams.outer;
       args = ref.cc_funcParams.args.filter(function(name, i) {
         return !(i & 1);
+      }).map(function(x) {
+        var tokens = CoffeeScript.tokens(x);
+        tokens.pop(); // remove TERMINATOR
+        return tokens;
       });
     } else {
       localVars = outerVars = args = [];
@@ -1845,7 +1836,7 @@ define('cc/client/compiler', function(require, exports, module) {
         if (i) {
           tokens.push([",", ",", _]);
         }
-        tokens.push(["IDENTIFIER", args[i], _]);
+        push.apply(tokens, args[i]);
       }
       tokens.push(["PARAM_END"  , ")", _]);
     }
@@ -2050,7 +2041,10 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
+        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceSyncBlock(tokens);
+        // console.log("-----------------------------");
+        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
@@ -2100,11 +2094,11 @@ define('cc/client/compiler', function(require, exports, module) {
   };
 
 });
-define('cc/common/timevalue', function(require, exports, module) {
+define('cc/common/numericstring', function(require, exports, module) {
 
   var cc = require("../cc");
   
-  var calc = function(str) {
+  var timevalue = function(str) {
     var result = null;
     var freq;
     if (str.charAt(0) === "~") {
@@ -2226,6 +2220,21 @@ define('cc/common/timevalue', function(require, exports, module) {
     return null;
   };
   
+  var notevalue = function(str) {
+    var m = /^([CDEFGAB])([-+#b])?(\d)$/.exec(str);
+    if (m) {
+      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[3] * 12) + 12;
+      var acc = m[2];
+      if (acc === "-" || acc === "b") {
+        midi--;
+      } else if (acc === "+" || acc === "#") {
+        midi++;
+      }
+      return midi;
+    }
+    return str;
+  };
+  
   module.exports = {
     hz     : hz,
     time   : time,
@@ -2237,7 +2246,8 @@ define('cc/common/timevalue', function(require, exports, module) {
     calcNote : calcNote,
     calcBeat : calcBeat,
     calcTicks: calcTicks,
-    calc: calc,
+    timevalue: timevalue,
+    notevalue: notevalue,
   };
 
 });
@@ -5707,36 +5717,64 @@ define('cc/lang/number', function(require, exports, module) {
   chord_tensions.diminished7 = chord_tensions.dim7;
   chord_tensions.i7          = chord_tensions.dim7;
   
-  var chord = function(num, name, inversion) {
+  var chord = function(num, name, inversion, length) {
+    var i, imax;
     var tensions = chord_tensions[name] || [];
     var list = [ num ];
-    for (var i = 0, imax = tensions.length; i < imax; ++i) {
+    for (i = 0, imax = tensions.length; i < imax; ++i) {
       list.push(num + tensions[i]);
     }
-    inversion = Math.max(0, Math.min(inversion, list.length - 1));
-    while (inversion--) {
-      list.push( list.shift() + 12 );
+    if (inversion >= 0) {
+      inversion = Math.max(0, Math.min(+inversion, list.length - 1));
+      while (inversion--) {
+        list.push( list.shift() + 12 );
+      }
+    } else {
+      inversion = Math.max(0, Math.min(-inversion, list.length - 1));
+      while (inversion--) {
+        list.unshift( list.pop() - 12 );
+      }
+    }
+    if (length >= 0) {
+      if (length < list.length) {
+        list = list.slice(0, length);
+      } else {
+        length -= list.length;
+        for (i = 0, imax = length; i < imax; ++i) {
+          list.push( list[i] + 12 );
+        }
+      }
     }
     return list;
   };
   
-  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion) {
-    return chord(this, name, inversion);
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+    return chord(this, name, inversion, length);
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
 
-  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion) {
+  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion, length) {
     var num = this;
-    return chord(0, name, inversion).map(function(midi) {
+    return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
   
-  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion) {
+  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion, length) {
     var num = Math.pow(2, this * 1/12);
-    return chord(0, name, inversion).map(function(midi) {
+    return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+
+  (function() {
+    var keys = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+    Object.keys(keys).forEach(function(key) {
+      var note = keys[key];
+      for (var i = 0; i <= 9; ++i) {
+        cc.global[key + i] = note + (i * 12);
+      }
+    });
+  })();
   
   module.exports = {};
 
@@ -7173,8 +7211,11 @@ define('cc/lang/string', function(require, exports, module) {
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
+  var numericstring = require("../common/numericstring");
+  var timevalue = numericstring.timevalue;
+  var notevalue = numericstring.notevalue;
   var slice = [].slice;
-
+  
   var asNumber = function(val) {
     val = +val;
     if (isNaN(val)) {
@@ -7279,6 +7320,22 @@ define('cc/lang/string', function(require, exports, module) {
       var args = slice.call(arguments);
       return (0)[selector].apply(asNumber(this), args);
     }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
+  });
+
+  fn.defineProperty(String.prototype, "time", function() {
+    var val = timevalue(this);
+    if (typeof val === "string") {
+      return 0;
+    }
+    return val;
+  });
+  
+  fn.defineProperty(String.prototype, "note", function() {
+    var val = notevalue(this);
+    if (typeof val === "string") {
+      return 0;
+    }
+    return val;
   });
   
   module.exports = {};
@@ -11174,7 +11231,7 @@ define('cc/plugins/demand', function(require, exports, module) {
     $kr: {
       defaults: "dur=1,reset=0,level=1,doneAction=0",
       ctor: function(dur, reset, level, doneAction) {
-        return this.multiNew(2, dur, reset, doneAction, level);
+        return this.multiNew(1, dur, reset, doneAction, level);
       }
     }
   };
@@ -11328,7 +11385,7 @@ define('cc/plugins/demand', function(require, exports, module) {
     $kr: {
       defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
       ctor: function(dur, reset, level, doneAction, gapFirst) {
-        return this.multiNew(2, dur, reset, doneAction, level, gapFirst);
+        return this.multiNew(1, dur, reset, doneAction, level, gapFirst);
       }
     }
   };

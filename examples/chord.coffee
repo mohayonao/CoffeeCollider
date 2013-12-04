@@ -6,27 +6,25 @@ syn = SynthDef (freqs=[0,0,0,0], trig=0)->
   arp_t = TrigImpulse.kr(trig, "~bpm120 l8")
   arp_f = Demand.kr(arp_t, 0, Drand(freqs, Infinity) )
   arp   = Saw.ar(arp_f, 0.1) * Decay.kr(arp_t, "bpm120 l4")
-  arp   = arp + CombL.ar(arp, delaytime:"bpm120 l8.", decaytime:5) * 0.75
+  arp   = arp + CombL.ar(arp, delaytime:"bpm120 l8.", decaytime:5) * 0.5
   
   Out.ar(0, (chord + arp).dup())
 .play()
 
 Task ->
   score = [
-    [ "F4", "M7", "bpm120 l2" ]
-    [ "G4", "M" , "bpm120 l2" ]
-    [ "E4", "m7", "bpm120 l2" ]
-    [ "A4", "m" , "bpm120 l2" ]
+    [ F4, "M7",  0, "bpm120 l2" ]
+    [ G4, "M" ,  0, "bpm120 l2" ]
+    [ E4, "m7",  0, "bpm120 l2" ]
+    [ A4, "m" , -1, "bpm120 l2" ]
     
-    [ "F4", "M7", "bpm120 l2" ]
-    [ "G4", "M" , "bpm120 l2" ]
-    [ "E4", "m7", "bpm120 l2" ]
-    [ "A4", "m" , "bpm120 l4" ]
-    [ "E4", "M7", "bpm120 l4" ]
+    [ F4, "M7",  0, "bpm120 l2" ]
+    [ G4, "M" ,  0, "bpm120 l2" ]
+    [ E4, "m7",  0, "bpm120 l2" ]
+    [ A4, "m" , -1, "bpm120 l4" ]
+    [ E4, "M7",  0, "bpm120 l4" ]
   ]
-  Pseq(score, Infinity).do syncblock (items)->
-    [tone, chordname, dur] = items
-    syn.set trig:1, freqs:tone.chord(chordname).midicps()
+  Pseq(score, Infinity).do syncblock ([tone, chordname, inv, dur])->
+    syn.set trig:1, freqs:tone.chord(chordname, inversion:inv, length:4).midicps()
     dur.wait()
 .start()
-
