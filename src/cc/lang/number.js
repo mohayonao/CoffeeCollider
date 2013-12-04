@@ -878,6 +878,16 @@ define(function(require, exports, module) {
       return num * Math.pow(2, midi * 1/12);
     });
   }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+
+  (function() {
+    var keys = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+    Object.keys(keys).forEach(function(key) {
+      var note = keys[key];
+      for (var i = 0; i <= 9; ++i) {
+        cc.global[key + i] = note + (i * 12);
+      }
+    });
+  })();
   
   module.exports = {};
 

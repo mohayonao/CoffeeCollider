@@ -5,8 +5,11 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
+  var numericstring = require("../common/numericstring");
+  var timevalue = numericstring.timevalue;
+  var notevalue = numericstring.notevalue;
   var slice = [].slice;
-
+  
   var asNumber = function(val) {
     val = +val;
     if (isNaN(val)) {
@@ -111,6 +114,22 @@ define(function(require, exports, module) {
       var args = slice.call(arguments);
       return (0)[selector].apply(asNumber(this), args);
     }).defaults(ops.ARITY_OPS[selector]).multiCall().build());
+  });
+
+  fn.defineProperty(String.prototype, "time", function() {
+    var val = timevalue(this);
+    if (typeof val === "string") {
+      return 0;
+    }
+    return val;
+  });
+  
+  fn.defineProperty(String.prototype, "note", function() {
+    var val = notevalue(this);
+    if (typeof val === "string") {
+      return 0;
+    }
+    return val;
   });
   
   module.exports = {};
