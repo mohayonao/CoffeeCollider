@@ -170,7 +170,7 @@ define(function(require, exports, module) {
         callback = arguments[i++];
       }
       if (typeof code === "string") {
-        if (opts.lang && opts.lang !== "js") {
+        if (!opts.lang || opts.lang !== "js") {
           code = this.compiler.compile(code.trim());
         }
         if (callback) {
