@@ -830,36 +830,54 @@ define(function(require, exports, module) {
   chord_tensions.diminished7 = chord_tensions.dim7;
   chord_tensions.i7          = chord_tensions.dim7;
   
-  var chord = function(num, name, inversion) {
+  var chord = function(num, name, inversion, length) {
+    var i, imax;
     var tensions = chord_tensions[name] || [];
     var list = [ num ];
-    for (var i = 0, imax = tensions.length; i < imax; ++i) {
+    for (i = 0, imax = tensions.length; i < imax; ++i) {
       list.push(num + tensions[i]);
     }
-    inversion = Math.max(0, Math.min(inversion, list.length - 1));
-    while (inversion--) {
-      list.push( list.shift() + 12 );
+    if (inversion >= 0) {
+      inversion = Math.max(0, Math.min(+inversion, list.length - 1));
+      while (inversion--) {
+        list.push( list.shift() + 12 );
+      }
+    } else {
+      inversion = Math.max(0, Math.min(-inversion, list.length - 1));
+      while (inversion--) {
+        list.unshift( list.pop() - 12 );
+      }
+    }
+    if (length >= 0) {
+      if (length < list.length) {
+        list = list.slice(0, length);
+      } else {
+        length -= list.length;
+        for (i = 0, imax = length; i < imax; ++i) {
+          list.push( list[i] + 12 );
+        }
+      }
     }
     return list;
   };
   
-  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion) {
-    return chord(this, name, inversion);
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+    return chord(this, name, inversion, length);
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
 
-  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion) {
+  fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion, length) {
     var num = this;
-    return chord(0, name, inversion).map(function(midi) {
+    return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
   
-  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion) {
+  fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion, length) {
     var num = Math.pow(2, this * 1/12);
-    return chord(0, name, inversion).map(function(midi) {
+    return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
   
   module.exports = {};
 

@@ -1046,6 +1046,23 @@ define(function(require, exports, module) {
           actual   = (60).chord("m", 1);
           expected = [ 63, 67, 72 ]; // Cm
           assert.deepEqual(actual, expected);
+
+          actual   = (60).chord("m", -1);
+          expected = [ 55, 60, 63 ]; // Cm
+          assert.deepEqual(actual, expected);
+        });
+        it("length", function() {
+          actual   = (60).chord("M7", {length:-1});
+          expected = [ 60, 64, 67, 71 ]; // CM7
+          assert.deepEqual(actual, expected);
+
+          actual   = (60).chord("M7", {length:0});
+          expected = []; // CM7
+          assert.deepEqual(actual, expected);
+
+          actual   = (60).chord("M", {length:4});
+          expected = [ 60, 64, 67, 72 ]; // CM
+          assert.deepEqual(actual, expected);
         });
         it("chordcps", function() {
           actual   = (261.6255653006).chordcps("m");
