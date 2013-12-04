@@ -63,7 +63,9 @@ define(function(require, exports, module) {
     if (Array.isArray(code1)) { code1 = code1.join("\n"); }
     if (Array.isArray(code2)) { code2 = code2.join("\n"); }
     
-    var tokens1 = func(coffee.tokens(code1));
+    var tokens1 = func(coffee.tokens(code1).map(function(x) {
+      return [ x[0], x[1] ];
+    }));
     var result  = compiler.prettyPrint(tokens1);
     if (show & 1) {
       console.log("----- actual -----");
@@ -856,6 +858,22 @@ define(function(require, exports, module) {
           "                    0.3.wait()",
           "                ]",
           "          ]",
+          "  ]",
+        ];
+        testSuite(compiler.replaceSyncBlock, code1, code2);
+      });
+      it("case 6 (assign)", function() {
+        code1 = [
+          "10.do syncblock ([a, b, c])->",
+          "  console.log a",
+          "  1.wait()",
+        ];
+        code2 = [
+          "10.do syncblock ->",
+          "  [",
+          "    ([a, b, c])->",
+          "      console.log a",
+          "      1.wait()",
           "  ]",
         ];
         testSuite(compiler.replaceSyncBlock, code1, code2);

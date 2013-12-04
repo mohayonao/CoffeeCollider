@@ -742,6 +742,10 @@ define(function(require, exports, module) {
       outerVars = ref.cc_funcParams.outer;
       args = ref.cc_funcParams.args.filter(function(name, i) {
         return !(i & 1);
+      }).map(function(x) {
+        var tokens = CoffeeScript.tokens(x);
+        tokens.pop(); // remove TERMINATOR
+        return tokens;
       });
     } else {
       localVars = outerVars = args = [];
@@ -812,7 +816,7 @@ define(function(require, exports, module) {
         if (i) {
           tokens.push([",", ",", _]);
         }
-        tokens.push(["IDENTIFIER", args[i], _]);
+        push.apply(tokens, args[i]);
       }
       tokens.push(["PARAM_END"  , ")", _]);
     }
@@ -1017,7 +1021,10 @@ define(function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
+        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceSyncBlock(tokens);
+        // console.log("-----------------------------");
+        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
