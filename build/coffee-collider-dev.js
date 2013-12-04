@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131204101800",
+    version: "0.0.0",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},

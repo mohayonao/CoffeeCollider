@@ -96,7 +96,7 @@ module.exports = function(grunt) {
     uglify: {
       cc: {
         files: {
-          "build/coffee-collider-min.js": [ "build/coffee-collider.js" ]
+          "build/coffee-collider.js": [ "build/coffee-collider-dev.js" ]
         },
         // options: {
         //   sourceMap: "build/coffee-collider-min.map",
@@ -269,7 +269,7 @@ module.exports = function(grunt) {
   grunt.registerTask("copy", function() {
     var src = grunt.file.read("extras/edge/coffee-collider.js");
     src = src.replace(/(version: "[\d.]+)\+\d+/g, "$1");
-    grunt.file.write("build/coffee-collider.js", src);
+    grunt.file.write("build/coffee-collider-dev.js", src);
   });
   
   grunt.registerTask("test", function() {

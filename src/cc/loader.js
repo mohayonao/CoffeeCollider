@@ -7,7 +7,7 @@ define(function(require, exports, module) {
     var scripts = document.getElementsByTagName("script");
     if (scripts && scripts.length) {
       for (var i = 0; i < scripts.length; i++) {
-        var m = /^(.*\/)coffee-collider(?:-min)?\.js(\#.*)?$/.exec(scripts[i].src);
+        var m = /^(.*\/)coffee-collider(?:-dev)?\.js(\#.*)?$/.exec(scripts[i].src);
         if (m) {
           cc.rootPath = m[1];
           cc.coffeeColliderPath = m[0];
