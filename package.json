@@ -1,6 +1,6 @@
 {
   "name": "coffee-collider",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
   "keywords": [
     "language",
@@ -31,7 +31,8 @@
   "dependencies": {
     "coffee-script": "~1.6.3",
     "ws": "~0.4.31",
-    "speaker": "0.0.10"
+    "speaker": "0.0.10",
+    "optparse": "~1.0.4"
   },
   "devDependencies": {
     "amd-loader": "0.0.5",

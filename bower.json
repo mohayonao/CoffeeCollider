@@ -1,6 +1,6 @@
 {
   "name": "coffee-collider",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "authors": [
     "Nao Yonamine <mohayonao@gmail.com>"
   ],
@@ -18,6 +18,7 @@
     "extras",
     "files",
     "bin",
+    "src",
     "test",
     "Gruntfile.js",
     "index.html"

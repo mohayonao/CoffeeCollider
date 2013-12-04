@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.0.0+20131204101800",
+    version: "0.1.0+20131204173000",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -299,7 +299,7 @@ define('cc/client/client', function(require, exports, module) {
         callback = arguments[i++];
       }
       if (typeof code === "string") {
-        if (!opts.js) {
+        if (!opts.lang || opts.lang !== "js") {
           code = this.compiler.compile(code.trim());
         }
         if (callback) {
@@ -3862,6 +3862,7 @@ define('cc/lang/buffer', function(require, exports, module) {
   var utils  = require("./utils");
   var extend = require("../common/extend");
   var emitter = require("../common/emitter");
+  var slice = [].slice;
   
   var BufferSource = (function() {
     var bufSrcId = 0;
@@ -3935,6 +3936,36 @@ define('cc/lang/buffer', function(require, exports, module) {
     }
     extend(Buffer, cc.Object);
 
+    Buffer.prototype.free = function() {
+      cc.lang.pushToTimeline([
+        "/b_free", this.bufnum
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.zero = function() {
+      cc.lang.pushToTimeline([
+        "/b_zero", this.bufnum
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.set = function() {
+      var args = slice.call(arguments);
+      cc.lang.pushToTimeline([
+        "/b_set", this.bufnum, args
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.setn = function() {
+      var args = slice.call(arguments);
+      cc.lang.pushToTimeline([
+        "/b_set", this.bufnum, args
+      ]);
+      return this;
+    };
+    
     Buffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
       amps = utils.asArray(amps);
       var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
@@ -5371,59 +5402,53 @@ define('cc/lang/number', function(require, exports, module) {
   }).defaults(ops.ARITY_OPS.clip).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "fold", fn(function(lo, hi) {
-    var _in = this, x, c, range, range2;
-    x = _in - lo;
-    if (_in >= hi) {
-      _in = hi + hi - _in;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      _in = lo + lo - _in;
-      if (_in < hi) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
+    var val = this, x, range1, range2;
     if (hi === lo) {
       return lo;
     }
-    range = hi - lo;
-    range2 = range + range;
-    c = x - range2 * Math.floor(x / range2);
-    if (c >= range) {
-      c = range2 - c;
+    if (val >= hi) {
+      val = (hi * 2) - val;
+      if (val >= lo) {
+        return val;
+      }
+    } else if (val < lo) {
+      val = (lo * 2) - val;
+      if (val < hi) {
+        return val;
+      }
+    } else {
+      return val;
     }
-    return c + lo;
+    range1 = hi - lo;
+    range2 = range1 * 2;
+    x = val - lo;
+    x -= range2 * Math.floor(x / range2);
+    if (x >= range1) {
+      return range2 - x + lo;
+    }
+    return x + lo;
   }).defaults(ops.ARITY_OPS.fold).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "wrap", fn(function(lo, hi) {
-    if (lo > hi) {
-      return this.wrap(hi, lo);
-    }
-    var _in = this, range;
-    if (_in >= hi) {
-      range = hi - lo;
-      _in -= range;
-      if (_in < hi) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      range = hi - lo;
-      _in += range;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
+    var val = this;
     if (hi === lo) {
       return lo;
     }
-    return _in - range * Math.floor((_in - lo) / range);
+    var range = (hi - lo);
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
+      }
+    } else if (val < lo) {
+      val += range;
+      if (val >= lo) {
+        return val;
+      }
+    } else {
+      return val;
+    }
+    return val - range * Math.floor((val - lo) / range);
   }).defaults(ops.ARITY_OPS.wrap).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "blend", fn(function(that, blendFrac) {
@@ -9878,32 +9903,24 @@ define('cc/plugins/utils', function(require, exports, module) {
   };
   
   var sc_wrap = function(val, lo, hi) {
-    if (lo > hi) {
-      var t = lo;
-      lo = hi;
-      hi = t;
-    }
-    var _in = val, range;
-    if (_in >= hi) {
-      range = hi - lo;
-      _in -= range;
-      if (_in < hi) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      range = hi - lo;
-      _in += range;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
     if (hi === lo) {
       return lo;
     }
-    return _in - range * Math.floor((_in - lo) / range);
+    var range = (hi - lo);
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
+      }
+    } else if (val < lo) {
+      val += range;
+      if (val >= lo) {
+        return val;
+      }
+    } else {
+      return val;
+    }
+    return val - range * Math.floor((val - lo) / range);
   };
   
   module.exports = {
@@ -10617,8 +10634,16 @@ define('cc/plugins/demand', function(require, exports, module) {
     var fromUnit = unit.fromUnits[index];
     return fromUnit && fromUnit.calcRate === 3;
   };
+
+  var inputDemand = function(unit, index) {
+    var fromUnit = unit.fromUnits[index];
+    if (fromUnit && fromUnit.calcRate === 3) {
+      fromUnit.process(1);
+    }
+    return unit.inputs[index][0];
+  };
   
-  var demand_input_a = function(unit, index, offset) {
+  var inputDemandA = function(unit, index, offset) {
     var fromUnit = unit.fromUnits[index];
     if (fromUnit) {
       switch (fromUnit.calcRate) {
@@ -10691,7 +10716,7 @@ define('cc/plugins/demand', function(require, exports, module) {
         }
         if (ztrig > 0 && prevtrig <= 0) {
           for (j = 2, k = 0; j < numOfInputs; ++j) {
-            x = demand_input_a(this, j, i + 1);
+            x = inputDemandA(this, j, i + 1);
             if (isNaN(x)) {
               x = prevout[k];
               this.done = true;
@@ -10734,14 +10759,14 @@ define('cc/plugins/demand', function(require, exports, module) {
     var next = function(inNumSamples) {
       var grow, x;
       if (inNumSamples) {
-        grow = demand_input_a(this, 2, inNumSamples);
+        grow = inputDemandA(this, 2, inNumSamples);
         if (!isNaN(grow)) {
           this._grow = grow;
         }
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
-          this._value   = demand_input_a(this, 1, inNumSamples);
+          this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -10779,14 +10804,14 @@ define('cc/plugins/demand', function(require, exports, module) {
     var next = function(inNumSamples) {
       var step, x;
       if (inNumSamples) {
-        step = demand_input_a(this, 2, inNumSamples);
+        step = inputDemandA(this, 2, inNumSamples);
         if (!isNaN(step)) {
           this._step = step;
         }
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
-          this._value   = demand_input_a(this, 1, inNumSamples);
+          this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -10806,7 +10831,7 @@ define('cc/plugins/demand', function(require, exports, module) {
 
   cc.ugen.specs.Dwhite = {
     $new: {
-      defaults: "lo=1,hi=1,length=Infinity",
+      defaults: "lo=0,hi=1,length=Infinity",
       ctor: function(lo, hi, length) {
         return this.multiNew(3, length, lo, hi);
       }
@@ -10825,7 +10850,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var lo, hi, x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
         }
         if (this._repeatCount >= this._repeats) {
@@ -10833,8 +10858,8 @@ define('cc/plugins/demand', function(require, exports, module) {
           return;
         }
         this._repeatCount++;
-        lo = demand_input_a(this, 1, inNumSamples);
-        hi = demand_input_a(this, 2, inNumSamples);
+        lo = inputDemandA(this, 1, inNumSamples);
+        hi = inputDemandA(this, 2, inNumSamples);
         
         if (!isNaN(lo)) { this._lo = lo; }
         if (!isNaN(hi)) { this._hi = hi; }
@@ -10850,7 +10875,7 @@ define('cc/plugins/demand', function(require, exports, module) {
   
   cc.ugen.specs.Diwhite = {
     $new: {
-      defaults: "lo=1,hi=1,length=Infinity",
+      defaults: "lo=0,hi=127,length=Infinity",
       ctor: function(lo, hi, length) {
         return this.multiNew(3, length, lo, hi);
       }
@@ -10869,7 +10894,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var lo, hi, x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
         }
         if (this._repeatCount >= this._repeats) {
@@ -10877,8 +10902,8 @@ define('cc/plugins/demand', function(require, exports, module) {
           return;
         }
         this._repeatCount++;
-        lo = demand_input_a(this, 1, inNumSamples);
-        hi = demand_input_a(this, 2, inNumSamples);
+        lo = inputDemandA(this, 1, inNumSamples);
+        hi = inputDemandA(this, 2, inNumSamples);
         
         if (!isNaN(lo)) { this._lo = lo|0; }
         if (!isNaN(hi)) { this._hi = hi|0; }
@@ -10914,7 +10939,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         while (true) {
@@ -10930,7 +10955,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._repeatCount++;
@@ -10970,7 +10995,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var x, attempts;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         attempts = 0;
@@ -10989,7 +11014,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._needToResetChild = true;
@@ -10998,7 +11023,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               return;
             }
           } else {
-            out[0] = demand_input_a(this, this._index, inNumSamples);
+            out[0] = inputDemandA(this, this._index, inNumSamples);
             this._index++;
             this._needToResetChild = true;
             return;
@@ -11037,7 +11062,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var x, attempts;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         attempts = 0;
@@ -11057,7 +11082,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, index);
             }
-            x = demand_input_a(this, index, inNumSamples);
+            x = inputDemandA(this, index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._needToResetChild = true;
@@ -11066,7 +11091,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               return;
             }
           } else {
-            out[0] = demand_input_a(this, index, inNumSamples);
+            out[0] = inputDemandA(this, index, inNumSamples);
             this._index++;
             this._needToResetChild = true;
             return;
@@ -11098,7 +11123,7 @@ define('cc/plugins/demand', function(require, exports, module) {
       var x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         while (true) {
@@ -11111,7 +11136,7 @@ define('cc/plugins/demand', function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
               this._repeatCount++;
@@ -11136,6 +11161,298 @@ define('cc/plugins/demand', function(require, exports, module) {
       }
     };
 
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Duty = {
+    $ar: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0",
+      ctor: function(dur, reset, level, doneAction) {
+        return this.multiNew(2, dur, reset, doneAction, level);
+      }
+    },
+    $kr: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0",
+      ctor: function(dur, reset, level, doneAction) {
+        return this.multiNew(2, dur, reset, doneAction, level);
+      }
+    }
+  };
+
+  var duty_dur        = 0;
+  var duty_reset      = 1;
+  var duty_doneAction = 2;
+  var duty_level      = 3;
+  
+  cc.unit.specs.Duty = (function() {
+    var ctor = function() {
+      if (this.inRates[duty_reset] === 2) {
+        this.process = next_da;
+        this._prevreset = 0;
+      } else {
+        if (this.inRates[duty_reset] === 3) {
+          this.process = next_dd;
+          this._prevreset = inputDemand(this, duty_reset) * this.rate.sampleRate;
+        } else {
+          this.process = next_dk;
+          this._prevreset = 0;
+        }
+      }
+      this._count   = inputDemand(this, duty_dur) * this.rate.sampleRate - 1;
+      this._prevout = inputDemand(this, duty_level);
+      this.outputs[0][0] = this._prevout;
+    };
+    var next_da = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn   = this.inputs[duty_reset];
+      var prevout   = this._prevout;
+      var count     = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        zreset = resetIn[i];
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[3][duty_doneAction]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[3][duty_doneAction]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        } else {
+          count--;
+          out[i] = prevout;
+        }
+      }
+      this._count     = count;
+      this._prevreset = prevreset;
+      this._prevout   = prevout;
+    };
+    var next_dk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn   = this.inputs[duty_reset];
+      var prevout   = this._prevout;
+      var count     = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      zreset = resetIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        } else {
+          count--;
+          out[i] = prevout;
+        }
+      }
+      this._count     = count;
+      this._prevreset = prevreset;
+      this._prevout   = prevout;
+    };
+    var next_dd = function(inNumSamples) {
+      var out = this.outputs[0];
+      var prevout = this._prevout;
+      var count   = this._count;
+      var reset   = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var x;
+      
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (reset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+          reset = inputDemandA(this, duty_reset, i + 1) * sr + reset;
+        } else {
+          reset--;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        }
+        out[i] = prevout;
+        count--;
+      }
+      this._count     = count;
+      this._prevreset = reset;
+      this._prevout   = prevout;
+    };
+    return ctor;
+  })();
+                        
+  
+  cc.ugen.specs.TDuty = {
+    $ar: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
+      ctor: function(dur, reset, level, doneAction, gapFirst) {
+        return this.multiNew(2, dur, reset, doneAction, level, gapFirst);
+      }
+    },
+    $kr: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
+      ctor: function(dur, reset, level, doneAction, gapFirst) {
+        return this.multiNew(2, dur, reset, doneAction, level, gapFirst);
+      }
+    }
+  };
+
+  cc.unit.specs.TDuty = (function() {
+    var ctor = function() {
+      if (this.inRates[duty_reset] === 2) {
+        this.process = next_da;
+        this._prevreset = 0;
+      } else {
+        if (this.inRates[duty_reset] === 3) {
+          this.process = next_dd;
+          this._prevreset = inputDemand(this, duty_reset) * this.rate.sampleRate;
+        } else {
+          this.process = next_dk;
+          this._prevreset = 0;
+        }
+      }
+      if (this.inputs[4][0]) {
+        this._count = inputDemand(this, duty_dur) * this.rate.sampleRate;
+      } else {
+        this._count = 0;
+      }
+      this.outputs[0][0] = 0;
+    };
+    var next_da = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn = this.inputs[duty_reset];
+      var count = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        zreset = resetIn[i];
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+        prevreset = zreset;
+      }
+      this._count = count;
+      this._prevreset = prevreset;
+    };
+    var next_dk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn = this.inputs[duty_reset];
+      var count = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      zreset = resetIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+        prevreset = zreset;
+      }
+      this._count = count;
+      this._prevreset = prevreset;
+    };
+    var next_dd = function(inNumSamples) {
+      var out = this.outputs[0];
+      var count = this._count;
+      var reset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (reset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+          reset = inputDemandA(this, duty_reset, i + 1) * sr + reset;
+        } else {
+          reset--;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+      }
+      this._count = count;
+      this._prevreset = reset;
+    };
     return ctor;
   })();
   
@@ -19005,6 +19322,25 @@ define('cc/server/commands', function(require, exports, module) {
       }
     }
   };
+  commands["/b_free"] = function(msg) {
+    var bufnum = msg[1]|0;
+    delete this.buffers[bufnum];
+  };
+  commands["/b_zero"] = function(msg) {
+    var bufnum = msg[1]|0;
+    var buffer = this.buffers[bufnum];
+    if (buffer) {
+      buffer.zero();
+    }
+  };
+  commands["/b_set"] = function(msg) {
+    var bufnum = msg[1]|0;
+    var params = msg[2];
+    var buffer = this.buffers[bufnum];
+    if (buffer) {
+      buffer.set(params);
+    }
+  };
   commands["/b_gen"] = function(msg) {
     var bufnum = msg[1]|0;
     var cmd    = msg[2];
@@ -19100,6 +19436,38 @@ define('cc/server/buffer', function(require, exports, module) {
       }
       this.channels   = bufSrc.channels;
       this.sampleRate = bufSrc.sampleRate;
+    };
+    Buffer.prototype.zero = function() {
+      var samples = this.samples;
+      for (var i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    };
+    Buffer.prototype.set = function(params) {
+      var samples = this.samples;
+      for (var i = 0, imax = params.length >> 1; i < imax; i += 2) {
+        var index  = params[i];
+        if (typeof index !== "number" || index < 0 || samples.length <= index) {
+          continue;
+        }
+        index |= 0;
+        var values = params[i+1];
+        if (typeof values === "number") {
+          if (isNaN(values)) {
+            values = 0;
+          }
+          samples[index] = values;
+        } else if (Array.isArray(values)) {
+          for (var j = 0, jmax = values.length; j < jmax; ++j) {
+            if (samples.length <= i + j) {
+              break;
+            }
+            if (typeof values[j] === "number") {
+              samples[index + j] = values[j];
+            }
+          }
+        }
+      }
     };
     Buffer.prototype.gen = function(cmd, flags, params) {
       var func = gen_func[cmd];
@@ -20505,54 +20873,53 @@ define('cc/server/basic_unit', function(require, exports, module) {
   bopFunc.excess = function(a, b) {
     return a - Math.max(-b, Math.min(a, b));
   };
-  bopFunc.fold2 = function(a, b) {
-    var _in = a, x, c, range, range2;
-    x = _in + b;
-    if (_in >= b) {
-      _in = b + b - _in;
-      if (_in >= -b) {
-        return _in;
+  bopFunc.fold2 = function(val, hi) {
+    var x, range1, range2;
+    if (hi === 0) {
+      return 0;
+    }
+    range1 = hi + hi;
+    if (val >= hi) {
+      val = range1 - val;
+      if (val >= -hi) {
+        return val;
       }
-    } else if (_in < -b) {
-      _in = -b - b - _in;
-      if (_in < b) {
-        return _in;
+    } else if (val < -hi) {
+      val = -range1 - val;
+      if (val < hi) {
+        return val;
       }
     } else {
-      return _in;
+      return val;
     }
-    if (b === -b) {
-      return -b;
+    
+    range2 = range1 + range1;
+    x = val + hi;
+    x -= range2 * Math.floor(x / range2);
+    if (x >= range1) {
+      return range2 - x - hi;
     }
-    range  = b + b;
-    range2 = range + range;
-    c = x - range2 * Math.floor(x / range2);
-    if (c >= range) {
-      c = range2 - c;
-    }
-    return c - b;
+    return x - hi;
   };
-  bopFunc.wrap2 = function(a, b) {
-    var _in = a, range;
-    if (_in >= b) {
-      range = b + b;
-      _in -= range;
-      if (_in < b) {
-        return _in;
+  bopFunc.wrap2 = function(val, hi) {
+    if (hi === 0) {
+      return 0;
+    }
+    var range = hi * 2;
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
       }
-    } else if (_in < -b) {
-      range = b + b;
-      _in += range;
-      if (_in >= -b) {
-        return _in;
+    } else if (val < -hi) {
+      val += range;
+      if (val >= -hi) {
+        return val;
       }
     } else {
-      return _in;
+      return val;
     }
-    if (b === -b) {
-      return -b;
-    }
-    return _in - range * Math.floor((_in + b) / range);
+    return val - range * Math.floor((val + hi) / range);
   };
   
   

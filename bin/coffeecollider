@@ -49,7 +49,7 @@
     } else {
       client.play();
       setTimeout(function() {
-        client.execute(code, {js:true});
+        client.execute(code, {lang:"js"});
       }, 100);
     }
   }
