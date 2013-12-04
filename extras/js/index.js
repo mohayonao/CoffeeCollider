@@ -83,7 +83,12 @@ $(function() {
   });
 
   $("#link").on("click", function() {
-    var code = editor.getValue().trim();
+    var code;
+    if (isCoffee) {
+      code = editor.getValue().trim();
+    } else {
+      code = coffeeSource;
+    }
     window.location = "#" + srcFragment + encodeURIComponent(code);
   });
   
