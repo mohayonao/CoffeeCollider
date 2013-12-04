@@ -547,7 +547,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "dur=1,reset=0,level=1,doneAction=0",
       ctor: function(dur, reset, level, doneAction) {
-        return this.multiNew(C.AUDIO, dur, reset, doneAction, level);
+        return this.multiNew(C.CONTROL, dur, reset, doneAction, level);
       }
     }
   };
@@ -701,7 +701,7 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
       ctor: function(dur, reset, level, doneAction, gapFirst) {
-        return this.multiNew(C.AUDIO, dur, reset, doneAction, level, gapFirst);
+        return this.multiNew(C.CONTROL, dur, reset, doneAction, level, gapFirst);
       }
     }
   };
