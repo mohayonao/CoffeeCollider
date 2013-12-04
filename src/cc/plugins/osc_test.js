@@ -210,22 +210,10 @@ define(function(require, exports, module) {
       },
       { rate  : C.AUDIO,
         inputs: [
-          { name:"freq" , rate:C.AUDIO , value:[ 440, 660, 1000 ] },
-          { name:"phase", value:0}
-        ]
-      },
-      { rate  : C.AUDIO,
-        inputs: [
           { name:"freq" , rate:C.CONTROL, value:[ 440, 660, 1000 ] },
           { name:"phase", rate:C.CONTROL, value:[ 0, 0.5, 0.25, 1 ]}
         ]
       },
-      { rate  : C.AUDIO,
-        inputs: [
-          { name:"freq" , rate:C.CONTROL, value:[ 440, 660, 1000 ] },
-          { name:"phase", value:0}
-        ]
-      }
     ], {
       checker: function(statistics) {
         // console.log(statistics);

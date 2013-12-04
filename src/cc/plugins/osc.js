@@ -1270,18 +1270,14 @@ define(function(require, exports, module) {
     var ctor = function() {
       this._phase = this.inputs[1][0];
       if (this.inRates[0] === C.AUDIO) {
+        this.process = next_a;
         if (this.inRates[1] !== C.SCALAR) {
-          this.process = next_ak;
           this._phase = 1;
-        } else {
-          this.process = next_ai;
         }
       } else {
+        this.process = next_k;
         if (this.inRates[1] !== C.SCALAR) {
-          this.process = next_kk;
           this._phase = 1;
-        } else {
-          this.process = next_ki;
         }
       }
       this._phaseOffset = 0;
@@ -1290,7 +1286,7 @@ define(function(require, exports, module) {
         this._phase = 1;
       }
     };
-    var next_ak = function(inNumSamples) {
+    var next_a = function(inNumSamples) {
       var out     = this.outputs[0];
       var freqIn  = this.inputs[0];
       var phaseOffset = this.inputs[1][0];
@@ -1312,23 +1308,7 @@ define(function(require, exports, module) {
       this._phase = phase - phaseOffset;
       this._phaseOffset = phaseOffset;
     };
-    var next_ai = function(inNumSamples) {
-      var out    = this.outputs[0];
-      var freqIn = this.inputs[0];
-      var cpstoinc = this._cpstoinc;
-      var phase    = this._phase;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase >= 1) {
-          phase -= 1;
-          out[i] = 1;
-        } else {
-          out[i] = 0;
-        }
-        phase += freqIn[i] * cpstoinc;
-      }
-      this._phase = phase;
-    };
-    var next_kk = function(inNumSamples) {
+    var next_k = function(inNumSamples) {
       var out   = this.outputs[0];
       var freq  = this.inputs[0][0] * this._cpstoinc;
       var phaseOffset = this.inputs[1][0];
@@ -1348,21 +1328,6 @@ define(function(require, exports, module) {
       }
       this._phase = phase - phaseOffset;
       this._phaseOffset = phaseOffset;
-    };
-    var next_ki = function(inNumSamples) {
-      var out  = this.outputs[0];
-      var freq = this.inputs[0][0] * this._cpstoinc;
-      var phase = this._phase;
-      for (var i = 0; i < inNumSamples; ++i) {
-        if (phase >= 1) {
-          phase -= 1;
-          out[i] = 1;
-        } else {
-          out[i] = 0;
-        }
-        phase += freq;
-      }
-      this._phase = phase;
     };
     return ctor;
   })();
