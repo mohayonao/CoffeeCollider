@@ -7,8 +7,16 @@ define(function(require, exports, module) {
     var fromUnit = unit.fromUnits[index];
     return fromUnit && fromUnit.calcRate === C.DEMAND;
   };
+
+  var inputDemand = function(unit, index) {
+    var fromUnit = unit.fromUnits[index];
+    if (fromUnit && fromUnit.calcRate === C.DEMAND) {
+      fromUnit.process(1);
+    }
+    return unit.inputs[index][0];
+  };
   
-  var demand_input_a = function(unit, index, offset) {
+  var inputDemandA = function(unit, index, offset) {
     var fromUnit = unit.fromUnits[index];
     if (fromUnit) {
       switch (fromUnit.calcRate) {
@@ -81,7 +89,7 @@ define(function(require, exports, module) {
         }
         if (ztrig > 0 && prevtrig <= 0) {
           for (j = 2, k = 0; j < numOfInputs; ++j) {
-            x = demand_input_a(this, j, i + 1);
+            x = inputDemandA(this, j, i + 1);
             if (isNaN(x)) {
               x = prevout[k];
               this.done = true;
@@ -124,14 +132,14 @@ define(function(require, exports, module) {
     var next = function(inNumSamples) {
       var grow, x;
       if (inNumSamples) {
-        grow = demand_input_a(this, 2, inNumSamples);
+        grow = inputDemandA(this, 2, inNumSamples);
         if (!isNaN(grow)) {
           this._grow = grow;
         }
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
-          this._value   = demand_input_a(this, 1, inNumSamples);
+          this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -169,14 +177,14 @@ define(function(require, exports, module) {
     var next = function(inNumSamples) {
       var step, x;
       if (inNumSamples) {
-        step = demand_input_a(this, 2, inNumSamples);
+        step = inputDemandA(this, 2, inNumSamples);
         if (!isNaN(step)) {
           this._step = step;
         }
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
-          this._value   = demand_input_a(this, 1, inNumSamples);
+          this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -196,7 +204,7 @@ define(function(require, exports, module) {
 
   cc.ugen.specs.Dwhite = {
     $new: {
-      defaults: "lo=1,hi=1,length=Infinity",
+      defaults: "lo=0,hi=1,length=Infinity",
       ctor: function(lo, hi, length) {
         return this.multiNew(C.DEMAND, length, lo, hi);
       }
@@ -215,7 +223,7 @@ define(function(require, exports, module) {
       var lo, hi, x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
         }
         if (this._repeatCount >= this._repeats) {
@@ -223,8 +231,8 @@ define(function(require, exports, module) {
           return;
         }
         this._repeatCount++;
-        lo = demand_input_a(this, 1, inNumSamples);
-        hi = demand_input_a(this, 2, inNumSamples);
+        lo = inputDemandA(this, 1, inNumSamples);
+        hi = inputDemandA(this, 2, inNumSamples);
         
         if (!isNaN(lo)) { this._lo = lo; }
         if (!isNaN(hi)) { this._hi = hi; }
@@ -240,7 +248,7 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.Diwhite = {
     $new: {
-      defaults: "lo=1,hi=1,length=Infinity",
+      defaults: "lo=0,hi=127,length=Infinity",
       ctor: function(lo, hi, length) {
         return this.multiNew(C.DEMAND, length, lo, hi);
       }
@@ -259,7 +267,7 @@ define(function(require, exports, module) {
       var lo, hi, x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = x|0;
         }
         if (this._repeatCount >= this._repeats) {
@@ -267,8 +275,8 @@ define(function(require, exports, module) {
           return;
         }
         this._repeatCount++;
-        lo = demand_input_a(this, 1, inNumSamples);
-        hi = demand_input_a(this, 2, inNumSamples);
+        lo = inputDemandA(this, 1, inNumSamples);
+        hi = inputDemandA(this, 2, inNumSamples);
         
         if (!isNaN(lo)) { this._lo = lo|0; }
         if (!isNaN(hi)) { this._hi = hi|0; }
@@ -304,7 +312,7 @@ define(function(require, exports, module) {
       var x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         while (true) {
@@ -320,7 +328,7 @@ define(function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._repeatCount++;
@@ -360,7 +368,7 @@ define(function(require, exports, module) {
       var x, attempts;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         attempts = 0;
@@ -379,7 +387,7 @@ define(function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._needToResetChild = true;
@@ -388,7 +396,7 @@ define(function(require, exports, module) {
               return;
             }
           } else {
-            out[0] = demand_input_a(this, this._index, inNumSamples);
+            out[0] = inputDemandA(this, this._index, inNumSamples);
             this._index++;
             this._needToResetChild = true;
             return;
@@ -427,7 +435,7 @@ define(function(require, exports, module) {
       var x, attempts;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         attempts = 0;
@@ -447,7 +455,7 @@ define(function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, index);
             }
-            x = demand_input_a(this, index, inNumSamples);
+            x = inputDemandA(this, index, inNumSamples);
             if (isNaN(x)) {
               this._index++;
               this._needToResetChild = true;
@@ -456,7 +464,7 @@ define(function(require, exports, module) {
               return;
             }
           } else {
-            out[0] = demand_input_a(this, index, inNumSamples);
+            out[0] = inputDemandA(this, index, inNumSamples);
             this._index++;
             this._needToResetChild = true;
             return;
@@ -488,7 +496,7 @@ define(function(require, exports, module) {
       var x;
       if (inNumSamples) {
         if (this._repeats < 0) {
-          x = demand_input_a(this, 0, inNumSamples);
+          x = inputDemandA(this, 0, inNumSamples);
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         while (true) {
@@ -501,7 +509,7 @@ define(function(require, exports, module) {
               this._needToResetChild = false;
               resetDemandInput(this, this._index);
             }
-            x = demand_input_a(this, this._index, inNumSamples);
+            x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
               this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
               this._repeatCount++;
@@ -526,6 +534,298 @@ define(function(require, exports, module) {
       }
     };
 
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Duty = {
+    $ar: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0",
+      ctor: function(dur, reset, level, doneAction) {
+        return this.multiNew(C.AUDIO, dur, reset, doneAction, level);
+      }
+    },
+    $kr: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0",
+      ctor: function(dur, reset, level, doneAction) {
+        return this.multiNew(C.AUDIO, dur, reset, doneAction, level);
+      }
+    }
+  };
+
+  var duty_dur        = 0;
+  var duty_reset      = 1;
+  var duty_doneAction = 2;
+  var duty_level      = 3;
+  
+  cc.unit.specs.Duty = (function() {
+    var ctor = function() {
+      if (this.inRates[duty_reset] === C.AUDIO) {
+        this.process = next_da;
+        this._prevreset = 0;
+      } else {
+        if (this.inRates[duty_reset] === C.DEMAND) {
+          this.process = next_dd;
+          this._prevreset = inputDemand(this, duty_reset) * this.rate.sampleRate;
+        } else {
+          this.process = next_dk;
+          this._prevreset = 0;
+        }
+      }
+      this._count   = inputDemand(this, duty_dur) * this.rate.sampleRate - 1;
+      this._prevout = inputDemand(this, duty_level);
+      this.outputs[0][0] = this._prevout;
+    };
+    var next_da = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn   = this.inputs[duty_reset];
+      var prevout   = this._prevout;
+      var count     = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        zreset = resetIn[i];
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[3][duty_doneAction]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[3][duty_doneAction]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        } else {
+          count--;
+          out[i] = prevout;
+        }
+      }
+      this._count     = count;
+      this._prevreset = prevreset;
+      this._prevout   = prevout;
+    };
+    var next_dk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn   = this.inputs[duty_reset];
+      var prevout   = this._prevout;
+      var count     = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      zreset = resetIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        } else {
+          count--;
+          out[i] = prevout;
+        }
+      }
+      this._count     = count;
+      this._prevreset = prevreset;
+      this._prevout   = prevout;
+    };
+    var next_dd = function(inNumSamples) {
+      var out = this.outputs[0];
+      var prevout = this._prevout;
+      var count   = this._count;
+      var reset   = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var x;
+      
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (reset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+          reset = inputDemandA(this, duty_reset, i + 1) * sr + reset;
+        } else {
+          reset--;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, i+1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = prevout;
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          } else {
+            prevout = x;
+          }
+          out[i] = x;
+        }
+        out[i] = prevout;
+        count--;
+      }
+      this._count     = count;
+      this._prevreset = reset;
+      this._prevout   = prevout;
+    };
+    return ctor;
+  })();
+                        
+  
+  cc.ugen.specs.TDuty = {
+    $ar: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
+      ctor: function(dur, reset, level, doneAction, gapFirst) {
+        return this.multiNew(C.AUDIO, dur, reset, doneAction, level, gapFirst);
+      }
+    },
+    $kr: {
+      defaults: "dur=1,reset=0,level=1,doneAction=0,gapFirst=0",
+      ctor: function(dur, reset, level, doneAction, gapFirst) {
+        return this.multiNew(C.AUDIO, dur, reset, doneAction, level, gapFirst);
+      }
+    }
+  };
+
+  cc.unit.specs.TDuty = (function() {
+    var ctor = function() {
+      if (this.inRates[duty_reset] === C.AUDIO) {
+        this.process = next_da;
+        this._prevreset = 0;
+      } else {
+        if (this.inRates[duty_reset] === C.DEMAND) {
+          this.process = next_dd;
+          this._prevreset = inputDemand(this, duty_reset) * this.rate.sampleRate;
+        } else {
+          this.process = next_dk;
+          this._prevreset = 0;
+        }
+      }
+      if (this.inputs[4][0]) {
+        this._count = inputDemand(this, duty_dur) * this.rate.sampleRate;
+      } else {
+        this._count = 0;
+      }
+      this.outputs[0][0] = 0;
+    };
+    var next_da = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn = this.inputs[duty_reset];
+      var count = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        zreset = resetIn[i];
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+        prevreset = zreset;
+      }
+      this._count = count;
+      this._prevreset = prevreset;
+    };
+    var next_dk = function(inNumSamples) {
+      var out = this.outputs[0];
+      var resetIn = this.inputs[duty_reset];
+      var count = this._count;
+      var prevreset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var zreset, x;
+      zreset = resetIn[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (zreset > 0 && prevreset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+        prevreset = zreset;
+      }
+      this._count = count;
+      this._prevreset = prevreset;
+    };
+    var next_dd = function(inNumSamples) {
+      var out = this.outputs[0];
+      var count = this._count;
+      var reset = this._prevreset;
+      var sr = this.rate.sampleRate;
+      var x;
+      for (var i = 0; i < inNumSamples; ++i) {
+        if (reset <= 0) {
+          resetDemandInput(this, duty_level);
+          resetDemandInput(this, duty_dur);
+          count = 0;
+          reset = inputDemandA(this, duty_reset, i + 1) * sr + reset;
+        } else {
+          reset--;
+        }
+        if (count <= 0) {
+          count = inputDemandA(this, duty_dur, 1 + 1) * sr + count;
+          if (isNaN(count)) {
+            this.doneAction(this.inputs[duty_doneAction][0]);
+          }
+          x = inputDemandA(this, duty_level, i + 1);
+          if (isNaN(x)) {
+            x = 0;
+          }
+          out[i] = x;
+        } else {
+          out[i] = 0;
+        }
+        count--;
+      }
+      this._count = count;
+      this._prevreset = reset;
+    };
     return ctor;
   })();
   
