@@ -60,32 +60,24 @@ define(function(require, exports, module) {
   };
   
   var sc_wrap = function(val, lo, hi) {
-    if (lo > hi) {
-      var t = lo;
-      lo = hi;
-      hi = t;
-    }
-    var _in = val, range;
-    if (_in >= hi) {
-      range = hi - lo;
-      _in -= range;
-      if (_in < hi) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      range = hi - lo;
-      _in += range;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
     if (hi === lo) {
       return lo;
     }
-    return _in - range * Math.floor((_in - lo) / range);
+    var range = (hi - lo);
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
+      }
+    } else if (val < lo) {
+      val += range;
+      if (val >= lo) {
+        return val;
+      }
+    } else {
+      return val;
+    }
+    return val - range * Math.floor((val - lo) / range);
   };
   
   module.exports = {

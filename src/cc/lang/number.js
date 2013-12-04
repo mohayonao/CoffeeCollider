@@ -525,59 +525,53 @@ define(function(require, exports, module) {
   }).defaults(ops.ARITY_OPS.clip).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "fold", fn(function(lo, hi) {
-    var _in = this, x, c, range, range2;
-    x = _in - lo;
-    if (_in >= hi) {
-      _in = hi + hi - _in;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      _in = lo + lo - _in;
-      if (_in < hi) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
+    var val = this, x, range1, range2;
     if (hi === lo) {
       return lo;
     }
-    range = hi - lo;
-    range2 = range + range;
-    c = x - range2 * Math.floor(x / range2);
-    if (c >= range) {
-      c = range2 - c;
+    if (val >= hi) {
+      val = (hi * 2) - val;
+      if (val >= lo) {
+        return val;
+      }
+    } else if (val < lo) {
+      val = (lo * 2) - val;
+      if (val < hi) {
+        return val;
+      }
+    } else {
+      return val;
     }
-    return c + lo;
+    range1 = hi - lo;
+    range2 = range1 * 2;
+    x = val - lo;
+    x -= range2 * Math.floor(x / range2);
+    if (x >= range1) {
+      return range2 - x + lo;
+    }
+    return x + lo;
   }).defaults(ops.ARITY_OPS.fold).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "wrap", fn(function(lo, hi) {
-    if (lo > hi) {
-      return this.wrap(hi, lo);
-    }
-    var _in = this, range;
-    if (_in >= hi) {
-      range = hi - lo;
-      _in -= range;
-      if (_in < hi) {
-        return _in;
-      }
-    } else if (_in < lo) {
-      range = hi - lo;
-      _in += range;
-      if (_in >= lo) {
-        return _in;
-      }
-    } else {
-      return _in;
-    }
-    
+    var val = this;
     if (hi === lo) {
       return lo;
     }
-    return _in - range * Math.floor((_in - lo) / range);
+    var range = (hi - lo);
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
+      }
+    } else if (val < lo) {
+      val += range;
+      if (val >= lo) {
+        return val;
+      }
+    } else {
+      return val;
+    }
+    return val - range * Math.floor((val - lo) / range);
   }).defaults(ops.ARITY_OPS.wrap).multiCall().build());
   
   fn.defineArityProperty(Number.prototype, "blend", fn(function(that, blendFrac) {

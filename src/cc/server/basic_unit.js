@@ -798,54 +798,53 @@ define(function(require, exports, module) {
   bopFunc.excess = function(a, b) {
     return a - Math.max(-b, Math.min(a, b));
   };
-  bopFunc.fold2 = function(a, b) {
-    var _in = a, x, c, range, range2;
-    x = _in + b;
-    if (_in >= b) {
-      _in = b + b - _in;
-      if (_in >= -b) {
-        return _in;
+  bopFunc.fold2 = function(val, hi) {
+    var x, range1, range2;
+    if (hi === 0) {
+      return 0;
+    }
+    range1 = hi + hi;
+    if (val >= hi) {
+      val = range1 - val;
+      if (val >= -hi) {
+        return val;
       }
-    } else if (_in < -b) {
-      _in = -b - b - _in;
-      if (_in < b) {
-        return _in;
+    } else if (val < -hi) {
+      val = -range1 - val;
+      if (val < hi) {
+        return val;
       }
     } else {
-      return _in;
+      return val;
     }
-    if (b === -b) {
-      return -b;
+    
+    range2 = range1 + range1;
+    x = val + hi;
+    x -= range2 * Math.floor(x / range2);
+    if (x >= range1) {
+      return range2 - x - hi;
     }
-    range  = b + b;
-    range2 = range + range;
-    c = x - range2 * Math.floor(x / range2);
-    if (c >= range) {
-      c = range2 - c;
-    }
-    return c - b;
+    return x - hi;
   };
-  bopFunc.wrap2 = function(a, b) {
-    var _in = a, range;
-    if (_in >= b) {
-      range = b + b;
-      _in -= range;
-      if (_in < b) {
-        return _in;
+  bopFunc.wrap2 = function(val, hi) {
+    if (hi === 0) {
+      return 0;
+    }
+    var range = hi * 2;
+    if (val >= hi) {
+      val -= range;
+      if (val < hi) {
+        return val;
       }
-    } else if (_in < -b) {
-      range = b + b;
-      _in += range;
-      if (_in >= -b) {
-        return _in;
+    } else if (val < -hi) {
+      val += range;
+      if (val >= -hi) {
+        return val;
       }
     } else {
-      return _in;
+      return val;
     }
-    if (b === -b) {
-      return -b;
-    }
-    return _in - range * Math.floor((_in + b) / range);
+    return val - range * Math.floor((val + hi) / range);
   };
   
   
