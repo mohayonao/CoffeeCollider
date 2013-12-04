@@ -1331,6 +1331,112 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.TrigImpulse = {
+    $ar: {
+      defaults: "trig=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(trig, freq, phase, mul, add) {
+        return this.multiNew(C.AUDIO, trig, freq, phase).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,freq=440,phase=0,mul=1,add=0",
+      ctor: function(trig, freq, phase, mul, add) {
+        return this.multiNew(C.CONTROL, trig, freq, phase).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.unit.specs.TrigImpulse = (function() {
+    var ctor = function() {
+      this._phase = this.inputs[2][0];
+      if (this.inRates[1] === C.AUDIO) {
+        this.process = next_ka;
+        if (this.inRates[2] !== C.SCALAR) {
+          this._phase = 1;
+        }
+      } else {
+        this.process = next_kk;
+        if (this.inRates[2] !== C.SCALAR) {
+          this._phase = 1;
+        }
+      }
+      this._phaseOffset = 0;
+      this._cpstoinc    = this.rate.sampleDur;
+      if (this._phase === 0) {
+        this._phase = 1;
+      }
+      this._prevTrig = this.inputs[0][0];
+    };
+    var next_ka = function(inNumSamples) {
+      var out     = this.outputs[0];
+      var trig    = this.inputs[0];
+      var freqIn  = this.inputs[1];
+      var phaseOffset = this.inputs[2][0];
+      var cpstoinc = this._cpstoinc;
+      var phase    = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      var prevTrig = this._prevTrig;
+      if (trig > 0 && prevTrig <= 0) {
+        phase = phaseOffset;
+        if (this.inRates[2] !== C.SCALAR) {
+          phase = 1;
+        }
+        if (phase === 0) {
+          phase = 1;
+        }
+      }
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freqIn[i] * cpstoinc;
+      }
+      this._phase = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+      this._prevTrig    = trig;
+    };
+    var next_kk = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var trig = this.inputs[0][0];
+      var freq = this.inputs[1][0] * this._cpstoinc;
+      var phaseOffset = this.inputs[2][0];
+      var phase = this._phase;
+      var prevPhaseOffset = this._phaseOffset;
+      var phase_slope = (phaseOffset - prevPhaseOffset) * this.rate.slopeFactor;
+      var prevTrig = this._prevTrig;
+      if (trig > 0 && prevTrig <= 0) {
+        phase = phaseOffset;
+        if (this.inRates[2] !== C.SCALAR) {
+          phase = 1;
+        }
+        if (phase === 0) {
+          phase = 1;
+        }
+      }
+      phase += prevPhaseOffset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        phase += phase_slope;
+        if (phase >= 1) {
+          phase -= 1;
+          out[i] = 1;
+        } else {
+          out[i] = 0;
+        }
+        phase += freq;
+      }
+      this._phase       = phase - phaseOffset;
+      this._phaseOffset = phaseOffset;
+      this._prevTrig    = trig;
+    };
+    return ctor;
+  })();
   
   cc.ugen.specs.SyncSaw = {
     $ar: {

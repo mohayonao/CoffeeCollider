@@ -204,8 +204,8 @@ define(function(require, exports, module) {
     }).unitTestSuite([
       { rate  : C.AUDIO,
         inputs: [
-          { name:"freq" , rate:C.AUDIO, value:[ 440, 660, 1000 ] },
-          { name:"phase", rate:C.AUDIO, value:[ 0, 0.25, 0.5, 1 ]}
+          { name:"freq" , rate:C.AUDIO  , value:[ 440, 660, 1000 ] },
+          { name:"phase", rate:C.CONTROL, value:[ 0, 0.25, 0.5, 1 ]}
         ]
       },
       { rate  : C.AUDIO,
@@ -222,7 +222,48 @@ define(function(require, exports, module) {
         assert.ok(statistics.max === +1.0);
       }
     });
-
+    
+    ugenTestSuite("TrigImpulse", {
+      ar: ["trig",0, "freq",440, "phase",0],
+      kr: ["trig",0, "freq",440, "phase",0],
+    }).unitTestSuite([
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"trig" , rate:C.AUDIO, value:unitTestSuite.trig0 },
+          { name:"freq" , rate:C.AUDIO  , value:[ 440, 660, 1000 ]  },
+          { name:"phase", rate:C.CONTROL, value:[ 0, 0.25, 0.5, 1 ] }
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"trig" , rate:C.AUDIO  , value:unitTestSuite.trig0 },
+          { name:"freq" , rate:C.CONTROL, value:[ 440, 660, 1000 ]  },
+          { name:"phase", rate:C.CONTROL, value:[ 0, 0.5, 0.25, 1 ] }
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"trig" , rate:C.CONTROL, value:unitTestSuite.trig0 },
+          { name:"freq" , rate:C.AUDIO  , value:[ 440, 660, 1000 ]  },
+          { name:"phase", rate:C.CONTROL, value:[ 0, 0.25, 0.5, 1 ] }
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"trig" , rate:C.CONTROL, value:unitTestSuite.trig0 },
+          { name:"freq" , rate:C.CONTROL, value:[ 440, 660, 1000 ]  },
+          { name:"phase", rate:C.CONTROL, value:[ 0, 0.5, 0.25, 1 ] }
+        ]
+      },
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.ok(statistics.min ===  0.0);
+        assert.ok(statistics.max === +1.0);
+      }
+    });
+    
     ugenTestSuite("SyncSaw", {
       ar: ["syncFreq",440, "sawFreq",440],
       kr: ["syncFreq",440, "sawFreq",440],
