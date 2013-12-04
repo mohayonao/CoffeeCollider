@@ -6,6 +6,7 @@ define(function(require, exports, module) {
   var utils  = require("./utils");
   var extend = require("../common/extend");
   var emitter = require("../common/emitter");
+  var slice = [].slice;
   
   var BufferSource = (function() {
     var bufSrcId = 0;
@@ -79,6 +80,36 @@ define(function(require, exports, module) {
     }
     extend(Buffer, cc.Object);
 
+    Buffer.prototype.free = function() {
+      cc.lang.pushToTimeline([
+        "/b_free", this.bufnum
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.zero = function() {
+      cc.lang.pushToTimeline([
+        "/b_zero", this.bufnum
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.set = function() {
+      var args = slice.call(arguments);
+      cc.lang.pushToTimeline([
+        "/b_set", this.bufnum, args
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.setn = function() {
+      var args = slice.call(arguments);
+      cc.lang.pushToTimeline([
+        "/b_set", this.bufnum, args
+      ]);
+      return this;
+    };
+    
     Buffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
       amps = utils.asArray(amps);
       var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);

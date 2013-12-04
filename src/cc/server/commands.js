@@ -79,6 +79,25 @@ define(function(require, exports, module) {
       }
     }
   };
+  commands["/b_free"] = function(msg) {
+    var bufnum = msg[1]|0;
+    delete this.buffers[bufnum];
+  };
+  commands["/b_zero"] = function(msg) {
+    var bufnum = msg[1]|0;
+    var buffer = this.buffers[bufnum];
+    if (buffer) {
+      buffer.zero();
+    }
+  };
+  commands["/b_set"] = function(msg) {
+    var bufnum = msg[1]|0;
+    var params = msg[2];
+    var buffer = this.buffers[bufnum];
+    if (buffer) {
+      buffer.set(params);
+    }
+  };
   commands["/b_gen"] = function(msg) {
     var bufnum = msg[1]|0;
     var cmd    = msg[2];

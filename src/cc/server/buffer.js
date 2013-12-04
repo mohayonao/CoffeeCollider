@@ -59,6 +59,38 @@ define(function(require, exports, module) {
       this.channels   = bufSrc.channels;
       this.sampleRate = bufSrc.sampleRate;
     };
+    Buffer.prototype.zero = function() {
+      var samples = this.samples;
+      for (var i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    };
+    Buffer.prototype.set = function(params) {
+      var samples = this.samples;
+      for (var i = 0, imax = params.length >> 1; i < imax; i += 2) {
+        var index  = params[i];
+        if (typeof index !== "number" || index < 0 || samples.length <= index) {
+          continue;
+        }
+        index |= 0;
+        var values = params[i+1];
+        if (typeof values === "number") {
+          if (isNaN(values)) {
+            values = 0;
+          }
+          samples[index] = values;
+        } else if (Array.isArray(values)) {
+          for (var j = 0, jmax = values.length; j < jmax; ++j) {
+            if (samples.length <= i + j) {
+              break;
+            }
+            if (typeof values[j] === "number") {
+              samples[index + j] = values[j];
+            }
+          }
+        }
+      }
+    };
     Buffer.prototype.gen = function(cmd, flags, params) {
       var func = gen_func[cmd];
       if (func) {
