@@ -4,7 +4,9 @@ define(function(require, exports, module) {
   var CoffeeScript = global.CoffeeScript || global.require("coffee-script");
   
   var cc = require("../cc");
-  var timevalue = require("../common/timevalue").calc;
+  var numericstring = require("../common/numericstring");
+  var timevalue = numericstring.timevalue;
+  var notevalue = numericstring.notevalue;
   var push = [].push;
   
   // CoffeeScript tags
@@ -451,21 +453,6 @@ define(function(require, exports, module) {
       }
     }
     return tokens;
-  };
-  
-  var notevalue = function(str) {
-    var m = /^([CDEFGAB])(\d)([-+#b])?$/.exec(str);
-    if (m) {
-      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] * 12) + 12;
-      var acc = m[3];
-      if (acc === "-" || acc === "b") {
-        midi--;
-      } else if (acc === "+" || acc === "#") {
-        midi++;
-      }
-      return midi;
-    }
-    return str;
   };
   
   var replaceStrictlyPrecedence = function(tokens) {

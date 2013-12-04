@@ -527,7 +527,7 @@ define(function(require, exports, module) {
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][VALUE], "'10min'", "not replace when use single quotation");
       });
-      it("note value", function() {
+      it("notevalue", function() {
         tokens = coffee.tokens('"A4"');
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
@@ -568,22 +568,22 @@ define(function(require, exports, module) {
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "95");
         
-        tokens = coffee.tokens('"A7+"');
+        tokens = coffee.tokens('"A+7"');
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "106");
 
-        tokens = coffee.tokens('"A8#"');
+        tokens = coffee.tokens('"A#8"');
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "118");
 
-        tokens = coffee.tokens('"A9-"');
+        tokens = coffee.tokens('"A-9"');
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "128");
 
-        tokens = coffee.tokens('"A9b"');
+        tokens = coffee.tokens('"Ab9"');
         tokens = compiler.replaceNumericString(tokens);
         assert.equal(tokens[0][TAG]  , "NUMBER");
         assert.equal(tokens[0][VALUE], "128");

@@ -3,7 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("../cc");
   
-  var calc = function(str) {
+  var timevalue = function(str) {
     var result = null;
     var freq;
     if (str.charAt(0) === "~") {
@@ -125,6 +125,21 @@ define(function(require, exports, module) {
     return null;
   };
   
+  var notevalue = function(str) {
+    var m = /^([CDEFGAB])([-+#b])?(\d)$/.exec(str);
+    if (m) {
+      var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[3] * 12) + 12;
+      var acc = m[2];
+      if (acc === "-" || acc === "b") {
+        midi--;
+      } else if (acc === "+" || acc === "#") {
+        midi++;
+      }
+      return midi;
+    }
+    return str;
+  };
+  
   module.exports = {
     hz     : hz,
     time   : time,
@@ -136,7 +151,8 @@ define(function(require, exports, module) {
     calcNote : calcNote,
     calcBeat : calcBeat,
     calcTicks: calcTicks,
-    calc: calc,
+    timevalue: timevalue,
+    notevalue: notevalue,
   };
 
 });
