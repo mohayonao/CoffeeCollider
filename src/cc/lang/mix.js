@@ -51,7 +51,7 @@ define(function(require, exports, module) {
   };
   cc.global.Mix.ar = function(array) {
     if (Array.isArray(array)) {
-      var result = array.slice();
+      var result = cc.global.Mix(array);
       switch (asRate(result)) {
       case C.AUDIO:
         return result;
@@ -69,7 +69,7 @@ define(function(require, exports, module) {
   };
   cc.global.Mix.kr = function(array) {
     if (Array.isArray(array)) {
-      var result = array.slice();
+      var result = cc.global.Mix(array);
       var rate = asRate(result);
       if (rate === C.AUDIO) {
         result = result.map(function(x) {
