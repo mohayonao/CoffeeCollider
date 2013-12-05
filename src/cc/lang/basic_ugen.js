@@ -176,6 +176,7 @@ define(function(require, exports, module) {
     return BinaryOpUGen;
   })();
   
+  // TODO: a graph should be optimized when SynthDef building
   var optimizeSumObjects = (function() {
     var collect = function(obj) {
       if (typeof obj === "number") {
@@ -202,7 +203,7 @@ define(function(require, exports, module) {
       });
       switch (a.length) {
       case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-      case 3: return cc.createSum4(a[0], a[1], a[2]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
       case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
       case 1: return a[0];
       default: return work(utils.clump(a, 4));
@@ -225,7 +226,8 @@ define(function(require, exports, module) {
       if (list.length === 1 && list[0].length === 2) {
         return cc.createBinaryOpUGen("+!", list[0][0], list[0][1]);
       }
-      return work(list);
+      var result = work(list);
+      return result;
     };
   })();
   

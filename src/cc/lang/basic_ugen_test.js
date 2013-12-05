@@ -7,7 +7,8 @@ define(function(require, exports, module) {
   var slice = [].slice;
   
   var UGen = (function() {
-    function UGen(rate) {
+    function UGen(klassName, rate) {
+      this.klassName = klassName;
       this.rate = rate;
       this.inputs = [];
     }
@@ -42,10 +43,10 @@ define(function(require, exports, module) {
       };
       
       basic_ugen = require("./basic_ugen")
-      u1 = new UGen(C.SCALAR);
-      u2 = new UGen(C.CONTROL);
-      u3 = new UGen(C.AUDIO);
-      u4 = new UGen(C.DEMAND);
+      u1 = new UGen("TestUGen", C.SCALAR);
+      u2 = new UGen("TestUGen", C.CONTROL);
+      u3 = new UGen("TestUGen", C.AUDIO);
+      u4 = new UGen("TestUGen", C.DEMAND);
     });
     after(function() {
       cc.UGen = _UGen;
@@ -390,6 +391,18 @@ define(function(require, exports, module) {
         actual = cc.createBinaryOpUGen("-", sum4, 4);
         assert.instanceOf(actual, basic_ugen.Sum3);
         assert.deepEqual(actual.inputs, [u3, u2, u1]);
+      });
+      it("num * ugen * num * ugen = num * ugen * ugen", function() {
+        var u5 = cc.createBinaryOpUGen("*", 10, u1);
+        var u6 = cc.createBinaryOpUGen("*", 20, u1);
+        actual = cc.createBinaryOpUGen("*", u5, u6);
+        assert.deepEqual(actual.inputs[1], 200);
+      });
+      it("big sum", function() {
+        var a = u1;
+        for (var i = 0; i < 100; ++i) {
+          a = cc.createBinaryOpUGen("+", a, u1);
+        }
       });
     });
   });
