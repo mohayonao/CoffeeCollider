@@ -4,7 +4,6 @@ $(function() {
   var isEdge = /extras\/edge/.test(location.href);
   
   var srcFragment  = "try:";
-  var loadFragment = "load:";
   var $boot = $("#boot");
   
   var editor = ace.edit("editor");
@@ -95,7 +94,7 @@ $(function() {
   $("a", "#example-list").each(function(i, a) {
     var $a = $(a);
     $a.on("click", function() {
-      window.location = "#" + loadFragment + $(this).attr("data-path");
+      window.location = "#" + $(this).attr("data-path");
       return false;
     });
   });
@@ -125,14 +124,16 @@ $(function() {
     if (hash.indexOf(srcFragment) === 0) {
       editor.setValue(hash.substr(srcFragment.length));
       editor.clearSelection();
-    } else if (hash.indexOf(loadFragment) === 0) {
+    } else if (/.+\.coffee$/.test(hash)) {
       var path = "./examples/";
       if (isEdge) {
         path = "../../examples/";
       }
-      $.get(path + hash.substr(loadFragment.length)).then(function(res) {
+      $.get(path + hash).then(function(res) {
         editor.setValue(res);
         editor.clearSelection();
+        editor.moveCursorTo(0, 0);
+        editor.moveCursorToPosition(0);
       });
     }
   };
