@@ -182,7 +182,7 @@ define(function(require, exports, module) {
       value       : function(b) {
         if (Array.isArray(b)) {
           return b.map(function(b) {
-            return func.call(this, b);
+            return this[selector](b);
           }, this);
         } else if (cc.instanceOfUGen(b)) {
           return cc.createBinaryOpUGen(ugenSelector, this, b);
