@@ -59,11 +59,14 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
+        if (_in.rate !== C.AUDIO) {
+          throw new Error("first input is not audio rate");
+        }
         return this.multiNew(C.CONTROL, _in);
       }
     }
   };
-
+  
   cc.unit.specs.A2K = (function() {
     var ctor = function() {
       this.process = next;
@@ -82,7 +85,7 @@ define(function(require, exports, module) {
       }
     }
   };
-
+  
   cc.unit.specs.K2A = (function() {
     var ctor = function() {
       this.process = next;
@@ -93,6 +96,70 @@ define(function(require, exports, module) {
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = value;
       }
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.T2K = {
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        if (_in.rate !== C.AUDIO) {
+          throw new Error("first input is not audio rate");
+        }
+        return this.multiNew(C.CONTROL, _in);
+      }
+    }
+  };
+
+  cc.unit.specs.T2K = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._bufLength = cc.getRateInstance(C.AUDIO).bufLength;
+      this.outputs[0][0] = this.input[0][0];
+    };
+    var next = function() {
+      var inIn = this.input[0];
+      var out  = 0;
+      var val, n = this._bufLength;
+      for (var i = 0; i < n; ++i) {
+        val = inIn[i];
+        if (val > out) {
+          out = val;
+        }
+      }
+      this.outputs[0][0] = out;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.T2A = {
+    $kr: {
+      defaults: "in=0,offset=0",
+      ctor: function(_in, offset) {
+        if (_in.rate !== C.AUDIO) {
+          throw new Error("first input is not audio rate");
+        }
+        return this.multiNew(C.AUDIO, _in, offset);
+      }
+    }
+  };
+
+  cc.unit.specs.T2A = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var level = this.input[0][0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[0] = 0;
+      }
+      if (this._level <= 0 && level > 0) {
+        this.outputs[0][this.input[1][0]|0] = level;
+      }
+      this._level = level;
     };
     return ctor;
   })();
