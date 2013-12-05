@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.1.0+20131205173400",
+    version: "0.1.0+20131205201900",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -4648,7 +4648,7 @@ define('cc/lang/mix', function(require, exports, module) {
   };
   cc.global.Mix.ar = function(array) {
     if (Array.isArray(array)) {
-      var result = array.slice();
+      var result = cc.global.Mix(array);
       switch (asRate(result)) {
       case 2:
         return result;
@@ -4666,7 +4666,7 @@ define('cc/lang/mix', function(require, exports, module) {
   };
   cc.global.Mix.kr = function(array) {
     if (Array.isArray(array)) {
-      var result = array.slice();
+      var result = cc.global.Mix(array);
       var rate = asRate(result);
       if (rate === 2) {
         result = result.map(function(x) {
@@ -14076,11 +14076,14 @@ define('cc/plugins/inout', function(require, exports, module) {
     $kr: {
       defaults: "in=0",
       ctor: function(_in) {
+        if (_in.rate !== 2) {
+          throw new Error("first input is not audio rate");
+        }
         return this.multiNew(1, _in);
       }
     }
   };
-
+  
   cc.unit.specs.A2K = (function() {
     var ctor = function() {
       this.process = next;
@@ -14099,7 +14102,7 @@ define('cc/plugins/inout', function(require, exports, module) {
       }
     }
   };
-
+  
   cc.unit.specs.K2A = (function() {
     var ctor = function() {
       this.process = next;
@@ -14110,6 +14113,70 @@ define('cc/plugins/inout', function(require, exports, module) {
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = value;
       }
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.T2K = {
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        if (_in.rate !== 2) {
+          throw new Error("first input is not audio rate");
+        }
+        return this.multiNew(1, _in);
+      }
+    }
+  };
+
+  cc.unit.specs.T2K = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._bufLength = cc.getRateInstance(2).bufLength;
+      this.outputs[0][0] = this.input[0][0];
+    };
+    var next = function() {
+      var inIn = this.input[0];
+      var out  = 0;
+      var val, n = this._bufLength;
+      for (var i = 0; i < n; ++i) {
+        val = inIn[i];
+        if (val > out) {
+          out = val;
+        }
+      }
+      this.outputs[0][0] = out;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.T2A = {
+    $kr: {
+      defaults: "in=0,offset=0",
+      ctor: function(_in, offset) {
+        if (_in.rate !== 2) {
+          throw new Error("first input is not audio rate");
+        }
+        return this.multiNew(2, _in, offset);
+      }
+    }
+  };
+
+  cc.unit.specs.T2A = (function() {
+    var ctor = function() {
+      this.process = next;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var level = this.input[0][0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[0] = 0;
+      }
+      if (this._level <= 0 && level > 0) {
+        this.outputs[0][this.input[1][0]|0] = level;
+      }
+      this._level = level;
     };
     return ctor;
   })();
@@ -17447,32 +17514,32 @@ define('cc/plugins/range', function(require, exports, module) {
   cc.ugen.specs.Fold = cc.ugen.specs.InRange;
 
   cc.unit.specs.Fold = (function() {
-    var fold = function(_in, lo, hi) {
-      var x, c, range, range2;
-      x = _in - lo;
-      if (hi <= _in) {
-        _in = hi + hi - _in;
-        if (lo <= _in) {
-          return _in;
-        }
-      } else if (_in < lo) {
-        _in = lo + lo - _in;
-        if (_in < hi) {
-          return _in;
-        }
-      } else {
-        return _in;
-      }
+    var fold = function(val, lo, hi) {
+      var x, range1, range2;
       if (hi === lo) {
         return lo;
       }
-      range = hi - lo;
-      range2 = range + range;
-      c = x - range2 * Math.floor(x / range2);
-      if (c >= range) {
-        c = range2 - c;
+      if (val >= hi) {
+        val = (hi * 2) - val;
+        if (val >= lo) {
+          return val;
+        }
+      } else if (val < lo) {
+        val = (lo * 2) - val;
+        if (val < hi) {
+          return val;
+        }
+      } else {
+        return val;
       }
-      return c + lo;
+      range1 = hi - lo;
+      range2 = range1 * 2;
+      x = val - lo;
+      x -= range2 * Math.floor(x / range2);
+      if (x >= range1) {
+        return range2 - x + lo;
+      }
+      return x + lo;
     };
     var ctor = function() {
       if (this.inRates[1] === 2 && this.inRates[2] === 2) {
@@ -17523,30 +17590,25 @@ define('cc/plugins/range', function(require, exports, module) {
   cc.ugen.specs.Wrap = cc.ugen.specs.InRange;
 
   cc.unit.specs.Wrap = (function() {
-    var wrap = function(_in, lo, hi) {
-      if (lo > hi) {
-        return wrap(_in, hi, lo);
-      }
-      var range;
-      if (hi <= _in) {
-        range = hi - lo;
-        _in -= range;
-        if (_in < hi) {
-          return _in;
-        }
-      } else if (_in < lo) {
-        range = hi - lo;
-        _in += range;
-        if (_in >= lo) {
-          return _in;
-        }
-      } else {
-        return _in;
-      }
+    var wrap = function(val, lo, hi) {
       if (hi === lo) {
         return lo;
       }
-      return _in - range * Math.floor((_in - lo) / range);
+      var range = (hi - lo);
+      if (val >= hi) {
+        val -= range;
+        if (val < hi) {
+          return val;
+        }
+      } else if (val < lo) {
+        val += range;
+        if (val >= lo) {
+          return val;
+        }
+      } else {
+        return val;
+      }
+      return val - range * Math.floor((val - lo) / range);
     };
     var ctor = function() {
       if (this.inRates[1] === 2 && this.inRates[2] === 2) {
