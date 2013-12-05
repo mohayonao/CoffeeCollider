@@ -557,7 +557,7 @@ define(function(require, exports, module) {
     testSuite.trig0 = [ [0, 100], [1, 0], [0, 1000] ];
     testSuite.trig1 = [ [0,  10], [1, 0], [0,  100] ];
     testSuite.trig2 = [ [1, 10], [0, 1000], [1, 0], [0, 2000], [-1, 100], [0, 4000] ];
-    testSuite.trig2 = [ [1,  1], [0,  100], [1, 0], [0,  200], [-1,  10], [0,  400] ];
+    testSuite.trig3 = [ [1,  1], [0,  100], [1, 0], [0,  200], [-1,  10], [0,  400] ];
     
     return testSuite;
   })();

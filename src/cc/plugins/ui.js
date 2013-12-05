@@ -8,6 +8,11 @@ define(function(require, exports, module) {
     $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential" ) {
+          warp = 1;
+        } else if (warp === "linear") {
+          warp = 0;
+        }
         return this.multiNew(C.CONTROL, minval, maxval, warp, lag);
       }
     }
