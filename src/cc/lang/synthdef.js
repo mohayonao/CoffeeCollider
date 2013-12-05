@@ -36,7 +36,9 @@ define(function(require, exports, module) {
       }
       return this;
     };
-
+    
+    SynthDef.prototype.add = SynthDef.prototype.send;
+    
     SynthDef.prototype.play = function() {
       this.send();
       
