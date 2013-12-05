@@ -294,6 +294,23 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.PMOsc = {
+    $ar: {
+      defaults: "carfreq=0,modfreq=0,pmindex=0,modphase=0,mul=1,add=0",
+      ctor: function(carfreq, modfreq, pmindex, modphase, mul, add) {
+        var SinOsc = cc.global.SinOsc;
+        return SinOsc.ar(carfreq, SinOsc.ar(modfreq, modphase, pmindex), mul, add);
+      }
+    },
+    $kr: {
+      defaults: "carfreq=0,modfreq=0,pmindex=0,modphase=0,mul=1,add=0",
+      ctor: function(carfreq, modfreq, pmindex, modphase, mul, add) {
+        var SinOsc = cc.global.SinOsc;
+        return SinOsc.kr(carfreq, SinOsc.kr(modfreq, modphase, pmindex), mul, add);
+      }
+    }
+  };
   
   cc.ugen.specs.SinOscFB = {
     $ar: {
