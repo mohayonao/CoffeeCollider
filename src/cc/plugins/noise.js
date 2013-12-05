@@ -4,6 +4,19 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var utils = require("./utils");
   var cubicinterp = utils.cubicinterp;
+
+  // frand: return a float from 0.0 to 0.999...
+  // Math.random();
+
+  // frand0: return a float from +1.0 to +1.999...
+  // Math.random() + 1;
+
+  // frand2: return a float from -1.0 to +0.999...
+  // Math.random() * 2 - 1;
+  
+  // frand8: return a float from -0.125 to +0.124999...
+  // Math.random() * 0.25 - 0.125; 
+  
   
   cc.ugen.specs.WhiteNoise = {
     $ar: {
@@ -28,12 +41,37 @@ define(function(require, exports, module) {
     var next = function(inNumSamples) {
       var out = this.outputs[0];
       for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = Math.random() * 2 - 1;
+        out[i] = Math.random() * 2 - 1; // frand2
       }
     };
     return ctor;
   })();
 
+  cc.ugen.specs.BrownNoise = cc.ugen.specs.WhiteNoise;
+  
+  cc.unit.specs.BrownNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._level = Math.random() * 2 - 1;
+      this.outputs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var z   = this._level;
+      for (var i = 0; i < inNumSamples; ++i) {
+        z += Math.random() * 0.25 - 0.125; // frand8
+        if (z > 1) {
+          z = 2 - z;
+        } else if (z < -1) {
+          z = -2 - z;
+        }
+        out[i] = z;
+      }
+      this._level = z;
+    };
+    return ctor;
+  })();
+  
   cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
   
   cc.unit.specs.PinkNoise = (function() {
@@ -87,6 +125,116 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  cc.ugen.specs.GrayNoise = cc.ugen.specs.WhiteNoise;
+
+  cc.unit.specs.GrayNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._counter = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var counter = this._counter;
+      for (var i = 0; i < inNumSamples; ++i) {
+        // counter ^= 1L << (trand(s1,s2,s3) & 31);
+        // ZXP(out) = counter * 4.65661287308e-10f;
+        counter ^= 1 << ((Math.random() * 31)|0);
+        out[i] = counter * 4.65661287308e-10;
+      }
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Crackle = {
+    $ar: {
+      defaults: "chaosParam=1.5,mul=1,add=0",
+      ctor: function(chaosParam, mul, add) {
+        return this.multiNew(C.AUDIO, chaosParam).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "chaosParam=1.5,mul=1,add=0",
+      ctor: function(chaosParam, mul, add) {
+        return this.multiNew(C.CONTROL, chaosParam).madd(mul, add);
+      }
+    }
+  };
+
+  cc.unit.specs.Crackle = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1 = Math.random();
+      this._y2 = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var paramf = this.inputs[0][0];
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var y0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = y0 = Math.abs(y1 * paramf - y2 - 0.05);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Logistic = {
+    $ar: {
+      defaults: "chaosParam=1.5,freq=1000,init=0.5,mul=1,add=0",
+      ctor: function(chaosParam, freq, init, mul, add) {
+        return this.multiNew(C.AUDIO, chaosParam, freq, init).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "chaosParam=1.5,freq=1000,init=0.5,mul=1,add=0",
+      ctor: function(chaosParam, freq, init, mul, add) {
+        return this.multiNew(C.CONTROL, chaosParam, freq, init).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.unit.specs.Logistic = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1 = this.inputs[2][0];
+      this._counter = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var paramf  = this.inputs[0][0];
+      var freq    = this.inputs[1][0];
+      var y1      = this._y1;
+      var counter = this._counter;
+      var remain  = inNumSamples;
+      var sampleRate = this.rate.sampleRate;
+      var nsmps, i, j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, sampleRate / Math.max(0.001, freq))|0;
+          y1 = paramf * y1 * (1.0 - y1); // chaotic equation
+        }
+        nsmps = Math.min(counter, remain);
+        counter -= nsmps;
+        remain  -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = y1;
+        }
+      } while (remain);
+      this._y1 = y1;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+  
   cc.ugen.specs.Dust = {
     $ar: {
       defaults: "density=0,mul=1,add=0",
