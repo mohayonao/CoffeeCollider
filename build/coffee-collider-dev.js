@@ -204,7 +204,7 @@ define('cc/client/client', function(require, exports, module) {
       }
       this.strm  = new Int16Array(this.strmLength * this.channels);
       this.clear = new Int16Array(this.strmLength * this.channels);
-      this.strmList = new Array(16);
+      this.strmList = new Array(8);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.syncCount = 0;
@@ -277,7 +277,7 @@ define('cc/client/client', function(require, exports, module) {
       this.exports.emit("reset");
     };
     SynthClientImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex & 15];
+      var strm = this.strmList[this.strmListReadIndex & 7];
       if (strm) {
         this.strmListReadIndex += 1;
         this.strm.set(strm);
@@ -345,7 +345,7 @@ define('cc/client/client', function(require, exports, module) {
     };
     SynthClientImpl.prototype.recvFromLang = function(msg) {
       if (msg instanceof Int16Array) {
-        this.strmList[this.strmListWriteIndex & 15] = msg;
+        this.strmList[this.strmListWriteIndex & 7] = msg;
         this.strmListWriteIndex += 1;
       } else {
         var func = commands[msg[0]];
@@ -3533,7 +3533,7 @@ define('cc/lang/fn', function(require, exports, module) {
       value       : function(b) {
         if (Array.isArray(b)) {
           return b.map(function(b) {
-            return func.call(this, b);
+            return this[selector](b);
           }, this);
         } else if (cc.instanceOfUGen(b)) {
           return cc.createBinaryOpUGen(ugenSelector, this, b);
@@ -3568,7 +3568,22 @@ define('cc/lang/utils', function(require, exports, module) {
   var isDict = function(obj) {
     return !!(obj && obj.constructor === Object);
   };
-
+  
+  var asRate = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj.reduce(function(rate, obj) {
+        return Math.max(rate, asRate(obj));
+      }, 0);
+    }
+    if (obj) {
+      switch (obj.rate) {
+      case 0: case 1: case 2: case 3:
+        return obj.rate;
+      }
+    }
+    return 0;
+  };
+  
   var asNumber = function(obj) {
     obj = +obj;
     if (isNaN(obj)) {
@@ -3697,6 +3712,7 @@ define('cc/lang/utils', function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
+    asRate     : asRate,
     asNumber   : asNumber,
     asString   : asString,
     asArray    : asArray,
@@ -4584,6 +4600,7 @@ define('cc/lang/mix', function(require, exports, module) {
 
   var cc = require("./cc");
   var utils = require("./utils");
+  var asRate = utils.asRate;
   
   var mix = function(array) {
     if (!Array.isArray(array)) {
@@ -4619,6 +4636,8 @@ define('cc/lang/mix', function(require, exports, module) {
   cc.global.Mix = function(array) {
     return mix(array) || [];
   };
+  cc.global.Mix["new"] = cc.global.Mix;
+  
   cc.global.Mix.fill = function(n, func) {
     n = n|0;
     var array = new Array(n);
@@ -4627,7 +4646,65 @@ define('cc/lang/mix', function(require, exports, module) {
     }
     return mix(array);
   };
-  cc.global.Mix.ar = function() {
+  cc.global.Mix.ar = function(array) {
+    if (Array.isArray(array)) {
+      var result = array.slice();
+      switch (asRate(result)) {
+      case 2:
+        return result;
+      case 1:
+        return result.map(function(x) {
+          return cc.global.K2A.ar(x);
+        });
+      case 0:
+        return result.map(function(x) {
+          return cc.global.DC.ar(x);
+        });
+      }
+    }
+    throw "Mix.ar: bad arguments";
+  };
+  cc.global.Mix.kr = function(array) {
+    if (Array.isArray(array)) {
+      var result = array.slice();
+      var rate = asRate(result);
+      if (rate === 2) {
+        result = result.map(function(x) {
+          if (x.rate === 2) {
+            return cc.global.A2K.kr(x);
+          }
+          return x;
+        });
+        rate = asRate(result);
+      }
+      switch (rate) {
+      case 1:
+        return result;
+      case 0:
+        return result.map(function(x) {
+          return cc.global.DC.ar(x);
+        });
+      }
+    }
+    throw "Mix.kr: bad arguments";
+  };
+
+  cc.global.Mix.arFill = function(n, func) {
+    n = Math.max(0, n)|0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = func(i);
+    }
+    return cc.global.Mix.ar(a);
+  };
+
+  cc.global.Mix.krFill = function(n, func) {
+    n = Math.max(0, n)|0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = func(i);
+    }
+    return cc.global.Mix.kr(a);
   };
   
   module.exports = {};
@@ -7470,7 +7547,9 @@ define('cc/lang/synthdef', function(require, exports, module) {
       }
       return this;
     };
-
+    
+    SynthDef.prototype.add = SynthDef.prototype.send;
+    
     SynthDef.prototype.play = function() {
       this.send();
       
@@ -8977,21 +9056,7 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
   var ops    = require("../common/ops");
   var fn     = require("./fn");
   var utils  = require("./utils");
-
-  var asRate = function(obj) {
-    if (Array.isArray(obj)) {
-      return obj.reduce(function(rate, obj) {
-        return Math.max(rate, asRate(obj));
-      }, 0);
-    }
-    if (obj) {
-      switch (obj.rate) {
-      case 0: case 1: case 2: case 3:
-        return obj.rate;
-      }
-    }
-    return 0;
-  };
+  var asRate = utils.asRate;
   
   var Control = (function() {
     function Control(rate, klassName) {
@@ -9147,6 +9212,7 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
     return BinaryOpUGen;
   })();
   
+  // TODO: a graph should be optimized when SynthDef building
   var optimizeSumObjects = (function() {
     var collect = function(obj) {
       if (typeof obj === "number") {
@@ -9173,7 +9239,7 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
       });
       switch (a.length) {
       case 4: return cc.createSum4(a[0], a[1], a[2], a[3]);
-      case 3: return cc.createSum4(a[0], a[1], a[2]);
+      case 3: return cc.createSum3(a[0], a[1], a[2]);
       case 2: return cc.createBinaryOpUGen("+!", a[0], a[1]);
       case 1: return a[0];
       default: return work(utils.clump(a, 4));
@@ -9196,7 +9262,8 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
       if (list.length === 1 && list[0].length === 2) {
         return cc.createBinaryOpUGen("+!", list[0][0], list[0][1]);
       }
-      return work(list);
+      var result = work(list);
+      return result;
     };
   })();
   
@@ -9383,21 +9450,21 @@ define('cc/lang/basic_ugen', function(require, exports, module) {
   cc.instanceOfControlUGen = function(obj) {
     return obj instanceof Control;
   };
-  cc.createUnaryOpUGen = function(selector, a) {
+  cc.createUnaryOpUGen = fn(function(selector, a) {
     return new UnaryOpUGen().init(selector, a);
-  };
+  }).multiCall().build();
   cc.createBinaryOpUGen = fn(function(selector, a, b) {
     return new BinaryOpUGen().init(selector, a, b);
   }).multiCall().build();
   cc.createMulAdd = fn(function(_in, mul, add) {
     return new MulAdd().init(_in, mul, add);
   }).multiCall().build();
-  cc.createSum3 = function(in0, in1, in2) {
+  cc.createSum3 = fn(function(in0, in1, in2) {
     return new Sum3().init(in0, in1, in2);
-  };
-  cc.createSum4 = function(in0, in1, in2, in3) {
+  }).multiCall().build();
+  cc.createSum4 = fn(function(in0, in1, in2, in3) {
     return new Sum4().init(in0, in1, in2, in3);
-  };
+  }).multiCall().build();
   
   module.exports = {
     Control: Control,
@@ -14200,6 +14267,19 @@ define('cc/plugins/noise', function(require, exports, module) {
   var cc = require("../cc");
   var utils = require("./utils");
   var cubicinterp = utils.cubicinterp;
+
+  // frand: return a float from 0.0 to 0.999...
+  // Math.random();
+
+  // frand0: return a float from +1.0 to +1.999...
+  // Math.random() + 1;
+
+  // frand2: return a float from -1.0 to +0.999...
+  // Math.random() * 2 - 1;
+  
+  // frand8: return a float from -0.125 to +0.124999...
+  // Math.random() * 0.25 - 0.125; 
+  
   
   cc.ugen.specs.WhiteNoise = {
     $ar: {
@@ -14224,12 +14304,37 @@ define('cc/plugins/noise', function(require, exports, module) {
     var next = function(inNumSamples) {
       var out = this.outputs[0];
       for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = Math.random() * 2 - 1;
+        out[i] = Math.random() * 2 - 1; // frand2
       }
     };
     return ctor;
   })();
 
+  cc.ugen.specs.BrownNoise = cc.ugen.specs.WhiteNoise;
+  
+  cc.unit.specs.BrownNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._level = Math.random() * 2 - 1;
+      this.outputs[0][0] = this._level;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var z   = this._level;
+      for (var i = 0; i < inNumSamples; ++i) {
+        z += Math.random() * 0.25 - 0.125; // frand8
+        if (z > 1) {
+          z = 2 - z;
+        } else if (z < -1) {
+          z = -2 - z;
+        }
+        out[i] = z;
+      }
+      this._level = z;
+    };
+    return ctor;
+  })();
+  
   cc.ugen.specs.PinkNoise = cc.ugen.specs.WhiteNoise;
   
   cc.unit.specs.PinkNoise = (function() {
@@ -14283,6 +14388,116 @@ define('cc/plugins/noise', function(require, exports, module) {
     return ctor;
   })();
 
+  cc.ugen.specs.GrayNoise = cc.ugen.specs.WhiteNoise;
+
+  cc.unit.specs.GrayNoise = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._counter = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var counter = this._counter;
+      for (var i = 0; i < inNumSamples; ++i) {
+        // counter ^= 1L << (trand(s1,s2,s3) & 31);
+        // ZXP(out) = counter * 4.65661287308e-10f;
+        counter ^= 1 << ((Math.random() * 31)|0);
+        out[i] = counter * 4.65661287308e-10;
+      }
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Crackle = {
+    $ar: {
+      defaults: "chaosParam=1.5,mul=1,add=0",
+      ctor: function(chaosParam, mul, add) {
+        return this.multiNew(2, chaosParam).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "chaosParam=1.5,mul=1,add=0",
+      ctor: function(chaosParam, mul, add) {
+        return this.multiNew(1, chaosParam).madd(mul, add);
+      }
+    }
+  };
+
+  cc.unit.specs.Crackle = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1 = Math.random();
+      this._y2 = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var paramf = this.inputs[0][0];
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var y0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = y0 = Math.abs(y1 * paramf - y2 - 0.05);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Logistic = {
+    $ar: {
+      defaults: "chaosParam=1.5,freq=1000,init=0.5,mul=1,add=0",
+      ctor: function(chaosParam, freq, init, mul, add) {
+        return this.multiNew(2, chaosParam, freq, init).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "chaosParam=1.5,freq=1000,init=0.5,mul=1,add=0",
+      ctor: function(chaosParam, freq, init, mul, add) {
+        return this.multiNew(1, chaosParam, freq, init).madd(mul, add);
+      }
+    }
+  };
+  
+  cc.unit.specs.Logistic = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._y1 = this.inputs[2][0];
+      this._counter = 0;
+      next.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var paramf  = this.inputs[0][0];
+      var freq    = this.inputs[1][0];
+      var y1      = this._y1;
+      var counter = this._counter;
+      var remain  = inNumSamples;
+      var sampleRate = this.rate.sampleRate;
+      var nsmps, i, j = 0;
+      do {
+        if (counter <= 0) {
+          counter = Math.max(1, sampleRate / Math.max(0.001, freq))|0;
+          y1 = paramf * y1 * (1.0 - y1); // chaotic equation
+        }
+        nsmps = Math.min(counter, remain);
+        counter -= nsmps;
+        remain  -= nsmps;
+        for (i = 0; i < nsmps; ++i) {
+          out[j++] = y1;
+        }
+      } while (remain);
+      this._y1 = y1;
+      this._counter = counter;
+    };
+    return ctor;
+  })();
+  
   cc.ugen.specs.Dust = {
     $ar: {
       defaults: "density=0,mul=1,add=0",
@@ -15067,6 +15282,23 @@ define('cc/plugins/osc', function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.PMOsc = {
+    $ar: {
+      defaults: "carfreq=0,modfreq=0,pmindex=0,modphase=0,mul=1,add=0",
+      ctor: function(carfreq, modfreq, pmindex, modphase, mul, add) {
+        var SinOsc = cc.global.SinOsc;
+        return SinOsc.ar(carfreq, SinOsc.ar(modfreq, modphase, pmindex), mul, add);
+      }
+    },
+    $kr: {
+      defaults: "carfreq=0,modfreq=0,pmindex=0,modphase=0,mul=1,add=0",
+      ctor: function(carfreq, modfreq, pmindex, modphase, mul, add) {
+        var SinOsc = cc.global.SinOsc;
+        return SinOsc.kr(carfreq, SinOsc.kr(modfreq, modphase, pmindex), mul, add);
+      }
+    }
+  };
   
   cc.ugen.specs.SinOscFB = {
     $ar: {
@@ -18001,8 +18233,545 @@ define('cc/plugins/trig', function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.PulseCount = {
+    $ar: {
+      defaults: "trig=0,reset=0",
+      ctor: function(trig, reset) {
+        return this.multiNew(2, trig, reset);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,reset=0",
+      ctor: function(trig, reset) {
+        return this.multiNew(1, trig, reset);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
   
-  cc.ugen.specs.ZeroCrossing = {
+  cc.unit.specs.PulseCount = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next;
+      }
+      this._prevtrig  = 0;
+      this._prevreset = 0;
+      this._level = 0;
+      this.outputs[0][0] = 0;
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level = this._level;
+      var curtrig, curreset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig  = trigIn[i];
+        curreset = resetIn[i];
+        if (prevreset <= 0 && curreset > 0) {
+          level = 0;
+        } else if (prevtrig <= 0 && curtrig > 0) {
+          level += 1;
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+        prevreset = curreset;
+      }
+      this._level = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level = this._level;
+      var curtrig, curreset;
+
+      curtrig  = trigIn[0];
+      curreset = resetIn[0];
+      if (prevreset <= 0 && curreset > 0) {
+        level = 0;
+      } else if (prevtrig <= 0 && curtrig > 0) {
+        level += 1;
+      }
+      out[0] = level;
+      prevtrig  = curtrig;
+      prevreset = curreset;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig  = trigIn[i];
+        curreset = resetIn[i];
+        if (prevreset <= 0 && curreset > 0) {
+          level = 0;
+        } else if (prevtrig <= 0 && curtrig > 0) {
+          level += 1;
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+        prevreset = curreset;
+      }
+      this._level = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Peak = {
+    $ar: {
+      defaults: "in=0,trig=0",
+      ctor: function(_in, trig) {
+        return this.multiNew(2, _in, trig);
+      }
+    },
+    $kr: {
+      defaults: "in=0,trig=0",
+      ctor: function(_in, trig) {
+        return this.multiNew(1, _in, trig);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.Peak = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._prevtrig = 0;
+      this.outputs[0][0] = this._level = this.inputs[0][0];
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = Math.abs(inIn[i]);
+        out[i] = level = Math.max(inlevel, level);
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      
+      curtrig = trigIn[0];
+      inlevel = Math.abs(inIn[0]);
+      out[0] = level = Math.max(inlevel, level);
+      if (prevtrig <= 0 && curtrig > 0) {
+        level = inlevel;
+      }
+      prevtrig = curtrig;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = Math.abs(inIn[i]);
+        out[i] = level = Math.max(inlevel, level);
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.RunningMin = cc.ugen.specs.Peak;
+  
+  cc.unit.specs.RunningMin = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._prevtrig = 0;
+      this.outputs[0][0] = this._level = this.inputs[0][0];
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = inIn[i];
+        if (inlevel < level) {
+          level = inlevel;
+        }
+        out[i] = level;
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      
+      curtrig = trigIn[0];
+      inlevel = inIn[0];
+      if (inlevel < level) {
+        level = inlevel;
+      }
+      out[0] = level;
+      if (prevtrig <= 0 && curtrig > 0) {
+        level = inlevel;
+      }
+      prevtrig = curtrig;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = inIn[i];
+        if (inlevel < level) {
+          level = inlevel;
+        }
+        out[i] = level;
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.RunningMax = cc.ugen.specs.Peak;
+
+  cc.unit.specs.RunningMax = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._prevtrig = 0;
+      this.outputs[0][0] = this._level = this.inputs[0][0];
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = inIn[i];
+        if (inlevel > level) {
+          level = inlevel;
+        }
+        out[i] = level;
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn   = this.inputs[0];
+      var trigIn = this.inputs[1];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, inlevel;
+      
+      curtrig = trigIn[0];
+      inlevel = inIn[0];
+      if (inlevel > level) {
+        level = inlevel;
+      }
+      out[0] = level;
+      if (prevtrig <= 0 && curtrig > 0) {
+        level = inlevel;
+      }
+      prevtrig = curtrig;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        inlevel = inIn[i];
+        if (inlevel > level) {
+          level = inlevel;
+        }
+        out[i] = level;
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = inlevel;
+        }
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Stepper = {
+    $ar: {
+      defaults: "trig=0,reset=0,min=0,max=7,step=1,resetval",
+      ctor: function(trig, reset, min, max, step, resetval) {
+        if (typeof resetval === "undefined") {
+          resetval = min;
+        }
+        return this.multiNew(2, trig, reset, min, max, step, resetval);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,reset=0,min=0,max=7,step=1,resetval",
+      ctor: function(trig, reset, min, max, step, resetval) {
+        if (typeof resetval === "undefined") {
+          resetval = min;
+        }
+        return this.multiNew(1, trig, reset, min, max, step, resetval);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.Stepper = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next_k;
+      }
+      this._prevtrig  = 0;
+      this._prevreset = 0;
+      this._level     = this.inputs[5][0];
+      this.outputs[0][0] = 0;
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var zmin = this.inputs[2][0];
+      var zmax = this.inputs[3][0];
+      var step = this.inputs[4][0];
+      var resetval = this.inputs[5][0];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level    = this._level;
+      var curtrig, curreset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig  = trigIn[i];
+        curreset = resetIn[i];
+        if (prevreset <= 0 && curreset > 0) {
+          level = sc_wrap(resetval, zmin, zmax);
+        } else if (prevtrig <= 0 && curtrig > 0) {
+          level = sc_wrap(level + step, zmin, zmax);
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+        prevreset = curreset;
+      }
+      this._level    = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var zmin = this.inputs[2][0];
+      var zmax = this.inputs[3][0];
+      var step = this.inputs[4][0];
+      var resetval = this.inputs[5][0];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level    = this._level;
+      var curtrig, curreset;
+
+      curtrig  = trigIn[0];
+      curreset = resetIn[0];
+      if (prevreset <= 0 && curreset > 0) {
+        level = sc_wrap(resetval, zmin, zmax);
+      } else if (prevtrig <= 0 && curtrig > 0) {
+        level = sc_wrap(level + step, zmin, zmax);
+      }
+      out[0] = level;
+      prevtrig  = curtrig;
+      prevreset = curreset;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig  = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = sc_wrap(level + step, zmin, zmax);
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+        prevreset = curreset;
+      }
+      this._level    = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.PulseDivider = {
+    $ar: {
+      defaults: "trig=0,div=2,start=0",
+      ctor: function(trig, div, start) {
+        return this.multiNew(2, trig, div, start);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,div=2,start=0",
+      ctor: function(trig, div, start) {
+        return this.multiNew(1, trig, div, start);
+      }
+    }
+  };
+
+  cc.unit.specs.PulseDivider = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = 0;
+      this._level    = 0;
+      this._counter  = Math.floor(this.inputs[2][0] + 0.5);
+      this.outputs[0][0] = 0;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn = this.inputs[0];
+      var div    = this.inputs[1][0]|0;
+      var prevtrig = this._prevtrig;
+      var counter  = this._counter;
+      var z, curtrig;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          counter++;
+          if (counter >= div) {
+            counter = 0;
+            z = 1;
+          } else {
+            z = 0;
+          }
+        } else {
+          z = 0;
+        }
+        out[i] = z;
+        prevtrig = curtrig;
+      }
+      this._counter  = counter;
+      this._prevtrig = prevtrig;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.SetResetFF = cc.ugen.specs.PulseCount;
+
+  cc.unit.specs.SetResetFF = (function() {
+    var ctor = function() {
+      if (this.inRates[1] === 2) {
+        this.process = next_a;
+      } else {
+        this.process = next;
+      }
+      this._prevtrig  = 0;
+      this._prevreset = 0;
+      this._level = 0;
+      this.outputs[0][0] = 0;
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level = this._level;
+      var curtrig, curreset;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig  = trigIn[i];
+        curreset = resetIn[i];
+        if (prevreset <= 0 && curreset > 0) {
+          level = 0;
+        } else if (prevtrig <= 0 && curtrig > 0) {
+          level = 1;
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+        prevreset = curreset;
+      }
+      this._level = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn  = this.inputs[0];
+      var resetIn = this.inputs[1];
+      var prevtrig  = this._prevtrig;
+      var prevreset = this._prevreset;
+      var level = this._level;
+      var curtrig, curreset;
+      
+      curtrig  = trigIn[0];
+      curreset = resetIn[0];
+      if (prevreset <= 0 && curreset > 0) {
+        level = 0;
+      } else if (prevtrig <= 0 && curtrig > 0) {
+        level = 1;
+      }
+      out[0] = level;
+      prevtrig  = curtrig;
+      prevreset = curreset;
+      
+      for (var i = 1; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = 1;
+        }
+        out[i] = level;
+        prevtrig  = curtrig;
+      }
+      this._level = level;
+      this._prevtrig  = prevtrig;
+      this._prevreset = prevreset;
+    };
+    
+    return ctor;
+  })();
+
+  cc.ugen.specs.ToggleFF = {
     $ar: {
       defaults: "trig=0",
       ctor: function(trig) {
@@ -18018,6 +18787,49 @@ define('cc/plugins/trig', function(require, exports, module) {
     checkInputs: cc.ugen.checkSameRateAsFirstInput
   };
 
+  cc.unit.specs.ToggleFF = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = 0;
+      this._level = 0;
+      this.outputs[0][0] = 0;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn = this.inputs[0];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          level = 1 - level;
+        }
+        out[i] = level;
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.ZeroCrossing = {
+    $ar: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.multiNew(2, _in);
+      }
+    },
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.multiNew(1, _in);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+  
   cc.unit.specs.ZeroCrossing = (function() {
     var ctor = function() {
       this.process = next;
@@ -18093,6 +18905,52 @@ define('cc/plugins/trig', function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.Sweep = {
+    $ar: {
+      defaults: "trig=0,rate=1",
+      ctor: function(trig, rate) {
+        return this.multiNew(2, trig, rate);
+      }
+    },
+    $kr: {
+      defaults: "trig=0,rate=1",
+      ctor: function(trig, rate) {
+        return this.multiNew(1, trig, rate);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.Sweep = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = this.inputs[0][0];
+      this._level = 0;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var trigIn = this.inputs[0];
+      var rate   = this.inputs[1][0] * this.rate.sampleDur;
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, frac;
+      for (var i = 0; i < inNumSamples; ++i) {
+        curtrig = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          frac = -prevtrig / (curtrig - prevtrig);
+          level = frac * rate;
+        } else {
+          level += rate;
+        }
+        out[i] = level;
+        prevtrig = curtrig;
+      }
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
   
   cc.ugen.specs.Phasor = {
     $ar: {
@@ -18106,33 +18964,96 @@ define('cc/plugins/trig', function(require, exports, module) {
       ctor: function(trig, rate, start, end, resetPos) {
         return this.multiNew(1, trig, rate, start, end, resetPos);
       }
-    }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
   };
   
   cc.unit.specs.Phasor = (function() {
     var ctor = function() {
       this.process = next;
-      this._prev = this.inputs[0][0];
+      this._prevtrig = this.inputs[0][0];
       this.outputs[0][0] = this._level = this.inputs[2][0];
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
-      var trig  = this.inputs[0][0];
-      var rate  = this.inputs[1][0];
-      var start = this.inputs[2][0];
-      var end   = this.inputs[3][0];
-      var prev  = this._prev;
-      var level = this._level;
-      if (prev <= 0 && trig > 0) {
-        level = this.inputs[4][0];
-      }
+      var trigIn = this.inputs[0];
+      var rate   = this.inputs[1][0];
+      var start  = this.inputs[2][0];
+      var end    = this.inputs[3][0];
+      var resetPos = this.inputs[4][0];
+      var prevtrig = this._prevtrig;
+      var level    = this._level;
+      var curtrig, frac;
       for (var i = 0; i < inNumSamples; ++i) {
-        level = sc_wrap(level, start, end);
+        curtrig = trigIn[i];
+        if (prevtrig <= 0 && curtrig > 0) {
+          frac = 1 - prevtrig / (curtrig - prevtrig);
+          level = resetPos + frac * rate;
+        }
         out[i] = level;
         level += rate;
+        level = sc_wrap(level, start, end);
+        prevtrig = curtrig;
       }
-      this._prev  = trig;
+      this._prevtrig = prevtrig;
+      this._level    = level;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.PeakFollower = {
+    $ar: {
+      defaults: "in=0,decay=0.999",
+      ctor: function(_in, decay) {
+        return this.multiNew(2, _in, decay);
+      }
+    },
+    $kr: {
+      defaults: "in=0,decay=0.999",
+      ctor: function(_in, decay) {
+        return this.multiNew(1, _in, decay);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.PeakFollower = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._decay = this.inputs[1][0];
+      this.outputs[0][0] = this._level = this.inputs[0][0];
+    };
+    var next = function(inNumSamples) {
+      var out  = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var decay = this.inputs[1][0];
+      var level = this._level;
+      var i, inlevel;
+      if (decay === this._decay) {
+        for (i = 0; i < inNumSamples; ++i) {
+          inlevel = Math.abs(inIn[i]);
+          if (inlevel >= level) {
+            level = inlevel;
+          } else {
+            level = inlevel + decay * (level - inlevel);
+          }
+          out[i] = level;
+        }
+      } else {
+        var decay_slope = (decay - this._decay) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          inlevel = Math.abs(inIn[i]);
+          if (inlevel >= level) {
+            level = inlevel;
+          } else {
+            level = (1 - Math.abs(decay)) * inlevel + decay * level;
+            decay += decay_slope;
+          }
+          out[i] = level;
+        }
+      }
       this._level = level;
+      this._decay = decay;
     };
     return ctor;
   })();
@@ -18149,6 +19070,11 @@ define('cc/plugins/ui', function(require, exports, module) {
     $kr: {
       defaults: "minval=0,maxval=1,warp=0,lag=0.2",
       ctor: function(minval, maxval, warp, lag) {
+        if (warp === "exponential" ) {
+          warp = 1;
+        } else if (warp === "linear") {
+          warp = 0;
+        }
         return this.multiNew(1, minval, maxval, warp, lag);
       }
     }
@@ -18513,7 +19439,7 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), 10);
+        this.timer.start(this.process.bind(this), 5);
       }
       this.sendToLang([
         "/played", this.syncCount[0]
@@ -18538,7 +19464,9 @@ define('cc/server/server', function(require, exports, module) {
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
-      this.instanceManager.pushToTimeline(userId, timeline);
+      if (timeline.length) {
+        this.instanceManager.pushToTimeline(userId, timeline);
+      }
     };
     SynthServer.prototype.process = function() {
       throw "SynthServer#process: should be overridden";
@@ -18696,6 +19624,7 @@ define('cc/server/instance', function(require, exports, module) {
   var cc = require("./cc");
   var node = require("./node");
   var commands = require("./commands");
+  var push = [].push;
   
   var InstanceManager = (function() {
     function InstanceManager() {
@@ -18771,8 +19700,8 @@ define('cc/server/instance', function(require, exports, module) {
     };
     InstanceManager.prototype.pushToTimeline = function(userId, timeline) {
       var instance = this.map[userId];
-      if (instance) {
-        instance.timeline = instance.timeline.concat(timeline);
+      if (instance && timeline.length) {
+        push.apply(instance.timeline, timeline);
       }
     };
     InstanceManager.prototype.doBinayCommand = function(userId, binary) {
@@ -19229,40 +20158,52 @@ define('cc/server/node', function(require, exports, module) {
     
     Synth.prototype.build = function(specs, controls, instance) {
       this.specs = specs;
-
-      var fixNumList = specs.consts.map(function(value) {
+      var list, value, unit, i, imax;
+      var fixNumList, unitList, filteredUnitList;
+      list = specs.consts;
+      fixNumList = new Array(list.length);
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        value = list[i];
         if (value === "Infinity") {
           value = Infinity;
         } else if (value === "-Infinity") {
           value = -Infinity;
         }
-        return instance.getFixNum(value);
-      });
-      var unitList = specs.defList.map(function(spec) {
-        return cc.createUnit(this, spec);
-      }, this);
+        fixNumList[i] = instance.getFixNum(value);
+      }
+      list = specs.defList;
+      unitList = new Array(list.length);
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        unitList[i] = cc.createUnit(this, list[i]);
+      }
+      
       this.params   = specs.params;
       this.controls = new Float32Array(this.params.values);
       this.set(controls);
-      this.unitList = unitList.filter(function(unit) {
+      
+      this.unitList = filteredUnitList = [];
+      for (i = 0, imax = unitList.length; i < imax; ++i) {
+        unit = unitList[i];
         var inputs    = unit.inputs;
         var inRates   = unit.inRates;
         var fromUnits = unit.fromUnits;
         var inSpec  = unit.specs[3];
-        for (var i = 0, imax = inputs.length; i < imax; ++i) {
-          var i2 = i << 1;
-          if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outputs[0];
-            inRates[i] = 0;
+        for (var j = 0, jmax = inputs.length; j < jmax; ++j) {
+          var j2 = j << 1;
+          if (inSpec[j2] === -1) {
+            inputs[j]  = fixNumList[inSpec[j2+1]].outputs[0];
+            inRates[j] = 0;
           } else {
-            inputs[i]    = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
-            inRates[i]   = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
-            fromUnits[i] = unitList[inSpec[i2]];
+            inputs[j]    = unitList[inSpec[j2]].outputs[inSpec[j2+1]];
+            inRates[j]   = unitList[inSpec[j2]].outRates[inSpec[j2+1]];
+            fromUnits[j] = unitList[inSpec[j2]];
           }
         }
         unit.init();
-        return !!unit.process;
-      });
+        if (unit.process) {
+          filteredUnitList.push(unit);
+        }
+      }
       return this;
     };
 
@@ -19761,7 +20702,6 @@ define('cc/server/unit', function(require, exports, module) {
       this.outputs    = outputs;
       this.allOutputs = allOutputs;
       this.bufLength  = bufLength;
-      this.done       = false;
     }
     Unit.prototype.init = function() {
       var ctor = cc.unit.specs[this.name];
@@ -19773,11 +20713,7 @@ define('cc/server/unit', function(require, exports, module) {
       return this;
     };
     Unit.prototype.doneAction = function(action) {
-      if (!this.done) {
-        this.done = true;
-        this.parent.doneAction(action);
-      }
-      action = 0;
+      this.parent.doneAction(action);
     };
     return Unit;
   })();
@@ -19900,7 +20836,10 @@ define('cc/server/server-nodejs', function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), 10);
+        var that = this;
+        setTimeout(function() {
+          that.timer.start(that.process.bind(that), 5);
+        }, 50); // TODO: ???
       }
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
@@ -19944,14 +20883,14 @@ define('cc/server/server-nodejs', function(require, exports, module) {
       this.sendToLang(strm);
       this.syncCount[0] += 1;
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmList[this.strmListWriteIndex & 7] = new Int16Array(strm);
+        this.strmListWriteIndex += 1;
       }
     };
     NodeJSSynthServer.prototype._process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
+      var strm = this.strmList[this.strmListReadIndex & 7];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strmListReadIndex += 1;
         this._strm.set(strm);
       }
       this.sysSyncCount += 1;
