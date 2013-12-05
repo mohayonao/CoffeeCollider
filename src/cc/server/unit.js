@@ -30,7 +30,6 @@ define(function(require, exports, module) {
       this.outputs    = outputs;
       this.allOutputs = allOutputs;
       this.bufLength  = bufLength;
-      this.done       = false;
     }
     Unit.prototype.init = function() {
       var ctor = cc.unit.specs[this.name];
@@ -42,11 +41,7 @@ define(function(require, exports, module) {
       return this;
     };
     Unit.prototype.doneAction = function(action) {
-      if (!this.done) {
-        this.done = true;
-        this.parent.doneAction(action);
-      }
-      action = 0;
+      this.parent.doneAction(action);
     };
     return Unit;
   })();

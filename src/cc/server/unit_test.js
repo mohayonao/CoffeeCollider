@@ -41,7 +41,6 @@ define(function(require, exports, module) {
       assert.equal(u.numOfInputs, u.inputs.length);
       assert.equal(u.numOfOutputs, u.outputs.length);
       assert.equal(u.bufLength   , 64);
-      assert.isFalse(u.done);
     });
     it("init", function() {
       var specs = [
@@ -67,10 +66,7 @@ define(function(require, exports, module) {
       parent.doneAction.result = null;
       u.doneAction(2);
       assert.equal(parent.doneAction.result, 2);
-      
-      parent.doneAction.result = null;
-      u.doneAction(2);
-      assert.isNull(parent.doneAction.result);
+
     });
   });
 

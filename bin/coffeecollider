@@ -47,10 +47,7 @@
       filepath = filepath.replace(/\.coffee$/, ".js");
       fs.writeFileSync(filepath, code);
     } else {
-      client.play();
-      setTimeout(function() {
-        client.execute(code, {lang:"js"});
-      }, 100);
+      client.execute(code, {lang:"js"}).play();
     }
   }
 

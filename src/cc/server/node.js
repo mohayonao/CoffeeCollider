@@ -335,40 +335,52 @@ define(function(require, exports, module) {
     
     Synth.prototype.build = function(specs, controls, instance) {
       this.specs = specs;
-
-      var fixNumList = specs.consts.map(function(value) {
+      var list, value, unit, i, imax;
+      var fixNumList, unitList, filteredUnitList;
+      list = specs.consts;
+      fixNumList = new Array(list.length);
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        value = list[i];
         if (value === "Infinity") {
           value = Infinity;
         } else if (value === "-Infinity") {
           value = -Infinity;
         }
-        return instance.getFixNum(value);
-      });
-      var unitList = specs.defList.map(function(spec) {
-        return cc.createUnit(this, spec);
-      }, this);
+        fixNumList[i] = instance.getFixNum(value);
+      }
+      list = specs.defList;
+      unitList = new Array(list.length);
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        unitList[i] = cc.createUnit(this, list[i]);
+      }
+      
       this.params   = specs.params;
       this.controls = new Float32Array(this.params.values);
       this.set(controls);
-      this.unitList = unitList.filter(function(unit) {
+      
+      this.unitList = filteredUnitList = [];
+      for (i = 0, imax = unitList.length; i < imax; ++i) {
+        unit = unitList[i];
         var inputs    = unit.inputs;
         var inRates   = unit.inRates;
         var fromUnits = unit.fromUnits;
         var inSpec  = unit.specs[3];
-        for (var i = 0, imax = inputs.length; i < imax; ++i) {
-          var i2 = i << 1;
-          if (inSpec[i2] === -1) {
-            inputs[i]  = fixNumList[inSpec[i2+1]].outputs[0];
-            inRates[i] = C.SCALAR;
+        for (var j = 0, jmax = inputs.length; j < jmax; ++j) {
+          var j2 = j << 1;
+          if (inSpec[j2] === -1) {
+            inputs[j]  = fixNumList[inSpec[j2+1]].outputs[0];
+            inRates[j] = C.SCALAR;
           } else {
-            inputs[i]    = unitList[inSpec[i2]].outputs[inSpec[i2+1]];
-            inRates[i]   = unitList[inSpec[i2]].outRates[inSpec[i2+1]];
-            fromUnits[i] = unitList[inSpec[i2]];
+            inputs[j]    = unitList[inSpec[j2]].outputs[inSpec[j2+1]];
+            inRates[j]   = unitList[inSpec[j2]].outRates[inSpec[j2+1]];
+            fromUnits[j] = unitList[inSpec[j2]];
           }
         }
         unit.init();
-        return !!unit.process;
-      });
+        if (unit.process) {
+          filteredUnitList.push(unit);
+        }
+      }
       return this;
     };
 

@@ -45,7 +45,10 @@ define(function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
+        var that = this;
+        setTimeout(function() {
+          that.timer.start(that.process.bind(that), C.PROCESSING_INTERVAL);
+        }, 50); // TODO: ???
       }
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
@@ -89,14 +92,14 @@ define(function(require, exports, module) {
       this.sendToLang(strm);
       this.syncCount[0] += 1;
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & C.STRM_LIST_MASK;
+        this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = new Int16Array(strm);
+        this.strmListWriteIndex += 1;
       }
     };
     NodeJSSynthServer.prototype._process = function() {
-      var strm = this.strmList[this.strmListReadIndex];
+      var strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & C.STRM_LIST_MASK;
+        this.strmListReadIndex += 1;
         this._strm.set(strm);
       }
       this.sysSyncCount += 1;
