@@ -3,6 +3,7 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   var utils = require("./utils");
+  var asRate = utils.asRate;
   
   var mix = function(array) {
     if (!Array.isArray(array)) {
@@ -46,7 +47,65 @@ define(function(require, exports, module) {
     }
     return mix(array);
   };
-  cc.global.Mix.ar = function() {
+  cc.global.Mix.ar = function(array) {
+    if (Array.isArray(array)) {
+      var result = array.slice();
+      switch (asRate(result)) {
+      case C.AUDIO:
+        return result;
+      case C.CONTROL:
+        return result.map(function(x) {
+          return cc.global.K2A.ar(x);
+        });
+      case C.SCALAR:
+        return result.map(function(x) {
+          return cc.global.DC.ar(x);
+        });
+      }
+    }
+    throw "Mix.ar: bad arguments";
+  };
+  cc.global.Mix.kr = function(array) {
+    if (Array.isArray(array)) {
+      var result = array.slice();
+      var rate = asRate(result);
+      if (rate === C.AUDIO) {
+        result = result.map(function(x) {
+          if (x.rate === C.AUDIO) {
+            return cc.global.A2K.kr(x);
+          }
+          return x;
+        });
+        rate = asRate(result);
+      }
+      switch (rate) {
+      case C.CONTROL:
+        return result;
+      case C.SCALAR:
+        return result.map(function(x) {
+          return cc.global.DC.ar(x);
+        });
+      }
+    }
+    throw "Mix.kr: bad arguments";
+  };
+
+  cc.global.Mix.arFill = function(n, func) {
+    n = Math.max(0, n)|0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = func(i);
+    }
+    return cc.global.Mix.ar(a);
+  };
+
+  cc.global.Mix.krFill = function(n, func) {
+    n = Math.max(0, n)|0;
+    var a = new Array(n);
+    for (var i = 0; i < n; ++i) {
+      a[i] = func(i);
+    }
+    return cc.global.Mix.kr(a);
   };
   
   module.exports = {};

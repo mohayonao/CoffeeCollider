@@ -6,7 +6,22 @@ define(function(require, exports, module) {
   var isDict = function(obj) {
     return !!(obj && obj.constructor === Object);
   };
-
+  
+  var asRate = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj.reduce(function(rate, obj) {
+        return Math.max(rate, asRate(obj));
+      }, 0);
+    }
+    if (obj) {
+      switch (obj.rate) {
+      case C.SCALAR: case C.CONTROL: case C.AUDIO: case C.DEMAND:
+        return obj.rate;
+      }
+    }
+    return C.SCALAR;
+  };
+  
   var asNumber = function(obj) {
     obj = +obj;
     if (isNaN(obj)) {
@@ -135,6 +150,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
+    asRate     : asRate,
     asNumber   : asNumber,
     asString   : asString,
     asArray    : asArray,

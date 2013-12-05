@@ -6,21 +6,7 @@ define(function(require, exports, module) {
   var ops    = require("../common/ops");
   var fn     = require("./fn");
   var utils  = require("./utils");
-
-  var asRate = function(obj) {
-    if (Array.isArray(obj)) {
-      return obj.reduce(function(rate, obj) {
-        return Math.max(rate, asRate(obj));
-      }, 0);
-    }
-    if (obj) {
-      switch (obj.rate) {
-      case C.SCALAR: case C.CONTROL: case C.AUDIO: case C.DEMAND:
-        return obj.rate;
-      }
-    }
-    return C.SCALAR;
-  };
+  var asRate = utils.asRate;
   
   var Control = (function() {
     function Control(rate, klassName) {
