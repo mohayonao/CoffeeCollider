@@ -39,6 +39,8 @@ define(function(require, exports, module) {
   cc.global.Mix = function(array) {
     return mix(array) || [];
   };
+  cc.global.Mix["new"] = cc.global.Mix;
+  
   cc.global.Mix.fill = function(n, func) {
     n = n|0;
     var array = new Array(n);

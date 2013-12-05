@@ -400,21 +400,21 @@ define(function(require, exports, module) {
   cc.instanceOfControlUGen = function(obj) {
     return obj instanceof Control;
   };
-  cc.createUnaryOpUGen = function(selector, a) {
+  cc.createUnaryOpUGen = fn(function(selector, a) {
     return new UnaryOpUGen().init(selector, a);
-  };
+  }).multiCall().build();
   cc.createBinaryOpUGen = fn(function(selector, a, b) {
     return new BinaryOpUGen().init(selector, a, b);
   }).multiCall().build();
   cc.createMulAdd = fn(function(_in, mul, add) {
     return new MulAdd().init(_in, mul, add);
   }).multiCall().build();
-  cc.createSum3 = function(in0, in1, in2) {
+  cc.createSum3 = fn(function(in0, in1, in2) {
     return new Sum3().init(in0, in1, in2);
-  };
-  cc.createSum4 = function(in0, in1, in2, in3) {
+  }).multiCall().build();
+  cc.createSum4 = fn(function(in0, in1, in2, in3) {
     return new Sum4().init(in0, in1, in2, in3);
-  };
+  }).multiCall().build();
   
   module.exports = {
     Control: Control,
