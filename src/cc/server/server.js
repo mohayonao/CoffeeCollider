@@ -55,7 +55,7 @@ define(function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), 10);
+        this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
       }
       this.sendToLang([
         "/played", this.syncCount[0]
@@ -80,7 +80,9 @@ define(function(require, exports, module) {
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
-      this.instanceManager.pushToTimeline(userId, timeline);
+      if (timeline.length) {
+        this.instanceManager.pushToTimeline(userId, timeline);
+      }
     };
     SynthServer.prototype.process = function() {
       throw "SynthServer#process: should be overridden";

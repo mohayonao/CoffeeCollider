@@ -33,7 +33,7 @@ define(function(require, exports, module) {
       this.instanceManager.play(userId);
       if (this.api) {
         this._strm = new Int16Array(this.strmLength * this.channels);
-        this.strmList = new Array(8);
+        this.strmList = new Array(C.STRM_LIST_LENGTH);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         var strmList = this.strmList;
@@ -45,7 +45,7 @@ define(function(require, exports, module) {
         }
       }
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), 10);
+        this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
       }
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
@@ -65,7 +65,7 @@ define(function(require, exports, module) {
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - 4) {
+      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
@@ -90,13 +90,13 @@ define(function(require, exports, module) {
       this.syncCount[0] += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & C.STRM_LIST_MASK;
       }
     };
     NodeJSSynthServer.prototype._process = function() {
       var strm = this.strmList[this.strmListReadIndex];
       if (strm) {
-        this.strmListReadIndex = (this.strmListReadIndex + 1) & 7;
+        this.strmListReadIndex = (this.strmListReadIndex + 1) & C.STRM_LIST_MASK;
         this._strm.set(strm);
       }
       this.sysSyncCount += 1;

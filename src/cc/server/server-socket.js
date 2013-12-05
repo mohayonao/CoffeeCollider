@@ -92,7 +92,7 @@ define(function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - 4) {
+      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
@@ -117,7 +117,7 @@ define(function(require, exports, module) {
       
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
-        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
+        this.strmListWriteIndex = (this.strmListWriteIndex + 1) & C.STRM_LIST_MASK;
       }
     };
     

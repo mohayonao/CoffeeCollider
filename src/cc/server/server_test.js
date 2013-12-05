@@ -10,11 +10,12 @@ define(function(require, exports, module) {
   
   describe("server/server.js", function() {
     var called;
-    var _lang, _createTimer, _createInstanceManager;
+    var _lang, _createTimer, _createInstanceManager, _initRateInstance;
     before(function() {
       _lang = cc.lang;
       _createTimer = cc.createTimer;
       _createInstanceManager = cc.createInstanceManager;
+      _initRateInstance = cc.initRateInstance;
       
       cc.lang = { process: nop };
       cc.createTimer = function() {
@@ -53,11 +54,13 @@ define(function(require, exports, module) {
           },
         };
       };
+      cc.initRateInstance = function() {};
     });
     after(function() {
       cc.lang = _lang;
       cc.createTimer = _createTimer;
       cc.createInstanceManager = _createInstanceManager;
+      cc.initRateInstance = _initRateInstance;
     });
     beforeEach(function() {
       called = [];
@@ -100,7 +103,7 @@ define(function(require, exports, module) {
           instance.recvFromLang(["/reset"]);
         });
         it("/processed", function() {
-          instance.recvFromLang(["/processed", 0]);
+          instance.recvFromLang(["/processed", [0]]);
           assert.deepEqual(called, ["im.pushToTimeline"]);
         });
       });

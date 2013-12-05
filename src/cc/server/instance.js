@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var node = require("./node");
   var commands = require("./commands");
+  var push = [].push;
   
   var InstanceManager = (function() {
     function InstanceManager() {
@@ -79,8 +80,8 @@ define(function(require, exports, module) {
     };
     InstanceManager.prototype.pushToTimeline = function(userId, timeline) {
       var instance = this.map[userId];
-      if (instance) {
-        instance.timeline = instance.timeline.concat(timeline);
+      if (instance && timeline.length) {
+        push.apply(instance.timeline, timeline);
       }
     };
     InstanceManager.prototype.doBinayCommand = function(userId, binary) {

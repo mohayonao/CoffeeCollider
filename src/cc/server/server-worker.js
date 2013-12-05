@@ -25,7 +25,7 @@ define(function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - 4) {
+      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
