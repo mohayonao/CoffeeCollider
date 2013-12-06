@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.1.0+20131205201900",
+    version: "0.1.1+20131206215200",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -19501,7 +19501,7 @@ define('cc/server/server', function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), 5);
+        this.timer.start(this.process.bind(this), 10);
       }
       this.sendToLang([
         "/played", this.syncCount[0]
@@ -20900,7 +20900,7 @@ define('cc/server/server-nodejs', function(require, exports, module) {
       if (!this.timer.isRunning()) {
         var that = this;
         setTimeout(function() {
-          that.timer.start(that.process.bind(that), 5);
+          that.timer.start(that.process.bind(that), 10);
         }, 50); // TODO: ???
       }
     };
