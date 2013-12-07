@@ -60,16 +60,26 @@ define(function(require, exports, module) {
   };
   
   var testSuite = function(func, code1, code2, show) {
-    if (Array.isArray(code1)) { code1 = code1.join("\n"); }
-    if (Array.isArray(code2)) { code2 = code2.join("\n"); }
-    
-    var tokens1 = func(coffee.tokens(code1).map(function(x) {
+    var tokens1;
+    if (code1.isTokens) {
+      tokens1 = code1;
+    } else {
+      if (Array.isArray(code1)) {
+        code1 = code1.join("\n");
+      }
+      tokens1 = coffee.tokens(code1);
+    }
+    var tokens1 = func(tokens1).map(function(x) {
       return [ x[0], x[1] ];
-    }));
+    });
     var result  = compiler.prettyPrint(tokens1);
     if (show & 1) {
       console.log("----- actual -----");
       console.log(result);
+    }
+    
+    if (Array.isArray(code2)) {
+      code2 = code2.join("\n");
     }
     var tokens2 = coffee.tokens(code2);
     
@@ -630,14 +640,14 @@ define(function(require, exports, module) {
         code2 = "+10.__add__(-[20])";
         testSuite(compiler.replaceBinaryOperator, code1, code2);
       });
-      it("issue-33", function() {
-        code1 = "+10 +F+ -[20]";
-        code1 = compiler.replaceTextBinaryAdverb(code1);
-        code2 = "+10.__add__(-[20], FOLD)";
-        testSuite(compiler.replaceBinaryOperator, code1, code2);
+      it("with adverb", function() {
+        code1 = "+10 + -[20]";
+        code2 = "+10.__add__(-[20], SHORT)";
+        code1 = coffee.tokens(code1);
+        code1[2][TAG] = "MATH";
+        code1[2].adverb = "SHORT";
+        code1.isTokens  = true;
         
-        code1 = '+10 +"#!F"+ -[20]';
-        code2 = "+10.__add__(-[20], FOLD)";
         testSuite(compiler.replaceBinaryOperator, code1, code2);
       });
     });
@@ -924,17 +934,28 @@ define(function(require, exports, module) {
       });
     });
     describe("Compiler", function() {
-      it("compile", function() {
-        code1 = [
-          "[ 1, 2, 3 ]"
-        ].join("\n");
-        
-        var c = cc.createCompiler();
-        actual = eval(c.compile(code1));
-        assert.deepEqual(actual, [ 1, 2, 3 ]);
-        
-        actual = eval(c.compile(""));
-        assert.isUndefined(actual);
+      describe("compile", function() {
+        var _global;
+        before(function() {
+          _global = cc.global;
+          cc.global = {};
+        });
+        after(function() {
+          cc.global = _global;
+        });
+        it("case 1", function() {
+          code1 = '[10] +S+ [10, 20, 30] *F* [40,50,60]';
+          code2 = [
+            "((global, cc, UNDEFINED)->",
+            "  [10].__add__(([10, 20, 30].__mul__([40, 50, 60], FOLD)), SHORT)",
+            ").call(cc.__context__, this.self || global, cc)",
+          ].join("\n");
+          
+          code1 = cc.createCompiler().compile(code1).trim();
+          code2 = coffee.compile(code2, {bare:true}).replace("UNDEFINED", "undefined").trim();
+          
+          assert.equal(code1, code2);
+        });
       });
       it("toString", function() {
         var code, c;

@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.1.1",
+    version: "0.1.2",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -1531,35 +1531,42 @@ define('cc/client/compiler', function(require, exports, module) {
     });
     return code;
   };
+  var replaceBinaryOperatorAdverbs = function(tokens) {
+    tokens = detectPlusMinusOperator(tokens);
+    for (var i = tokens.length-3; i >= 0; i--) {
+      var token = tokens[i];
+      if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
+        var adverb = bop.checkAdvarb(tokens, i);
+        if (adverb) {
+          token.adverb = adverb;
+          tokens.splice(i + 1, 2);
+        }
+      }
+    }
+    return tokens;
+  };
   var replaceBinaryOperator = function(tokens) {
     tokens = detectPlusMinusOperator(tokens);
     for (var i = tokens.length-1; i >= 0; i--) {
       var token = tokens[i];
       if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
         var selector = bop.operatorDict[token[VALUE]];
-        var adverb   = bop.checkAdvarb(tokens, i);
-        var next = getNextOperand(tokens, i);
+        var adverb   = token.adverb;
+        var next     = getNextOperand(tokens, i);
+        tokens.splice(
+          i, 1,
+          ["."         , "."     , _],
+          ["IDENTIFIER", selector, _],
+          ["CALL_START", "("     , _]
+        );
         if (adverb) {
-          i -= 2;
           tokens.splice(
-            i, 3,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
-          tokens.splice(
-            next.end+1, 0,
+            next.end+3, 0,
             [","         , ","   , _],
             ["IDENTIFIER", adverb, _],
             ["CALL_END"  , ")"   , _]
           );
         } else {
-          tokens.splice(
-            i, 1,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
           tokens.splice(
             next.end+3, 0,
             ["CALL_END", ")", _]
@@ -1571,8 +1578,8 @@ define('cc/client/compiler', function(require, exports, module) {
   };
   bop.checkAdvarb = function(tokens, index) {
     var t0 = tokens[index  ];
-    var t1 = tokens[index-1];
-    var t2 = tokens[index-2];
+    var t1 = tokens[index+1];
+    var t2 = tokens[index+2];
     if (t0 && t1 && t2) {
       if (/^"#![WSCFTX]"$/.test(t1[VALUE])) {
         var key = t1[VALUE].charAt(3);
@@ -2033,6 +2040,7 @@ define('cc/client/compiler', function(require, exports, module) {
       code = replaceTextBinaryAdverb(code);
       var tokens = CoffeeScript.tokens(code);
       if (tokens.length) {
+        tokens = replaceBinaryOperatorAdverbs(tokens);
         tokens = replaceGlobalVariables(tokens);
         tokens = replaceNumericString(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
@@ -2041,10 +2049,7 @@ define('cc/client/compiler', function(require, exports, module) {
         tokens = replaceCompoundAssign(tokens);
         tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
-        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceSyncBlock(tokens);
-        // console.log("-----------------------------");
-        // console.log( JSON.stringify(tokens, null, 2) );
         tokens = replaceCCVariables(tokens);
         tokens = finalize(tokens);
       }
