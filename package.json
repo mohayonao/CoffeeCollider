@@ -1,7 +1,7 @@
 {
   "name": "coffee-collider",
   "version": "0.1.2",
-  "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
+  "description": "Sound Processing Language for Web Audio",
   "keywords": [
     "language",
     "coffeescript",
@@ -45,9 +45,10 @@
     "grunt-contrib-jshint": "~0.6.5",
     "grunt-contrib-uglify": "~0.2.7",
     "grunt-contrib-compress": "~0.5.2",
-    "grunt-este-watch": "~0.1.13"
+    "grunt-este-watch": "~0.1.13",
+    "coveralls": "~2.6.0"
   },
   "scripts": {
-    "test": "grunt travis --verbose"
+    "test": "grunt travis --verbose && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage"
   }
 }

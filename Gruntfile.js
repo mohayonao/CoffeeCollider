@@ -304,6 +304,12 @@ module.exports = function(grunt) {
     if (arg0 === "travis") {
       reporter = "list";
       tstFiles = grunt.file.expand("src/cc/**/*_test.js");
+      tstFiles.forEach(function(file) {
+        var related = file.replace(/_test\.js$/, ".js");
+        if (grunt.file.exists(related)) {
+          covFiles.push(path.resolve(related));
+        }
+      });
     } else if (arg0 === "test") {
       tstFiles = grunt.file.expand("src/cc/**/*_test.js");
       reporter = "dot";
@@ -359,6 +365,8 @@ module.exports = function(grunt) {
       hook.hookRequire(matchFn, transformer);
       
       global[coverageVar] = {};
+
+      console.log("Istanbul");
     }
     
     var done = this.async();
@@ -377,13 +385,17 @@ module.exports = function(grunt) {
       if (covFiles.length) {
         var collector = new Collector();
         collector.add(global[coverageVar]);
-        Report.create("text").writeReport(collector, true);
+        if (arg0 === "travis") {
+          Report.create("lcovonly", { dir:"coverage" }).writeReport(collector, true);
+        } else {
+          Report.create("text").writeReport(collector, true);
+        }
       }
       done();
     });
   });
   
-  grunt.registerTask("coverage", function() {
+  grunt.registerTask("cover", function() {
     var arg0 = arguments[0];
     
     var istanbul = require("istanbul");
