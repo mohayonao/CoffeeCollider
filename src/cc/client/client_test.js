@@ -175,6 +175,9 @@ define(function(require, exports, module) {
           assert.deepEqual(posted, ["/reset"]);
         });
         describe("#execute", function() {
+          beforeEach(function() {
+            instance.pendingExecution = null;
+          });
           it("not append, without callback", function() {
             instance.execute("10");
             assert.deepEqual(posted, [ "/execute", 0, "10", false, false ]);
@@ -190,6 +193,12 @@ define(function(require, exports, module) {
           it("append, with callback", function() {
             instance.execute("10", true, nop);
             assert.deepEqual(posted, [ "/execute", 0, "10", true, true ]);
+          });
+          it("pending", function() {
+            instance.pendingExecution = [];
+            instance.execute("10", true, nop);
+            assert.deepEqual(posted, '');
+            assert.deepEqual(instance.pendingExecution[0], ["10", true, nop]);
           });
         });
         it("#getStream", function() {
@@ -219,6 +228,7 @@ define(function(require, exports, module) {
           });
           it("/executed", function() {
             var result;
+            instance.pendingExecution = null;
             instance.execute("10", function(_result) {
               result = _result;
             });

@@ -365,8 +365,6 @@ module.exports = function(grunt) {
       hook.hookRequire(matchFn, transformer);
       
       global[coverageVar] = {};
-
-      console.log("Istanbul");
     }
     
     var done = this.async();
