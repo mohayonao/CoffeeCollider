@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.1.2",
+    version: "0.1.3",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -227,6 +227,7 @@ define('cc/client/client', function(require, exports, module) {
       }
       this.syncItems = syncItems;
       this.syncItemsUInt32 = new Uint32Array(syncItems.buffer);
+      this.pendingExecution = [];
     }
     
     SynthClientImpl.prototype.play = function() {
@@ -288,15 +289,21 @@ define('cc/client/client', function(require, exports, module) {
     };
     SynthClientImpl.prototype.execute = function(code, opts) {
       opts = opts || {};
-      var append, callback;
-      var i = 1;
-      if (typeof arguments[i] === "boolean") {
-        append = arguments[i++];
+      var args = arguments;
+      
+      if (this.pendingExecution) {
+        this.pendingExecution.push(slice.apply(args));
+        return;
+      }
+      
+      var i = 1, append, callback;
+      if (typeof args[i] === "boolean") {
+        append = args[i++];
       } else {
         append = false;
       }
-      if (typeof arguments[i] === "function") {
-        callback = arguments[i++];
+      if (typeof args[i] === "function") {
+        callback = args[i++];
       }
       if (typeof code === "string") {
         if (!opts.lang || opts.lang !== "js") {
@@ -396,9 +403,6 @@ define('cc/client/client', function(require, exports, module) {
     return SynthClientImpl;
   })();
   
-  
-  
-    
   commands["/connected"] = function(msg) {
     var globalIds = msg[3];
     if (globalIds) {
@@ -410,6 +414,16 @@ define('cc/client/client', function(require, exports, module) {
       "/init", this.sampleRate, this.channels, this.strmLength
     ]);
     this.exports.emit("connected");
+    
+    var i, imax;
+    if (this.pendingExecution) {
+      var execute = this.execute;
+      var args    = this.pendingExecution;
+      this.pendingExecution = null;
+      for (i = 0, imax = args.length; i < imax; ++i) {
+        execute.apply(this, args[i]);
+      }
+    }
   };
   commands["/played"] = function(msg) {
     var syncCount = msg[1];
