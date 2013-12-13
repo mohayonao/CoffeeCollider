@@ -1609,7 +1609,7 @@ define(function(require, exports, module) {
     binary_ai: binary_ai,
     binary_ka: binary_ka,
     binary_kk: binary_kk,
-    binary_ia: binary_ia,
+    binary_ia: binary_ia
   };
 
 });

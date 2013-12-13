@@ -994,7 +994,7 @@ define(function(require, exports, module) {
         return this.multiNew(C.CONTROL, _in).madd(mul, add);
       }
     },
-    checkInputs: cc.ugen.checkSameRateAsFirstInput,
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
   };
 
   cc.unit.specs.LPZ1 = (function() {

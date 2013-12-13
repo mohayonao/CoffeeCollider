@@ -90,7 +90,7 @@ define(function(require, exports, module) {
             sampleRate : buffer.sampleRate,
             numChannels: buffer.numberOfChannels,
             numFrames  : buffer.length,
-            samples    : samples,
+            samples    : samples
           });
         };
         return WebAudioAPI;

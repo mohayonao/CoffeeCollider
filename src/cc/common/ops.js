@@ -42,7 +42,7 @@ define(function(require, exports, module) {
     curvelin  : "inMin=0,inMax=1,outMin=0,outMax=1,curve=-4,clip=\"minmax\"",
     bilin     : "inCenter=0.5,inMin=0,inMax=1,outCenter=0.5,outMin=0,outMax=1,clip=\"minmax\"",
     rrand     : "num=1",
-    exprand   : "num=1",
+    exprand   : "num=1"
   };
 
   var COMMONS = {
@@ -50,7 +50,7 @@ define(function(require, exports, module) {
     dup : "n=2",
     "do": "",
     wait: "",
-    asUGenInput: "",
+    asUGenInput: ""
   };
   
   var ALIASES = {
@@ -60,7 +60,7 @@ define(function(require, exports, module) {
     __sub__  : "-",
     __mul__  : "*",
     __div__  : "/",
-    __mod__  : "%",
+    __mod__  : "%"
   };
   
   module.exports = {
@@ -70,7 +70,7 @@ define(function(require, exports, module) {
     BINARY_OPS_MAP: BINARY_OPS_MAP,
     ARITY_OPS     : ARITY_OPS,
     ALIASES       : ALIASES,
-    COMMONS       : COMMONS,
+    COMMONS       : COMMONS
   };
 
 });

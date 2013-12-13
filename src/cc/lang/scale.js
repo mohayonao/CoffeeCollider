@@ -835,7 +835,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     Scale : Scale,
-    Tuning: Tuning,
+    Tuning: Tuning
   };
 
 });

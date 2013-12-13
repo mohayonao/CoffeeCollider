@@ -51,7 +51,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    Unit : Unit,
+    Unit : Unit
   };
 
 });

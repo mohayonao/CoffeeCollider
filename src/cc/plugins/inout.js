@@ -10,7 +10,7 @@ define(function(require, exports, module) {
       defaults: "bus=0,numChannels=1",
       ctor: function(bus, numChannels) {
         return this.multiNew(C.AUDIO, numChannels, bus);
-      },
+      }
     },
     $kr: {
       defaults: "bus=0,numChannels=1",

@@ -163,7 +163,7 @@ define(function(require, exports, module) {
       ctor: function(bufnum, freq, phase, mul, add) {
         return this.multiNew(C.CONTROL, bufnum, freq, phase).madd(mul, add);
       }
-    },
+    }
   };
 
   cc.unit.specs.Osc = (function() {

@@ -557,7 +557,7 @@ define(function(require, exports, module) {
 
     Pn      : Pn,
     Pfin    : Pfin,
-    Pstutter: Pstutter,
+    Pstutter: Pstutter
   };
 
 });

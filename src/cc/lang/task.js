@@ -622,7 +622,7 @@ define(function(require, exports, module) {
     TaskWaitTokenLogicOR : TaskWaitTokenLogicOR,
     TaskWaitTokenFunction: TaskWaitTokenFunction,
     TaskWaitTokenBoolean : TaskWaitTokenBoolean,
-    TaskWaitTokenDate    : TaskWaitTokenDate,
+    TaskWaitTokenDate    : TaskWaitTokenDate
   };
 
 });

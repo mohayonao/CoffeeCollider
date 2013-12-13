@@ -48,7 +48,7 @@ define(function(require, exports, module) {
   })();
   
   module.exports = {
-    Random: Random,
+    Random: Random
   };
 
 });

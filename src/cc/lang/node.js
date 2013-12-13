@@ -248,7 +248,7 @@ define(function(require, exports, module) {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    args2controls: args2controls,
+    args2controls: args2controls
   };
 
 });

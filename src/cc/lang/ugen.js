@@ -478,7 +478,7 @@ define(function(require, exports, module) {
   module.exports = {
     UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
-    OutputProxy : OutputProxy,
+    OutputProxy : OutputProxy
   };
 
 });

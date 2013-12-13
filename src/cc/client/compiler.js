@@ -577,7 +577,7 @@ define(function(require, exports, module) {
       "-=": "__sub__",
       "*=": "__mul__",
       "/=": "__div__",
-      "%=": "__mod__",
+      "%=": "__mod__"
     }
   };
   var replaceCompoundAssign = function(tokens) {
@@ -713,7 +713,7 @@ define(function(require, exports, module) {
   };
   
   var segmented = {
-    target: ["Task", "syncblock"],
+    target: ["Task", "syncblock"]
   };
   
   var replaceSyncBlock = function(tokens) {
@@ -1075,7 +1075,7 @@ define(function(require, exports, module) {
     finalize                 : finalize,
     prettyPrint              : prettyPrint,
     
-    notevalue: notevalue,
+    notevalue: notevalue
   };
 
 });

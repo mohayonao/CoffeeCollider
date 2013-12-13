@@ -424,7 +424,7 @@ define(function(require, exports, module) {
     asJSON: asJSON,
     
     reshape : reshape,
-    topoSort: topoSort,
+    topoSort: topoSort
   };
 
 });

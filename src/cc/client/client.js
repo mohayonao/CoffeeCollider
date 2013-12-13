@@ -350,7 +350,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     SynthClient    : SynthClient,
-    SynthClientImpl: SynthClientImpl,
+    SynthClientImpl: SynthClientImpl
   };
 
 });

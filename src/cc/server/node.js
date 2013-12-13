@@ -413,7 +413,7 @@ define(function(require, exports, module) {
   module.exports = {
     Node : Node,
     Group: Group,
-    Synth: Synth,
+    Synth: Synth
   };
 
 });

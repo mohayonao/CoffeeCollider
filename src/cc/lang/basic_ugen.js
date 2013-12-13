@@ -422,7 +422,7 @@ define(function(require, exports, module) {
     BinaryOpUGen: BinaryOpUGen,
     MulAdd: MulAdd,
     Sum3: Sum3,
-    Sum4: Sum4,
+    Sum4: Sum4
   };
 
 });

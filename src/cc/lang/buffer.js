@@ -210,7 +210,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    Buffer: Buffer,
+    Buffer: Buffer
   };
 
 });

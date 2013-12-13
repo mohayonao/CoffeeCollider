@@ -816,7 +816,7 @@ define(function(require, exports, module) {
     "11+"   : [4, 7, 10, 14, 18],
     "m11+"  : [3, 7, 10, 14, 18],
     "13"    : [4, 7, 10, 14, 17, 21],
-    "m13"   : [3, 7, 10, 14, 17, 21],
+    "m13"   : [3, 7, 10, 14, 17, 21]
   };
   chord_tensions.M           = chord_tensions.major;
   chord_tensions.m           = chord_tensions.minor;
