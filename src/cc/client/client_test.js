@@ -24,13 +24,13 @@ define(function(require, exports, module) {
       };
       cc.createCompiler = function() {
         return {
-          compile: function(code) { return code; }
+          compile: function(code) { return code + ".coffee"; }
         };
       };
       cc.createWebWorker = nop;
       cc.createAudioAPI = function() {
         return {
-          sampleRate:8000, channels:1, strmLength:1024,
+          sampleRate:8000, channels:2, strmLength:1024,
           init:nop, play:nop, pause:nop,
         };
       };
@@ -50,202 +50,359 @@ define(function(require, exports, module) {
       cc.createXMLHttpRequest = _createXMLHttpRequest
     });
     describe("SynthClient", function() {
+      var instance;
       describe("createSynthClient", function() {
         it("WebWorker", function() {
-          var exports = cc.createSynthClient();
+          instance = cc.createSynthClient();
+          assert.instanceOf(instance, client.SynthClient);
           assert.equal("worker", cc.opmode);
         });
         it("WebSocket", function() {
-          var exports = cc.createSynthClient({socket:"path/to/socket"});
+          instance = cc.createSynthClient({socket:"path/to/socket"});
+          assert.instanceOf(instance, client.SynthClient);
           assert.equal("socket", cc.opmode);
+        });
+        it("node.js", function() {
+          instance = cc.createSynthClient({nodejs:true});
+          assert.instanceOf(instance, client.SynthClient);
+          assert.equal("nodejs", cc.opmode);
         });
       });
       describe("instance methods", function() {
-        var instance, passed;
+        var mock;
         beforeEach(function() {
-          passed = "";
-          cc.createSynthClientWorkerImpl = function() {
-            return {
-              play: function() {
-                return (passed = "play");
-              },
-              pause: function() {
-                return (passed = "pause");
-              },
-              reset: function() {
-                return (passed = "reset");
-              },
-              execute: function() {
-                return (passed = "execute");
-              },
-              getStream: function() {
-                return (passed = "getStream");
-              },
-              importScripts: function() {
-                return (passed = "importScripts");
-              },
-              getWebAudioComponents: function() {
-                return (passed = "getWebAudioComponents");
-              }
-            };
+          mock = {
+            play : function() { mock.play .result = [].slice.apply(arguments); },
+            pause: function() { mock.pause.result = [].slice.apply(arguments); },
+            reset: function() { mock.reset.result = [].slice.apply(arguments); },
+            execute: function() { mock.execute.result = [].slice.apply(arguments); },
+            compile: function() { mock.compile.result = [].slice.apply(arguments); return "compile"; },
+            getStream: function() { mock.getStream.result = [].slice.apply(arguments); return "getStream"; },
+            getWebAudioComponents: function() { mock.getWebAudioComponents.result = [].slice.apply(arguments); return "getWebAudioComponents"; },
           };
           instance = cc.createSynthClient();
+          instance.impl = mock;
         });
         it("#play", function() {
-          actual = instance.play();
-          assert.equal(actual, instance, "return self");
-          assert.equal(passed, "play",
-                       "should call impl.play()");
+          actual   = instance.play(1, 2);
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.play.result, [1, 2]);
         });
         it("#pause", function() {
-          actual = instance.pause();
-          assert.equal(actual, instance, "return self");
-          assert.equal(passed, "pause",
-                       "should call impl.pause()");
+          actual   = instance.pause(1, 2);
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.pause.result, [1, 2]);
         });
         it("#reset", function() {
-          actual = instance.reset();
-          assert.equal(actual, instance, "return self");
-          assert.equal(passed, "reset",
-                       "should call impl.reset()");
+          actual   = instance.reset(1, 2);
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.reset.result, [1, 2]);
         });
         it("#execute", function() {
-          actual = instance.execute();
-          assert.equal(actual, instance, "return self");
-          assert.equal(passed, "execute",
-                       "should call impl.execute()");
+          actual   = instance.execute(1, 2);
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.execute.result, [1, 2]);
         });
-        it("getStream", function() {
-          actual = instance.getStream();
-          assert.equal(actual, "getStream");
-          assert.equal(passed, "getStream",
-                       "should call impl.getStream()");
+        it("#compile", function() {
+          actual   = instance.compile(1, 2);
+          expected = "compile";
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.compile.result, [1, 2]);
         });
-        it("importScripts", function() {
-          actual = instance.importScripts();
-          assert.equal(actual, instance, "return self");
-          assert.equal(passed, "importScripts",
-                       "should call impl.importScripts()");
+        it("#getStream", function() {
+          actual   = instance.getStream(1, 2);
+          expected = "getStream";
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.getStream.result, [1, 2]);
         });
-        it("getWebAudioComponents", function() {
-          actual = instance.getWebAudioComponents();
-          assert.equal(actual, "getWebAudioComponents");
-          assert.equal(passed, "getWebAudioComponents",
-                       "should call impl.getWebAudioComponents()");
+        it("#getWebAudioComponents", function() {
+          actual   = instance.getWebAudioComponents(1, 2);
+          expected = "getWebAudioComponents";
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.getWebAudioComponents.result, [1, 2]);
         });
       });
     });
     describe("SynthClientImpl", function() {
       var instance, event, emitted, posted;
       beforeEach(function() {
-        event = posted = "";
+        event   = [];
+        posted  = [];
+        emitted = [];
         instance = cc.createSynthClientImpl({ emit:function(e) {
-          event = e;
-          emitted = [].slice.call(arguments, 1);
+          event.push(e);
+          emitted.push([].slice.call(arguments, 1));
         }}, {});
         instance.lang = {
-          postMessage: function(msg) { posted = msg; }
+          postMessage: function(msg) { posted.push(msg); }
         };
       });
-      describe("instance methods", function() {
-        it("#play", function() {
-          instance.play();
-          assert.deepEqual(posted, ["/play"]);
-          
-          event = posted = "";
-          instance.play();
-          assert.equal(posted, "");
+      it("#play", function() {
+        instance.play();
+        assert.deepEqual(posted, [["/play"]]);
+        instance.play();
+        assert.deepEqual(posted, [["/play"]]);
+      });
+      it("#play (cover)", function() {
+        instance.api = null;
+        instance.play();
+      });
+      it("_played", function() {
+        instance._played(1);
+        assert.deepEqual(event, ["play"]);
+        assert.equal(instance.syncCount, 1);
+      });
+      it("#pause", function() {
+        instance.pause();
+        assert.deepEqual(posted, []);
+        instance.play();
+        instance.pause();
+        assert.deepEqual(posted, [["/play"], ["/pause"]]);
+      });
+      it("_paused", function() {
+        instance._paused();
+        assert.deepEqual(event, ["pause"]);
+      });
+      it("_paused (cover)", function() {
+        instance.api = null;
+        instance._paused();
+      });
+      it("#reset", function() {
+        instance.reset();
+        assert.deepEqual(posted , [["/reset"]]);
+        assert.deepEqual(event  , ["reset"]);
+        assert.deepEqual(emitted, [[]]);
+        assert.equal(instance.execId, 0);
+        assert.deepEqual(instance.execCallbacks, {});
+        assert.equal(instance.strmListReadIndex , 0);
+        assert.equal(instance.strmListWriteIndex, 0);
+      });
+      describe("#execute", function() {
+        it("basis", function() {
+          instance.pendingExecution = null; // ready
+          instance.execute("code");
+          assert.deepEqual(posted, [["/execute", 0, "code.coffee", false, false]]);
         });
-        it("#pause", function() {
-          instance.pause();
-          assert.equal(posted, "");
+        it("append", function() {
+          instance.pendingExecution = null; // ready
+          instance.execute("code", true);
+          assert.deepEqual(posted, [["/execute", 0, "code.coffee", true, false]]);
+        });
+        it("callback", function() {
+          instance.pendingExecution = null; // ready
+          instance.execute("code", function(){});
+          assert.deepEqual(posted, [["/execute", 0, "code.coffee", false, true]]);
+        });
+        it("append and callback", function() {
+          instance.pendingExecution = null; // ready
+          instance.execute("code", true, function(){});
+          assert.deepEqual(posted, [["/execute", 0, "code.coffee", true, true]]);
+        });
+        it("lang:js", function() {
+          instance.pendingExecution = null; // ready
+          instance.execute("code", true, function(){}, {lang:"js"});
+          assert.deepEqual(posted, [["/execute", 0, "code", true, true]]);
+        });
+        it("pending", function() {
+          instance.execute("code");
+          assert.deepEqual(instance.pendingExecution, [["code"]]);
+        });
+        it("typeof code != string", function() {
+          assert.throws(function() {
+            instance.execute();
+          }, Error);
+        });
+      });
+      describe("#compile", function() {
+        it("basis", function() {
+          actual   = instance.compile("code");
+          expected = "code.coffee";
+          assert.equal(actual, expected);
+        });
+        it("typeof code != string", function() {
+          assert.throws(function() {
+            instance.compile();
+          }, Error);
+        });
+      });
+      it("#getStream", function() {
+        var strm = instance.strm;
+        for (var i = 0; i < strm.length; i++) {
+          if (i < strm.length * 0.5) {
+            strm[i] =  32767;
+          } else {
+            strm[i] = -32768;
+          }
+        }
+        actual = instance.getStream();
+        assert.isObject(actual);
+        assert.isFunction(actual.getChannelData);
+        
+        strm = actual.getChannelData(0);
+        assert.equal(strm.length, instance.strmLength);
+        assert.closeTo(strm[0], 1, 1e-4);
+        assert.closeTo(strm[strm.length-1], 1, 1e-4);
+        
+        strm = actual.getChannelData(1);
+        assert.equal(strm.length, instance.strmLength);
+        assert.closeTo(strm[0], -1, 1e-4);
+        assert.closeTo(strm[strm.length-1], -1, 1e-4);
+        
+        assert.throws(function() {
+          actual.getChannelData(2);
+        }, Error);
+      });
+      it("#getWebAudioComponents", function() {
+        instance.api.type = "dummy";
+        actual   = instance.getWebAudioComponents();
+        expected = [];
+        assert.deepEqual(actual, expected);
 
-          event = posted = "";
-          instance.play();
-          instance.pause();
-          assert.deepEqual(posted, ["/pause"]);
-          
-          event = posted = "";
-          instance.pause();
-          assert.equal(posted, "");
+        instance.api.type = "Web Audio API";
+        instance.api.context = "context";
+        instance.api.jsNode  = "jsNode";
+        actual   = instance.getWebAudioComponents();
+        expected = [ "context", "jsNode" ];
+        assert.deepEqual(actual, expected);
+      });
+      it("#process", function() {
+        var i16;
+        for (var i = 0; i < C.STRM_LIST_LENGTH; i++) {
+          i16 = new Int16Array(instance.strmLength * 2);
+          instance.recvFromLang(i16);
+          instance.process();
+          assert.deepEqual(instance.strm, i16);
+        }
+        assert.equal(instance.syncCount, C.STRM_LIST_LENGTH);
+        
+        instance.process();
+        assert.deepEqual(instance.strm, i16);
+        assert.equal(instance.syncCount, C.STRM_LIST_LENGTH);
+      });
+      it("#sendToLang", function() {
+        instance.sendToLang(["/sendToLang(1)", 1, 2, 3]);
+        assert.deepEqual(posted, [["/sendToLang(1)", 1, 2, 3]]);
+
+        instance.sendToLang(["/sendToLang(2)", 4, 5, 6]);
+        assert.deepEqual(posted, [["/sendToLang(1)", 1, 2, 3], ["/sendToLang(2)", 4, 5, 6]]);
+      });
+      it("#sendToLang (cover)", function() {
+        instance.lang = null;
+        instance.sendToLang();
+      });
+      it("#recvFromLang", function() {
+        var i16;
+        for (var i = 0; i <= C.STRM_LIST_LENGTH; i++) {
+          i16 = new Int16Array(instance.strmLength * 2);
+          instance.recvFromLang(i16);
+          assert.equal(instance.strmList[i & C.STRM_LIST_MASK], i16);
+          assert.equal(instance.strmListWriteIndex, i+1);
+        }
+      });
+      describe("#readAudioFile", function(done) {
+        it("no api", function() {
+          instance.api = null;
+          instance.readAudioFile();
         });
-        it("#reset", function() {
-          instance.reset();
-          assert.equal(event, "reset");
-          assert.deepEqual(posted, ["/reset"]);
-        });
-        describe("#execute", function() {
-          beforeEach(function() {
-            instance.pendingExecution = null;
-          });
-          it("not append, without callback", function() {
-            instance.execute("10");
-            assert.deepEqual(posted, [ "/execute", 0, "10", false, false ]);
-          });
-          it("append, without callback", function() {
-            instance.execute("10", true);
-            assert.deepEqual(posted, [ "/execute", 0, "10", true, false ]);
-          });
-          it("not append, callback", function() {
-            instance.execute("10", nop);
-            assert.deepEqual(posted, [ "/execute", 0, "10", false, true ]);
-          });
-          it("append, with callback", function() {
-            instance.execute("10", true, nop);
-            assert.deepEqual(posted, [ "/execute", 0, "10", true, true ]);
-          });
-          it("pending", function() {
-            instance.pendingExecution = [];
-            instance.execute("10", true, nop);
-            assert.deepEqual(posted, '');
-            assert.deepEqual(instance.pendingExecution[0], ["10", true, nop]);
-          });
-        });
-        it("#getStream", function() {
-          var stream = instance.getStream();
-          assert.instanceOf(stream.getChannelData(0), Float32Array);
-          assert.instanceOf(stream.getChannelData(1), Float32Array);
-          assert.isUndefined(stream.getChannelData(2));
-        });
-        it("#importScripts", function() {
-          instance.importScripts(["A", "B", "C"]);
-          assert.deepEqual(posted, ["/importScripts", ["A", "B", "C"]]);
-        });
-        it("#readAudioFile", function(done) {
+        it("basis", function(done) {
           instance.api.decodeAudioFile = function(_, callback) {
             callback(null, "decodeAudioFile");
           };
           instance.readAudioFile("path/to/audio", function(err, result) {
+            assert.isNull(err);
             assert.equal(result, "decodeAudioFile");
             done();
           });
         });
-        describe("messaging", function() {
-          it("/connected", function() {
-            instance.recvFromLang(["/connected", 96000, 4, []]);
-            assert.equal(event, "connected");
-            assert.deepEqual(posted, ["/init", 8000, 1, 1024]);
+        it("not support", function(done) {
+          instance.api.decodeAudioFile = null;
+          instance.readAudioFile("path/to/audio", function(err, result) {
+            assert.isString(err);
+            done();
           });
-          it("/executed", function() {
-            var result;
-            instance.pendingExecution = null;
-            instance.execute("10", function(_result) {
-              result = _result;
-            });
-            instance.recvFromLang(["/executed", 0, 1000]);
-            assert.equal(result, 1000);
-            instance.recvFromLang(["/executed", 0, 2000]);
-            assert.equal(result, 1000, "callback would be called only once");
-          });
-          it("/buffer/request", function() {
-            instance.recvFromLang(["/buffer/request", "/path/to/audio", 1]);
-            assert.deepEqual(posted, "");
-          });
-          it("/socket/sendToClient", function() {
-            instance.recvFromLang(["/socket/sendToClient", "hello"]);
-            assert.equal(event, "message");
-            assert.deepEqual(emitted, ["hello"]);
-          });
+        });
+      });
+      describe("commands", function() {
+        it("/connected", function() {
+          instance.execute = function() {
+            instance.execute.result = [].slice.call(arguments);
+          };
+          instance.pendingExecution = null;
+          instance.recvFromLang(["/connected", 44100, 2, ["client_test_connected"]]);
+          assert.deepEqual(posted, [["/init", instance.sampleRate, instance.channels, instance.strmLength]]);
+          assert.isTrue(cc.global.client_test_connected);
+          delete cc.global.client_test_connected;
+        });
+        it("/connected (node.js)", function() {
+          instance.execute = function() {
+            instance.execute.result = [].slice.call(arguments);
+          };
+          instance.pendingExecution = [ [1, 2, 3] ];
+          instance.recvFromLang(["/connected", 44100, 2]);
+          assert.deepEqual(posted, [["/init", instance.sampleRate, instance.channels, instance.strmLength]]);
+          assert.deepEqual(instance.execute.result, [ 1, 2, 3 ]);
+        });
+        it("/played", function() {
+          var syncCount = 0;
+          instance._played = function(_syncCount) {
+            syncCount = _syncCount;
+          };
+          instance.recvFromLang(["/played", 1]);
+          assert.equal(syncCount, 1);
+        });
+        it("/paused", function() {
+          var passed = false;
+          instance._paused = function() {
+            passed = true;
+          };
+          instance.recvFromLang(["/paused"]);
+          assert.isTrue(passed);
+        });
+        it("/executed", function() {
+          var result = null;
+          instance.execCallbacks[0] = function(_result) {
+            result = _result;
+          };
+          instance.recvFromLang(["/executed", 0, 10]);
+          assert.equal(result, 10);
+          
+          result = null;
+          instance.recvFromLang(["/executed", 0, 10]);
+          assert.equal(result, null);
+        });
+        it("/buffer/request", function() {
+          var path = null;
+          instance.readAudioFile = function(_path, callback) {
+            path = _path;
+            callback(null, "done");
+          };
+          instance.recvFromLang(["/buffer/request", "/path/to/audio", 1]);
+          assert.equal(path, "/path/to/audio");
+          assert.deepEqual(posted, [["/buffer/response", "done", 1]]);
+        });
+        it("/buffer/request (error)", function() {
+          var path = null;
+          instance.readAudioFile = function(_path, callback) {
+            path = _path;
+            callback("error!!", "done");
+          };
+          instance.recvFromLang(["/buffer/request", "/path/to/audio", 1]);
+          assert.equal(path, "/path/to/audio");
+          assert.deepEqual(posted, []);
+        });
+        it("/socket/sendToClient", function() {
+          instance.recvFromLang(["/socket/sendToClient", "hello"]);
+          assert.deepEqual(event, ["message"]);
+          assert.deepEqual(emitted, [["hello"]]);
+        });
+        it("/unknown", function() {
+          assert.throws(function() {
+            instance.recvFromLang(["/unknown command"]);
+          }, Error);
         });
       });
     });

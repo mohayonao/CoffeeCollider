@@ -9,8 +9,9 @@ define(function(require, exports, module) {
   
   var SynthClient = (function() {
     function SynthClient(opts) {
-      emitter.mixin(this);
       opts = opts || {};
+      
+      emitter.mixin(this);
       this.version = cc.version;
       if (opts.socket) {
         this.impl = cc.createSynthClientSocketImpl(this, opts);
@@ -24,15 +25,15 @@ define(function(require, exports, module) {
     }
     
     SynthClient.prototype.play = function() {
-      this.impl.play();
+      this.impl.play.apply(this.impl, arguments);
       return this;
     };
     SynthClient.prototype.pause = function() {
-      this.impl.pause();
+      this.impl.pause.apply(this.impl, arguments);
       return this;
     };
     SynthClient.prototype.reset = function() {
-      this.impl.reset();
+      this.impl.reset.apply(this.impl, arguments);
       return this;
     };
     SynthClient.prototype.execute = function() {
@@ -43,14 +44,10 @@ define(function(require, exports, module) {
       return this.impl.compile.apply(this.impl, arguments);
     };
     SynthClient.prototype.getStream = function() {
-      return this.impl.getStream();
-    };
-    SynthClient.prototype.importScripts = function() {
-      this.impl.importScripts(slice.call(arguments));
-      return this;
+      return this.impl.getStream.apply(this.impl, arguments);
     };
     SynthClient.prototype.getWebAudioComponents = function() {
-      return this.impl.getWebAudioComponents();
+      return this.impl.getWebAudioComponents.apply(this.impl, arguments);
     };
     
     return SynthClient;
@@ -111,16 +108,14 @@ define(function(require, exports, module) {
       }
     };
     SynthClientImpl.prototype._played = function(syncCount) {
-      if (this.api) {
-        var strm = this.strm;
-        for (var i = 0, imax = strm.length; i < imax; ++i) {
-          strm[i] = 0;
-        }
-        this.strmList.splice(0);
-        this.strmListReadIndex  = 0;
-        this.strmListWriteIndex = 0;
-        this.syncCount = syncCount;
+      var strm = this.strm, i;
+      for (i = strm.length; i--; ) {
+        strm[i] = 0;
       }
+      this.strmList.splice(0);
+      this.strmListReadIndex  = 0;
+      this.strmListWriteIndex = 0;
+      this.syncCount = syncCount;
       this.exports.emit("play");
     };
     SynthClientImpl.prototype.pause = function() {
@@ -138,8 +133,8 @@ define(function(require, exports, module) {
     SynthClientImpl.prototype.reset = function() {
       this.execId = 0;
       this.execCallbacks = {};
-      var strm = this.strm;
-      for (var i = 0, imax = strm.length; i < imax; ++i) {
+      var strm = this.strm, i;
+      for (i = strm.length; i--; ) {
         strm[i] = 0;
       }
       this.strmList.splice(0);
@@ -148,20 +143,13 @@ define(function(require, exports, module) {
       this.sendToLang(["/reset"]);
       this.exports.emit("reset");
     };
-    SynthClientImpl.prototype.process = function() {
-      var strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
-      if (strm) {
-        this.strmListReadIndex += 1;
-        this.strm.set(strm);
-      }
-      this.syncCount += 1;
-      this.syncItemsUInt32[C.SYNC_COUNT] = this.syncCount;
-      this.sendToLang(this.syncItems);
-    };
-    SynthClientImpl.prototype.execute = function(code, opts) {
-      opts = opts || {};
+    SynthClientImpl.prototype.execute = function(code) {
+      var opts;
       var args = arguments;
       
+      if (typeof code !== "string") {
+        throw new Error("cc.execute requires a code, but got: " + (typeof code));
+      }
       if (this.pendingExecution) {
         this.pendingExecution.push(slice.apply(args));
         return;
@@ -175,27 +163,31 @@ define(function(require, exports, module) {
       }
       if (typeof args[i] === "function") {
         callback = args[i++];
+      } else {
+        callback = null;
       }
-      if (typeof code === "string") {
-        if (!opts.lang || opts.lang !== "js") {
-          code = this.compiler.compile(code.trim());
-        }
-        if (callback) {
-          this.execCallbacks[this.execId] = callback;
-        }
-        this.sendToLang([
-          "/execute", this.execId, code, append, !!callback
-        ]);
-        this.execId += 1;
+      if (typeof args[i] === "object") {
+        opts = args[i++];
+      } else {
+        opts = {};
       }
+      
+      if (!opts.lang || opts.lang !== "js") {
+        code = this.compiler.compile(code.trim());
+      }
+      if (callback) {
+        this.execCallbacks[this.execId] = callback;
+      }
+      this.sendToLang([
+        "/execute", this.execId, code, append, !!callback
+      ]);
+      this.execId += 1;
     };
     SynthClientImpl.prototype.compile = function(code) {
-      if (typeof code === "string") {
-        code = this.compiler.compile(code.trim());
-      } else {
-        code = "";
+      if (typeof code !== "string") {
+        throw new Error("cc.execute requires a code, but got: " + (typeof code));
       }
-      return code;
+      return this.compiler.compile(code.trim());
     };
     SynthClientImpl.prototype.getStream = function() {
       var f32 = new Float32Array(this.strm);
@@ -210,11 +202,26 @@ define(function(require, exports, module) {
           } else if (channel === 1) {
             return new Float32Array(f32.buffer, strmLength * 4);
           }
+          throw new Error("bad channel");
         }
       };
     };
-    SynthClientImpl.prototype.importScripts = function(list) {
-      this.sendToLang(["/importScripts", list]);
+    SynthClientImpl.prototype.getWebAudioComponents = function() {
+      if (this.api && this.api.type === "Web Audio API") {
+        return [ this.api.context, this.api.jsNode ];
+      }
+      return [];
+    };
+    SynthClientImpl.prototype.process = function() {
+      var strm;
+      if (this.strmListWriteIndex <= this.strmListReadIndex) {
+        return;
+      }
+      strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
+      this.strmListReadIndex += 1;
+      this.strm.set(strm);
+      this.syncItemsUInt32[C.SYNC_COUNT] = ++this.syncCount;
+      this.sendToLang(this.syncItems);
     };
     SynthClientImpl.prototype.sendToLang = function(msg) {
       if (this.lang) {
@@ -236,13 +243,7 @@ define(function(require, exports, module) {
     };
     SynthClientImpl.prototype.readAudioFile = function(path, callback) {
       var api = this.api;
-      if (this.api) {
-        if (typeof path !== "string") {
-          throw new TypeError("readAudioFile: first argument must be a String.");
-        }
-        if (typeof callback !== "function") {
-          throw new TypeError("readAudioFile: second argument must be a Function.");
-        }
+      if (api) {
         if (!api.decodeAudioFile) {
           callback("Audio decoding not supported", null);
           return;
@@ -263,12 +264,6 @@ define(function(require, exports, module) {
         };
         xhr.send();
       }
-    };
-    SynthClientImpl.prototype.getWebAudioComponents = function() {
-      if (this.api && this.api.type === "Web Audio API") {
-        return [ this.api.context, this.api.jsNode ];
-      }
-      return [];
     };
     
     return SynthClientImpl;
@@ -309,10 +304,7 @@ define(function(require, exports, module) {
     var result = msg[2];
     var callback = this.execCallbacks[execId];
     if (callback) {
-      if (result !== undefined) {
-        result = unpack(result);
-      }
-      callback(result);
+      callback(unpack(result));
       delete this.execCallbacks[execId];
     }
   };
