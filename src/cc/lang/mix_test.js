@@ -15,7 +15,12 @@ define(function(require, exports, module) {
   };
 
   describe("mix.js", function() {
+    var _createSum4, _createSum3, _createBinaryOpUGen;
     before(function() {
+      _createSum4 = cc.createSum4;
+      _createSum3 = cc.createSum3;
+      _createBinaryOpUGen = cc.createBinaryOpUGen;
+      
       cc.createSum4 = fn(function(a, b, c, d) {
         return "[" + [a, b, c, d].join(",") +"]";
       }).multiCall().build();
@@ -25,6 +30,15 @@ define(function(require, exports, module) {
       cc.createBinaryOpUGen = fn(function(selector, a, b) {
         return "[" + [a, b].join(",") + "]";
       }).multiCall().build();
+    });
+    after(function() {
+      cc.createSum4 = _createSum4;
+      cc.createSum3 = _createSum3;
+      cc.createBinaryOpUGen = _createBinaryOpUGen;
+    });
+    it("mix", function() {
+      var a = cc.global.Mix();
+      assert.deepEqual(a, []);
     });
     it("mix 1", function() {
       var a = cc.global.Mix(1);
@@ -67,6 +81,36 @@ define(function(require, exports, module) {
     it("mix [[[1,2], [10,20]], [100,200]]", function() {
       var a = cc.global.Mix([[[1,2], [10,20]], [100,200]]);
       assert.deepEqual(parse(a), [[[1,100],[2,100]], [[10,200],[20,200]]]);
+    });
+    it("mix.fill(4)", function() {
+      var a = cc.global.Mix.fill(4, function() {
+        return 0;
+      });
+      assert.deepEqual(parse(a), [0,0,0,0]);
+    });
+    it("mix.fill(8)", function() {
+      var a = cc.global.Mix.fill(8, function() {
+        return 0;
+      });
+      assert.deepEqual(parse(a), [[0,0,0,0], [0,0,0,0]]);
+    });
+    it("mix.fill(12)", function() {
+      var a = cc.global.Mix.fill(12, function() {
+        return 0;
+      });
+      assert.deepEqual(parse(a), [[0,0,0,0], [0,0,0,0], [0,0,0,0]]);
+    });
+    it("mix.fill(16)", function() {
+      var a = cc.global.Mix.fill(16, function() {
+        return 0;
+      });
+      assert.deepEqual(parse(a), [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]]);
+    });
+    it("mix.fill(20)", function() {
+      var a = cc.global.Mix.fill(20, function() {
+        return 0;
+      });
+      assert.deepEqual(parse(a), [[[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]], [0,0,0,0]]);
     });
   });
 
