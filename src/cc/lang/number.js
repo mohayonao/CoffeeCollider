@@ -858,13 +858,39 @@ define(function(require, exports, module) {
     }
     return list;
   };
-  
-  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+
+  fn.defineProperty(Number.prototype, "midichord", fn(function(name, inversion, length) {
     return chord(this, name, inversion, length);
   }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
-
+  
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+    if (!cc.deprecate.chord) {
+      cc.deprecate.chord = true;
+      cc.global.console.log("Number#chord is now called `Number#midichord`");
+    }
+    return chord(this, name, inversion, length);
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "cpschord", fn(function(name, inversion, length) {
+    var num = this;
+    return chord(0, name, inversion, length).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
   fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion, length) {
     var num = this;
+    if (!cc.deprecate.chordcps) {
+      cc.deprecate.chordcps = true;
+      cc.global.console.log("Number#chordcps is now called `Number#cpschord`");
+    }
+    return chord(0, name, inversion, length).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "ratiochord", fn(function(name, inversion, length) {
+    var num = Math.pow(2, this * 1/12);
     return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
@@ -872,11 +898,15 @@ define(function(require, exports, module) {
   
   fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion, length) {
     var num = Math.pow(2, this * 1/12);
+    if (!cc.deprecate.chordratio) {
+      cc.deprecate.chordratio = true;
+      cc.global.console.log("Number#chordratio is now called `Number#ratiochord`");
+    }
     return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
   }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
-
+  
   (function() {
     var keys = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
     Object.keys(keys).forEach(function(key) {

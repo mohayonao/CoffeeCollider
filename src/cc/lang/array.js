@@ -158,32 +158,41 @@ define(function(require, exports, module) {
   });
 
   // chord
-  fn.defineProperty(Array.prototype, "chord", fn(function(name, inversion) {
+  var midichord = fn(function(name, inversion) {
     return this.map(function(x) {
       if (typeof x === "number") {
-        return x.chord(name, inversion);
+        return x.midichord(name, inversion);
       }
       return x;
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
-
-  fn.defineProperty(Array.prototype, "chordcps", fn(function(name, inversion) {
-    return this.map(function(x) {
-      if (typeof x === "number") {
-        return x.chordcps(name, inversion);
-      }
-      return x;
-    });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0").multiCall().build();
   
-  fn.defineProperty(Array.prototype, "chordratio", fn(function(name, inversion) {
+  fn.defineProperty(Array.prototype, "midichord", midichord);
+  fn.defineProperty(Array.prototype, "chord"    , midichord); // deprecate
+
+  var cpschord = fn(function(name, inversion) {
     return this.map(function(x) {
       if (typeof x === "number") {
-        return x.chordratio(name, inversion);
+        return x.cpschord(name, inversion);
       }
       return x;
     });
-  }).defaults("name=\"\",inversion=0").multiCall().build());
+  }).defaults("name=\"\",inversion=0").multiCall().build();
+  
+  fn.defineProperty(Array.prototype, "cpschord", cpschord);
+  fn.defineProperty(Array.prototype, "chordcps", cpschord); // deprecate
+
+  var ratiochord = fn(function(name, inversion) {
+    return this.map(function(x) {
+      if (typeof x === "number") {
+        return x.ratiochord(name, inversion);
+      }
+      return x;
+    });
+  }).defaults("name=\"\",inversion=0").multiCall().build();
+  
+  fn.defineProperty(Array.prototype, "ratiochord", ratiochord);
+  fn.defineProperty(Array.prototype, "chordratio", ratiochord); // deprecate
   
   // Array methods
   // utils

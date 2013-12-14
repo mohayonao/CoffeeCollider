@@ -6,7 +6,8 @@ define(function(require, exports, module) {
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
-    unit   : {specs:{}}
+    unit   : {specs:{}},
+    deprecate: {}
   };
 
 });
