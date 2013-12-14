@@ -129,12 +129,6 @@ define(function(require, exports, module) {
             }
           });
         });
-        it("__and__", function() {
-          assert.equal(instance.__and__(1), 0);
-        });
-        it("__or__", function() {
-          assert.equal(instance.__or__(1), 0);
-        });
         describe("arity operators", function() {
           it("madd", function() {
             var instance = cc.global.Test.ar(10);

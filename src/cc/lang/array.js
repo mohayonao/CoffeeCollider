@@ -136,12 +136,6 @@ define(function(require, exports, module) {
       });
     });
   });
-  fn.defineProperty(Array.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", this.concat(b));
-  });
-  fn.defineProperty(Array.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", this.concat(b));
-  });
   
   // arity operators
   Object.keys(ops.ARITY_OPS).forEach(function(selector) {

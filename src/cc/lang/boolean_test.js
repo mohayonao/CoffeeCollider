@@ -11,21 +11,16 @@ define(function(require, exports, module) {
   
   describe("lang/boolean.js", function() {
     var actual, expected;
-    var _instanceOfUGen, _createTaskWaitLogic;
+    var _instanceOfUGen;
     before(function() {
       _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
 
       cc.instanceOfUGen = function() {
         return false;
       };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
     });
     after(function() {
       cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
     });
 
     describe("class methods", function() {
@@ -74,12 +69,6 @@ define(function(require, exports, module) {
               assert.deepEqual(false[selector](1), [ 0, 1 ]);
             });
           });
-        });
-        it("__and__", function() {
-          assert.deepEqual(true.__and__(false), ["and", true, false]);
-        });
-        it("__or__", function() {
-          assert.deepEqual(false.__or__(true), ["or", false, true]);
         });
       });
       describe("arity operators", function() {

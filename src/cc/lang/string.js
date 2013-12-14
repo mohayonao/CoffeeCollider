@@ -101,12 +101,6 @@ define(function(require, exports, module) {
     }
     return 0;
   });
-  fn.defineBinaryProperty(String.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(String.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
   
   // arity operators
   Object.keys(ops.ARITY_OPS).forEach(function(selector) {

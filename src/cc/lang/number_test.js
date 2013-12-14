@@ -11,19 +11,15 @@ define(function(require, exports, module) {
   
   describe("lang/number.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createMulAdd;
+    var _lang, _instanceOfUGen, _createMulAdd;
     before(function() {
       _lang = cc.lang;
       _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
       _createMulAdd = cc.createMulAdd;
       
       cc.lang = {};
       cc.instanceOfUGen = function() {
         return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
       };
       cc.createMulAdd = function(a, mul, add) {
         return a * mul + add;
@@ -32,7 +28,6 @@ define(function(require, exports, module) {
     after(function() {
       cc.lang = _lang;
       cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
       cc.createMulAdd = _createMulAdd;
     });
 
@@ -413,12 +408,6 @@ define(function(require, exports, module) {
           assert.equal((+2.5).__mod__(-3.5),  2.5 % -3.5);
           assert.equal((+2.5).__mod__( 0.0),  0.0); // avoid NaN
           assert.equal((+2.5).__mod__(+3.5),  2.5 % +3.5);
-        });
-        it("__and__", function() {
-          assert.deepEqual((1).__and__(2), ["and", 1, 2]);
-        });
-        it("__or__", function() {
-          assert.deepEqual((1).__or__(2), ["or", 1, 2]);
         });
         it("eq", function() {
           assert.equal((-2.5).eq(-3.5), 0);

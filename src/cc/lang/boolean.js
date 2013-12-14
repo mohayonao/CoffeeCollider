@@ -60,12 +60,6 @@ define(function(require, exports, module) {
       return (this ? 1 : 0)[selector](b);
     });
   });
-  fn.defineBinaryProperty(Boolean.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(Boolean.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
   
   // arity operators
   Object.keys(ops.ARITY_OPS).forEach(function(selector) {

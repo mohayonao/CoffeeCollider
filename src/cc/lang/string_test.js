@@ -11,21 +11,16 @@ define(function(require, exports, module) {
   
   describe("lang/string.js", function() {
     var actual, expected;
-    var _instanceOfUGen, _createTaskWaitLogic;
+    var _instanceOfUGen;
     before(function() {
       _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
       
       cc.instanceOfUGen = function() {
         return false;
       };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
     });
     after(function() {
       cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
     });
 
     describe("class methods", function() {
@@ -100,12 +95,6 @@ define(function(require, exports, module) {
           assert.deepEqual("+10".__mod__(3), ["+10"]);
           assert.deepEqual("+10".__mod__(4), ["+10"]);
           assert.deepEqual("+10".__mod__(""), 0);
-        });
-        it("__and__", function() {
-          assert.deepEqual("s1".__and__("s2"), ["and", "s1", "s2"]);
-        });
-        it("__or__", function() {
-          assert.deepEqual("s1".__or__("s2"), ["or", "s1", "s2"]);
         });
       });
       describe("arity operators", function() {

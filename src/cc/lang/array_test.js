@@ -12,19 +12,15 @@ define(function(require, exports, module) {
 
   describe("lang/array.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createBinaryOpUGen;
+    var _lang, _instanceOfUGen, _createBinaryOpUGen;
     before(function() {
       _lang = cc.lang;
       _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
       _createBinaryOpUGen  = cc.createBinaryOpUGen;
       
       cc.lang = {};
       cc.instanceOfUGen = function() {
         return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
       };
       cc.createBinaryOpUGen = function(selector, a, b) {
         return [selector, a, b];
@@ -33,7 +29,6 @@ define(function(require, exports, module) {
     after(function() {
       cc.lang = _lang;
       cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
       cc.createBinaryOpUGen  = _createBinaryOpUGen;
     });
     
@@ -229,12 +224,6 @@ define(function(require, exports, module) {
               assert.deepEqual([1,2,3][selector](1), [ [1,1], [2,1], [3,1] ]);
             });
           });
-        });
-        it("__and__", function() {
-          assert.deepEqual([1,2,3].__and__(4), ["and", 1, 2, 3, 4]);
-        });
-        it("__or__", function() {
-          assert.deepEqual([1,2,3].__or__(4), ["or", 1, 2, 3, 4]);
         });
         it("ugen", function() {
           cc.instanceOfUGen = function() {

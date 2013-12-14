@@ -145,13 +145,6 @@ define(function(require, exports, module) {
         });
       }
     });
-
-    UGen.prototype.__and__ = function() {
-      return 0;
-    };
-    UGen.prototype.__or__ = function() {
-      return 0;
-    };
     
     // arity operators methods
     UGen.prototype.madd = fn(function(mul, add) {

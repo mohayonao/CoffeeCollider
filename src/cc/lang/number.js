@@ -275,12 +275,6 @@ define(function(require, exports, module) {
     }
     return this % b;
   });
-  fn.defineBinaryProperty(Number.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(Number.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
-  });
   fn.defineBinaryProperty(Number.prototype, "eq", function(b) {
     return this === b ? 1 : 0;
   });

@@ -99,7 +99,7 @@ define(function(require, exports, module) {
   };
   
   var shouldBeImplementedMethods = function() {
-    var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__","__and__","__or__" ];
+    var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__" ];
     list = list.concat(Object.keys(ops.UNARY_OPS).filter(function(selector) {
       return /^[a-z]/.test(selector);
     }));
