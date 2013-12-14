@@ -410,6 +410,10 @@ define(function(require, exports, module) {
     return Synth;
   })();
   
+  cc.createRootNode = function(instance) {
+    return new Group(0, 0, 0, instance);
+  };
+  
   module.exports = {
     Node : Node,
     Group: Group,

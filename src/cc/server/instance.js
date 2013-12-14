@@ -2,7 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("./cc");
-  var node = require("./node");
   var commands = require("./commands");
   var push = [].push;
   
@@ -131,7 +130,7 @@ define(function(require, exports, module) {
       this.busAmp   = 0.8;
       this.timeline = [];
       this.timelineIndex = 0;
-      this.rootNode = new node.Group(0, 0, 0, this);
+      this.rootNode = cc.createRootNode(this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
@@ -156,7 +155,7 @@ define(function(require, exports, module) {
         this.bus.set(this.manager.busClear);
       }
       this.timeline = [];
-      this.rootNode = new node.Group(0, 0, 0, this);
+      this.rootNode = cc.createRootNode(this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
