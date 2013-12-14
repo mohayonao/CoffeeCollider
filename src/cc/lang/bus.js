@@ -25,6 +25,7 @@ define(function(require, exports, module) {
   })();
 
   cc.global.Bus = function() {
+    return cc.global.Bus.control(1);
   };
   
   cc.global.Bus.control = fn(function(numChannels) {
@@ -37,7 +38,7 @@ define(function(require, exports, module) {
     } else {
       numChannels = 0;
     }
-    return new Bus(C.AUDIO, index, numChannels);
+    return new Bus(C.CONTROL, index, numChannels);
   }).defaults("numChannels=1").build();
   
   cc.global.Bus.audio = fn(function(numChannels) {
@@ -52,12 +53,18 @@ define(function(require, exports, module) {
     }
     return new Bus(C.AUDIO, index, numChannels);
   }).defaults("numChannels=1").build();
+
+  cc.instanceOfBus = function(obj) {
+    return obj instanceof Bus;
+  };
   
   cc.resetBus = function() {
     bus_allocator.audio   = 2;
     bus_allocator.control = 0;
   };
   
-  module.exports = {};
+  module.exports = {
+    Bus: Bus
+  };
 
 });
