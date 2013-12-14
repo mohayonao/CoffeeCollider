@@ -38,7 +38,7 @@ define(function(require, exports, module) {
     }
     Buffer.prototype.bindBufferSource = function(bufSrc, startFrame, frames) {
       startFrame = Math.max( 0, Math.min(startFrame|0, bufSrc.frames));
-      frames     = Math.max(-1, Math.min(frames |0, bufSrc.frames - startFrame));
+      frames     = Math.max(-1, Math.min(frames    |0, bufSrc.frames - startFrame));
       if (startFrame === 0) {
         if (frames === -1) {
           this.samples = bufSrc.samples;
@@ -60,32 +60,35 @@ define(function(require, exports, module) {
       this.sampleRate = bufSrc.sampleRate;
     };
     Buffer.prototype.zero = function() {
-      var samples = this.samples;
-      for (var i = samples.length; i--; ) {
+      var i, samples = this.samples;
+      for (i = samples.length; i--; ) {
         samples[i] = 0;
       }
     };
     Buffer.prototype.set = function(params) {
       var samples = this.samples;
-      for (var i = 0, imax = params.length >> 1; i < imax; i += 2) {
-        var index  = params[i];
-        if (typeof index !== "number" || index < 0 || samples.length <= index) {
+      var samples_length = samples.length;
+      var index, value, values;
+      var i, imax = params.length;
+      var j, jmax;
+      for (i = 0; i < imax; i += 2) {
+        index = params[i];
+        if (typeof index !== "number" || index < 0 || samples_length <= index) {
           continue;
         }
         index |= 0;
-        var values = params[i+1];
-        if (typeof values === "number") {
-          if (isNaN(values)) {
-            values = 0;
-          }
-          samples[index] = values;
-        } else if (Array.isArray(values)) {
-          for (var j = 0, jmax = values.length; j < jmax; ++j) {
-            if (samples.length <= i + j) {
+        value = params[i+1];
+        if (typeof value === "number") {
+          samples[index] = value || 0; // remove NaN
+        } else if (Array.isArray(value)) {
+          values = value;
+          for (j = 0, jmax = values.length; j < jmax; ++j) {
+            if (samples_length <= index + j) {
               break;
             }
-            if (typeof values[j] === "number") {
-              samples[index + j] = values[j];
+            value = values[j];
+            if (typeof value === "number") {
+              samples[index + j] = value || 0; // remove NaN
             }
           }
         }
@@ -119,59 +122,65 @@ define(function(require, exports, module) {
   var gen_func = {};
   
   gen_func.sine1 = function(samples, wavetable, params) {
+    var len = samples.length;
     var i, imax;
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; ++i) {
-        add_wpartial(samples.length, samples, i+1, params[i], 0);
+        add_wpartial(len, samples, i+1, params[i], 0);
       }
     } else {
       for (i = 0, imax = params.length; i < imax; ++i) {
-        add_partial(samples.length, samples, i+1, params[i], 0);
+        add_partial(len, samples, i+1, params[i], 0);
       }
     }
   };
   
   gen_func.sine2 = function(samples, wavetable, params) {
+    var len = samples.length;
     var i, imax;
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; i += 2) {
-        add_wpartial(samples.length, samples, params[i], params[i+1], 0);
+        add_wpartial(len, samples, params[i], params[i+1], 0);
       }
     } else {
       for (i = 0, imax = params.length; i < imax; i += 2) {
-        add_partial(samples.length, samples, params[i], params[i+1], 0);
+        add_partial(len, samples, params[i], params[i+1], 0);
       }
     }
   };
   
   gen_func.sine3 = function(samples, wavetable, params) {
+    var len = samples.length;
     var i, imax;
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; i += 3) {
-        add_wpartial(samples.length, samples, params[i], params[i+1], params[i+2]);
+        add_wpartial(len, samples, params[i], params[i+1], params[i+2]);
       }
     } else {
       for (i = 0, imax = params.length; i < imax; i += 3) {
-        add_partial(samples.length, samples, params[i], params[i+1], params[i+2]);
+        add_partial(len, samples, params[i], params[i+1], params[i+2]);
       }
     }
   };
 
   gen_func.cheby = function(samples, wavetable, params) {
+    var len = samples.length;
     var i, imax;
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; ++i) {
-        add_wchebyshev(samples.length, samples, i+1, params[i]);
+        add_wchebyshev(len, samples, i+1, params[i]);
       }
     } else {
       for (i = 0, imax = params.length; i < imax; ++i) {
-        add_chebyshev(samples.length, samples, i+1, params[i]);
+        add_chebyshev(len, samples, i+1, params[i]);
       }
     }
   };
   
   var add_wpartial = function(size, data, partial, amp, phase) {
-    if (amp === 0) { return; }
+    if (amp === 0) {
+      return;
+    }
     var size2 = size >> 1;
     var w = (partial * 2.0 * Math.PI) / size2;
     var cur = amp * Math.sin(phase);
@@ -186,7 +195,9 @@ define(function(require, exports, module) {
     }
   };
   var add_partial = function(size, data, partial, amp, phase) {
-    if (amp === 0) { return; }
+    if (amp === 0) {
+      return;
+    }
     var w = (partial * 2.0 * Math.PI) / size;
     for (var i = 0; i < size; ++i) {
       data[i] += amp * Math.sin(phase);
@@ -194,11 +205,13 @@ define(function(require, exports, module) {
     }
   };
   var add_wchebyshev = function(size, data, partial, amp) {
-    if (amp === 0) { return; }
+    if (amp === 0) {
+      return;
+    }
     var size2 = size >> 1;
     var w = 2 / size2;
     var phase = -1;
-    var offset = -amp * Math.cos(partial * Math.PI * 2);
+    var offset = -amp * Math.cos(partial * Math.PI * 0.5);
     var cur = amp * Math.cos(partial * Math.acos(phase)) - offset;
     var next;
     phase += w;
@@ -211,10 +224,12 @@ define(function(require, exports, module) {
     }
   };
   var add_chebyshev = function(size, data, partial, amp) {
-    if (amp === 0) { return; }
+    if (amp === 0) {
+      return;
+    }
     var w = 2 / size;
     var phase = -1;
-    var offset = -amp * Math.cos(partial * Math.PI * 2);
+    var offset = -amp * Math.cos(partial * Math.PI * 0.5);
     for (var i = 0; i < size; ++i) {
       data[i] += amp * Math.cos(partial * Math.acos(phase)) - offset;
       phase += w;
@@ -227,7 +242,7 @@ define(function(require, exports, module) {
       absamp = Math.abs(data[i]);
       if (absamp > maxamp) { maxamp = absamp; }
     }
-    if (maxamp !== 0 && maxamp === peak) {
+    if (maxamp !== 0 && maxamp !== peak) {
       ampfac = peak / maxamp;
       for (i = 0; i < size; ++i) {
         data[i] *= ampfac;
@@ -238,10 +253,10 @@ define(function(require, exports, module) {
   var normalize_wsamples = function(size, data, peak) {
     var maxamp, absamp, ampfac, i;
     for (i = maxamp = 0; i < size; i += 2) {
-      absamp = Math.abs(data[i]);
+      absamp = Math.abs(data[i] + data[i+1]);
       if (absamp > maxamp) { maxamp = absamp; }
     }
-    if (maxamp !== 0 && maxamp === peak) {
+    if (maxamp !== 0 && maxamp !== peak) {
       ampfac = peak / maxamp;
       for (i = 0; i < size; ++i) {
         data[i] *= ampfac;
