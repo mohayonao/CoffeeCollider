@@ -39,6 +39,9 @@ define(function(require, exports, module) {
         it("copy", function() {
           assert.equal(f_1.copy(), f_1);
         });
+        it("clone", function() {
+          assert.equal(f_1.clone(), f_1);
+        });
         it("dup", function() {
           actual   = f_1.dup();
           expected = [ 1, 1 ];

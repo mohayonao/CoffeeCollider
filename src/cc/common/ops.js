@@ -47,7 +47,8 @@ define(function(require, exports, module) {
 
   var COMMONS = {
     copy: "",
-    dup : "n=2",
+    clone: "deep=false",
+    dup : "n=2,deep=false",
     "do": "",
     wait: "",
     asUGenInput: ""

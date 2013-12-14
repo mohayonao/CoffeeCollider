@@ -37,6 +37,10 @@ define(function(require, exports, module) {
           assert.deepEqual(d.copy(), d);
           assert.notEqual(d.copy(), d);
         });
+        it("clone", function() {
+          assert.deepEqual(d.clone(), d);
+          assert.notEqual(d.clone(), d);
+        });
         it("dup", function() {
           actual   = d.dup();
           expected = [ d, d ];

@@ -194,6 +194,20 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
           assert.notEqual(actual, list);
         });
+        it("clone", function() {
+          var list = [ 1, 2, 3, [null] ];
+          actual   = list.clone();
+          expected = [ 1, 2, 3, [null] ];
+          assert.deepEqual(actual, expected);
+          assert.notEqual(actual, list);
+          assert.equal(actual[3], list[3]);
+          
+          actual   = list.clone(true);
+          expected = [ 1, 2, 3, [null] ];
+          assert.deepEqual(actual, expected);
+          assert.notEqual(actual, list);
+          assert.notEqual(actual[3], list[3]);
+        });
         it("dup", function() {
           actual   = [ 1, 2, 3 ].dup();
           expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ] ];

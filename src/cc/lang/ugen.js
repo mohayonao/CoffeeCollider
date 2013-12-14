@@ -92,6 +92,10 @@ define(function(require, exports, module) {
       return this;
     };
     
+    UGen.prototype.clone = fn(function() {
+      return this;
+    }).defaults(ops.COMMONS.clone).build();
+    
     UGen.prototype.dup = fn(function(n) {
       var a = new Array(n|0);
       for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -99,7 +103,7 @@ define(function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
-
+    
     UGen.prototype["do"] = function() {
       return this;
     };
@@ -364,6 +368,10 @@ define(function(require, exports, module) {
       this.outputIndex  = index;
     }
     extend(OutputProxy, UGen);
+    
+    OutputProxy.prototype.clone = fn(function() {
+      return this;
+    }).defaults(ops.COMMONS.clone).build();
     
     return OutputProxy;
   })();

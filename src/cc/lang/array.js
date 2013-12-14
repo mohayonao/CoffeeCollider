@@ -11,11 +11,18 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "copy", function() {
     return this.slice();
   });
+
+  fn.defineProperty(Array.prototype, "clone", fn(function(deep) {
+    if (deep) {
+      return this.map(function(x) { return x && x.clone ? x.clone(true) : x; });
+    }
+    return this.slice();
+  }).defaults(ops.COMMONS.clone).build());
   
-  fn.defineProperty(Array.prototype, "dup", fn(function(n) {
+  fn.defineProperty(Array.prototype, "dup", fn(function(n, deep) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
-      a[i] = this.slice();
+      a[i] = this.clone(deep);
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());

@@ -1,7 +1,6 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("./cc");
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
@@ -22,6 +21,10 @@ define(function(require, exports, module) {
   fn.defineProperty(String.prototype, "copy", function() {
     return this;
   });
+  
+  fn.defineProperty(String.prototype, "clone", fn(function() {
+    return this;
+  }).defaults(ops.COMMONS.clone).build());
   
   fn.defineProperty(String.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);

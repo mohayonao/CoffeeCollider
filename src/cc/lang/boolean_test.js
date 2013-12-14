@@ -37,6 +37,10 @@ define(function(require, exports, module) {
           assert.equal(true .copy(), true );
           assert.equal(false.copy(), false);
         });
+        it("clone", function() {
+          assert.equal(true .clone(), true );
+          assert.equal(false.clone(), false);
+        });
         it("dup", function() {
           actual   = true.dup();
           expected = [ true, true ];

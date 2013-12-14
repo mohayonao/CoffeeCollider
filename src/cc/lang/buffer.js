@@ -76,7 +76,7 @@ define(function(require, exports, module) {
       ]);
     }
     extend(Buffer, cc.Object);
-
+    
     Buffer.prototype.free = function() {
       cc.lang.pushToTimeline([
         "/b_free", this.bufnum

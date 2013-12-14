@@ -20,6 +20,10 @@ define(function(require, exports, module) {
     return this;
   });
   
+  fn.defineProperty(Function.prototype, "clone", fn(function() {
+    return this;
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(Function.prototype, "dup", fn(function(n) {
     n |= 0;
     var a = new Array(n);

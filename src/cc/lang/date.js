@@ -11,6 +11,10 @@ define(function(require, exports, module) {
     return new Date(+this);
   });
   
+  fn.defineProperty(Date.prototype, "clone", fn(function() {
+    return new Date(+this);
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(Date.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
