@@ -130,7 +130,7 @@ define(function(require, exports, module) {
       this.busAmp   = 0.8;
       this.timeline = [];
       this.timelineIndex = 0;
-      this.rootNode = cc.createRootNode(this);
+      this.rootNode = cc.createServerRootNode(this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
@@ -155,7 +155,7 @@ define(function(require, exports, module) {
         this.bus.set(this.manager.busClear);
       }
       this.timeline = [];
-      this.rootNode = cc.createRootNode(this);
+      this.rootNode = cc.createServerRootNode(this);
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};

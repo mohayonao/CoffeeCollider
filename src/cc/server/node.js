@@ -410,7 +410,7 @@ define(function(require, exports, module) {
     return Synth;
   })();
   
-  cc.createRootNode = function(instance) {
+  cc.createServerRootNode = function(instance) {
     return new Group(0, 0, 0, instance);
   };
   

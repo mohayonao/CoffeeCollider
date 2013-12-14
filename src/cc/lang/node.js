@@ -225,7 +225,7 @@ define(function(require, exports, module) {
     return new Synth(node, C.REPLACE, def, args);
   };
   
-  cc.createRootNode = function() {
+  cc.createLangRootNode = function() {
     return new Group();
   };
   cc.instanceOfNode = function(obj) {

@@ -13,8 +13,8 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.rootNode   = cc.createRootNode();
-      this.taskManager   = cc.createTaskManager();
+      this.rootNode    = cc.createLangRootNode();
+      this.taskManager = cc.createTaskManager();
       this.timelineResult  = [];
       this.bufferRequestId = 0;
       this.bufferRequestCallback = {};
