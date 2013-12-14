@@ -26,7 +26,7 @@
   },
   "main": "./build/coffee-collider",
   "bin": {
-    "coffeecollider": "./bin/coffeecollider"
+    "coffeecollider": "./bin/coffeecollider.js"
   },
   "dependencies": {
     "coffee-script": "~1.6.3",
