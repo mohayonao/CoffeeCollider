@@ -204,18 +204,9 @@ define(function(require, exports, module) {
           throw new Error(name + " is not defined.")
         }
         describe("UGen:" + name, function() {
-          var _createMulAdd, _createBinaryOpUGen;
-          before(function() {
-            _createMulAdd = cc.createMulAdd;
-            _createBinaryOpUGen = cc.createBinaryOpUGen;
-            cc.createMulAdd = function(_in) { return _in; }
-            cc.createBinaryOpUGen = function(selector, a, b) { return a; }
-            
-          });
-          after(function() {
-            cc.createMulAdd = _createMulAdd;
-            cc.createBinaryOpUGen = _createBinaryOpUGen;
-          });
+          mock("createMulAdd", function(_in) { return _in; });
+          mock("createBinaryOpUGen", function(selector, a, b) { return a; });
+          
           var tests = specs;
           var Klass = cc.global[name];
           if (typeof specs === "function") {
