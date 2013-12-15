@@ -233,12 +233,11 @@ define(function(require, exports, module) {
     };
     SynthClientImpl.prototype.process = function() {
       var strm;
-      if (this.strmListWriteIndex <= this.strmListReadIndex) {
-        return;
+      if (this.strmListReadIndex < this.strmListWriteIndex) {
+        strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
+        this.strmListReadIndex += 1;
+        this.strm.set(strm);
       }
-      strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
-      this.strmListReadIndex += 1;
-      this.strm.set(strm);
       this.syncItemsUInt32[C.SYNC_COUNT] = ++this.syncCount;
       this.sendToLang(this.syncItems);
     };

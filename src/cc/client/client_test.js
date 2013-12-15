@@ -281,7 +281,6 @@ define(function(require, exports, module) {
         
         instance.process();
         assert.deepEqual(instance.strm, i16);
-        assert.equal(instance.syncCount, C.STRM_LIST_LENGTH);
       });
       it("#sendToLang", function() {
         instance.sendToLang(["/sendToLang(1)", 1, 2, 3]);
