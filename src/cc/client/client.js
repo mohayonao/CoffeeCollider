@@ -11,7 +11,6 @@ define(function(require, exports, module) {
     function SynthClient(opts) {
       opts = opts || {};
       
-      emitter.mixin(this);
       this.version = cc.version;
       if (opts.socket) {
         this.impl = cc.createSynthClientSocketImpl(this, opts);
@@ -49,13 +48,33 @@ define(function(require, exports, module) {
     SynthClient.prototype.getWebAudioComponents = function() {
       return this.impl.getWebAudioComponents.apply(this.impl, arguments);
     };
+
+    SynthClient.prototype.getListeners = function() {
+      return this.impl.getListeners.apply(this.impl, arguments);
+    };
+    SynthClient.prototype.hasListeners = function() {
+      return this.impl.hasListeners.apply(this.impl, arguments);
+    };
+    SynthClient.prototype.on = function() {
+      this.impl.on.apply(this.impl, arguments);
+      return this;
+    };
+    SynthClient.prototype.once = function() {
+      this.impl.once.apply(this.impl, arguments);
+      return this;
+    };
+    SynthClient.prototype.off = function() {
+      this.impl.off.apply(this.impl, arguments);
+      return this;
+    };
     
     return SynthClient;
   })();
 
   var SynthClientImpl = (function() {
     function SynthClientImpl(exports, opts) {
-      this.exports  = exports;
+      emitter.mixin(this);
+      
       this.compiler = cc.createCompiler("coffee");
       
       this.isPlaying = false;
@@ -116,7 +135,7 @@ define(function(require, exports, module) {
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.syncCount = syncCount;
-      this.exports.emit("play");
+      this.emit("play");
     };
     SynthClientImpl.prototype.pause = function() {
       if (this.isPlaying) {
@@ -128,7 +147,7 @@ define(function(require, exports, module) {
       if (this.api) {
         this.api.pause();
       }
-      this.exports.emit("pause");
+      this.emit("pause");
     };
     SynthClientImpl.prototype.reset = function() {
       this.execId = 0;
@@ -141,7 +160,7 @@ define(function(require, exports, module) {
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
       this.sendToLang(["/reset"]);
-      this.exports.emit("reset");
+      this.emit("reset");
     };
     SynthClientImpl.prototype.execute = function(code) {
       var opts;
@@ -279,7 +298,7 @@ define(function(require, exports, module) {
     this.sendToLang([
       "/init", this.sampleRate, this.channels, this.strmLength
     ]);
-    this.exports.emit("connected");
+    this.emit("connected");
     
     var i, imax;
     if (this.pendingExecution) {
@@ -318,7 +337,7 @@ define(function(require, exports, module) {
     });
   };
   commands["/socket/sendToClient"] = function(msg) {
-    this.exports.emit("message", msg[1]);
+    this.emit("message", msg[1]);
   };
   commands["/console/log"] = function(msg) {
     console.log.apply(console, unpack(msg[1]));

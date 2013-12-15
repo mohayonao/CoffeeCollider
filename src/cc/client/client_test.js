@@ -128,15 +128,10 @@ define(function(require, exports, module) {
       });
     });
     describe("SynthClientImpl", function() {
-      var instance, event, emitted, posted;
+      var instance, posted;
       beforeEach(function() {
-        event   = [];
         posted  = [];
-        emitted = [];
-        instance = cc.createSynthClientImpl({ emit:function(e) {
-          event.push(e);
-          emitted.push([].slice.call(arguments, 1));
-        }}, {});
+        instance = cc.createSynthClientImpl({}, {});
         instance.lang = {
           postMessage: function(msg) { posted.push(msg); }
         };
@@ -151,9 +146,11 @@ define(function(require, exports, module) {
         instance.api = null;
         instance.play();
       });
-      it("_played", function() {
+      it("_played", function(done) {
+        instance.on("play", function() {
+          done();
+        });
         instance._played(1);
-        assert.deepEqual(event, ["play"]);
         assert.equal(instance.syncCount, 1);
       });
       it("#pause", function() {
@@ -163,19 +160,22 @@ define(function(require, exports, module) {
         instance.pause();
         assert.deepEqual(posted, [["/play"], ["/pause"]]);
       });
-      it("_paused", function() {
+      it("_paused", function(done) {
+        instance.on("pause", function() {
+          done();
+        });
         instance._paused();
-        assert.deepEqual(event, ["pause"]);
       });
       it("_paused (cover)", function() {
         instance.api = null;
         instance._paused();
       });
-      it("#reset", function() {
+      it("#reset", function(done) {
+        instance.on("reset", function() {
+          done();
+        });
         instance.reset();
         assert.deepEqual(posted , [["/reset"]]);
-        assert.deepEqual(event  , ["reset"]);
-        assert.deepEqual(emitted, [[]]);
         assert.equal(instance.execId, 0);
         assert.deepEqual(instance.execCallbacks, {});
         assert.equal(instance.strmListReadIndex , 0);
@@ -394,10 +394,12 @@ define(function(require, exports, module) {
           assert.equal(path, "/path/to/audio");
           assert.deepEqual(posted, []);
         });
-        it("/socket/sendToClient", function() {
+        it("/socket/sendToClient", function(done) {
+          instance.on("message", function(msg) {
+            assert.equal(msg, "hello");
+            done();
+          });
           instance.recvFromLang(["/socket/sendToClient", "hello"]);
-          assert.deepEqual(event, ["message"]);
-          assert.deepEqual(emitted, [["hello"]]);
         });
         it("/unknown", function() {
           assert.throws(function() {
