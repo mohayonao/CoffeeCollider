@@ -597,6 +597,9 @@ define(function(require, exports, module) {
     sendToServer: function(cmd) {
       cc.lang.sendToServer.result.push(cmd);
     },
+    sendToClient: function(cmd) {
+      cc.lang.sendToClient.result.push(cmd);
+    },
     requestBuffer: function(path, callback) {
       callback({
         samples    : new Float32Array([0, 1, 2, 3]),
@@ -608,6 +611,7 @@ define(function(require, exports, module) {
     $beforeEach: function() {
       cc.lang.pushToTimeline.result = [];
       cc.lang.sendToServer.result   = [];
+      cc.lang.sendToClient.result   = [];
     }
   };
 

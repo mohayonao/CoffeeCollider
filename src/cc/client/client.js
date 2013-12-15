@@ -49,6 +49,10 @@ define(function(require, exports, module) {
       return this.impl.getWebAudioComponents.apply(this.impl, arguments);
     };
 
+    SynthClient.prototype.send = function() {
+      this.impl.send.apply(this.impl, arguments);
+      return this;
+    };
     SynthClient.prototype.getListeners = function() {
       return this.impl.getListeners.apply(this.impl, arguments);
     };
@@ -231,6 +235,11 @@ define(function(require, exports, module) {
       }
       return [];
     };
+    SynthClientImpl.prototype.send = function() {
+      this.sendToLang([
+        "/send", slice.call(arguments)
+      ]);
+    };
     SynthClientImpl.prototype.process = function() {
       var strm;
       if (this.strmListReadIndex < this.strmListWriteIndex) {
@@ -337,6 +346,10 @@ define(function(require, exports, module) {
   };
   commands["/socket/sendToClient"] = function(msg) {
     this.emit("message", msg[1]);
+  };
+  commands["/send"] = function(msg) {
+    var args = msg[1];
+    this.emit.apply(this, args);
   };
   commands["/console/log"] = function(msg) {
     console.log.apply(console, unpack(msg[1]));

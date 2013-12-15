@@ -145,8 +145,9 @@ define(function(require, exports, module) {
       delete this.bufferRequestCallback[requestId];
     }
   };
-  commands["/importScripts"] = function(msg) {
-    importScripts(msg[1]);
+  commands["/send"] = function(msg) {
+    var args = msg[1];
+    cc.global.Message.emit.apply(cc.global.Message, args);
   };
   
   cc.SynthLang = SynthLang;
@@ -172,6 +173,7 @@ define(function(require, exports, module) {
   require("./date");
   require("./env");
   require("./function");
+  require("./message");
   require("./mix");
   require("./node");
   require("./number");
