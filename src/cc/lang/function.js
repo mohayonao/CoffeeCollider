@@ -48,6 +48,10 @@ define(function(require, exports, module) {
     return utils.asUGenInput(this());
   });
   
+  fn.defineProperty(Function.prototype, "asString", function() {
+    return "Function";
+  });
+  
   // unary operator methods
   ["__plus__","__minus__"].concat(Object.keys(ops.UNARY_OPS)).forEach(function(selector) {
     fn.defineProperty(Function.prototype, selector, function() {

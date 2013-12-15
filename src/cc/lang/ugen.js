@@ -116,7 +116,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    UGen.prototype.toString = function() {
+    UGen.prototype.asString = function() {
       return this.klassName;
     };
     

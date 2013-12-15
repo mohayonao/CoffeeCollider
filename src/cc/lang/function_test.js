@@ -51,6 +51,16 @@ define(function(require, exports, module) {
           expected = [ 1, 1, 1, 1, 1 ];
           assert.deepEqual(actual, expected);
         });
+        it("asUGenInput", function() {
+          actual   = f_1.asUGenInput();
+          expected = 1;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = f_1.asString();
+          expected = "Function";
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {

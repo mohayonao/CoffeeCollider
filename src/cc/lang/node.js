@@ -63,6 +63,10 @@ define(function(require, exports, module) {
     Node.prototype.performWait = function() {
       return this._blocking;
     };
+
+    Node.prototype.asString = function() {
+      return this.klassName + "(" + this.nodeId + ")";
+    };
     
     return Node;
   })();

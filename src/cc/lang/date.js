@@ -48,7 +48,11 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(Date.prototype, "asUGenInput", function() {
-    return +this;
+    throw new Error("Date can't cast to a UGen.");
+  });
+  
+  fn.defineProperty(Date.prototype, "asString", function() {
+    return this.toString();
   });
   
   // unary operator methods

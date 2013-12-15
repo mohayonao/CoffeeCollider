@@ -47,7 +47,15 @@ define(function(require, exports, module) {
       });
       it("asUGenInput", function() {
         instance = cc.global.Bus.audio(10);
-        assert.equal(instance.asUGenInput(), instance.index);
+        actual   = instance.asUGenInput();
+        expected = instance.index;
+        assert.equal(actual, expected);
+      });
+      it("asString", function() {
+        instance = cc.global.Bus.audio(10);
+        actual   = instance.asString();
+        expected = "Bus(audio, 2, 10)";
+        assert.equal(actual, expected);
       });
     });
   });

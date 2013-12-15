@@ -167,7 +167,7 @@ define(function(require, exports, module) {
       if (checkNumber(val) || (Array.isArray(val) && val.every(checkNumber))) {
         continue;
       }
-      throw "bad arguments";
+      throw "bad arguments:" + utils.asString(val);
     }
     return true;
   };

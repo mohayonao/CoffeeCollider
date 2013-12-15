@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend = require("../common/extend");
+  var utils  = require("./utils");
   
   var bus_allocator = {
     audio:2, control:0
@@ -19,6 +20,10 @@ define(function(require, exports, module) {
     
     Bus.prototype.asUGenInput = function() {
       return this.index;
+    };
+
+    Bus.prototype.asString = function() {
+      return "Bus(" + utils.asRateString(this.rate) + ", " + this.index + ", " + this.numChannels + ")";
     };
     
     return Bus;

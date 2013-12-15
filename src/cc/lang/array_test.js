@@ -217,6 +217,16 @@ define(function(require, exports, module) {
           expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ] ];
           assert.deepEqual(actual, expected);
         });
+        it("asUGenInput", function() {
+          actual   = [ 1, 2, 3 ].asUGenInput();
+          expected = [ 1, 2, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("asString", function() {
+          actual   = [ 1, 2, 3 ].asString();
+          expected = "[ 1, 2, 3 ]";
+          assert.deepEqual(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {

@@ -73,6 +73,16 @@ define(function(require, exports, module) {
           expected = [ 10, 10, 10, 10, 10 ];
           assert.deepEqual(actual, expected);
         });
+        it("asUGenInput", function() {
+          actual   = (1).asUGenInput();
+          expected = 1;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = (1).asString();
+          expected = "1";
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("__plus__", function() {

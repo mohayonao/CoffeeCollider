@@ -50,6 +50,24 @@ define(function(require, exports, module) {
           expected = [ false, false, false, false, false ];
           assert.deepEqual(actual, expected);
         });
+        it("asUGenInput", function() {
+          actual   = true.asUGenInput();
+          expected = 1;
+          assert.equal(actual, expected);
+          
+          actual   = false.asUGenInput();
+          expected = 0;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = true.asString();
+          expected = "true";
+          assert.equal(actual, expected);
+          
+          actual   = false.asString();
+          expected = "false";
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {

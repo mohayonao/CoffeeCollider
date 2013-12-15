@@ -16,6 +16,14 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+
+  fn.defineProperty(cc.Object.prototype, "asUGenInput", function() {
+    throw new Error(this.klassName + " can't cast to a UGen.");
+  });
+  
+  fn.defineProperty(cc.Object.prototype, "asString", function() {
+    return this.klassName;
+  });
   
   module.exports = {};
 

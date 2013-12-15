@@ -91,6 +91,16 @@ define(function(require, exports, module) {
           assert.deepEqual(instance.dup(), [ instance, instance ]);
           assert.deepEqual(instance.dup(5), [ instance, instance, instance, instance, instance ]);
         });
+        it("asUGenInput", function() {
+          actual   = instance.asUGenInput();
+          expected = instance;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = instance.asString();
+          expected = "Test";
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {

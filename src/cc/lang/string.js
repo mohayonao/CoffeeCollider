@@ -43,6 +43,10 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(String.prototype, "asUGenInput", function() {
+    throw new Error("String can't cast to a UGen.");
+  });
+  
+  fn.defineProperty(String.prototype, "asString", function() {
     return this;
   });
   

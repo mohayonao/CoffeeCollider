@@ -53,8 +53,13 @@ define(function(require, exports, module) {
     }
     return this;
   });
+  
   fn.defineProperty(Number.prototype, "asUGenInput", function() {
     return this;
+  });
+
+  fn.defineProperty(Number.prototype, "asString", function() {
+    return this.toString();
   });
   
   // unary operator methods

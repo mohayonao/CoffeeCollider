@@ -48,7 +48,11 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(Boolean.prototype, "asUGenInput", function() {
-    return !!this;
+    return this ? 1 : 0;
+  });
+
+  fn.defineProperty(Boolean.prototype, "asString", function() {
+    return this ? "true" : "false";
   });
   
   // unary operator methods

@@ -50,6 +50,16 @@ define(function(require, exports, module) {
           expected = [ d, d, d, d, d ];
           assert.deepEqual(actual, expected);
         });
+        it("asUGenInput", function() {
+          assert.throws(function() {
+            d.asUGenInput();
+          });
+        });
+        it("asString", function() {
+          actual   = d.asString();
+          expected = d.toString();
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {
