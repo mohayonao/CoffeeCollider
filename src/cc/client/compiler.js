@@ -857,6 +857,7 @@ define(function(require, exports, module) {
     code = replaceTextBinaryAdverb(code);
     tokens = CoffeeScript.tokens(code);
     if (tokens.length) {
+      tokens = replaceNumericString(tokens);
       tokens = detectFunctionParameters(tokens);
       tokens = detectPlusMinusOperator(tokens);
       tokens = replaceBinaryOperatorAdverbs(tokens);
@@ -871,7 +872,6 @@ define(function(require, exports, module) {
       var tokens = getConditionedTokens(code);
       if (tokens.length) {
         tokens = replaceGlobalVariables(tokens);
-        tokens = replaceNumericString(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
         tokens = replaceBinaryOperator(tokens);
