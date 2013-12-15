@@ -70,6 +70,8 @@ define(function(require, exports, module) {
       this.bufnum     = bufnum++;
       this.frames     = frames  |0;
       this.channels   = channels|0;
+      this.sampleRate = cc.lang.sampleRate;
+      this.path       = null;
       
       cc.lang.pushToTimeline([
         "/b_new", this.bufnum, this.frames, this.channels
@@ -151,6 +153,10 @@ define(function(require, exports, module) {
       return this.bufnum;
     };
     
+    Buffer.prototype.asString = function() {
+      return "Buffer(" + this.bufnum + ", " + this.frames + ", " + this.channels + ", " + this.sampleRate + ", " + this.path + ")";
+    };
+    
     return Buffer;
   })();
   
@@ -186,6 +192,8 @@ define(function(require, exports, module) {
     } else {
       cc.lang.requestBuffer(path, function(result) {
         if (result) {
+          buffer.sampleRate = result.sampleRate;
+          buffer.path       = path;
           new BufferSource(result, path).bind(buffer, startFrame, numFrames);
         }
       });
