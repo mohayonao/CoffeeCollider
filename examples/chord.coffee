@@ -25,6 +25,6 @@ Task ->
     [ E4, "M7",  0, "bpm120 l4" ]
   ]
   Pseq(score, Infinity).do syncblock ([tone, chordname, inv, dur])->
-    syn.set trig:1, freqs:tone.chord(chordname, inversion:inv, length:4).midicps()
+    syn.set trig:1, freqs:tone.midichord(chordname, inversion:inv, length:4).midicps()
     dur.wait()
 .start()

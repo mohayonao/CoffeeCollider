@@ -143,3 +143,13 @@ ul li a {
 .btn-danger:active {
   background-color: #dc2d1b;
 }
+
+#keyboard {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width : 220px;
+  height: 80px;
+  border: solid 1px #2c3e50;
+  display: none;
+}
