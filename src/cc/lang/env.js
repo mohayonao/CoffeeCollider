@@ -95,7 +95,9 @@ define(function(require, exports, module) {
     }
     return new Env(levels, times, curve, releaseNode, loopNode, offset);
   }).defaults("levels=0,times=0,curve=\"lin\",releaseNode,loopNode,offset=0").build();
-
+  
+  cc.global.Env["new"] = cc.global.Env;
+  
   cc.global.Env.triangle = fn(function(dur, level) {
     dur = dur.__mul__(0.5);
     return new Env(

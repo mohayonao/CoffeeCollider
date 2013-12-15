@@ -401,6 +401,8 @@ define(function(require, exports, module) {
     build(instance, func, args, rates, prependArgs, variants);
     return instance;
   };
+  cc.global.SynthDef["new"] = cc.global.SynthDef;
+  
   cc.instanceOfSynthDef = function(obj) {
     return obj instanceof SynthDef;
   };

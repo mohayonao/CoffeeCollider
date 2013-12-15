@@ -181,6 +181,8 @@ define(function(require, exports, module) {
     return buffer;
   }).defaults("numFrames=0,numChannels=1,source").build();
   
+  cc.global.Buffer["new"] = cc.global.Buffer;
+  
   cc.global.Buffer.read = fn(function(path, startFrame, numFrames) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: path should be a string.");

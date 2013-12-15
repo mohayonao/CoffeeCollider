@@ -503,42 +503,52 @@ define(function(require, exports, module) {
   cc.global.Pgeom = fn(function(start, grow, length) {
     return new Pgeom(start, grow, length);
   }).defaults("start=0,grow=1,length=Infinity").build();
+  cc.global.Pgeom["new"] = cc.global.Pgeom;
   
   cc.global.Pseries = fn(function(start, step, length) {
     return new Pseries(start, step, length);
   }).defaults("start=0,step=1,length=Infinity").build();
+  cc.global.Pseries["new"] = cc.global.Pseries;
   
   cc.global.Pwhite = fn(function(lo, hi, length) {
     return new Pwhite(lo, hi, length);
   }).defaults("lo=0,hi=1,length=Infinity").build();
+  cc.global.Pwhite["new"] = cc.global.Pwhite;
   
   cc.global.Pser = fn(function(list, repeats, offset) {
     return new Pser(list, repeats, offset);
   }).defaults("list=[],repeats=1,offset=0").build();
+  cc.global.Pser["new"] = cc.global.Pser;
   
   cc.global.Pseq = fn(function(list, repeats, offset) {
     return new Pseq(list, repeats, offset);
   }).defaults("list,repeats=1,offset=0").build();
-
+  cc.global.Pseq["new"] = cc.global.Pseq;
+  
   cc.global.Pshuf = fn(function(list, repeats) {
     return new Pshuf(list, repeats);
   }).defaults("list=[],repeats=1").build();
+  cc.global.Pshuf["new"] = cc.global.Pshuf;
   
   cc.global.Prand = fn(function(list, repeats) {
     return new Prand(list, repeats);
   }).defaults("list=[],repeats=1").build();
+  cc.global.Prand["new"] = cc.global.Prand;
   
   cc.global.Pn = fn(function(pattern, repeats) {
     return new Pn(pattern, repeats);
   }).defaults("pattern=[],repeats=Infinity").build();
+  cc.global.Pn["new"] = cc.global.Pn;
   
   cc.global.Pfin = fn(function(count, pattern) {
     return new Pfin(count, pattern);
   }).defaults("count=1,pattern=[]").build();
+  cc.global.Pfin["new"] = cc.global.Pfin;
   
   cc.global.Pstutter = fn(function(n, pattern) {
     return new Pstutter(n, pattern);
   }).defaults("n=1,pattern=[]").build();
+  cc.global.Pstutter["new"] = cc.global.Pstutter;
   
   module.exports = {
     Pattern: Pattern,

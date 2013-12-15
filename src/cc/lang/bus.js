@@ -33,6 +33,8 @@ define(function(require, exports, module) {
     return cc.global.Bus.control(1);
   };
   
+  cc.global.Bus["new"] = cc.global.Bus;
+  
   cc.global.Bus.control = fn(function(numChannels) {
     var index = bus_allocator.control;
     if (typeof numChannels === "number") {

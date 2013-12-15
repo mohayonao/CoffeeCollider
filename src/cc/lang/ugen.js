@@ -413,6 +413,7 @@ define(function(require, exports, module) {
       ugenInterface = function() {
         return cc.global[name]["new"].apply(null, slice.call(arguments));
       };
+      cc.global[name] = ugenInterface;
     } else {
       ugenInterface = function(rate) {
         if (typeof rate === "number") {
@@ -424,8 +425,9 @@ define(function(require, exports, module) {
         }
         return new UGen(name);
       };
+      cc.global[name] = ugenInterface;
+      cc.global[name]["new"] = ugenInterface;
     }
-    cc.global[name] = ugenInterface;
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "$") {
