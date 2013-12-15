@@ -4,18 +4,19 @@ module.exports = function(grunt) {
   var path   = require("path");
   var assert = require("chai").assert;
   
-  assert.deepCloseTo = function(expected, actual, delta) {
-    expected.forEach(function(x, i) {
-      if (isNaN(x)) {
-        assert.isTrue(isNaN(actual[i]), "NaN");
-      } else if (x === +Infinity) {
-        assert.equal(actual[i], +Infinity);
-      } else if (x === -Infinity) {
-        assert.equal(actual[i], -Infinity);
+  assert.deepCloseTo = function(actual, expected, delta) {
+    assert.equal(actual.length, expected.length);
+    for (var i = 0; i < actual.length; ++i) {
+      if (isNaN(expected[i])) {
+        assert.isTrue(isNaN(actual[i]), "index:" + i + ", want NaN got " + actual[i]);
+      } else if (expected[i] === +Infinity) {
+        assert.equal(actual[i], +Infinity, "index:" + i);
+      } else if (expected[i] === -Infinity) {
+        assert.equal(actual[i], -Infinity, "index:" + i);
       } else {
-        assert.closeTo(actual[i], x, delta);
+        assert.closeTo(actual[i], expected[i], delta, "index:" + i);
       }
-    });
+    }
   };
   
   grunt.loadNpmTasks("grunt-contrib-connect");
