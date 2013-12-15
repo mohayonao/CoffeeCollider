@@ -31,10 +31,18 @@ $(function() {
   });
   
   var cc = window.cc = new CoffeeCollider(config);
+  cc.on("play", function() {
+    viewer.start();
+    changeFavicon("play");
+  });
+  cc.on("pause", function() {
+    viewer.stop();
+    changeFavicon("pause");
+  });
+  
   var viewer = new WaveViewer(cc, document.getElementById("canvas"), {
     width:200, height:100, fillStyle:"#2c3e50", strokeStyle:"#f1c40f", lineWidth:2
   });
-  var status = "pause";
   
   var changeFavicon;
   if (isEdge) {
@@ -47,22 +55,6 @@ $(function() {
     };
   }
   
-  $boot.on("click", function(e) {
-    if (status === "pause") {
-      cc.play();
-      viewer.start();
-      $boot.addClass("btn-danger");
-      status = "play";
-      changeFavicon("play");
-    } else {
-      cc.pause();
-      viewer.stop();
-      $boot.removeClass("btn-danger");
-      status = "pause";
-      changeFavicon("pause");
-    }
-  });
-  
   $("#run").on("click", function() {
     var code;
     if (isCoffee) {
@@ -74,13 +66,13 @@ $(function() {
       if (res !== undefined) {
         console.log(res);
       }
-    });
+    }).play();
   });
   
-  $("#reset").on("click", function() {
-    cc.reset();
+  $("#stop").on("click", function() {
+    cc.reset().pause();
   });
-
+  
   $("#link").on("click", function() {
     var code;
     if (isCoffee) {
@@ -102,7 +94,7 @@ $(function() {
   $("#version").text(cc.version);
 
   var isCoffee = true, coffeeSource = "";
-  $("#compile-js").on("click", function() {
+  $("#compile").on("click", function() {
     var jsSource = "";
     isCoffee = !isCoffee;
     if (isCoffee) {
