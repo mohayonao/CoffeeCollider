@@ -10,9 +10,7 @@ define(function(require, exports, module) {
   describe("server/unit.js", function() {
     var parent;
     
-    testTools.mock("getRateInstance", function(rate) {
-      return { bufLength: 64 };
-    });
+    testTools.mock("server");
     
     before(function() {
       parent = {
@@ -38,9 +36,9 @@ define(function(require, exports, module) {
       assert.equal(u.numOfOutputs, 1);
       assert.isArray(u.inputs);
       assert.isArray(u.outputs);
-      assert.equal(u.numOfInputs, u.inputs.length);
+      assert.equal(u.numOfInputs , u.inputs.length);
       assert.equal(u.numOfOutputs, u.outputs.length);
-      assert.equal(u.bufLength   , 64);
+      assert.equal(u.bufLength   , cc.server.rates[C.AUDIO].bufLength);
     });
     it("init", function() {
       var specs = [

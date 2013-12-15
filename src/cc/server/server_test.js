@@ -12,7 +12,6 @@ define(function(require, exports, module) {
     testTools.mock("lang");
     testTools.mock("createTimer");
     testTools.mock("createInstanceManager");
-    testTools.mock("initRateInstance", function() {});
     
     describe("SynthServer", function() {
       describe("createSynthServer", function() {

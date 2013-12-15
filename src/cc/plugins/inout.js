@@ -115,7 +115,7 @@ define(function(require, exports, module) {
   cc.unit.specs.T2K = (function() {
     var ctor = function() {
       this.process = next;
-      this._bufLength = cc.getRateInstance(C.AUDIO).bufLength;
+      this._bufLength = cc.server.rates[C.AUDIO].bufLength;
       this.outputs[0][0] = this.input[0][0];
     };
     var next = function() {

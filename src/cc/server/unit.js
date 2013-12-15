@@ -16,7 +16,7 @@ define(function(require, exports, module) {
       this.inRates   = new Array(this.numOfInputs);
       this.fromUnits = new Array(this.numOfInputs);
       this.outRates = specs[4];
-      this.rate     = cc.getRateInstance(this.calcRate);
+      this.rate     = cc.server.rates[this.calcRate];
       var bufLength = this.rate.bufLength;
       var allOutputs = new Float32Array(bufLength * this.numOfOutputs);
       var outputs    = new Array(this.numOfOutputs);

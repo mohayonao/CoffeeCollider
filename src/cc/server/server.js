@@ -10,6 +10,7 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
+      this.rates = null;
       this.instanceManager = cc.createInstanceManager();
       this.strm = null;
       this.timer = cc.createTimer();
@@ -48,7 +49,11 @@ define(function(require, exports, module) {
         this.strm  = new Int16Array(this.strmLength * this.channels);
         this.instanceManager.init(this);
         this.instanceManager.append(0);
-        cc.initRateInstance();
+        this.rates = [];
+        this.rates[C.AUDIO  ] = cc.createRate(this.sampleRate, this.bufLength);
+        this.rates[C.CONTROL] = cc.createRate(this.sampleRate / this.bufLength, 1);
+        this.rates[C.SCALAR ] = this.rates[C.CONTROL];
+        this.rates[C.DEMAND ] = this.rates[C.CONTROL];
       }
     };
     SynthServer.prototype.play = function(msg, userId) {

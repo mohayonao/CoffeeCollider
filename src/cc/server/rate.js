@@ -27,14 +27,6 @@ define(function(require, exports, module) {
   cc.createRate = function(sampleRate, bufLength) {
     return new Rate(sampleRate, bufLength);
   };
-  var bufRate, fulRate;
-  cc.initRateInstance = function() {
-    bufRate = new Rate(cc.server.sampleRate / cc.server.bufLength, 1);
-    fulRate = new Rate(cc.server.sampleRate, cc.server.bufLength);
-  };
-  cc.getRateInstance = function(rate) {
-    return rate === C.AUDIO ? fulRate : bufRate;
-  };
   
   module.exports = {};
 
