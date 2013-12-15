@@ -2,29 +2,29 @@ define(function(require, exports, module) {
   "use strict";
   
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   var cc = require("./cc");
   var unit = require("./unit");
   
   describe("server/unit.js", function() {
-    var parent, _getRateInstance;
+    var parent;
+    
+    testTools.mock("getRateInstance", function(rate) {
+      return { bufLength: 64 };
+    });
+    
     before(function() {
       parent = {
         doneAction: function(action) {
           parent.doneAction.result = action;
         }
       };
-      _getRateInstance = cc.getRateInstance;
-      cc.getRateInstance = function(rate) {
-        return { bufLength: 64 };
-      };
       cc.unit.specs.TestUnit = function() {
         cc.unit.specs.TestUnit.called = true;
       };
     });
-    after(function() {
-      cc.getRateInstance = _getRateInstance;
-    });
+    
     it("create", function() {
       var specs = [
         "TestUnit", C.AUDIO, 1, [ 0, 0, 0, 0 ], [ 2 ], ""

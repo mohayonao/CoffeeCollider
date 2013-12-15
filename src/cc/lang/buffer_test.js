@@ -2,40 +2,15 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   var buffer = require("./buffer");
   var cc = require("./cc");
   
   describe("lang/buffer.js", function() {
     var instance, actual, expected;
-    var _lang;
-    before(function() {
-      _lang = cc.lang;
-      cc.lang = {
-        sampleRate: 44100,
-        pushToTimeline: function(cmd) {
-          cc.lang.pushToTimeline.result.push(cmd);
-        },
-        sendToServer: function(cmd) {
-          cc.lang.sendToServer.result.push(cmd);
-        },
-        requestBuffer: function(path, callback) {
-          callback({
-            samples    : new Float32Array([0, 1, 2, 3]),
-            numChannels: 1,
-            sampleRate : 8000,
-            numFrames  : 4
-          });
-        }
-      };
-    });
-    after(function() {
-      cc.lang = _lang;
-    });
-    beforeEach(function() {
-      cc.lang.pushToTimeline.result = [];
-      cc.lang.sendToServer.result   = [];
-    });
+    testTools.mock("lang");
+    
     describe("BufferSource", function() {
       it("new", function() {
         instance = new buffer.BufferSource({

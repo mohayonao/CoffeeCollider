@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   require("./date");
 
   var testTools = require("../../testTools");
@@ -12,17 +13,11 @@ define(function(require, exports, module) {
   describe("lang/date.js", function() {
     var d = new Date(0), n = +d;
     var actual, expected;
-    var _instanceOfUGen;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      
-      cc.instanceOfUGen = function() {
-        return false;
-      };
+    
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
-    });
+    
     describe("class methods", function() {
     });
     

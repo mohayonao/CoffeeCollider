@@ -2,6 +2,8 @@ define(function(require, exports, module) {
   "use strict";
   
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
+  
   var cc = require("./cc");
   var node = require("./node");
   var Group = node.Group;
@@ -25,20 +27,14 @@ define(function(require, exports, module) {
   
   describe("server/node.js", function() {
     var nodeId, rootNode, nodes;
-    var _server;
-    before(function() {
-      _server = cc.server;
-      
-      cc.server = {
-        timeline: {
-          push: function(func) { func(); }
-        },
-        sendToLang: function() {}
-      };
+
+    testTools.mock("server", {
+      timeline: {
+        push: function(func) { func(); }
+      },
+      sendToLang: function() {}
     });
-    after(function() {
-      cc.server = _server;
-    });
+    
     beforeEach(function() {
       nodeId = 0;
       nodes = [];

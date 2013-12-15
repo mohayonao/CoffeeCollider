@@ -2,22 +2,16 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
 
   var cc = require("./cc");
   var buffer = require("./buffer");
 
   describe("server/buffer.js", function() {
     var instance, actual, expected;
-    var _server;
-    before(function() {
-      _server = cc.server;
-      cc.server = {
-        sampleRate: 44100
-      };
-    });
-    after(function() {
-      cc.server = _server;
-    });
+    
+    testTools.mock("server");
+    
     describe("Buffer", function() {
       it("new", function() {
         instance = new buffer.Buffer(0, 16, 2);

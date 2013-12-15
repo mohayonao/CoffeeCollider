@@ -12,26 +12,13 @@ define(function(require, exports, module) {
 
   describe("lang/array.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createBinaryOpUGen;
-    before(function() {
-      _lang = cc.lang;
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createBinaryOpUGen  = cc.createBinaryOpUGen;
-      
-      cc.lang = {};
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createBinaryOpUGen = function(selector, a, b) {
-        return [selector, a, b];
-      };
+    testTools.mock("lang", {});
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.lang = _lang;
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createBinaryOpUGen  = _createBinaryOpUGen;
+    testTools.mock("createBinaryOpUGen", function(selector, a, b) {
+      return [selector, a, b];
     });
-    
     describe("class methods", function() {
       it("series", function() {
         actual   = Array.series(10);

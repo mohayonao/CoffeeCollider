@@ -2,10 +2,10 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
   require("./function");
-
-  var testTools = require("../../testTools");
+  
   var cc  = require("./cc");
   var ops = require("../common/ops");
   
@@ -14,16 +14,8 @@ define(function(require, exports, module) {
   
   describe("lang/function.js", function() {
     var actual, expected;
-    var _instanceOfUGen;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-    });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
     
     describe("class methods", function() {

@@ -2,6 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
   require("./string");
 
@@ -11,18 +12,10 @@ define(function(require, exports, module) {
   
   describe("lang/string.js", function() {
     var actual, expected;
-    var _instanceOfUGen;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      
-      cc.instanceOfUGen = function() {
-        return false;
-      };
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
-    });
-
+    
     describe("class methods", function() {
     });
     

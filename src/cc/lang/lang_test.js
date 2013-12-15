@@ -2,57 +2,19 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   require("./lang");
   
   var cc = require("./cc");
-  var nop = function() { return {}; };
   
   describe("lang/lang.js", function() {
-    var called;
-    var _exports, _createWebWorker, _createTaskManager, _resetBuffer, _resetNode, _resetBuiltin;
-    before(function() {
-      _exports = cc.exports;
-      _createWebWorker = cc.createWebWorker;
-      _createTaskManager = cc.createTaskManager;
-      _resetBuffer = cc.resetBuffer;
-      _resetNode   = cc.resetNode;
-      
-      cc.exports = nop;
-      cc.createWebWorker = nop;
-      cc.createTaskManager = function() {
-        return {
-          start: function() {
-            called.push("tl.start");
-          },
-          reset: function() {
-            called.push("tl.reset");
-          },
-          process: function() {
-            called.push("tl.process");
-          }
-        };
-      };
-      cc.resetBuffer = function() {
-        called.push("resetBuffer");
-      };
-      cc.resetNode   = function() {
-        called.push("resetNode");
-      };
-      cc.resetBuiltin = function() {
-        called.push("resetBuiltin");
-      };
-    });
-    after(function() {
-      cc.exports = _exports;
-      cc.createWebWorker = _createWebWorker;
-      cc.createTaskManager = _createTaskManager;
-      cc.resetBuffer = _resetBuffer;
-      cc.resetNode   = _resetNode;
-    });
-    beforeEach(function() {
-      called = [];
-    });
+    testTools.mock("createWebWorker");
+    testTools.mock("resetBuffer");
+    testTools.mock("resetNode");
+    testTools.mock("resetBuiltin");
+    testTools.mock("createTaskManager");
+    
     describe("SynthLang", function() {
       describe("createSynthLang", function() {
         it("WebWorker", function() {
@@ -87,7 +49,7 @@ define(function(require, exports, module) {
         });
         it("#play", function() {
           instance.play(["/play"]);
-          assert.deepEqual(called, ["tl.start"]);
+          assert.deepEqual(cc.createTaskManager.called, ["start"]);
           assert.deepEqual(sendToServer, ["/play"]);
         });
         it("#pause", function() {
@@ -96,11 +58,10 @@ define(function(require, exports, module) {
         });
         it("#reset", function() {
           instance.reset(["/reset"]);
-          assert.notEqual(called.indexOf("resetBuffer") , -1);
-          assert.notEqual(called.indexOf("resetNode")   , -1);
-          assert.notEqual(called.indexOf("resetBuiltin"), -1);
-          assert.notEqual(called.indexOf("tl.reset")    , -1);
-          assert.equal(called.length, 4);
+          assert.isTrue(cc.resetBuffer .result);
+          assert.isTrue(cc.resetNode   .result);
+          assert.isTrue(cc.resetBuiltin.result);
+          assert.deepEqual(cc.createTaskManager.called, ["reset"]);
           assert.deepEqual(sendToServer, ["/reset"]);
         });
         it("#requestBuffer", function() {
@@ -207,8 +168,10 @@ define(function(require, exports, module) {
           };
           
           instance.process();
-          assert.deepEqual(called, ["tl.process"],
-                           "WebWorkerLang processes one by one");
+          assert.deepEqual(
+            cc.createTaskManager.called, ["process"],
+            "WebWorkerLang processes one by one"
+          );
           assert.deepEqual(sendToServer, ["/processed", [] ]);
         });
         it("WebSocket", function() {
@@ -225,12 +188,14 @@ define(function(require, exports, module) {
           var expected = [];
           var i, n = instance.strmLength / instance.bufLength;
           for (var i = 0; i < n; ++i) {
-            expected.push("tl.process");
+            expected.push("process");
           }
           
           instance.process();
-          assert.deepEqual(called, expected,
-                           "WebSocketLang processes in a lump");
+          assert.deepEqual(
+            cc.createTaskManager.called, expected,
+            "WebSocketLang processes in a lump"
+          );
           expected = expected.map(function(x) { return 0; });
           assert.deepEqual(sendToServer, ["/processed", expected ]);
         });

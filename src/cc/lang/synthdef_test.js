@@ -2,9 +2,9 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
-  var synthdef = require("./synthdef");
+  var testTools = require("../../testTools");
   
+  var synthdef = require("./synthdef");
   var cc = require("./cc");
   
   var IR = 0, TR = 1, KR = 2, AR = 3;
@@ -37,75 +37,40 @@ define(function(require, exports, module) {
   
   describe("lang/synthdef.js", function() {
     var actual, expected;
-    var _lang, _instanceOfNode, _Synth;
-    var _setSynthDef, _createScalarControl, _createTrigControl;
-    var _createAudioControl, _createLagControl, _createControl;
-    var _instanceOfOut, _instanceOfOutputProxy, _instanceOfControlUGen;
     var addToSynth;
-    before(function() {
-      _lang = cc.lang;
-      _instanceOfNode = cc.instanceOfNode;
-      _Synth = cc.global.Synth;
-      _setSynthDef = cc.setSynthDef;
-      _createScalarControl   = cc.createScalarControl;
-      _createTrigControl     = cc.createTrigControl;
-      _createAudioControl    = cc.createAudioControl;
-      _createLagControl      = cc.createLagControl;
-      _createControl         = cc.createControl;
-      _instanceOfOut         = cc.instanceOfOut;
-      _instanceOfOutputProxy = cc.instanceOfOutputProxy;
-      _instanceOfControlUGen = cc.instanceOfControlUGen;
-
-      cc.lang = {
-        pushToTimeline: function(cmd) {
-          cc.lang.pushToTimeline.result = cmd;
-        }
-      };
-      cc.instanceOfNode = function() {
-        return true;
-      };
-      cc.global.Synth = function(def, args, target, action) {
-        return [def, args, target, action];
-      };
-      cc.setSynthDef = function(func) {
-        addToSynth = func;
-      };
-      cc.createTrigControl = function() {
-        return new Control("TrigControl", C.CONTROL);
-      };
-      cc.createAudioControl = function() {
-        return new Control("AudioControl", C.AUDIO);
-      };
-      cc.createLagControl = function() {
-        return new Control("LagControl", C.CONTROL);
-      };
-      cc.createControl = function(rate) {
-        return new Control("Control", rate);
-      };
-      cc.instanceOfOut = function(obj) {
-        return obj.klassName === "Out";
-      };
-      cc.instanceOfOutputProxy = function(obj) {
-        return obj.klassName === "OutputProxy";
-      };
-      cc.instanceOfControlUGen = function(obj) {
-        return /Control$/.test(obj.klassName);
-      };
+    
+    testTools.mock("lang");
+    testTools.mock("createTrigControl", function() {
+      return new Control("TrigControl", C.CONTROL);
     });
-    after(function() {
-      cc.lang = _lang;
-      cc.instanceOfNode = _instanceOfNode;
-      cc.global.Synth = _Synth;
-      cc.setSynthDef = _setSynthDef;
-      cc.createScalarControl   = _createScalarControl;
-      cc.createTrigControl     = _createTrigControl;
-      cc.createAudioControl    = _createAudioControl;
-      cc.createLagControl      = _createLagControl;
-      cc.createControl         = _createControl;
-      cc.instanceOfOut         = _instanceOfOut;
-      cc.instanceOfOutputProxy = _instanceOfOutputProxy;
-      cc.instanceOfControlUGen = _instanceOfControlUGen;
+    testTools.mock("createAudioControl", function() {
+      return new Control("AudioControl", C.AUDIO);
     });
+    testTools.mock("createLagControl", function() {
+      return new Control("LagControl", C.CONTROL);
+    });
+    testTools.mock("createControl", function(rate) {
+      return new Control("Control", rate);
+    });
+    testTools.mock("instanceOfNode", function() {
+      return true;
+    });
+    testTools.mock("instanceOfControlUGen", function(obj) {
+      return /Control$/.test(obj.klassName);
+    });
+    testTools.mock("instanceOfOut", function(obj) {
+      return obj.klassName === "Out";
+    });
+    testTools.mock("instanceOfOutputProxy", function(obj) {
+      return obj.klassName === "OutputProxy";
+    });
+    testTools.mock("global.Synth", function(def, args, target, action) {
+      return [def, args, target, action];
+    });
+    testTools.mock("setSynthDef", function(func) {
+      addToSynth = func;
+    });
+    
     describe("private methods", function() {
       it("initBuild", function() {
         var that = {};
@@ -459,8 +424,9 @@ define(function(require, exports, module) {
         assert.equal(actual, expected);
         
         assert.deepEqual(
-          cc.lang.pushToTimeline.result,
-          [ "/s_def", def._defId, JSON.stringify({consts:["-Infinity", "Infinity"]}) ]
+          cc.lang.pushToTimeline.result, [
+            [ "/s_def", def._defId, JSON.stringify({consts:["-Infinity", "Infinity"]}) ]
+          ]
         );
         
         cc.lang.pushToTimeline.result = [];

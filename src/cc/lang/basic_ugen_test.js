@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   var cc = require("./cc");
   var slice = [].slice;
   
@@ -29,30 +30,22 @@ define(function(require, exports, module) {
   describe("lang/basic_ugen.js", function() {
     var actual, expected;
     var basic_ugen;
-    var _UGen, _MultiOutUGen, _instanceOfUGen;
+    var _UGen = cc.UGen;
     var u1, u2, u3, u4;
+    testTools.mock("UGen", UGen);
+    testTools.mock("MultiOutUGen", MultiOutUGen);
+    testTools.mock("instanceOfUGen", function(obj) {
+      return obj instanceof UGen || (_UGen && obj instanceof _UGen);
+    });
+    
     before(function() {
-      _UGen = cc.UGen;
-      _MultiOutUGen = cc.MultiOutUGen;
-      _instanceOfUGen = cc.instanceOfUGen;
-
-      cc.UGen = UGen;
-      cc.MultiOutUGen = MultiOutUGen;
-      cc.instanceOfUGen = function(obj) {
-        return obj instanceof UGen || (_UGen && obj instanceof _UGen);
-      };
-      
       basic_ugen = require("./basic_ugen")
       u1 = new UGen("TestUGen", C.SCALAR);
       u2 = new UGen("TestUGen", C.CONTROL);
       u3 = new UGen("TestUGen", C.AUDIO);
       u4 = new UGen("TestUGen", C.DEMAND);
     });
-    after(function() {
-      cc.UGen = _UGen;
-      cc.MultiOutUGen = _MultiOutUGen;
-      cc.instanceOfUGen = _instanceOfUGen;
-    });
+    
     describe("UnaryOpUGen", function() {
       it("create", function() {
         actual = cc.createUnaryOpUGen("neg", u1);

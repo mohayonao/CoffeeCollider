@@ -2,21 +2,15 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
-  var unitTestSuite = require("../../testTools").unitTestSuite;
+  var testTools = require("../../testTools");
+  var unitTestSuite = testTools.unitTestSuite;
+  
   var cc   = require("./cc");
   var unit = require("./unit");
   var basic_unit = require("./basic_unit");
   var ops  = require("../common/ops");
   
   describe("server/basic_unit.js", function() {
-    var _getRateInstance;
-    before(function() {
-      _getRateInstance = cc.getRateInstance;
-    });
-    after(function() {
-      cc.getRateInstance = _getRateInstance;
-    });
     describe("unary operators", function() {
       describe("uopFunc", function() {
         Object.keys(basic_unit.uopFunc).forEach(function(selector) {
@@ -68,13 +62,14 @@ define(function(require, exports, module) {
         });
       });
       describe("unit", function() {
+        testTools.mock("getRateInstance", function() {
+          return { bufLength: 64 };
+        });
+        
         var specialIndex;
         before(function() {
           specialIndex = ops.UNARY_OPS_MAP.length;
           ops.UNARY_OPS_MAP[specialIndex] = "uopTest";
-          cc.getRateInstance = function() {
-            return { bufLength: 64 };
-          };
         });
         beforeEach(function() {
           basic_unit.uopFunc.uopTest = function(a) {
@@ -457,13 +452,14 @@ define(function(require, exports, module) {
         });
       });
       describe("unit", function() {
+        testTools.mock("getRateInstance", function() {
+          return { bufLength:8, slopeFactor:1/8 };
+        });
+        
         var specialIndex;
         before(function() {
           specialIndex = ops.BINARY_OPS_MAP.length;
           ops.BINARY_OPS_MAP[specialIndex] = "bopTest";
-          cc.getRateInstance = function() {
-            return { bufLength:8, slopeFactor:1/8 };
-          };
         });
         beforeEach(function() {
           basic_unit.bopFunc.bopTest = function(a, b) {

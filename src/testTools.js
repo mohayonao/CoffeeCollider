@@ -561,7 +561,148 @@ define(function(require, exports, module) {
     
     return testSuite;
   })();
+
+  // mock
+  var mock = function(name, obj) {
+    var target = cc;
+    if (/^global\./.test(name)) {
+      target = cc.global;
+      name   = name.substr(7);
+    }
+    var substitute = obj || mock[name];
+    before(function() {
+      mock._saved[name] = target[name];
+      target[name] = substitute;
+    });
+    if (substitute.$beforeEach) {
+      beforeEach(substitute.$beforeEach);
+    }
+    after(function() {
+      target[name] = mock._saved[name];
+    });
+  };
+  mock._saved = {};
+
+  mock.console = {
+    log: function() {
+      mock.console.log.result = slice.apply(arguments);
+    },
+    $beforeEach: function() {
+      mock.console.log.result = null;
+    }
+  };
   
+  mock.createWebWorker = function() {
+    return {};
+  };
+  mock.createTimer = function() {
+    return {
+      isRunning: function() {
+        return false;
+      },
+      start: function() {},
+      stop : function() {}
+    };
+  };
+  
+  mock.lang = {
+    sampleRate: 44100,
+    rootNode  : {},
+    pushToTimeline: function(cmd) {
+      cc.lang.pushToTimeline.result.push(cmd);
+    },
+    sendToServer: function(cmd) {
+      cc.lang.sendToServer.result.push(cmd);
+    },
+    requestBuffer: function(path, callback) {
+      callback({
+        samples    : new Float32Array([0, 1, 2, 3]),
+        numChannels: 1,
+        sampleRate : 8000,
+        numFrames  : 4
+      });
+    },
+    $beforeEach: function() {
+      cc.lang.pushToTimeline.result = [];
+      cc.lang.sendToServer.result   = [];
+    }
+  };
+
+  mock.server = {
+    sampleRate: 44100,
+  };
+  
+  mock.createMulAdd = function(a, mul, add) {
+    return a * mul + add;
+  };
+  
+  mock.createTaskManager = function() {
+    return {
+      start: function() {
+        mock.createTaskManager.called.push("start");
+      },
+      reset: function() {
+        mock.createTaskManager.called.push("reset");
+      },
+      process: function() {
+        mock.createTaskManager.called.push("process");
+      }
+    };
+  };
+  mock.createTaskManager.$beforeEach = function() {
+    mock.createTaskManager.called = [];
+  };
+
+  mock.createInstanceManager = function() {
+    return {
+      init: function() {
+        mock.createInstanceManager.called.push("init");
+      },
+      play: function() {
+        mock.createInstanceManager.called.push("play");
+      },
+      pause: function() {
+        mock.createInstanceManager.called.push("pause");
+      },
+      reset: function() {
+        mock.createInstanceManager.called.push("reset");
+      },
+      pushToTimeline: function() {
+        mock.createInstanceManager.called.push("pushToTimeline");
+      },
+      append: function() {
+        mock.createInstanceManager.called.push("append");
+      },
+      remove: function() {
+        mock.createInstanceManager.called.push("remove");
+      },
+      process:function() {
+        mock.createInstanceManager.called.push("process");
+      }
+    };
+  };
+  mock.createInstanceManager.$beforeEach = function() {
+    mock.createInstanceManager.called = [];
+  };
+  
+  mock.resetBuffer = function() {
+    mock.resetBuffer.result = true;
+  };
+  mock.resetBuffer.$beforeEach = function() {
+    mock.resetBuffer.result = null;
+  };
+  mock.resetNode = function() {
+    mock.resetNode.result = true;
+  };
+  mock.resetNode.$beforeEach = function() {
+    mock.resetNode.result = null;
+  };
+  mock.resetBuiltin = function() {
+    mock.resetBuiltin.result = true;
+  };
+  mock.resetBuiltin.$beforeEach = function() {
+    mock.resetBuiltin.result = null;
+  };
   
   module.exports = {
     Random: Random,
@@ -573,6 +714,7 @@ define(function(require, exports, module) {
     shouldBeImplementedMethods : shouldBeImplementedMethods,
     ugenTestSuite: ugenTestSuite,
     unitTestSuite: unitTestSuite,
+    mock: mock
   };
 
 });

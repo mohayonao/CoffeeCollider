@@ -2,43 +2,20 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
   require("./number");
 
-  var testTools = require("../../testTools");
   var cc     = require("./cc");
   var random = require("../common/random");
   
   describe("lang/number.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createMulAdd, _console;
-    before(function() {
-      _lang = cc.lang;
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createMulAdd = cc.createMulAdd;
-      _console      = cc.global.console;
-      
-      cc.lang = {};
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createMulAdd = function(a, mul, add) {
-        return a * mul + add;
-      };
-      cc.global.console = {
-        log: function(msg) {
-          cc.global.console.log.result = msg;
-        }
-      };
-    });
-    after(function() {
-      cc.lang = _lang;
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createMulAdd   = _createMulAdd;
-      cc.global.console = _console;
-    });
-    beforeEach(function() {
-      cc.global.console.log.result = null;
+    testTools.mock("lang");
+    testTools.mock("global.console");
+    testTools.mock("createMulAdd");
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
     
     describe("class methods", function() {
@@ -1093,19 +1070,19 @@ define(function(require, exports, module) {
             actual   = (60).chord();
             expected = [ 60, 64, 67 ]; // C
             assert.deepEqual(actual, expected);
-            assert.isString(cc.global.console.log.result);
+            assert.isString(cc.global.console.log.result[0]);
           });
           it("chordcps", function() {
             actual   = (261.6255653006).chordcps("m");
             expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
             assert.deepCloseTo(expected, expected, 1e-6);
-            assert.isString(cc.global.console.log.result);
+            assert.isString(cc.global.console.log.result[0]);
           });
           it("chordratio", function() {
             actual   = (12).chordratio("m7");
             expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
             assert.deepCloseTo(expected, expected, 1e-6);
-            assert.isString(cc.global.console.log.result);
+            assert.isString(cc.global.console.log.result[0]);
           });
         });
       });
