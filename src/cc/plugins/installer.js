@@ -8,6 +8,7 @@ define(function(require, exports, module) {
   require("./demand");
   require("./env");
   require("./filter");
+  require("./info");
   require("./inout");
   require("./line");
   require("./noise");
