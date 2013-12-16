@@ -1,17 +1,17 @@
-# CoffeeCollider [![Build Status](https://travis-ci.org/mohayonao/CoffeeCollider.png?branch=master)](https://travis-ci.org/mohayonao/CoffeeCollider) [![Dependency Status](https://david-dm.org/mohayonao/CoffeeCollider.png)](https://david-dm.org/mohayonao/CoffeeCollider) [![Coverage Status](https://coveralls.io/repos/mohayonao/CoffeeCollider/badge.png?branch=dev)](https://coveralls.io/r/mohayonao/CoffeeCollider?branch=dev)
+# CoffeeCollider [![Build Status](https://travis-ci.org/mohayonao/CoffeeCollider.png?branch=master)](https://travis-ci.org/mohayonao/CoffeeCollider) [![Dependency Status](https://david-dm.org/mohayonao/CoffeeCollider.png)](https://david-dm.org/mohayonao/CoffeeCollider) [![Coverage Status](https://coveralls.io/repos/mohayonao/CoffeeCollider/badge.png?branch=master)](https://coveralls.io/r/mohayonao/CoffeeCollider?branch=master)
 
 CoffeeCollider is a language for real time audio synthesis and algorithmic composition in HTML5. The concept of this project is designed as "write CoffeeScript, and be processed as SuperCollider."
 
 ## Installation
 node.js
-```text
-$ npm install -g coffee-collider
-$ coffeecollider examples/khoomii.coffee
+```sh
+npm install -g coffee-collider
+coffeecollider -e "(->SinOsc.ar([440,442])).play()"
 ```
 
 bower
-```text
-$ bower install coffee-collider
+```sh
+bower install coffee-collider
 ```
 
 ## Features
@@ -22,7 +22,7 @@ $ bower install coffee-collider
 - Run anywhere. supporting Chrome/Firefox/Safari/Opera/IE(flashfallback), iOS/Android and node.js
 
 ## Examples
-Open the below links, and press the "boot" and "run" button.
+Open the below links, and press the "Run" button.
 
 - [noise](http://mohayonao.github.io/CoffeeCollider/#noise.coffee)
 - [sequence](http://mohayonao.github.io/CoffeeCollider/#sequence.coffee)
