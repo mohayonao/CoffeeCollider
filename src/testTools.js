@@ -467,30 +467,30 @@ define(function(require, exports, module) {
           unit.process(unit.rate.bufLength, testSuite.instance);
           end   = Date.now();
           statistics.time += end - begin;
-          for (j = unit.allOutputs.length; j--; ) {
-            var x = unit.allOutputs[j];
-            statistics.samples += 1;
-            if (isNaN(x)) {
-              statistics.hasNaN = true;
-            } else if (Math.abs(x) === Infinity) {
-              statistics.hasInfinity = true;
-            } else {
-              if (x < statistics.min) {
-                statistics.min = x;
-              }
-              if (statistics.max < x) {
-                statistics.max = x;
-              }
-              if (Math.abs(x) < statistics.absmin) {
-                statistics.absmin = Math.abs(x);
-              }
-              if (statistics.absmax < Math.abs(x)) {
-                statistics.absmax = Math.abs(x);
-              }
-              values.push(x);
-              statistics.mean += x;
-              statistics.rms  += x * x;
+        }
+        for (j = unit.allOutputs.length; j--; ) {
+          var x = unit.allOutputs[j];
+          statistics.samples += 1;
+          if (isNaN(x)) {
+            statistics.hasNaN = true;
+          } else if (Math.abs(x) === Infinity) {
+            statistics.hasInfinity = true;
+          } else {
+            if (x < statistics.min) {
+              statistics.min = x;
             }
+            if (statistics.max < x) {
+              statistics.max = x;
+            }
+            if (Math.abs(x) < statistics.absmin) {
+              statistics.absmin = Math.abs(x);
+            }
+            if (statistics.absmax < Math.abs(x)) {
+              statistics.absmax = Math.abs(x);
+            }
+            values.push(x);
+            statistics.mean += x;
+            statistics.rms  += x * x;
           }
         }
         if (opts.postProcess) {
@@ -504,7 +504,7 @@ define(function(require, exports, module) {
         var x = statistics.mean - values[i];
         variance += x * x;
       }
-      statistics.variance = variance / statistics.samples;
+      statistics.variance = variance / (statistics.samples - 1);
       
       if (checker) {
         if (typeof checker === "function") {
