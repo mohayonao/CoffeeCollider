@@ -374,7 +374,7 @@ define(function(require, exports, module) {
     $ir: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return this.multiNew(C.CONTROL, bufnum); // TODO: SCALAR rate
+        return this.multiNew(C.SCALAR, bufnum);
       }
     }
   };
