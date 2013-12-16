@@ -1420,7 +1420,7 @@ define(function(require, exports, module) {
         if (this.process) {
           this.process(1);
         } else {
-          this.outputs[0][0] = this._in0 * this._in1 + this._in2 + this._in3;
+          this.outputs[0][0] = this._in0 + this._in1 + this._in2 + this._in3;
         }
       }
     };

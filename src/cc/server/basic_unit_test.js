@@ -900,10 +900,10 @@ define(function(require, exports, module) {
     },
     { rate  : C.SCALAR,
       inputs: [
-        { name:"in0", rate:C.SCALAR, value:unitTestSuite.in1 },
-        { name:"in1", rate:C.SCALAR, value:unitTestSuite.in2 },
-        { name:"in2", rate:C.SCALAR, value:unitTestSuite.in1 },
-        { name:"in3", rate:C.SCALAR, value:unitTestSuite.in2 },
+        { name:"in0", rate:C.SCALAR, value:1 },
+        { name:"in1", rate:C.SCALAR, value:2 },
+        { name:"in2", rate:C.SCALAR, value:3 },
+        { name:"in3", rate:C.SCALAR, value:4 },
       ]
     },
   ]);
