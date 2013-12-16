@@ -404,7 +404,6 @@ define(function(require, exports, module) {
         this.process = next;
         break;
       }
-      this._fbufnum = -1e9;
     };
     var next_1ch = function(inNumSamples, instance) {
       if (!get_buffer.call(this, instance)) {
@@ -461,6 +460,127 @@ define(function(require, exports, module) {
         }
       }
     };
+    return ctor;
+  })();
+
+  cc.ugen.specs.RecordBuf = {
+    $ar: {
+      defaults: "inputArray=[],bufnum=0,offset=0,recLevel=1,preLevel=0,run=1,loop=1,trigger=1,doneAction=0",
+      ctor: function(inputArray, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction) {
+        return this.multiNewList([
+          C.AUDIO, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction
+        ].concat(asArray(inputArray)));
+      }
+    },
+    $kr: {
+      defaults: "inputArray=[],bufnum=0,offset=0,recLevel=1,preLevel=0,run=1,loop=1,trigger=1,doneAction=0",
+      ctor: function(inputArray, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction) {
+        return this.multiNewList([
+          C.CONTROL, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction
+        ].concat(asArray(inputArray)));
+      }
+    }
+  };
+
+  cc.unit.specs.RecordBuf = (function() {
+    var ctor = function() {
+      switch (this.numOfInputs - 8) {
+      case 1:
+        this.process = next_1ch;
+        break;
+      case 2:
+        this.process = next_2ch;
+        break;
+      default:
+        this.process = next;
+        break;
+      }
+      this._writepos = this.inputs[1][0];
+      this._recLevel = this.inputs[2][0];
+      this._preLevel = this.inputs[3][0];
+      this._prevtrig = 0;
+      this._preindex = 0;
+    };
+    var recbuf_next = function(func) {
+      return function(inNumSamples, instance) {
+        if (!get_buffer.call(this, instance)) {
+          return;
+        }
+        var channels = this._channels;
+        var frames   = this._frames;
+        var samples  = this._samples;
+        var inputs   = this.inputs;
+        var recLevel = this.inputs[2][0];
+        var preLevel = this.inputs[3][0];
+        var run      = this.inputs[4][0];
+        var loop     = this.inputs[5][0]|0;
+        var trig     = this.inputs[6][0];
+        var writepos = this._writepos;
+        var recLevel_slope = (recLevel - this._recLevel) * this.rate.slopeFactor;
+        var preLevel_slope = (preLevel - this._preLevel) * this.rate.slopeFactor;
+        var prevpos, posincr;
+        var i;
+        recLevel = this._recLevel;
+        preLevel = this._preLevel;
+        prevpos  = this._prevpos;
+        posincr  = run > 0 ? +1 : -1;
+        if (trig > 0 && this._prevtrig) {
+          this.done = false;
+          writepos  = (this.inputs[1][0] * channels)|0;
+        }
+        if (writepos < 0) {
+          writepos = frames - 1;
+        } else if (writepos >= frames) {
+          writepos = 0;
+        }
+        for (i = 0; i < inNumSamples; ++i) {
+          func(inputs, i, samples, writepos, prevpos, recLevel, preLevel, channels);
+          prevpos   = writepos;
+          writepos += posincr;
+          if (writepos >= frames) {
+            if (loop) {
+              writepos = 0;
+            } else {
+              writepos = frames - 1;
+              this.done = true;
+            }
+          } else if (0 < writepos) {
+            if (loop) {
+              writepos = frames - 1;
+            } else {
+              writepos  = 0;
+              this.done = true;
+            }
+          }
+          recLevel += recLevel_slope;
+          preLevel += preLevel_slope;
+        }
+        if (this.done) {
+          this.doneAction(this.inputs[7][0]|0);
+        }
+        this._prevtrig = trig;
+        this._writepos = writepos;
+        this._prevpos  = prevpos;
+        this._recLevel = recLevel;
+        this._preLevel = preLevel;
+      };
+    };
+
+    var next_1ch = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel) {
+      samples[writepos] = inputs[8][index] * recLevel + samples[prevpos] * preLevel;
+    });
+
+    var next_2ch = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel) {
+      samples[writepos*2  ] = inputs[8][index] * recLevel + samples[prevpos*2  ] * preLevel;
+      samples[writepos*2+1] = inputs[9][index] * recLevel + samples[prevpos*2+1] * preLevel;
+    });
+
+    var next = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel, channels) {
+      var j;
+      for (j = 0; j < channels; ++j) {
+        samples[writepos*channels+j] = inputs[8+j][index] + recLevel * samples[prevpos*channels+j] * preLevel;
+      }
+    });
     return ctor;
   })();
   
