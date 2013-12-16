@@ -36,7 +36,7 @@ define(function(require, exports, module) {
   cc.unit.specs.WhiteNoise = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -83,7 +83,7 @@ define(function(require, exports, module) {
       }
       this._whites = whites;
       this._key    = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var MAX_KEY = 31;
     var next = function(inNumSamples) {
@@ -114,7 +114,7 @@ define(function(require, exports, module) {
   cc.unit.specs.ClipNoise = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -131,7 +131,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._counter = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -167,7 +167,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._y1 = Math.random();
       this._y2 = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -206,7 +206,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._y1 = this.inputs[2][0];
       this._counter = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -256,7 +256,7 @@ define(function(require, exports, module) {
       this._density = 0;
       this._scale   = 0;
       this._thresh  = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -286,7 +286,7 @@ define(function(require, exports, module) {
       this._density = 0;
       this._scale   = 0;
       this._thresh  = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -328,7 +328,7 @@ define(function(require, exports, module) {
       this.process  = next;
       this._level   = 0;
       this._counter = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -363,7 +363,7 @@ define(function(require, exports, module) {
       this._level   = Math.random() * 2 - 1;
       this._counter = 0;
       this._slope   = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -405,7 +405,7 @@ define(function(require, exports, module) {
       this._curve   = 0;
       this._nextValue = Math.random() * 2 - 1;
       this._nextMidPt = this._nextValue * 0.5;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -450,7 +450,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._counter = 0;
       this._level   = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];

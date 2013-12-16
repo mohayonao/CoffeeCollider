@@ -7,14 +7,14 @@ define(function(require, exports, module) {
   var log001 = Math.log(0.001);
   var sqrt2  = Math.sqrt(2);
 
-  var do_next_1 = function(next) {
-    var tmp_floops  = this.rate.filterLoops;
-    var tmp_framain = this.rate.filterRemain;
-    this.rate.filterLoops  = 0;
-    this.rate.filterRemain = 1;
-    next.call(this, 1);
-    this.rate.filterLoops  = tmp_floops;
-    this.rate.filterRemain = tmp_framain;
+  var do_next_1 = function(unit, next) {
+    var tmp_floops  = unit.rate.filterLoops;
+    var tmp_framain = unit.rate.filterRemain;
+    unit.rate.filterLoops  = 0;
+    unit.rate.filterRemain = 1;
+    next.call(unit, 1);
+    unit.rate.filterLoops  = tmp_floops;
+    unit.rate.filterRemain = tmp_framain;
   };
   
   cc.ugen.specs.Resonz = {
@@ -43,7 +43,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq = undefined;
       this._rq   = 0;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -124,7 +124,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._b1 = this.inputs[1][0];
       this._y1 = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -175,7 +175,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._b1 = this.inputs[1][0];
       this._x1 = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -249,7 +249,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq  = undefined;
       this._reson = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -308,7 +308,7 @@ define(function(require, exports, module) {
       this._x2 = 0;
       this._freq  = undefined;
       this._reson = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -383,7 +383,7 @@ define(function(require, exports, module) {
       this._x2 = 0;
       this._freq  = undefined;
       this._reson = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -463,7 +463,7 @@ define(function(require, exports, module) {
       this._y1 = 0;
       this._y2 = 0;
       this._freq  = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -529,7 +529,7 @@ define(function(require, exports, module) {
       this._y1 = 0;
       this._y2 = 0;
       this._freq  = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -610,7 +610,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq = undefined;
       this._bw   = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -679,7 +679,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq = undefined;
       this._bw   = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -763,7 +763,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq  = undefined;
       this._reson = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -833,7 +833,7 @@ define(function(require, exports, module) {
       this._y2 = 0;
       this._freq  = undefined;
       this._reson = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out = this.outputs[0];
@@ -918,7 +918,7 @@ define(function(require, exports, module) {
       this._freq = undefined;
       this._bw   = undefined;
       this._db   = undefined;
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -1001,7 +1001,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -1034,7 +1034,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -1067,7 +1067,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -1101,7 +1101,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this._x2 = this.inputs[0][0];
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -1132,7 +1132,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this._x2 = this.inputs[0][0];
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -1163,7 +1163,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this._x2 = this.inputs[0][0];
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -1194,7 +1194,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._x1 = this._x2 = this.inputs[0][0];
-      do_next_1.call(this, next);
+      do_next_1(this, next);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -1537,7 +1537,7 @@ define(function(require, exports, module) {
       this._b1u = 0;
       this._b1d = 0;
       this._y1 = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -1591,7 +1591,7 @@ define(function(require, exports, module) {
       this._b1d = 0;
       this._y1a = this.inputs[0][0];
       this._y1b = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -1660,7 +1660,7 @@ define(function(require, exports, module) {
       this._y1a = this.inputs[0][0];
       this._y1b = this.inputs[0][0];
       this._y1c = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -1849,7 +1849,7 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
       this._level = this.inputs[0][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];

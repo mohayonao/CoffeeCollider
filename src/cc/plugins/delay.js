@@ -145,34 +145,34 @@ define(function(require, exports, module) {
   cc.ugen.specs.DelayC = cc.ugen.specs.DelayN;
 
   // DelayN/DelayL/DelayC
-  var delay_ctor = function() {
-    this._maxdelaytime = this.inputs[1][0];
-    this._delaytime    = this.inputs[2][0];
-    this._dlybuf       = 0;
+  var delay_ctor = function(unit) {
+    unit._maxdelaytime = unit.inputs[1][0];
+    unit._delaytime    = unit.inputs[2][0];
+    unit._dlybuf       = 0;
 
-    var delaybufsize = Math.ceil(this._maxdelaytime * this.rate.sampleRate + 1);
-    delaybufsize = delaybufsize + this.rate.bufLength;
+    var delaybufsize = Math.ceil(unit._maxdelaytime * unit.rate.sampleRate + 1);
+    delaybufsize = delaybufsize + unit.rate.bufLength;
     delaybufsize = 1 << Math.ceil(Math.log(delaybufsize) * Math.LOG2E);
-    this._fdelaylen = this._idelaylen = delaybufsize;
+    unit._fdelaylen = unit._idelaylen = delaybufsize;
 
-    this._dlybuf = new Float32Array(delaybufsize);
-    this._mask   = delaybufsize - 1;
+    unit._dlybuf = new Float32Array(delaybufsize);
+    unit._mask   = delaybufsize - 1;
     
-    this._dsamp = calcDelay(this, this._delaytime, 1);
-    this._numoutput = 0;
-    this._iwrphase  = 0;
+    unit._dsamp = calcDelay(unit, unit._delaytime, 1);
+    unit._numoutput = 0;
+    unit._iwrphase  = 0;
   };
-  var delay_next = function(inNumSamples, perform) {
-    var out  = this.outputs[0];
-    var inIn = this.inputs[0];
-    var delaytime = this.inputs[2][0];
-    var dlybuf   = this._dlybuf;
-    var iwrphase = this._iwrphase;
-    var dsamp    = this._dsamp;
-    var mask     = this._mask;
+  var delay_next = function(unit, inNumSamples, perform) {
+    var out  = unit.outputs[0];
+    var inIn = unit.inputs[0];
+    var delaytime = unit.inputs[2][0];
+    var dlybuf   = unit._dlybuf;
+    var iwrphase = unit._iwrphase;
+    var dsamp    = unit._dsamp;
+    var mask     = unit._mask;
     var frac, irdphase;
     var i;
-    if (delaytime === this._delaytime) {
+    if (delaytime === unit._delaytime) {
       frac = dsamp - (dsamp|0);
       for (i = 0; i < inNumSamples; ++i) {
         dlybuf[iwrphase & mask] = inIn[i];
@@ -181,8 +181,8 @@ define(function(require, exports, module) {
         iwrphase += 1;
       }
     } else {
-      var next_dsamp  = calcDelay(this, delaytime, 1);
-      var dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+      var next_dsamp  = calcDelay(unit, delaytime, 1);
+      var dsamp_slope = (next_dsamp - dsamp) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         dlybuf[iwrphase & mask] = inIn[i];
         dsamp += dsamp_slope;
@@ -191,44 +191,44 @@ define(function(require, exports, module) {
         out[i] = perform(dlybuf, mask, irdphase, frac);
         iwrphase += 1;
       }
-      this._dsamp     = next_dsamp;
-      this._delaytime = delaytime;
+      unit._dsamp     = next_dsamp;
+      unit._delaytime = delaytime;
     }
     if (iwrphase > dlybuf.length) {
       iwrphase -= dlybuf.length;
     }
-    this._iwrphase = iwrphase;
+    unit._iwrphase = iwrphase;
   };
   
   cc.unit.specs.DelayN = (function() {
     var ctor = function() {
-      delay_ctor.call(this);
+      delay_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      delay_next.call(this, inNumSamples, perform_N);
+      delay_next(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
   
   cc.unit.specs.DelayL = (function() {
     var ctor = function() {
-      delay_ctor.call(this);
+      delay_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      delay_next.call(this, inNumSamples, perform_L);
+      delay_next(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
   
   cc.unit.specs.DelayC = (function() {
     var ctor = function() {
-      delay_ctor.call(this);
+      delay_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      delay_next.call(this, inNumSamples, perform_C);
+      delay_next(this, inNumSamples, perform_C);
     };
     return ctor;
   })();
@@ -252,38 +252,38 @@ define(function(require, exports, module) {
   cc.ugen.specs.CombC = cc.ugen.specs.CombN;
 
   // CombN/CombL/CombC
-  var comb_ctor = function() {
+  var comb_ctor = function(unit) {
     var delaybufsize;
-    this._maxdelaytime = this.inputs[1][0];
-    this._delaytime    = this.inputs[2][0];
-    this._decaytime    = this.inputs[3][0];
-    delaybufsize = Math.ceil(this._maxdelaytime * this.rate.sampleRate + 1);
-    delaybufsize = delaybufsize + this.rate.bufLength;
+    unit._maxdelaytime = unit.inputs[1][0];
+    unit._delaytime    = unit.inputs[2][0];
+    unit._decaytime    = unit.inputs[3][0];
+    delaybufsize = Math.ceil(unit._maxdelaytime * unit.rate.sampleRate + 1);
+    delaybufsize = delaybufsize + unit.rate.bufLength;
     delaybufsize = 1 << Math.ceil(Math.log(delaybufsize) * Math.LOG2E);
-    this._fdelaylen = this._idelaylen = delaybufsize;
-    this._dlybuf    = new Float32Array(delaybufsize);
-    this._mask      = delaybufsize - 1;
-    this._dsamp     = calcDelay(this, this._delaytime, 1);
-    this._iwrphase  = 0;
-    this._feedbk    = calcFeedback(this._delaytime, this._decaytime);
+    unit._fdelaylen = unit._idelaylen = delaybufsize;
+    unit._dlybuf    = new Float32Array(delaybufsize);
+    unit._mask      = delaybufsize - 1;
+    unit._dsamp     = calcDelay(unit, unit._delaytime, 1);
+    unit._iwrphase  = 0;
+    unit._feedbk    = calcFeedback(unit._delaytime, unit._decaytime);
   };
-  var comb_next = function(inNumSamples, perform) {
-    var out  = this.outputs[0];
-    var inIn = this.inputs[0];
-    var delaytime = this.inputs[2][0];
-    var decaytime = this.inputs[3][0];
-    var dlybuf   = this._dlybuf;
-    var iwrphase = this._iwrphase;
-    var dsamp    = this._dsamp;
-    var feedbk   = this._feedbk;
-    var mask     = this._mask;
+  var comb_next = function(unit, inNumSamples, perform) {
+    var out  = unit.outputs[0];
+    var inIn = unit.inputs[0];
+    var delaytime = unit.inputs[2][0];
+    var decaytime = unit.inputs[3][0];
+    var dlybuf   = unit._dlybuf;
+    var iwrphase = unit._iwrphase;
+    var dsamp    = unit._dsamp;
+    var feedbk   = unit._feedbk;
+    var mask     = unit._mask;
     var frac     = dsamp - (dsamp|0);
     var irdphase, value;
     var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
     var i;
-    if (delaytime === this._delaytime) {
+    if (delaytime === unit._delaytime) {
       irdphase = iwrphase - (dsamp|0);
-      if (decaytime === this._decaytime) {
+      if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
           value = perform(dlybuf, mask, irdphase, frac);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
@@ -293,7 +293,7 @@ define(function(require, exports, module) {
         }
       } else {
         next_feedbk  = calcFeedback(delaytime, decaytime);
-        feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+        feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           value = perform(dlybuf, mask, irdphase, frac);
           dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
@@ -302,14 +302,14 @@ define(function(require, exports, module) {
           irdphase++;
           iwrphase++;
         }
-        this._feedbk = next_feedbk;
-        this._decaytime = decaytime;
+        unit._feedbk = next_feedbk;
+        unit._decaytime = decaytime;
       }
     } else {
-      next_dsamp  = calcDelay(this, delaytime, 1);
-      dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+      next_dsamp  = calcDelay(unit, delaytime, 1);
+      dsamp_slope = (next_dsamp - dsamp) * unit.rate.slopeFactor;
       next_feedbk  = calcFeedback(delaytime, decaytime);
-      feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+      feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
         value = perform(dlybuf, mask, irdphase, frac);
@@ -320,43 +320,43 @@ define(function(require, exports, module) {
         irdphase++;
         iwrphase++;
       }
-      this._feedbk = feedbk;
-      this._dsamp  = dsamp;
-      this._delaytime = delaytime;
-      this._decaytime = decaytime;
+      unit._feedbk = feedbk;
+      unit._dsamp  = dsamp;
+      unit._delaytime = delaytime;
+      unit._decaytime = decaytime;
     }
-    this._iwrphase = iwrphase;
+    unit._iwrphase = iwrphase;
   };
 
   cc.unit.specs.CombN = (function() {
     var ctor = function() {
-      comb_ctor.call(this);
+      comb_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_N);
+      comb_next(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
   
   cc.unit.specs.CombL = (function() {
     var ctor = function() {
-      comb_ctor.call(this);
+      comb_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_L);
+      comb_next(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
   
   cc.unit.specs.CombC = (function() {
     var ctor = function() {
-      comb_ctor.call(this);
+      comb_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      comb_next.call(this, inNumSamples, perform_C);
+      comb_next(this, inNumSamples, perform_C);
     };
     return ctor;
   })();
@@ -381,23 +381,23 @@ define(function(require, exports, module) {
 
   // AllpassN/AllpassL/AllpassC
   var allpass_ctor = comb_ctor;
-  var allpass_next = function(inNumSamples, perform) {
-    var out  = this.outputs[0];
-    var inIn = this.inputs[0];
-    var delaytime = this.inputs[2][0];
-    var decaytime = this.inputs[3][0];
-    var dlybuf   = this._dlybuf;
-    var iwrphase = this._iwrphase;
-    var dsamp    = this._dsamp;
-    var feedbk   = this._feedbk;
-    var mask     = this._mask;
+  var allpass_next = function(unit, inNumSamples, perform) {
+    var out  = unit.outputs[0];
+    var inIn = unit.inputs[0];
+    var delaytime = unit.inputs[2][0];
+    var decaytime = unit.inputs[3][0];
+    var dlybuf   = unit._dlybuf;
+    var iwrphase = unit._iwrphase;
+    var dsamp    = unit._dsamp;
+    var feedbk   = unit._feedbk;
+    var mask     = unit._mask;
     var irdphase, frac, value, dwr;
     var next_feedbk, feedbk_slope, next_dsamp, dsamp_slope;
     var i;
-    if (delaytime === this._delaytime) {
+    if (delaytime === unit._delaytime) {
       irdphase = iwrphase - (dsamp|0);
       frac     = dsamp - (dsamp|0);
-      if (decaytime === this._decaytime) {
+      if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
           value = perform(dlybuf, mask, irdphase, frac);
           dwr = value * feedbk + inIn[i];
@@ -408,7 +408,7 @@ define(function(require, exports, module) {
         }
       } else {
         next_feedbk  = calcFeedback(delaytime, decaytime);
-        feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+        feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
           value = perform(dlybuf, mask, irdphase, frac);
           dwr = value * feedbk + inIn[i];
@@ -418,14 +418,14 @@ define(function(require, exports, module) {
           irdphase++;
           iwrphase++;
         }
-        this._feedbk = next_feedbk;
-        this._decaytime = decaytime;
+        unit._feedbk = next_feedbk;
+        unit._decaytime = decaytime;
       }
     } else {
-      next_dsamp  = calcDelay(this, delaytime, 1);
-      dsamp_slope = (next_dsamp - dsamp) * this.rate.slopeFactor;
+      next_dsamp  = calcDelay(unit, delaytime, 1);
+      dsamp_slope = (next_dsamp - dsamp) * unit.rate.slopeFactor;
       next_feedbk  = calcFeedback(delaytime, decaytime);
-      feedbk_slope = (next_feedbk - feedbk) * this.rate.slopeFactor;
+      feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
         frac     = dsamp - (dsamp|0);
@@ -438,43 +438,43 @@ define(function(require, exports, module) {
         irdphase++;
         iwrphase++;
       }
-      this._feedbk = feedbk;
-      this._dsamp  = dsamp;
-      this._delaytime = delaytime;
-      this._decaytime = decaytime;
+      unit._feedbk = feedbk;
+      unit._dsamp  = dsamp;
+      unit._delaytime = delaytime;
+      unit._decaytime = decaytime;
     }
-    this._iwrphase = iwrphase;
+    unit._iwrphase = iwrphase;
   };
   
   cc.unit.specs.AllpassN = (function() {
     var ctor = function() {
-      allpass_ctor.call(this);
+      allpass_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_N);
+      allpass_next(this, inNumSamples, perform_N);
     };
     return ctor;
   })();
   
   cc.unit.specs.AllpassL = (function() {
     var ctor = function() {
-      allpass_ctor.call(this);
+      allpass_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_L);
+      allpass_next(this, inNumSamples, perform_L);
     };
     return ctor;
   })();
   
   cc.unit.specs.AllpassC = (function() {
     var ctor = function() {
-      allpass_ctor.call(this);
+      allpass_ctor(this);
       this.process = next;
     };
     var next = function(inNumSamples) {
-      allpass_next.call(this, inNumSamples, perform_C);
+      allpass_next(this, inNumSamples, perform_C);
     };
     return ctor;
   })();

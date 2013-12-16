@@ -148,7 +148,7 @@ define(function(require, exports, module) {
   cc.unit.specs.T2A = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];

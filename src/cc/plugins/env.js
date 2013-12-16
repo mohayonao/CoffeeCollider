@@ -499,7 +499,7 @@ define(function(require, exports, module) {
       this._prevGate = 0;
       this._slope    = 0;
       this._counter  = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function() {
       var out  = this.outputs[0];

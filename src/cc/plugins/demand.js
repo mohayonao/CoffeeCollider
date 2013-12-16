@@ -126,7 +126,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._grow  = 0;
       this._value = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -171,7 +171,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._step  = 0;
       this._value = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -216,7 +216,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._lo = 0;
       this._hi = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -260,7 +260,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._lo = 0;
       this._hi = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -304,7 +304,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Dser = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -361,7 +361,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Dseq = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -425,7 +425,7 @@ define(function(require, exports, module) {
         indices[i] = i + 1;
       }
       this._indices = indices.sort(scramble);
-      next.call(this, 0);
+      this.process(0);
     };
     var scramble = function() {
       return Math.random() - 0.5;
@@ -488,7 +488,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Drand = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {

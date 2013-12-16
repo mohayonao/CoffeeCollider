@@ -61,15 +61,15 @@ define(function(require, exports, module) {
     return [ index0, index1, index2, index3 ];
   };
 
-  var get_buffer = function(instance) {
-    var buffer = instance.buffers[this.inputs[0][0]|0];
+  var get_buffer = function(unit, instance) {
+    var buffer = instance.buffers[unit.inputs[0][0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples) {
-        this._frames     = buffer.frames;
-        this._channels   = buffer.channels;
-        this._sampleRate = buffer.sampleRate;
-        this._samples    = samples;
+        unit._frames     = buffer.frames;
+        unit._channels   = buffer.channels;
+        unit._sampleRate = buffer.sampleRate;
+        unit._samples    = samples;
         return true;
       }
     }
@@ -124,7 +124,7 @@ define(function(require, exports, module) {
     };
     
     var next_1ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out   = this.outputs[0];
@@ -162,7 +162,7 @@ define(function(require, exports, module) {
     };
     
     var next_2ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out1  = this.outputs[0];
@@ -207,7 +207,7 @@ define(function(require, exports, module) {
     };
     
     var next = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var outputs = this.outputs;
@@ -308,7 +308,7 @@ define(function(require, exports, module) {
       }
     };
     var next_1ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out = this.outputs[0];
@@ -327,7 +327,7 @@ define(function(require, exports, module) {
       }
     };
     var next_2ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out1 = this.outputs[0];
@@ -348,7 +348,7 @@ define(function(require, exports, module) {
       }
     };
     var next = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var outputs = this.outputs;
@@ -406,7 +406,7 @@ define(function(require, exports, module) {
       }
     };
     var next_1ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -422,7 +422,7 @@ define(function(require, exports, module) {
       }
     };
     var next_2ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -441,7 +441,7 @@ define(function(require, exports, module) {
       }
     };
     var next = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -503,7 +503,7 @@ define(function(require, exports, module) {
     };
     var recbuf_next = function(func) {
       return function(inNumSamples, instance) {
-        if (!get_buffer.call(this, instance)) {
+        if (!get_buffer(this, instance)) {
           return;
         }
         var channels = this._channels;
@@ -604,7 +604,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._sampleRate;
       }
     };
@@ -619,7 +619,7 @@ define(function(require, exports, module) {
       this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._sampleRate * this._sampleDur;
       }
     };
@@ -633,7 +633,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._frames;
       }
     };
@@ -647,7 +647,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._samples.length;
       }
     };
@@ -662,7 +662,7 @@ define(function(require, exports, module) {
       this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._frames * this._sampleDur;
       }
     };
@@ -676,7 +676,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._channels;
       }
     };

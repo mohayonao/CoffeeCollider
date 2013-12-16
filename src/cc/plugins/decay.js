@@ -25,7 +25,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._b1 = this.inputs[1][0];
       this._y1 = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -73,7 +73,7 @@ define(function(require, exports, module) {
       this._decayTime = undefined;
       this._b1 = 0;
       this._y1 = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -126,7 +126,7 @@ define(function(require, exports, module) {
       this._b1b = 0;
       this._y1a = 0;
       this._y1b = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
