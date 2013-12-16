@@ -1777,7 +1777,7 @@ define(function(require, exports, module) {
       } else if (lagTime !== this._lagTime) {
         scaleFactor = lagTime / this._lagTime;
         this._counter = counter = Math.max(1, (this._counter * scaleFactor)|0);
-        this._slope   = slope   = this._slope / scaleFactor;
+        this._slope   = slope   = (this._slope / scaleFactor) || 0;
         this._lagTime = lagTime;
       }
       _in = this._in;

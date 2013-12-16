@@ -260,7 +260,18 @@ define(function(require, exports, module) {
   })();
   
   var unitTestSuite = (function() {
-    var parent = { controls:new Float32Array(16), doneAction:function() {} };
+    var parent = {
+      controls:new Float32Array(16)
+    };
+    parent.doneAction = function(action) {
+      parent.doneAction.action = action;
+    };
+    parent.run = function(state) {
+      parent.run.state = state;
+    };
+    parent.end = function() {
+      parent.end.called = true;
+    };
     
     Float32Array.prototype.setScalar = function(value) {
       for (var i = this.length; i--;) {
@@ -269,7 +280,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    var signal = function(pattern, sampleDur) {
+    var signal = function(pattern, sampleDur, name) {
       var index  = 0;
       var remain = 0;
       var prev   = 0;
@@ -278,7 +289,8 @@ define(function(require, exports, module) {
         var value = prev;
         for (var i = 0, imax = _in.length; i < imax; ++i) {
           if (remain <= 0) {
-            value = pattern[(index++) % pattern.length];
+            value = pattern[index % pattern.length];
+            index += 1;
             if (Array.isArray(value)) {
               remain = value[1];
               value  = value[0];
@@ -294,13 +306,18 @@ define(function(require, exports, module) {
       };
     };
     
-    var inputSpec = function(rate, value) {
+    var inputSpec = function(parent, rate, value, name) {
       rate = rate || C.SCALAR;
-      var sampleDur = cc.server.rates[rate].sampleDur;
-      var process   = (rate !== C.SCALAR) ? signal(value, sampleDur) : null;
-      return {rate:rate, sampleDur:sampleDur, process:process, value:value};
+      var sampleDur;
+      if (parent === C.AUDIO && rate !== C.AUDIO) {
+        sampleDur = -1;
+      } else {
+        sampleDur = cc.server.rates[rate].sampleDur;
+      }
+      var process   = (rate !== C.SCALAR) ? signal(value, sampleDur, name) : null;
+      return {rate:rate, sampleDur:sampleDur, process:process, value:value, name:name};
     };
-
+    
     var initInputs = function(num) {
       var list = [];
       for (var i = 0; i < num; i++) {
@@ -345,20 +362,26 @@ define(function(require, exports, module) {
           it(testName, (function(items, opts) {
             return function() {
               var inputSpecs = items.inputs.map(function(items) {
-                return typeof items === "number" ? inputSpec(C.SCALAR, items) : inputSpec(items.rate, items.value);
+                if (typeof items === "number") {
+                  return inputSpec(rate, C.SCALAR, items);
+                } else {
+                  return inputSpec(rate, items.rate, items.value, items.name);
+                }
               });
-              var statistics = unitTest(unitSpec, inputSpecs, items.checker, opts);
+              var results    = unitTest(unitSpec, inputSpecs, items.checker, opts);
+              var unit       = results[0];
+              var statistics = results[1];
               if (!statistics.checked) {
                 if (opts.checker) {
                   if (typeof opts.checker === "function") {
-                    opts.checker(statistics);
+                    opts.checker.call(unit, statistics);
                   } else if (typeof opts.checker[name] === "function") {
-                    opts.checker[name](statistics);
+                    opts.checker[name].call(unit, statistics);
                   } else {
-                    defaultChecker(statistics);
+                    defaultChecker.call(unit, statistics);
                   }
                 } else {
-                  defaultChecker(statistics);
+                  defaultChecker.call(unit, statistics);
                 }
               }
             };
@@ -381,7 +404,7 @@ define(function(require, exports, module) {
     var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
 
-      var bufLength = opts.bufLength || 65536;
+      var bufLength = opts.bufLength || 16384;
       var saved_rate = mock.server.rates[C.AUDIO];
       
       mock.server.rates[C.AUDIO] = {
@@ -508,17 +531,17 @@ define(function(require, exports, module) {
       
       if (checker) {
         if (typeof checker === "function") {
-          checker(statistics);
+          checker.call(unit, statistics);
           statistics.checked = true;
         } else if (typeof checker[spec[0]] === "function") {
-          checker[spec[0]](statistics);
+          checker[spec[0]].call(unit, statistics);
           statistics.checked = true;
         }
       }
       
       mock.server.rates[C.AUDIO] = saved_rate;
       
-      return statistics;      
+      return [unit, statistics];
     };
 
     var randomTable = new Array(1024);

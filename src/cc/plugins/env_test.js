@@ -183,4 +183,114 @@ define(function(require, exports, module) {
     });
   });
 
+  ugenTestSuite("Free", {
+    kr: ["trig",0, "id",0]
+  }).unitTestSuite([
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"trig", rate:C.CONTROL, value:[0,1,0,1,0,1] },
+        { namd:"id"  , rate:C.CONTROL, value:[0,1,2] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isTrue(!!unitTestSuite.instance.nodes[1].end.called);
+      }
+    },
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"trig", rate:C.CONTROL, value:[0] },
+        { namd:"id"  , rate:C.CONTROL, value:[0,1,2] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isFalse(!!unitTestSuite.instance.nodes[1].end.called);
+      }
+    },
+  ], {
+    before: function() {
+      unitTestSuite.instance = {
+        nodes: [null, {
+          end: function() {
+            unitTestSuite.instance.nodes[1].end.called = true;
+          }
+        }]
+      }
+    }
+  });
+
+  ugenTestSuite("FreeSelf", {
+    kr: ["in",0]
+  }).unitTestSuite([
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"in", rate:C.CONTROL, value:[0,1,0,1,0,1] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isTrue(this.parent.end.called);
+      }
+    },
+  ]);
+
+  ugenTestSuite("Pause", {
+    kr: ["gate",0, "id",0]
+  }).unitTestSuite([
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"gate", rate:C.CONTROL, value:[0,1,0,1,0,1] },
+        { namd:"id"  , rate:C.CONTROL, value:[0,1,2] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isTrue(!!unitTestSuite.instance.nodes[1].run.state);
+      }
+    },
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"gate", rate:C.CONTROL, value:[0] },
+        { namd:"id"  , rate:C.CONTROL, value:[0,1,2] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isFalse(!!unitTestSuite.instance.nodes[1].run.state);
+      }
+    },
+  ], {
+    before: function() {
+      unitTestSuite.instance = {
+        nodes: [null, {
+          run: function(state) {
+            unitTestSuite.instance.nodes[1].run.state = state;
+          }
+        }]
+      }
+    }
+  });
+  
+  ugenTestSuite("PauseSelf", {
+    kr: ["in",0]
+  }).unitTestSuite([
+    {
+      rate: C.CONTROL,
+      inputs: [
+        { name:"in", rate:C.CONTROL, value:[0,1,0,1,0,] },
+      ],
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        assert.isFalse(!!this.parent.run.state);
+      }
+    },
+  ]);
+
 });
