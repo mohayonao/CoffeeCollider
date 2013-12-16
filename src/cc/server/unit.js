@@ -30,6 +30,7 @@ define(function(require, exports, module) {
       this.outputs    = outputs;
       this.allOutputs = allOutputs;
       this.bufLength  = bufLength;
+      this.done       = false;
     }
     Unit.prototype.init = function() {
       var ctor = cc.unit.specs[this.name];

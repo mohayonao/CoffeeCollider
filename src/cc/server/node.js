@@ -282,6 +282,12 @@ define(function(require, exports, module) {
     Node.prototype.stop = function() {
       free.call(this);
     };
+    Node.prototype.run = function(inRun) {
+      this.running = !!inRun; // TODO
+    };
+    Node.prototype.end = function() {
+      this.running = false; // TODO
+    };
     Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
