@@ -637,6 +637,23 @@ define(function(require, exports, module) {
             [ "[h]", null, "i", "10", "j", "20" ], []
           ]);
         });
+        it("case 2", function() {
+          code1 = [
+            "a = (b)->",
+            "  syncblock (i)->",
+            "    c = b * i"
+          ].join("\n");
+          tokens = coffee.tokens(code1);
+          tokens = compiler.detectFunctionParameters(tokens);
+          actual = crawlLocalVars(tokens);
+          assert.deepEqual(actual, [
+            ["a"], [], ["c"]
+          ]);
+          actual = crawlArgs(tokens);
+          assert.deepEqual(actual, [
+            [ "b", null ], [ "i", null ]
+          ]);
+        });
       });
       describe("replaceNumericString", function() {
         it("basic", function() {
@@ -1000,6 +1017,22 @@ define(function(require, exports, module) {
           ];
           testSuite(compiler.replaceSyncBlock, code1, code2);
         });
+        it("case 7", function() {
+          code1 = [
+            "(out)->",
+            "  syncblock (i)->",
+            "    a = out * i"
+          ];
+          code2 = [
+            "(out)->",
+            "  syncblock ->",
+            "    a = undefined",
+            "    [",
+            "      (i)-> a = out * i",
+            "    ]",
+          ];
+          testSuite(compiler.replaceSyncBlock, code1, code2);
+        });
         it("not replace (not exists function)", function() {
           code1 = [
             "syncblock a",
@@ -1131,6 +1164,24 @@ define(function(require, exports, module) {
           "        if true",
           "          x = 0",
           "    ]",
+          ").call(cc.__context__, this.self || global, cc)",
+        ];
+        testSuite(code1, code2);
+      });
+      it("test2", function() {
+        code1 = [
+          "(out)->",
+          "  syncblock (i)->",
+          "    a = out * i"
+        ];
+        code2 = [
+          "((global, cc)->",
+          "  (out)->",
+          "    syncblock ->",
+          "      a = undefined",
+          "      [",
+          "        (i)-> a = out.__mul__(i)",
+          "      ]",
           ").call(cc.__context__, this.self || global, cc)",
         ];
         testSuite(code1, code2);

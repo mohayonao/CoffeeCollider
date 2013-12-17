@@ -220,7 +220,7 @@ define(function(require, exports, module) {
         /* falls through */
       case "->": case "=>":
         scope = {
-          declared: stack.peek.declared.concat(stack.peek.local),
+          declared: stack.peek.declared.concat(stack.peek.local).concat(stack.peek.args),
           args:vars.splice(0), local:[], outer:[], indent:indent
         };
         tokens[i].cc_funcParams = {
