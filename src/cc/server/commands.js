@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
-  
+
+  var cc     = require("./cc");
   var node   = require("./node");
   var buffer = require("./buffer");
   
@@ -111,7 +112,7 @@ define(function(require, exports, module) {
   
   commands[C.BINARY_CMD_SET_SYNC] = function(binary) {
     this.syncItems.set(binary);
-    var server    = this.manager.server;
+    var server    = cc.server;
     var syncCount = new Uint32Array(binary.buffer)[C.SYNC_COUNT];
     if (server.sysSyncCount < syncCount) {
       server.sysSyncCount = syncCount;

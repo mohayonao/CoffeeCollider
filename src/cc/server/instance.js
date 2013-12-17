@@ -12,26 +12,10 @@ define(function(require, exports, module) {
       this.server = null;
       this.process = process0;
     }
-
-    InstanceManager.prototype.init = function(server) {
-      if (this.server) {
-        return;
-      }
-      var busLength  = server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
-      var bufLength  = server.bufLength;
-      var bufLength4 = server.bufLength << 2;
-      this.server    = server;
-      this.busClear  = new Float32Array(busLength);
-      this.map       = {};
-      this.list      = [];
-      this.busOut    = new Float32Array(busLength);
-      this.busOutLen = server.bufLength << 1;
-      this.busOutL  = new Float32Array(this.busOut.buffer, 0         , bufLength);
-      this.busOutR  = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
-    };
+    
     InstanceManager.prototype.append = function(userId) {
       if (!this.map[userId]) {
-        var instance = new Instance(this, userId);
+        var instance = new Instance(userId);
         this.map[userId] = instance;
         this.list.push(instance);
         if (this.list.length === 1) {
@@ -77,13 +61,13 @@ define(function(require, exports, module) {
         return instance.rootNode.running;
       });
     };
-    InstanceManager.prototype.pushToTimeline = function(userId, timeline) {
+    InstanceManager.prototype.pushToTimeline = function(timeline, userId) {
       var instance = this.map[userId];
-      if (instance && timeline.length) {
-        push.apply(instance.timeline, timeline);
+      if (instance) {
+        instance.pushToTimeline(timeline);
       }
     };
-    InstanceManager.prototype.doBinayCommand = function(userId, binary) {
+    InstanceManager.prototype.doBinayCommand = function(binary, userId) {
       var instance = this.map[userId];
       if (instance) {
         instance.doBinayCommand(binary);
@@ -91,13 +75,13 @@ define(function(require, exports, module) {
     };
     
     var process0 = function() {
-      this.busOut.set(this.busClear);
+      cc.server.busOut.set(cc.server.busClear);
     };
-    var process1 = function(bufLength, index) {
-      this.list[0].process(bufLength, index);
-      this.busOut.set(this.list[0].bus);
+    var process1 = function(bufLength) {
+      this.list[0].process(bufLength);
+      cc.server.busOut.set(this.list[0].bus);
     };
-    var processN = function(bufLength, index) {
+    var processN = function(bufLength) {
       var list = this.list;
       var busOut    = this.busOut;
       var busOutLen = this.busOutLen;
@@ -105,7 +89,7 @@ define(function(require, exports, module) {
       busOut.set(this.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
         instance = list[i];
-        instance.process(bufLength, index);
+        instance.process(bufLength);
         var inBus = instance.bus;
         var inAmp = instance.busAmp;
         for (var j = busOutLen; j--; ) {
@@ -119,12 +103,10 @@ define(function(require, exports, module) {
   
   
   var Instance = (function() {
-    function Instance(manager, userId) {
-      var busLength = manager.server.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
-      this.manager = manager;
+    function Instance(userId) {
       this.userId  = userId|0;
-      this.bus     = new Float32Array(busLength);
-      this.busClear = manager.busClear;
+      this.bus      = new Float32Array(cc.server.busClear);
+      this.busClear = cc.server.busClear;
       
       this.busIndex = 0;
       this.busAmp   = 0.8;
@@ -140,7 +122,7 @@ define(function(require, exports, module) {
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
-
+    
     Instance.prototype.play = function() {
       this.rootNode.running = true;
       this.bus.set(this.busClear);
@@ -151,9 +133,7 @@ define(function(require, exports, module) {
       this.timeline = [];
     };
     Instance.prototype.reset = function() {
-      if (this.manager.busClear) {
-        this.bus.set(this.manager.busClear);
-      }
+      this.bus.set(this.busClear);
       this.timeline = [];
       this.rootNode = cc.createServerRootNode(this);
       this.nodes   = { 0:this.rootNode };
@@ -161,6 +141,12 @@ define(function(require, exports, module) {
       this.defs    = {};
       this.buffers = {};
       this.bufSrc  = {};
+    };
+    Instance.prototype.isRunning = function() {
+      return this.rootNode.running;
+    };
+    Instance.prototype.pushToTimeline = function(timeline) {
+      push.apply(this.timeline, timeline);
     };
     Instance.prototype.doBinayCommand = function(binary) {
       var func  = commands[(binary[1] << 8) + binary[0]];
@@ -195,9 +181,13 @@ define(function(require, exports, module) {
   cc.createInstanceManager = function() {
     return new InstanceManager();
   };
+  cc.createInstance = function(userId) {
+    return new Instance(userId);
+  };
   
   module.exports = {
-    InstanceManager: InstanceManager
+    InstanceManager: InstanceManager,
+    Instance: Instance
   };
 
 });

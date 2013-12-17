@@ -16,6 +16,7 @@ define(function(require, exports, module) {
       this.channels   = C.SOCKET_CHANNELS;
       this.strmLength = C.SOCKET_STRM_LENGTH;
       this.bufLength  = C.SOCKET_BUF_LENGTH;
+      this.instance   = cc.createInstanceManager();
       this.list = [];
       this.map  = {};
       this.exports = null; // bind after
@@ -37,7 +38,7 @@ define(function(require, exports, module) {
         var userId = _userId++;
         that.list.push(ws);
         that.map[userId] = ws;
-        that.instanceManager.append(userId);
+        that.instance.append(userId);
         ws.on("message", function(msg) {
           // receive a message from the lang
           if (typeof msg !== "string") {
@@ -50,7 +51,7 @@ define(function(require, exports, module) {
         ws.on("close", function() {
           if (that.map[userId]) {
             that.pause([], userId);
-            that.instanceManager.remove(userId);
+            that.instance.remove(userId);
             that.list.splice(that.list.indexOf(ws), 1);
             delete that.map[userId];
           }
@@ -96,14 +97,14 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var instanceManager = this.instanceManager;
+      var instance = this.instance;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = instanceManager.busOutL;
-      var busOutR = instanceManager.busOutR;
+      var busOutL = this.busOutL;
+      var busOutR = this.busOutR;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        instanceManager.process(bufLength);
+        instance.process(bufLength);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));

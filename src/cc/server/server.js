@@ -10,10 +10,10 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.rates = null;
-      this.instanceManager = cc.createInstanceManager();
-      this.strm = null;
-      this.timer = cc.createTimer();
+      this.instance = null;
+      this.rates    = null;
+      this.strm     = null;
+      this.timer    = cc.createTimer();
       this.initialized = false;
       this.syncCount    = 0;
       this.sysSyncCount = 0;
@@ -25,7 +25,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.recvFromLang = function(msg, userId) {
       userId = userId|0;
       if (msg instanceof Uint8Array) {
-        this.instanceManager.doBinayCommand(userId, msg);
+        this.instance.doBinayCommand(msg, userId);
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -46,9 +46,21 @@ define(function(require, exports, module) {
           this.channels   = msg[2]|0;
           this.strmLength = msg[3]|0;
         }
-        this.strm  = new Int16Array(this.strmLength * this.channels);
-        this.instanceManager.init(this);
-        this.instanceManager.append(0);
+        this.strm = new Int16Array(this.strmLength * this.channels);
+
+        var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+        var bufLength  = this.bufLength;
+        var bufLength4 = this.bufLength << 2;
+        
+        this.busLength = busLength;
+        this.busClear  = new Float32Array(busLength);
+        this.busOut    = new Float32Array(busLength);
+        this.busOutLen = this.bufLength << 1;
+        this.busOutL   = new Float32Array(this.busOut.buffer, 0         , bufLength);
+        this.busOutR   = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
+        if (!this.instance) {
+          this.instance = cc.createInstance(0);
+        }
         this.rates = [];
         this.rates[C.AUDIO  ] = cc.createRate(this.sampleRate, this.bufLength);
         this.rates[C.CONTROL] = cc.createRate(this.sampleRate / this.bufLength, 1);
@@ -58,7 +70,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.play(userId);
+      this.instance.play(userId);
       if (!this.timer.isRunning()) {
         var that = this;
         this.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
@@ -69,9 +81,9 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.pause(userId);
+      this.instance.pause(userId);
       if (this.timer.isRunning()) {
-        if (!this.instanceManager.isRunning()) {
+        if (!this.instance.isRunning()) {
           this.timer.stop();
         }
       }
@@ -81,13 +93,13 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.reset(userId);
+      this.instance.reset(userId);
     };
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
       if (timeline.length) {
-        this.instanceManager.pushToTimeline(userId, timeline);
+        this.instance.pushToTimeline(timeline, userId);
       }
     };
     SynthServer.prototype.process = function() {

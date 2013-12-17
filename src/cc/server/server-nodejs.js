@@ -30,7 +30,7 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.play(userId);
+      this.instance.play(userId);
       if (this.api) {
         this._strm = new Int16Array(this.strmLength * this.channels);
         this.strmList = new Array(C.STRM_LIST_LENGTH);
@@ -53,16 +53,16 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.pause(userId);
+      this.instance.pause(userId);
       if (this.api) {
         if (this.api.isPlaying) {
-          if (!this.instanceManager.isRunning()) {
+          if (!this.instance.isRunning()) {
             this.api.pause();
           }
         }
       }
       if (this.timer.isRunning()) {
-        if (!this.instanceManager.isRunning()) {
+        if (!this.instance.isRunning()) {
           this.timer.stop();
         }
       }
@@ -72,16 +72,18 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var instanceManager = this.instanceManager;
+      var instance = this.instance;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = instanceManager.busOutL;
-      var busOutR = instanceManager.busOutR;
+      var busOut  = this.busOut;
+      var busOutL = this.busOutL;
+      var busOutR = this.busOutR;
       var lang = cc.lang;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
-        instanceManager.process(bufLength);
+        instance.process(bufLength);
+        busOut.set(instance.bus);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));

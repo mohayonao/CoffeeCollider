@@ -11,6 +11,7 @@ define(function(require, exports, module) {
   describe("server/server.js", function() {
     testTools.mock("lang");
     testTools.mock("createTimer");
+    testTools.mock("createInstance");
     testTools.mock("createInstanceManager");
     
     describe("SynthServer", function() {
@@ -42,15 +43,19 @@ define(function(require, exports, module) {
           assert.equal(instance.channels  ,    1);
         });
         it("/play", function() {
+          instance.init();
           instance.recvFromLang(["/play"]);
         });
         it("/pause", function() {
+          instance.init();
           instance.recvFromLang(["/pause"]);
         });
         it("/reset", function() {
+          instance.init();
           instance.recvFromLang(["/reset"]);
         });
         it("/processed", function() {
+          instance.init();
           instance.recvFromLang(["/processed", [0]]);
           assert.deepEqual(cc.createInstanceManager.called, [ "pushToTimeline" ]);
         });

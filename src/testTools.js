@@ -709,6 +709,7 @@ define(function(require, exports, module) {
       },
       append: function() {
         mock.createInstanceManager.called.push("append");
+        return mock.createInstance();
       },
       remove: function() {
         mock.createInstanceManager.called.push("remove");
@@ -720,6 +721,29 @@ define(function(require, exports, module) {
   };
   mock.createInstanceManager.$beforeEach = function() {
     mock.createInstanceManager.called = [];
+  };
+  
+  mock.createInstance = function() {
+    return {
+      play: function() {
+        mock.createInstanceManager.called.push("play");
+      },
+      pause: function() {
+        mock.createInstanceManager.called.push("pause");
+      },
+      reset: function() {
+        mock.createInstanceManager.called.push("reset");
+      },
+      pushToTimeline: function() {
+        mock.createInstanceManager.called.push("pushToTimeline");
+      },
+      process: function() {
+        mock.createInstanceManager.called.push("process");
+      }
+    };
+  };
+  mock.createInstance.$beforeEach = function() {
+    mock.createInstance.called = [];
   };
   
   mock.resetBuffer = function() {
