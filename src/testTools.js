@@ -640,7 +640,8 @@ define(function(require, exports, module) {
 
   mock.server = {
     sampleRate: 44100,
-    rates: []
+    rates: [],
+    busClear: new Float32Array(1024),
   };
   mock.server.rates[C.AUDIO] = {
     sampleRate      : 44100,

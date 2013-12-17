@@ -122,10 +122,10 @@ define(function(require, exports, module) {
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
-    
     Instance.prototype.play = function() {
       this.rootNode.running = true;
       this.bus.set(this.busClear);
+      this.timeline = [];
     };
     Instance.prototype.pause = function() {
       this.rootNode.running = false;
