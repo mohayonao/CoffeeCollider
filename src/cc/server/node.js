@@ -347,11 +347,6 @@ define(function(require, exports, module) {
       fixNumList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
         value = list[i];
-        if (value === "Infinity") {
-          value = Infinity;
-        } else if (value === "-Infinity") {
-          value = -Infinity;
-        }
         fixNumList[i] = instance.getFixNum(value);
       }
       list = specs.defList;

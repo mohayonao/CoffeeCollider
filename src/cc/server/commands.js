@@ -43,7 +43,7 @@ define(function(require, exports, module) {
   };
   commands["/s_def"] = function(msg) {
     var defId = msg[1]|0;
-    var specs = JSON.parse(msg[2]);
+    var specs = msg[2];
     this.defs[defId] = specs;
   };
   commands["/s_new"] = function(msg) {

@@ -22,15 +22,8 @@ define(function(require, exports, module) {
     
     SynthDef.prototype.send = function() {
       if (!this._sent) {
-        var consts = this.specs.consts;
-        if (consts[0] === -Infinity) {
-          consts[0] = "-Infinity";
-        }
-        if (consts[consts.length-1] === Infinity) {
-          consts[consts.length-1] = "Infinity";
-        }
         cc.lang.pushToTimeline([
-          "/s_def", this._defId, JSON.stringify(this.specs)
+          "/s_def", this._defId, this.specs
         ]);
         this._sent = true;
       }

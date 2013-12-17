@@ -425,7 +425,7 @@ define(function(require, exports, module) {
         
         assert.deepEqual(
           cc.lang.pushToTimeline.result, [
-            [ "/s_def", def._defId, JSON.stringify({consts:["-Infinity", "Infinity"]}) ]
+            [ "/s_def", def._defId, {consts:[-Infinity, Infinity]} ]
           ]
         );
         
