@@ -27,30 +27,26 @@ define(function(require, exports, module) {
   
   cc.unit.specs.In = (function() {
     var ctor = function() {
-      this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
         this.process = next_a;
         this._busOffset = 0;
       } else {
         this.process = next_k;
-        this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
+        this._busOffset = this.bufLength * C.AUDIO_BUS_LEN;
       }
     };
     var next_a = function(inNumSamples, instance) {
       var out = this.outputs[0];
       var bus  = instance.bus;
-      var bufLength = this._bufLength;
+      var bufLength = this.bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = bus[offset + i];
       }
     };
     var next_k = function(inNumSamples, instance) {
-      var out = this.outputs[0];
       var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
-      for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = value;
-      }
+      this.outputs[0][0] = value;
     };
     return ctor;
   })();

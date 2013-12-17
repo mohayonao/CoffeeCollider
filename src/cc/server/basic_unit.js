@@ -969,19 +969,18 @@ define(function(require, exports, module) {
   
   cc.unit.specs.Out = (function() {
     var ctor = function() {
-      this._bufLength = cc.server.bufLength;
       if (this.calcRate === C.AUDIO) {
         this.process = next_a;
         this._busOffset = 0;
       } else {
         this.process = next_k;
-        this._busOffset = this._bufLength * C.AUDIO_BUS_LEN;
+        this._busOffset = this.bufLength * C.AUDIO_BUS_LEN;
       }
     };
     var next_a = function(inNumSamples, instance) {
       var inputs = this.inputs;
       var bus    = instance.bus;
-      var bufLength = this._bufLength;
+      var bufLength = this.bufLength;
       var offset, _in;
       var fbusChannel = (inputs[0][0]|0) - 1;
       for (var i = 1, imax = inputs.length; i < imax; ++i) {
