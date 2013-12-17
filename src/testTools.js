@@ -749,6 +749,18 @@ define(function(require, exports, module) {
   mock.createInstance.$beforeEach = function() {
     mock.createInstance.called = [];
   };
+
+  mock.createServerGroup = function(nodeId, target, addAction, instance) {
+    return [nodeId, target, addAction, instance ];
+  };
+
+  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
+    return [ nodeId, target, addAction, defId, controls, instance ];
+  };
+
+  mock.createServerBuffer = function(bufnum, frames, channels) {
+    return [ bufnum, frames, channels ];
+  };
   
   mock.resetBuffer = function() {
     mock.resetBuffer.result = true;

@@ -414,6 +414,14 @@ define(function(require, exports, module) {
   cc.createServerRootNode = function(instance) {
     return new Group(0, 0, 0, instance);
   };
+
+  cc.createServerGroup = function(nodeId, target, addAction, instance) {
+    return new Group(nodeId, target, addAction, instance);
+  };
+
+  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
+    return new Synth(nodeId, target, addAction, defId, controls, instance);
+  };
   
   module.exports = {
     Node : Node,

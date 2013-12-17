@@ -138,9 +138,11 @@ define(function(require, exports, module) {
   
   // TODO: moved
   require("../common/timer");
-  require("./instance");
   require("./rate");
   require("./unit");
+  require("./buffer");
+  require("./node");
+  require("./instance");
   require("./server-worker");
   require("./server-nodejs");
   require("./server-socket");

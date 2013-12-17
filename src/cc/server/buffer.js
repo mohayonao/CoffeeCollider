@@ -263,6 +263,14 @@ define(function(require, exports, module) {
       }
     }
   };
+
+  cc.createServerBufferSource = function(bufSrcId) {
+    return new BufferSource(bufSrcId);
+  };
+  
+  cc.createServerBuffer = function(bufnum, frames, channels) {
+    return new Buffer(bufnum, frames, channels);
+  };
   
   module.exports = {
     BufferSource: BufferSource,
