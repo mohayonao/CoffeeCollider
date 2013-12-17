@@ -68,7 +68,7 @@ define(function(require, exports, module) {
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
+      if (this.sysSyncCount < this.syncCount - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
@@ -90,7 +90,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToLang(strm);
-      this.syncCount[0] += 1;
+      this.syncCount += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = new Int16Array(strm);
         this.strmListWriteIndex += 1;

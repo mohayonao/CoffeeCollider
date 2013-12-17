@@ -15,7 +15,7 @@ define(function(require, exports, module) {
       this.strm = null;
       this.timer = cc.createTimer();
       this.initialized = false;
-      this.syncCount    = new Uint32Array(1);
+      this.syncCount    = 0;
       this.sysSyncCount = 0;
     }
     
@@ -63,7 +63,7 @@ define(function(require, exports, module) {
         this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
       }
       this.sendToLang([
-        "/played", this.syncCount[0]
+        "/played", this.syncCount
       ]);
     };
     SynthServer.prototype.pause = function(msg, userId) {
@@ -75,7 +75,7 @@ define(function(require, exports, module) {
         }
       }
       this.sendToLang([
-        "/paused", this.syncCount[0]
+        "/paused", this.syncCount
       ]);
     };
     SynthServer.prototype.reset = function(msg, userId) {

@@ -92,7 +92,7 @@ define(function(require, exports, module) {
       }
     };
     SocketSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
+      if (this.sysSyncCount < this.syncCount - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
@@ -113,7 +113,7 @@ define(function(require, exports, module) {
       }
       this.sendToLang(strm);
       this.sendToLang(["/process"]);
-      this.syncCount[0] += 1;
+      this.syncCount += 1;
       
       if (this.api) {
         this.strmList[this.strmListWriteIndex] = new Int16Array(strm);

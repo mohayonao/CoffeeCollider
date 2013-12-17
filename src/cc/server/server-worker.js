@@ -25,7 +25,7 @@ define(function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
+      if (this.sysSyncCount < this.syncCount - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
@@ -47,7 +47,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToLang(strm);
-      this.syncCount[0] += 1;
+      this.syncCount += 1;
     };
     
     return WorkerSynthServer;
