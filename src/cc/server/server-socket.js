@@ -5,6 +5,102 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   var emitter = require("../common/emitter");
   
+  var InstanceManager = (function() {
+    function InstanceManager() {
+      this.map  = {};
+      this.list = [];
+      this.server = null;
+      this.process = process0;
+    }
+    
+    InstanceManager.prototype.append = function(userId) {
+      if (!this.map[userId]) {
+        var instance = cc.createInstance(userId);
+        this.map[userId] = instance;
+        this.list.push(instance);
+        if (this.list.length === 1) {
+          this.process = process1;
+        } else {
+          this.process = processN;
+        }
+      }
+      return this.map[userId];
+    };
+    InstanceManager.prototype.remove = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        this.list.splice(this.list.indexOf(instance), 1);
+        delete this.map[userId];
+        if (this.list.length === 1) {
+          this.process = process1;
+        } else if (this.list.length === 0) {
+          this.process = process0;
+        }
+      }
+    };
+    InstanceManager.prototype.play = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.play();
+      }
+    };
+    InstanceManager.prototype.pause = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.pause();
+      }
+    };
+    InstanceManager.prototype.reset = function(userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.reset();
+      }
+    };
+    InstanceManager.prototype.isRunning = function() {
+      return this.list.some(function(instance) {
+        return instance.isRunning();
+      });
+    };
+    InstanceManager.prototype.pushToTimeline = function(timeline, userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.pushToTimeline(timeline);
+      }
+    };
+    InstanceManager.prototype.doBinayCommand = function(binary, userId) {
+      var instance = this.map[userId];
+      if (instance) {
+        instance.doBinayCommand(binary);
+      }
+    };
+    
+    var process0 = function() {
+      cc.server.busOut.set(cc.server.busClear);
+    };
+    var process1 = function(bufLength) {
+      this.list[0].process(bufLength);
+      cc.server.busOut.set(this.list[0].bus);
+    };
+    var processN = function(bufLength) {
+      var list = this.list;
+      var busOut    = this.busOut;
+      var busOutLen = this.busOutLen;
+      var instance;
+      busOut.set(this.busClear);
+      for (var i = 0, imax = list.length; i < imax; ++i) {
+        instance = list[i];
+        instance.process(bufLength);
+        var inBus = instance.bus;
+        var inAmp = instance.busAmp;
+        for (var j = busOutLen; j--; ) {
+          busOut[j] += inBus[j] * inAmp;
+        }
+      }
+    };
+    
+    return InstanceManager;
+  })();
+
   var SocketSynthServer = (function() {
     var WebSocketServer;
     if (global.require) {
@@ -16,7 +112,7 @@ define(function(require, exports, module) {
       this.channels   = C.SOCKET_CHANNELS;
       this.strmLength = C.SOCKET_STRM_LENGTH;
       this.bufLength  = C.SOCKET_BUF_LENGTH;
-      this.instance   = cc.createInstanceManager();
+      this.instance   = new InstanceManager();
       this.list = [];
       this.map  = {};
       this.exports = null; // bind after
@@ -157,7 +253,9 @@ define(function(require, exports, module) {
     return server;
   };
   
-  module.exports = {};
+  module.exports = {
+    InstanceManager: InstanceManager
+  };
 
 });
   

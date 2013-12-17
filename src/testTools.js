@@ -727,19 +727,22 @@ define(function(require, exports, module) {
   mock.createInstance = function() {
     return {
       play: function() {
-        mock.createInstanceManager.called.push("play");
+        mock.createInstance.called.push("play");
       },
       pause: function() {
-        mock.createInstanceManager.called.push("pause");
+        mock.createInstance.called.push("pause");
       },
       reset: function() {
-        mock.createInstanceManager.called.push("reset");
+        mock.createInstance.called.push("reset");
       },
       pushToTimeline: function() {
-        mock.createInstanceManager.called.push("pushToTimeline");
+        mock.createInstance.called.push("pushToTimeline");
       },
       process: function() {
-        mock.createInstanceManager.called.push("process");
+        mock.createInstance.called.push("process");
+      },
+      isRunning: function() {
+        return false;
       }
     };
   };

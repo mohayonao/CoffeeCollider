@@ -57,7 +57,7 @@ define(function(require, exports, module) {
         it("/processed", function() {
           instance.init();
           instance.recvFromLang(["/processed", [0]]);
-          assert.deepEqual(cc.createInstanceManager.called, [ "pushToTimeline" ]);
+          assert.deepEqual(cc.createInstance.called, [ "pushToTimeline" ]);
         });
       });
     });
