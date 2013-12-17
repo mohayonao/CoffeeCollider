@@ -90,9 +90,9 @@ define(function(require, exports, module) {
   cc.unit.specs.XLine = (function() {
     var ctor = function() {
       this.process = next;
-      var start = this.inputs[0][0];
-      var end = this.inputs[1][0];
-      var dur = this.inputs[2][0];
+      var start = this.inputs[0][0] || 0.001;
+      var end   = this.inputs[1][0] || 0.001;
+      var dur   = this.inputs[2][0];
       var counter = Math.round(dur * this.rate.sampleRate);
       if (counter === 0) {
         this._level   = end;
