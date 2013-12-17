@@ -60,7 +60,8 @@ define(function(require, exports, module) {
       userId = userId|0;
       this.instanceManager.play(userId);
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
+        var that = this;
+        this.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
       }
       this.sendToLang([
         "/played", this.syncCount

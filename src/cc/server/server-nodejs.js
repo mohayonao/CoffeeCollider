@@ -47,7 +47,7 @@ define(function(require, exports, module) {
       if (!this.timer.isRunning()) {
         var that = this;
         setTimeout(function() {
-          that.timer.start(that.process.bind(that), C.PROCESSING_INTERVAL);
+          that.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
         }, 50); // TODO: ???
       }
     };
