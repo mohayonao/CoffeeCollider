@@ -49,7 +49,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Number.prototype, "wait", function() {
     var n = this;
     if (n >= 0 && cc.currentTask) {
-      cc.currentTask.__wait__(cc.createTaskWaitTokenNumber(n));
+      cc.currentTask.__wait__(n);
     }
     return this;
   });
