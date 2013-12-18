@@ -65,7 +65,7 @@ define(function(require, exports, module) {
     var buffer = instance.buffers[unit.inputs[0][0]|0];
     if (buffer) {
       var samples = buffer.samples;
-      if (samples) {
+      if (samples.length) {
         unit._frames     = buffer.frames;
         unit._channels   = buffer.channels;
         unit._sampleRate = buffer.sampleRate;
