@@ -306,6 +306,9 @@ define(function(require, exports, module) {
       case 4 : this._perform = perform_C; break;
       default: this._perform = perform_L; break;
       }
+      this._samples  = null;
+      this._channels = 0;
+      this._frames   = 0;
     };
     var next_1ch = function(inNumSamples, instance) {
       if (!get_buffer(this, instance)) {
@@ -314,11 +317,11 @@ define(function(require, exports, module) {
       var out = this.outputs[0];
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
@@ -334,11 +337,11 @@ define(function(require, exports, module) {
       var out2 = this.outputs[1];
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
@@ -354,11 +357,11 @@ define(function(require, exports, module) {
       var outputs = this.outputs;
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
