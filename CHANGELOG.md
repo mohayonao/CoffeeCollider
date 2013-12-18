@@ -1,3 +1,8 @@
+- **v0.2.1** (2013-12-18)
+  - Fixed [#46](https://github.com/mohayonao/CoffeeCollider/issues/46) output NaN when using unread buffer
+  - Fixed [#47](https://github.com/mohayonao/CoffeeCollider/issues/47) feedback delays output NaN
+  - Fixed [#48](https://github.com/mohayonao/CoffeeCollider/issues/48) BufRd outputs NaN
+
 - **v0.2.0** (2013-12-18)
   - Added [#44](https://github.com/mohayonao/CoffeeCollider/issues/44) messaging API
   - Added [#42](https://github.com/mohayonao/CoffeeCollider/issues/42) CLI eval option
