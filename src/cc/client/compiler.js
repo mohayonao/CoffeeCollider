@@ -5,55 +5,8 @@ define(function(require, exports, module) {
   
   var cc = require("../cc");
   var numericstring = require("../common/numericstring");
-  var timevalue = numericstring.timevalue;
-  var notevalue = numericstring.notevalue;
   var push = [].push;
   
-  // CoffeeScript tags
-  // IDENTIFIER
-  // NUMBER
-  // STRING
-  // REGEX
-  // BOOL
-  // NULL
-  // UNDEFINED
-  // COMPOUND_ASSIGN -=, +=, div=, *=, %=, ||=, &&=, ?=, <<=, >>=, >>>=, &=, ^=, |=
-  // UNARY           !, ~, new, typeof, delete, do
-  // LOGIC           &&, ||, &, |, ^
-  // SHIFT           <<, >>, >>>
-  // COMPARE         ==, !=, <, >, <=, >=
-  // MATH            *, div, %, 
-  // RELATION        in, of, instanceof
-  // =
-  // +
-  // -
-  // ..
-  // ...
-  // ++
-  // --
-  // (
-  // )
-  // [
-  // ]
-  // {
-  // }
-  // ?
-  // ::
-  // @
-  // IF
-  // ELSE
-  // WHILE
-  // LOOP
-  // SWITCH
-  // LEADING_WHEN
-  // THIS
-  // SUPER
-  // INDENT
-  // OUTDENT
-  // RETURN
-  // TERMINATOR
-  // HERECOMMENT
-
   var TAG   = 0;
   var VALUE = 1;
   var _     = {}; // empty location
@@ -62,21 +15,12 @@ define(function(require, exports, module) {
   var isDot = function(token) {
     return !!token && (token[TAG] === "." || token[TAG] === "@");
   };
-  
-  var getIdentifier = function(token) {
-    var val = token[VALUE];
-    if (val.reserved) {
-      return val[0] + val[1] + (val[2]||"") + (val[3]||"") + (val[4]||"") +
-        (val[5]||"") + (val[6]||"") + (val[7]||"");
-    }
-    return val;
+  var isColon = function(token) {
+    return !!token && token[TAG] === ":";
   };
-  
-  // var getLine = function(tokens, index) {
-  // };
   var indexOfParamEnd = function(tokens, index) {
-    var bracket = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
+    var bracket = 0, i, imax = tokens.length;
+    for (i = index; i < imax; ++i) {
       switch (tokens[i][TAG]) {
       case "PARAM_START":
         bracket += 1;
@@ -91,39 +35,15 @@ define(function(require, exports, module) {
     return -1;
   };
   var indexOfFunctionStart = function(tokens, index) {
-    var depth = 0;
-    for (var i = index, imax = tokens.length; i < imax; ++i) {
+    var i, imax = tokens.length;
+    for (i = index; i < imax; ++i) {
       switch (tokens[i][TAG]) {
+      case "PARAM_START": case "->": case "=>":
+        return i;
       case "TERMINATOR":
-        if (depth === 0) {
-          return -1;
-        }
-        break;
-      case "PARAM_START":
-        if (depth === 0) {
-          return i;
-        }
-        depth += 1;
-        break;
-      case "PARAM_END":
-        depth -= 1;
-        break;
-      case "->": case "=>":
-        if (depth === 0) {
-          return i;
-        }
-        break;
       case "[": case "{": case "(":
       case "CALL_START": case "INDEX_START":
-        depth += 1;
-        break;
-      case ")": case "}": case "]":
-      case "CALL_END": case "INDEX_END": case "PARAM_END":
-        depth -= 1;
-        break;
-      }
-      if (depth < 0) {
-        break;
+        return -1;
       }
     }
     return -1;
@@ -131,7 +51,7 @@ define(function(require, exports, module) {
   var formatArgument = function(op) {
     return op.tokens.slice(op.begin, op.end+1).map(function(token, index) {
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "'") {
-        return "\"" + token[VALUE].substr(1, token[VALUE].length-2) + "\"";
+        return "\"" + token[VALUE].substr(1, token[VALUE].length - 2) + "\"";
       } else if (token[TAG] === "IDENTIFIER" && op.tokens[op.begin+index+1][TAG] === ":") {
         return "\"" + token[VALUE] + "\"";
       }
@@ -139,16 +59,10 @@ define(function(require, exports, module) {
     }).join("");
   };
   
-  
-  
-  
   var detectPlusMinusOperator = function(tokens) {
-    if (tokens.cc_plusminus) {
-      return tokens;
-    }
-    var prevTag = "";
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      var tag = tokens[i][TAG];
+    var i, prevTag = "", tag, imax = tokens.length;
+    for (i = 0; i < imax; ++i) {
+      tag = tokens[i][TAG];
       if (tag === "+" || tag === "-") {
         switch (prevTag) {
         case "IDENTIFIER": case "NUMBER": case "STRING": case "BOOL":
@@ -167,25 +81,21 @@ define(function(require, exports, module) {
   };
   
   var revertPlusMinusOperator = function(tokens) {
-    if (!tokens.cc_plusminus) {
-      for (var i = 0, imax = tokens.length; i < imax; ++i) {
-        var val = tokens[i][VALUE];
-        if (val === "+" || val === "-") {
-          tokens[i][TAG] = val;
-        }
+    var i, val, imax = tokens.length;
+    for (i = 0; i < imax; ++i) {
+      val = tokens[i][VALUE];
+      if (val === "+" || val === "-") {
+        tokens[i][TAG] = val;
       }
-      return tokens;
     }
-    delete tokens.cc_plusminus;
     return tokens;
   };
   
   var getPrevOperand = function(tokens, index) {
-    tokens = detectPlusMinusOperator(tokens);
-    
     var bracket = 0;
     var indent  = 0;
     var end = index;
+    var prev;
     while (1 < index) {
       switch (tokens[index][TAG]) {
       case "(": case "[": case "{":
@@ -215,7 +125,6 @@ define(function(require, exports, module) {
       case "UNDEFINED": case "NULL": case "@": case "THIS": case "SUPER":
       case "->": case "=>":
         if (bracket === 0 && indent === 0) {
-          var prev;
           while ((prev = tokens[index-1]) && prev[TAG] === "UNARY") {
             index -= 1;
           }
@@ -229,11 +138,11 @@ define(function(require, exports, module) {
   };
   
   var getNextOperand = function(tokens, index) {
-    tokens = detectPlusMinusOperator(tokens);
     var bracket = 0;
     var indent  = 0;
     var begin = index;
     var imax = tokens.length - 2;
+    var tag;
 
     if (tokens[index] && tokens[index][TAG] === "@") {
       if (tokens[index+1][TAG] !== "IDENTIFIER") {
@@ -242,7 +151,7 @@ define(function(require, exports, module) {
     }
     
     while (index < imax) {
-      var tag = tokens[index][TAG];
+      tag = tokens[index][TAG];
       
       switch (tag) {
       case "(": case "[": case "{":
@@ -282,25 +191,26 @@ define(function(require, exports, module) {
       }
       index += 1;
     }
-    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length-2)};
+    return {tokens:tokens, begin:begin, end:Math.max(0,tokens.length - 2)};
   };
   
   var func = {};
   var detectFunctionParameters = function(tokens) {
-    if (tokens.cc_funcParams) {
-      return tokens;
-    }
     var stack = [
       { declared:[], args:[], local:[], outer:[] }
     ];
-    stack.setVariables = func.setVariables(stack);
-    
+    var scope;
     var indent = 0;
     var args = [];
     var vars = [];
-    for (var i = 0, imax = tokens.length - 1; i < imax; ++i) {
-      var op, token = tokens[i];
-      stack.peek = stack[stack.length-1];
+    var op, token;
+    var i, imax = tokens.length - 1;
+    
+    stack.setVariables = func.setVariables(stack);
+    
+    for (i = 0; i < imax; ++i) {
+      token = tokens[i];
+      stack.peek = stack[stack.length - 1];
       switch (token[TAG]) {
       case "PARAM_START":
         args = func.getInfoOfArguments(tokens, i);
@@ -309,8 +219,8 @@ define(function(require, exports, module) {
         args = args.args;
         /* falls through */
       case "->": case "=>":
-        var scope = {
-          declared: stack.peek.declared.concat(stack.peek.local),
+        scope = {
+          declared: stack.peek.declared.concat(stack.peek.local).concat(stack.peek.args),
           args:vars.splice(0), local:[], outer:[], indent:indent
         };
         tokens[i].cc_funcParams = {
@@ -360,6 +270,7 @@ define(function(require, exports, module) {
       "cc", "global", "console", "setInterval", "setTimeout", "clearInterval", "clearTimeout"
     ];
     return function(name) {
+      var i;
       if (ignored.indexOf(name) !== -1) {
         return;
       }
@@ -379,7 +290,7 @@ define(function(require, exports, module) {
       
       // outer variable
       stack.peek.outer.push(name);
-      for (var i = stack.length - 2; i >= 0; i--) {
+      for (i = stack.length - 2; i >= 0; i--) {
         if (stack[i].local.indexOf(name) !== -1) {
           return;
         }
@@ -392,11 +303,11 @@ define(function(require, exports, module) {
   
   func.getInfoOfArguments = function(tokens, index) {
     var begin = index;
-    var end  = indexOfParamEnd(tokens, index);
-    var vars = [];
-    var args = [];
-    for (var i = begin+1; i < end; ++i) {
-      var op = getNextOperand(tokens, i);
+    var end   = indexOfParamEnd(tokens, index);
+    var vars = [], args = [];
+    var i, op;
+    for (i = begin + 1; i < end; ++i) {
+      op = getNextOperand(tokens, i);
       args.push(formatArgument(op));
       vars = func.getVariables(op, vars);
       i += op.end - op.begin + 1;
@@ -414,11 +325,12 @@ define(function(require, exports, module) {
     return {vars:vars, args:args, end:end};
   };
   func.getVariables = function(op, list) {
-    var tokens = op.tokens;
+    var tokens = op.tokens, i, imax, _op;
     list = list || [];
     if (tokens[op.begin][TAG] === "[" && tokens[op.end][TAG] === "]") {
-      for (var i = op.begin+1, imax = op.end; i < imax; ++i) {
-        var _op = getNextOperand(tokens, i);
+      imax = op.end;
+      for (i = op.begin + 1; i < imax; ++i) {
+        _op = getNextOperand(tokens, i);
         list = func.getVariables(_op, list);
         i += _op.end - _op.begin + 1;
         if (tokens[i][TAG] !== ",") {
@@ -435,16 +347,15 @@ define(function(require, exports, module) {
     return list;
   };
   
-  
   var replaceNumericString = function(tokens) {
-    var str, val;
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      var token = tokens[i];
+    var token, str, val, i, imax = tokens.length;
+    for (i = 0; i < imax; ++i) {
+      token = tokens[i];
       if (token[TAG] === "STRING" && token[VALUE].charAt(0) === "\"") {
-        str = token[VALUE].substr(1, token[VALUE].length-2);
-        val = timevalue(str);
+        str = token[VALUE].substr(1, token[VALUE].length - 2);
+        val = numericstring.timevalue(str);
         if (typeof val !== "number") {
-          val = notevalue(str);
+          val = numericstring.notevalue(str);
         }
         if (typeof val === "number") {
           token[TAG] = "NUMBER";
@@ -456,206 +367,193 @@ define(function(require, exports, module) {
   };
   
   var replaceStrictlyPrecedence = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i > 0; i--) {
-      var token = tokens[i];
+    var i, token, prev, next;
+    for (i = tokens.length - 1; i > 0; i--) {
+      token = tokens[i];
       if (token[TAG] === "MATH" && (token[VALUE] !== "+" && token[VALUE] !== "-")) {
-        var prev = getPrevOperand(tokens, i);
-        var next = getNextOperand(tokens, i);
+        prev = getPrevOperand(tokens, i);
+        next = getNextOperand(tokens, i);
         tokens.splice(next.end + 1, 0, [")", ")" , _]);
         tokens.splice(prev.begin  , 0, ["(", "(" , _]);
       }
     }
     return tokens;
   };
-
-  var uop = {
-    operatorDict: {
-      "+": "__plus__", "-": "__minus__"
-    }
-  };
+  
   var replaceUnaryOperator = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "UNARY" && uop.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = uop.operatorDict[token[VALUE]];
-        var next = getNextOperand(tokens, i);
-        tokens.splice(
-          next.end+1, 0,
-          ["."         , "."     , _],
-          ["IDENTIFIER", selector, _],
-          ["CALL_START", "("     , _],
-          ["CALL_END"  , ")"     , _]
-        );
-        tokens.splice(i, 1);
+    var i, token, selector, next;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
+      if (token[TAG] !== "UNARY") {
+        continue;
       }
+      switch (token[VALUE]) {
+      case "+":
+        selector = "__plus__";
+        break;
+      case "-":
+        selector = "__minus__";
+        break;
+      default:
+        continue;
+      }
+      next = getNextOperand(tokens, i);
+      tokens.splice(
+        next.end + 1, 0,
+        ["."         , "."     , _],
+        ["IDENTIFIER", selector, _],
+        ["CALL_START", "("     , _],
+        ["CALL_END"  , ")"     , _]
+      );
+      tokens.splice(i, 1); // remove an origin operator
     }
     return tokens;
   };
   
-  var bop = {
-    operatorDict: {
-      "+": "__add__", "-": "__sub__", "*": "__mul__", "/": "__div__", "%": "__mod__"
-    },
-    adverbs: {
-      W:"WRAP", S:"SHORT", C:"CLIP", F:"FOLD", T:"TABLE", X:"FLAT",
-      WRAP:"WRAP", SHORT:"SHORT", CLIP:"CLIP", FOLD:"FOLD", TABLE:"TABLE", FLAT:"FLAT"
-    }
-  };
   var replaceTextBinaryAdverb = function(code) {
-    Object.keys(bop.adverbs).forEach(function(key) {
-      var a = new RegExp("([+\\-*/%])(" + key + ")\\1", "g");
-      var b = "$1 " + "\"#!" + key.charAt(0) + "\"" + " $1";
-      code = code.replace(a, b);
+    return code.replace(/([+\-*\/%])(W|S|C|F|T|X|WRAP|SHORT|CLIP|FOLD|TABLE|FLAT)\1/g, function(_, selector, adverb) {
+      return selector + " \"#!" + adverb.charAt(0) + "\" " + selector;
     });
-    return code;
   };
+  
   var replaceBinaryOperatorAdverbs = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-3; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
-        var adverb = bop.checkAdvarb(tokens, i);
-        if (adverb) {
-          token.adverb = adverb;
-          tokens.splice(i + 1, 2);
-        }
+    var i, t0, t1, t2;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      t0 = tokens[i];
+      if (t0[TAG] !== "MATH") {
+        continue;
+      }
+      t1 = tokens[i + 1];
+      t2 = tokens[i + 2];
+      if (t0[VALUE] === t2[VALUE] && /^"#![WSCFTX]"$/.test(t1[VALUE])) {
+        t0.adverb = t1[VALUE].charAt(3);
+        tokens.splice(i + 1, 2);
       }
     }
     return tokens;
   };
+  
   var replaceBinaryOperator = function(tokens) {
-    tokens = detectPlusMinusOperator(tokens);
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (token[TAG] === "MATH" && bop.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = bop.operatorDict[token[VALUE]];
-        var adverb   = token.adverb;
-        var next     = getNextOperand(tokens, i);
-        tokens.splice(
-          i, 1,
-          ["."         , "."     , _],
-          ["IDENTIFIER", selector, _],
-          ["CALL_START", "("     , _]
-        );
-        if (adverb) {
-          tokens.splice(
-            next.end+3, 0,
-            [","         , ","   , _],
-            ["IDENTIFIER", adverb, _],
-            ["CALL_END"  , ")"   , _]
-          );
-        } else {
-          tokens.splice(
-            next.end+3, 0,
-            ["CALL_END", ")", _]
-          );
-        }
+    var i, token, selector, adverb, next;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
+      if (token[TAG] !== "MATH") {
+        continue;
       }
-    }
-    return tokens;
-  };
-  bop.checkAdvarb = function(tokens, index) {
-    var t0 = tokens[index  ];
-    var t1 = tokens[index+1];
-    var t2 = tokens[index+2];
-    if (t0 && t1 && t2) {
-      if (/^"#![WSCFTX]"$/.test(t1[VALUE])) {
-        var key = t1[VALUE].charAt(3);
-        if (t0[VALUE] === t2[VALUE] && bop.adverbs.hasOwnProperty(key)) {
-          return bop.adverbs[key];
-        }
+      switch (token[VALUE]) {
+      case "+":
+        selector = "__add__";
+        break;
+      case "-":
+        selector = "__sub__";
+        break;
+      case "*":
+        selector = "__mul__";
+        break;
+      case "/":
+        selector = "__div__";
+        break;
+      case "%":
+        selector = "__mod__";
+        break;
+      default:
+        throw new Error("Unknown MATH:" + token[VALUE]);
       }
-    }
-  };
-  
-  
-  var compound = {
-    operatorDict: {
-      "+=": "__add__",
-      "-=": "__sub__",
-      "*=": "__mul__",
-      "/=": "__div__",
-      "%=": "__mod__",
-    }
-  };
-  var replaceCompoundAssign = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
-      if (compound.operatorDict.hasOwnProperty(token[VALUE])) {
-        var selector = compound.operatorDict[token[VALUE]];
-        var prev = getPrevOperand(tokens, i);
-        var next = getNextOperand(tokens, i);
-
+      adverb = token.adverb;
+      next   = getNextOperand(tokens, i);
+      tokens.splice(
+        i, 1,
+        ["."         , "."     , _],
+        ["IDENTIFIER", selector, _],
+        ["CALL_START", "("     , _]
+      );
+      if (adverb) {
+        adverb = {
+          W: "WRAP",
+          S: "SHORT",
+          C: "CLIP",
+          F: "FOLD",
+          T: "TABLE",
+          X: "FLAT"
+        }[adverb];
         tokens.splice(
-          i, 1,
-          ["="         , "="     , _],
-          ["."         , "."     , _],
-          ["IDENTIFIER", selector, _],
-          ["CALL_START", "("     , _]
+          next.end + 3, 0,
+          [","         , ","   , _],
+          ["IDENTIFIER", adverb, _],
+          ["CALL_END"  , ")"   , _]
         );
+      } else {
         tokens.splice(
-          next.end+4, 0,
+          next.end + 3, 0,
           ["CALL_END", ")", _]
         );
-        var subtokens = [ i+1, 0 ];
-        for (var j = prev.begin; j < i; ++j) {
-          subtokens.push(tokens[j]);
-        }
-        tokens.splice.apply(tokens, subtokens);
       }
     }
     return tokens;
   };
+  
+  var replaceCompoundAssign = function(tokens) {
+    var i, j, token, selector, prev, next, subtokens;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
+      if (token[TAG] !== "COMPOUND_ASSIGN") {
+        continue;
+      }
+      switch (token[VALUE]) {
+      case "+=":
+        selector = "__add__";
+        break;
+      case "-=":
+        selector = "__sub__";
+        break;
+      case "*=":
+        selector = "__mul__";
+        break;
+      case "/=":
+        selector = "__div__";
+        break;
+      case "%=":
+        selector = "__mod__";
+        break;
+      default:
+        throw new Error("Unknown COMPOUND_ASSIGN:" + token[VALUE]);
+      }
+      prev = getPrevOperand(tokens, i);
+      next = getNextOperand(tokens, i);
 
-  var logic = {
-    operatorDict: {
-      "&&": "__and__", "||": "__or__"
-    }
-  };
-  var replaceLogicOperator = function(tokens) {
-    var replaceable = false;
-    for (var i = 1; i < tokens.length; ++i) {
-      var token = tokens[i];
-      if (token[VALUE] === "wait" && tokens[i-1][TAG] === "@") {
-        replaceable = true;
-        continue;
+      tokens.splice(
+        i, 1,
+        ["="         , "="     , _],
+        ["."         , "."     , _],
+        ["IDENTIFIER", selector, _],
+        ["CALL_START", "("     , _]
+      );
+      tokens.splice(
+        next.end + 4, 0,
+        ["CALL_END", ")", _]
+      );
+      subtokens = [ i + 1, 0 ];
+      for (j = prev.begin; j < i; ++j) {
+        subtokens.push(tokens[j]);
       }
-      if (token[TAG] === ",") {
-        replaceable = false;
-        continue;
-      }
-      if (replaceable) {
-        if (token[TAG] === "LOGIC" && logic.operatorDict.hasOwnProperty(token[VALUE])) {
-          var selector = logic.operatorDict[token[VALUE]];
-          var next = getNextOperand(tokens, i);
-          tokens.splice(
-            i, 1,
-            ["."         , "."     , _],
-            ["IDENTIFIER", selector, _],
-            ["CALL_START", "("     , _]
-          );
-          tokens.splice(
-            next.end + 3, 0,
-            ["CALL_END", ")", _]
-          );
-          i = next.end+3; // skip
-        }
-      }
+      tokens.splice.apply(tokens, subtokens);
     }
     return tokens;
   };
   
+  var synthdef = {}; // utility functions
   
-  var synthdef = {};
   var replaceSynthDefinition = function(tokens) {
-    tokens = detectFunctionParameters(tokens);
-    for (var i = tokens.length - 5; i >= 0; i--) {
-      if ((i && tokens[i-1][TAG] === ".") || tokens[i][VALUE] !== "SynthDef") {
+    var i, index, args;
+    
+    for (i = tokens.length - 1; i >= 0; i--) {
+      if (tokens[i][VALUE] !== "SynthDef") {
         continue;
       }
-      var index = i;
+      if (isDot(tokens[i-1])) {
+        continue;
+      }
+      index = i;
       while (index < tokens.length) {
         if (tokens[index][TAG] === "CALL_START") {
           break;
@@ -666,72 +564,74 @@ define(function(require, exports, module) {
       if (index === -1) {
         continue;
       }
-      var args;
-      if (tokens[index].cc_funcRef) {
-        args = tokens[index].cc_funcRef.cc_funcParams.args;
-      } else {
-        args = [];
+      args = tokens[index].cc_funcRef.cc_funcParams.args;
+      if (args.length) {
+        synthdef.replaceDefaultArguments(tokens, index, args);
       }
-      synthdef.replaceSynthDefDefaultArguments(tokens, index, args);
-      
       index = getNextOperand(tokens, index).end + 1;
       synthdef.insertSynthDefArgumentsToAfterFunction(tokens, index, args);
     }
     return tokens;
   };
-  synthdef.replaceSynthDefDefaultArguments = function(tokens, index, args) {
-    if (args.length) {
-      var remove = indexOfParamEnd(tokens, index) - index + 1;
-      var subtokens = [ index, remove ];
-      
-      subtokens.push(["PARAM_START", "(", _]);
-      for (var i = 0, imax = args.length; i < imax; i += 2) {
-        if (i) {
-          subtokens.push([",", ",", _]);
-        }
-        subtokens.push(["IDENTIFIER", args[i], _]);
+  synthdef.replaceDefaultArguments = function(tokens, index, args) {
+    var i, removelen, spliceargs, imax = args.length;
+    removelen  = indexOfParamEnd(tokens, index) - index + 1;
+    spliceargs = [ index, removelen ];
+    
+    spliceargs.push(["PARAM_START", "(", _]);
+    for (i = 0; i < imax; i += 2) {
+      if (i) {
+        spliceargs.push([",", ",", _]);
       }
-      subtokens.push(["PARAM_END"  , ")", _]);
-      
-      tokens.splice.apply(tokens, subtokens);
+      spliceargs.push(["IDENTIFIER", args[i], _]);
     }
+    spliceargs.push(["PARAM_END"  , ")", _]);
+    
+    tokens.splice.apply(tokens, spliceargs);
   };
   synthdef.insertSynthDefArgumentsToAfterFunction = function(tokens, index, args) {
-    var subtokens = [ index, 0 ];
-    
-    subtokens.push([",", ",", _],
-                   ["[", "[", _]);
-    for (var j = 0, jmax = args.length; j < jmax; ++j) {
-      if (j) {
-        subtokens.push([",", ",", _]);
+    var i, spliceargs, imax = args.length;
+    spliceargs = [ index, 0 ];
+    spliceargs.push([",", ",", _],
+                    ["[", "[", _]);
+    for (i = 0; i < imax; ++i) {
+      if (i) {
+        spliceargs.push([",", ",", _]);
       }
-      subtokens.push(["STRING", "'" + (args[j]||0) + "'", _]);
+      spliceargs.push(["STRING", "'" + (args[i]||0) + "'", _]);
     }
-    subtokens.push(["]", "]", _]);
+    spliceargs.push(["]", "]", _]);
     
-    tokens.splice.apply(tokens, subtokens);
+    tokens.splice.apply(tokens, spliceargs);
   };
   
-  var segmented = {
-    target: ["Task", "syncblock"],
-  };
+  var segmented = {}; // utility functions
   
   var replaceSyncBlock = function(tokens) {
-    tokens = detectFunctionParameters(tokens);
-    var id;
-    for (var i = tokens.length - 1; i >= 0; i--) {
-      if (tokens[i][TAG] !== "IDENTIFIER" || tokens[i+1][TAG] !== "CALL_START") {
+    var i, token, index, isSyncBlock;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
+      if (token[TAG] !== "IDENTIFIER") {
         continue;
       }
-      id = getIdentifier(tokens[i]);
-      if (segmented.target.indexOf(id) === -1) {
+      if (tokens[i+1][TAG] !== "CALL_START") {
         continue;
       }
-      var index = indexOfFunctionStart(tokens, i + 2);
+      switch (token[VALUE]) {
+      case "Task":
+        isSyncBlock = false;
+        break;
+      case "syncblock":
+        isSyncBlock = true;
+        break;
+      default:
+        continue;
+      }
+      index = indexOfFunctionStart(tokens, i + 2);
       if (index === -1) {
         continue;
       }
-      segmented.makeSyncBlock(getNextOperand(tokens, index), id === "syncblock");
+      segmented.makeSyncBlock(getNextOperand(tokens, index), isSyncBlock);
     }
     return tokens;
   };
@@ -743,20 +643,15 @@ define(function(require, exports, module) {
     var localVars, outerVars, args;
     
     var ref = body[0].cc_funcRef;
-    
-    if (ref) {
-      localVars = ref.cc_funcParams.local;
-      outerVars = ref.cc_funcParams.outer;
-      args = ref.cc_funcParams.args.filter(function(name, i) {
-        return !(i & 1);
-      }).map(function(x) {
-        var tokens = CoffeeScript.tokens(x);
-        tokens.pop(); // remove TERMINATOR
-        return tokens;
-      });
-    } else {
-      localVars = outerVars = args = [];
-    }
+    localVars = ref.cc_funcParams.local;
+    outerVars = ref.cc_funcParams.outer;
+    args = ref.cc_funcParams.args.filter(function(name, i) {
+      return !(i & 1);
+    }).map(function(x) {
+      var tokens = CoffeeScript.tokens(x);
+      tokens.pop(); // remove TERMINATOR
+      return tokens;
+    });
 
     if (args.length) {
       // remove default args
@@ -876,80 +771,64 @@ define(function(require, exports, module) {
     }
     return tokens.splice(0);
   };
-  segmented.fetchBlock = function(tokens) {
-    var depth = 0;
-    for (var i = 0, imax = tokens.length; i < imax; ++i) {
-      switch (tokens[i][TAG]) {
-      case "INDENT":
-        depth += 1;
-        break;
-      case "OUTDENT":
-        if (depth === 0) {
-          var block = tokens.splice(0, i + 1);
-          block.pop(); // remove OUTDENT
-          return block;
-        }
-        depth -= 1;
-      }
-    }
-    return tokens.splice(0);
-  };
   
   var replaceGlobalVariables = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
+    var i, token;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;
       }
-      if (/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
-        if (tokens[i+1][TAG] === ":") {
-          continue; // { NotGlobal:"dict key is not global" }
-        }
-        if (isDot(tokens[i-1])) {
-          continue; // this.is.NotGlobal, @isNotGlobal
-        }
-        tokens.splice(
-          i, 1,
-          ["IDENTIFIER", "global", _],
-          ["."         , "."     , _],
-          ["IDENTIFIER", token[VALUE].substr(1), _]
-        );
+      if (!/^\$[a-z][a-zA-Z0-9_]*$/.test(token[VALUE])) {
+        continue;
       }
+      if (isColon(tokens[i+1])) {
+        continue; // { NotGlobal:"dict key is not global" }
+      }
+      if (isDot(tokens[i-1])) {
+        continue; // this.is.NotGlobal, @isNotGlobal
+      }
+      tokens.splice(
+        i, 1,
+        ["IDENTIFIER", "global", _],
+        ["."         , "."     , _],
+        ["IDENTIFIER", token[VALUE].substr(1), _]
+      );
     }
     return tokens;
   };
   
   var replaceCCVariables = function(tokens) {
-    for (var i = tokens.length-1; i >= 0; i--) {
-      var token = tokens[i];
+    var i, token;
+    for (i = tokens.length - 1; i >= 0; i--) {
+      token = tokens[i];
       if (token[TAG] !== "IDENTIFIER") {
         continue;
       }
-      if (cc.global.hasOwnProperty(token[VALUE])) {
-        if (tokens[i+1][TAG] === ":") {
-          continue;
-        }
-        if (isDot(tokens[i-1])) {
-          continue;
-        }
-        tokens.splice(
-          i, 0,
-          ["IDENTIFIER", "cc", _],
-          ["."         , "." , _]
-        );
+      if (!cc.global.hasOwnProperty(token[VALUE])) {
+        continue;
       }
+      if (isColon(tokens[i+1])) {
+        continue;
+      }
+      if (isDot(tokens[i-1])) {
+        continue;
+      }
+      tokens.splice(
+        i, 0,
+        ["IDENTIFIER", "cc", _],
+        ["."         , "." , _]
+      );
     }
     return tokens;
   };
   
-  var finalize = function(tokens) {
+  var wrapWholeCode = function(tokens) {
     tokens.unshift(["("          , "("       , _],
                    ["PARAM_START", "("       , _],
                    ["IDENTIFIER" , "global"  , _],
                    [","         , ","        , _],
                    ["IDENTIFIER", "cc"       , _],
-                   [","         , ","        , _],
-                   ["IDENTIFIER", "undefined", _],
                    ["PARAM_END"  , ")"       , _],
                    ["->"         , "->"      , _],
                    ["INDENT"     , 2         , _]);
@@ -972,78 +851,40 @@ define(function(require, exports, module) {
                 ["CALL_END"  , ")"          , _]);
     return tokens;
   };
-  
-  var tab = function(n) {
-    var t = "";
-    for (var i = 0; i < n; ++i) {
-      t += "  ";
+
+  var getConditionedTokens = function(code) {
+    var tokens;
+    code = replaceTextBinaryAdverb(code);
+    tokens = CoffeeScript.tokens(code);
+    if (tokens.length) {
+      tokens = replaceNumericString(tokens);
+      tokens = detectFunctionParameters(tokens);
+      tokens = detectPlusMinusOperator(tokens);
+      tokens = replaceBinaryOperatorAdverbs(tokens);
     }
-    return t;
-  };
-  var prettyPrint = function(tokens) {
-    var indent = 0;
-    tokens = detectPlusMinusOperator(tokens);
-    return tokens.map(function(token) {
-      switch (token[TAG]) {
-      case "TERMINATOR":
-        return "\n" + tab(indent);
-      case "INDENT":
-        indent += 1;
-        return "\n" + tab(indent);
-      case "OUTDENT":
-        indent -= 1;
-        return "\n" + tab(indent);
-      case "RETURN":
-        return "return ";
-      case "UNARY":
-        return token[VALUE] + (token[VALUE].length > 1 ? " " : "");
-      case "{":
-        return "{";
-      case ",": case "RELATION": case "IF": case "ELSE": case "SWITCH": case "LEADING_WHEN":
-        return token[VALUE] + " ";
-      case "=": case "COMPARE": case "MATH": case "LOGIC":
-        return " " + token[VALUE] + " ";
-      case "HERECOMMENT":
-        return "/* " + token[VALUE] + " */";
-      default:
-        return token[VALUE];
-      }
-    }).join("").split("\n").filter(function(line) {
-      return !(/^\s*$/.test(line));
-    }).join("\n").trim();
+    return tokens;
   };
   
   var CoffeeCompiler = (function() {
     function CoffeeCompiler() {
     }
     CoffeeCompiler.prototype.tokens = function(code) {
-      code = replaceTextBinaryAdverb(code);
-      var tokens = CoffeeScript.tokens(code);
+      var tokens = getConditionedTokens(code);
       if (tokens.length) {
-        tokens = replaceBinaryOperatorAdverbs(tokens);
         tokens = replaceGlobalVariables(tokens);
-        tokens = replaceNumericString(tokens);
         tokens = replaceStrictlyPrecedence(tokens);
         tokens = replaceUnaryOperator(tokens);
         tokens = replaceBinaryOperator(tokens);
         tokens = replaceCompoundAssign(tokens);
-        tokens = replaceLogicOperator(tokens);
         tokens = replaceSynthDefinition(tokens);
         tokens = replaceSyncBlock(tokens);
         tokens = replaceCCVariables(tokens);
-        tokens = finalize(tokens);
+        tokens = wrapWholeCode(tokens);
       }
       return tokens;
     };
     CoffeeCompiler.prototype.compile = function(code) {
-      var tokens = this.tokens(code);
-      return CoffeeScript.nodes(tokens).compile({bare:true}).trim();
-    };
-    CoffeeCompiler.prototype.toString = function(tokens) {
-      if (typeof tokens === "string") {
-        tokens = this.tokens(tokens);
-      }
-      return prettyPrint(tokens);
+      return CoffeeScript.nodes(this.tokens(code)).compile({bare:true}).trim();
     };
     return CoffeeCompiler;
   })();
@@ -1055,27 +896,28 @@ define(function(require, exports, module) {
   module.exports = {
     CoffeeCompiler: CoffeeCompiler,
     
-    detectPlusMinusOperator : detectPlusMinusOperator,
-    revertPlusMinusOperator : revertPlusMinusOperator,
+    // private methods
+    indexOfParamEnd     : indexOfParamEnd,
+    indexOfFunctionStart: indexOfFunctionStart,
+    formatArgument      : formatArgument,
     getPrevOperand          : getPrevOperand,
     getNextOperand          : getNextOperand,
+    detectPlusMinusOperator : detectPlusMinusOperator,
+    revertPlusMinusOperator : revertPlusMinusOperator,
     detectFunctionParameters: detectFunctionParameters,
-
-    replaceTextBinaryAdverb  : replaceTextBinaryAdverb,
+    
+    replaceTextBinaryAdverb     : replaceTextBinaryAdverb,
+    replaceBinaryOperatorAdverbs: replaceBinaryOperatorAdverbs,
     replaceNumericString     : replaceNumericString,
     replaceStrictlyPrecedence: replaceStrictlyPrecedence,
     replaceUnaryOperator     : replaceUnaryOperator,
     replaceBinaryOperator    : replaceBinaryOperator,
     replaceCompoundAssign    : replaceCompoundAssign,
-    replaceLogicOperator     : replaceLogicOperator,
     replaceSynthDefinition   : replaceSynthDefinition,
     replaceSyncBlock         : replaceSyncBlock,
     replaceGlobalVariables   : replaceGlobalVariables,
     replaceCCVariables       : replaceCCVariables,
-    finalize                 : finalize,
-    prettyPrint              : prettyPrint,
-    
-    notevalue: notevalue,
+    wrapWholeCode            : wrapWholeCode
   };
 
 });

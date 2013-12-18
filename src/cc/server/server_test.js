@@ -2,69 +2,18 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   require("./server");
   
   var cc = require("./cc");
-  var nop = function() { return {}; };
   
   describe("server/server.js", function() {
-    var called;
-    var _lang, _createTimer, _createInstanceManager, _initRateInstance;
-    before(function() {
-      _lang = cc.lang;
-      _createTimer = cc.createTimer;
-      _createInstanceManager = cc.createInstanceManager;
-      _initRateInstance = cc.initRateInstance;
-      
-      cc.lang = { process: nop };
-      cc.createTimer = function() {
-        return {
-          isRunning: function() {
-            return false;
-          },
-          start:nop, stop:nop
-        };
-      };
-      cc.createInstanceManager = function() {
-        return {
-          init: function() {
-            called.push("im.init");
-          },
-          play: function() {
-            called.push("im.play");
-          },
-          pause: function() {
-            called.push("im.pause");
-          },
-          reset: function() {
-            called.push("im.reset");
-          },
-          pushToTimeline: function(userId, timeline) {
-            called.push("im.pushToTimeline");
-          },
-          append: function() {
-            called.push("im.append");
-          },
-          remove: function() {
-            called.push("im.remove");
-          },
-          process:function() {
-            called.push("im.process");
-          },
-        };
-      };
-      cc.initRateInstance = function() {};
-    });
-    after(function() {
-      cc.lang = _lang;
-      cc.createTimer = _createTimer;
-      cc.createInstanceManager = _createInstanceManager;
-      cc.initRateInstance = _initRateInstance;
-    });
-    beforeEach(function() {
-      called = [];
-    });
+    testTools.mock("lang");
+    testTools.mock("createTimer");
+    testTools.mock("createInstance");
+    testTools.mock("createInstanceManager");
+    
     describe("SynthServer", function() {
       describe("createSynthServer", function() {
         it("WebWorker", function() {
@@ -94,17 +43,21 @@ define(function(require, exports, module) {
           assert.equal(instance.channels  ,    1);
         });
         it("/play", function() {
+          instance.init();
           instance.recvFromLang(["/play"]);
         });
         it("/pause", function() {
+          instance.init();
           instance.recvFromLang(["/pause"]);
         });
         it("/reset", function() {
+          instance.init();
           instance.recvFromLang(["/reset"]);
         });
         it("/processed", function() {
+          instance.init();
           instance.recvFromLang(["/processed", [0]]);
-          assert.deepEqual(called, ["im.pushToTimeline"]);
+          assert.deepEqual(cc.createInstance.called, [ "pushToTimeline" ]);
         });
       });
     });

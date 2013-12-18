@@ -23,7 +23,7 @@ define(function(require, exports, module) {
       this.inputs = slice.call(arguments);
       this.channels = [
         cc.createOutputProxy(this.rate, this, 0),
-        cc.createOutputProxy(this.rate, this, 1),
+        cc.createOutputProxy(this.rate, this, 1)
       ];
       this.numOfOutputs = 2;
       return this.channels;

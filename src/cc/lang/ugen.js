@@ -92,6 +92,10 @@ define(function(require, exports, module) {
       return this;
     };
     
+    UGen.prototype.clone = fn(function() {
+      return this;
+    }).defaults(ops.COMMONS.clone).build();
+    
     UGen.prototype.dup = fn(function(n) {
       var a = new Array(n|0);
       for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -99,7 +103,7 @@ define(function(require, exports, module) {
       }
       return a;
     }).defaults(ops.COMMONS.dup).build();
-
+    
     UGen.prototype["do"] = function() {
       return this;
     };
@@ -112,7 +116,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    UGen.prototype.toString = function() {
+    UGen.prototype.asString = function() {
       return this.klassName;
     };
     
@@ -145,13 +149,6 @@ define(function(require, exports, module) {
         });
       }
     });
-
-    UGen.prototype.__and__ = function() {
-      return 0;
-    };
-    UGen.prototype.__or__ = function() {
-      return 0;
-    };
     
     // arity operators methods
     UGen.prototype.madd = fn(function(mul, add) {
@@ -372,6 +369,10 @@ define(function(require, exports, module) {
     }
     extend(OutputProxy, UGen);
     
+    OutputProxy.prototype.clone = fn(function() {
+      return this;
+    }).defaults(ops.COMMONS.clone).build();
+    
     return OutputProxy;
   })();
   
@@ -412,6 +413,7 @@ define(function(require, exports, module) {
       ugenInterface = function() {
         return cc.global[name]["new"].apply(null, slice.call(arguments));
       };
+      cc.global[name] = ugenInterface;
     } else {
       ugenInterface = function(rate) {
         if (typeof rate === "number") {
@@ -423,8 +425,9 @@ define(function(require, exports, module) {
         }
         return new UGen(name);
       };
+      cc.global[name] = ugenInterface;
+      cc.global[name]["new"] = ugenInterface;
     }
-    cc.global[name] = ugenInterface;
     
     Object.keys(spec).forEach(function(key) {
       if (key.charAt(0) === "$") {
@@ -478,7 +481,7 @@ define(function(require, exports, module) {
   module.exports = {
     UGen        : UGen,
     MultiOutUGen: MultiOutUGen,
-    OutputProxy : OutputProxy,
+    OutputProxy : OutputProxy
   };
 
 });

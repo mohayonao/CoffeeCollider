@@ -73,6 +73,7 @@ define(function(require, exports, module) {
       this._iter = iter;
       this._wait = null;
       this._args = valueOf(iter);
+      this._remain = 0; // number
     }
     extend(Task, cc.Object);
     
@@ -139,6 +140,10 @@ define(function(require, exports, module) {
       if (this._wait) {
         throw new Error("Task#append: wait already exists???");
       }
+      if (typeof task === "number") {
+        task += this._remain;
+      }
+      this._remain = 0;
       this._wait = cc.createTaskWaitToken(task);
       if (task instanceof Task) {
         task._state = C.PLAYING;
@@ -161,6 +166,7 @@ define(function(require, exports, module) {
           if (this._wait.performWait(counterIncr)) {
             break;
           }
+          this._remain = this._wait.remain || 0;
           this._wait = null;
         }
         counterIncr = 0;
@@ -425,6 +431,7 @@ define(function(require, exports, module) {
         this.token -= counterIncr;
         if (this.token <= 0) {
           this._state = C.FINISHED;
+          this.remain = this.token * 0.001;
         }
       }
       return this._state === C.PLAYING;
@@ -622,7 +629,7 @@ define(function(require, exports, module) {
     TaskWaitTokenLogicOR : TaskWaitTokenLogicOR,
     TaskWaitTokenFunction: TaskWaitTokenFunction,
     TaskWaitTokenBoolean : TaskWaitTokenBoolean,
-    TaskWaitTokenDate    : TaskWaitTokenDate,
+    TaskWaitTokenDate    : TaskWaitTokenDate
   };
 
 });

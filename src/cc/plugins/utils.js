@@ -90,7 +90,7 @@ define(function(require, exports, module) {
 
     zapgremlins: zapgremlins,
     cubicinterp: cubicinterp,
-    sc_wrap: sc_wrap,
+    sc_wrap: sc_wrap
   };
 
 });

@@ -34,9 +34,7 @@ define(function(require, exports, module) {
       try {
         var source = "var t=0;onmessage=function(e){if(t)t=clearInterval(t),0;if(typeof e.data=='number'&&e.data>0)t=setInterval(function(){postMessage(0);},e.data);};";
         var blob = new Blob([source], {type:"text/javascript"});
-        var path = URL.createObjectURL(blob);
-        new Worker(path);
-        return path;
+        return URL.createObjectURL(blob);
       } catch (e) {}
     })();
     /*global URL:false */
@@ -75,7 +73,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     WorkerTimer: WorkerTimer,
-    NativeTimer: NativeTimer,
+    NativeTimer: NativeTimer
   };
 
 });

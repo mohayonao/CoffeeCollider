@@ -12,7 +12,6 @@ define(function(require, exports, module) {
       this.channels   = C.WORKER_CHANNELS;
       this.strmLength = C.WORKER_STRM_LENGTH;
       this.bufLength  = C.WORKER_BUF_LENGTH;
-      this.offset = 0;
     }
     extend(WorkerSynthServer, cc.SynthServer);
     
@@ -25,20 +24,22 @@ define(function(require, exports, module) {
       ]);
     };
     WorkerSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
+      if (this.sysSyncCount < this.syncCount - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
-      var instanceManager = this.instanceManager;
+      var instance = this.instance;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = instanceManager.busOutL;
-      var busOutR = instanceManager.busOutR;
+      var busOut  = this.busOut;
+      var busOutL = this.busOutL;
+      var busOutR = this.busOutR;
       var lang = cc.lang;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
-        instanceManager.process(bufLength);
+        instance.process(bufLength);
+        busOut.set(instance.bus);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
@@ -47,7 +48,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToLang(strm);
-      this.syncCount[0] += 1;
+      this.syncCount += 1;
     };
     
     return WorkerSynthServer;

@@ -10,11 +10,12 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.instanceManager = cc.createInstanceManager();
-      this.strm = null;
-      this.timer = cc.createTimer();
+      this.instance = null;
+      this.rates    = null;
+      this.strm     = null;
+      this.timer    = cc.createTimer();
       this.initialized = false;
-      this.syncCount    = new Uint32Array(1);
+      this.syncCount    = 0;
       this.sysSyncCount = 0;
     }
     
@@ -24,7 +25,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.recvFromLang = function(msg, userId) {
       userId = userId|0;
       if (msg instanceof Uint8Array) {
-        this.instanceManager.doBinayCommand(userId, msg);
+        this.instance.doBinayCommand(msg, userId);
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -45,43 +46,60 @@ define(function(require, exports, module) {
           this.channels   = msg[2]|0;
           this.strmLength = msg[3]|0;
         }
-        this.strm  = new Int16Array(this.strmLength * this.channels);
-        this.instanceManager.init(this);
-        this.instanceManager.append(0);
-        cc.initRateInstance();
+        this.strm = new Int16Array(this.strmLength * this.channels);
+
+        var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
+        var bufLength  = this.bufLength;
+        var bufLength4 = this.bufLength << 2;
+        
+        this.busLength = busLength;
+        this.busClear  = new Float32Array(busLength);
+        this.busOut    = new Float32Array(busLength);
+        this.busOutLen = this.bufLength << 1;
+        this.busOutL   = new Float32Array(this.busOut.buffer, 0         , bufLength);
+        this.busOutR   = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
+        if (!this.instance) {
+          this.instance = cc.createInstance(0);
+        }
+        this.rates = [];
+        this.rates[C.AUDIO  ] = cc.createRate(this.sampleRate, this.bufLength);
+        this.rates[C.CONTROL] = cc.createRate(this.sampleRate / this.bufLength, 1);
+        this.rates[C.SCALAR ] = this.rates[C.CONTROL];
+        this.rates[C.DEMAND ] = this.rates[C.CONTROL];
       }
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.play(userId);
+      this.instance.play(userId);
       if (!this.timer.isRunning()) {
-        this.timer.start(this.process.bind(this), C.PROCESSING_INTERVAL);
+        var that = this;
+        this.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
       }
       this.sendToLang([
-        "/played", this.syncCount[0]
+        "/played", this.syncCount
       ]);
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.pause(userId);
+      this.instance.pause(userId);
       if (this.timer.isRunning()) {
-        if (!this.instanceManager.isRunning()) {
+        if (!this.instance.isRunning()) {
           this.timer.stop();
         }
       }
       this.sendToLang([
-        "/paused", this.syncCount[0]
+        "/paused", this.syncCount
       ]);
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.reset(userId);
+      this.instance.reset(userId);
     };
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
       if (timeline.length) {
-        this.instanceManager.pushToTimeline(userId, timeline);
+        this.instance.pushToTimeline(timeline, userId);
       }
     };
     SynthServer.prototype.process = function() {
@@ -120,9 +138,11 @@ define(function(require, exports, module) {
   
   // TODO: moved
   require("../common/timer");
-  require("./instance");
   require("./rate");
   require("./unit");
+  require("./buffer");
+  require("./node");
+  require("./instance");
   require("./server-worker");
   require("./server-nodejs");
   require("./server-socket");

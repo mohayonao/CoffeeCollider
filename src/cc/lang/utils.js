@@ -21,6 +21,16 @@ define(function(require, exports, module) {
     }
     return C.SCALAR;
   };
+
+  var asRateString = function(obj) {
+    switch (obj) {
+    case C.SCALAR:  return "scalar";
+    case C.CONTROL: return "control";
+    case C.AUDIO:   return "audio";
+    case C.DEMAND:  return "demand";
+    }
+    return "unknown";
+  };
   
   var asNumber = function(obj) {
     obj = +obj;
@@ -35,10 +45,8 @@ define(function(require, exports, module) {
       return "null";
     } else if (obj === undefined) {
       return "undefined";
-    } else if (Array.isArray(obj)) {
-      return "[ " + obj.map(function(obj) {
-        return asString(obj);
-      }).join(", ") + " ]";
+    } else if (obj.asString) {
+      return obj.asString();
     }
     return obj.toString();
   };
@@ -150,11 +158,12 @@ define(function(require, exports, module) {
   
   module.exports = {
     isDict : isDict,
-    asRate     : asRate,
-    asNumber   : asNumber,
-    asString   : asString,
-    asArray    : asArray,
-    asUGenInput: asUGenInput,
+    asRate      : asRate,
+    asRateString: asRateString,
+    asNumber    : asNumber,
+    asString    : asString,
+    asArray     : asArray,
+    asUGenInput : asUGenInput,
     flop   : flop,
     flatten: flatten,
     clump  : clump,

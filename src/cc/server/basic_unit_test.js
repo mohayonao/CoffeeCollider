@@ -2,21 +2,16 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
-  var unitTestSuite = require("../../testTools").unitTestSuite;
+  var testTools = require("../../testTools");
+  var unitTestSuite = testTools.unitTestSuite;
+  
   var cc   = require("./cc");
   var unit = require("./unit");
   var basic_unit = require("./basic_unit");
   var ops  = require("../common/ops");
   
   describe("server/basic_unit.js", function() {
-    var _getRateInstance;
-    before(function() {
-      _getRateInstance = cc.getRateInstance;
-    });
-    after(function() {
-      cc.getRateInstance = _getRateInstance;
-    });
+    testTools.mock("server");
     describe("unary operators", function() {
       describe("uopFunc", function() {
         Object.keys(basic_unit.uopFunc).forEach(function(selector) {
@@ -72,9 +67,6 @@ define(function(require, exports, module) {
         before(function() {
           specialIndex = ops.UNARY_OPS_MAP.length;
           ops.UNARY_OPS_MAP[specialIndex] = "uopTest";
-          cc.getRateInstance = function() {
-            return { bufLength: 64 };
-          };
         });
         beforeEach(function() {
           basic_unit.uopFunc.uopTest = function(a) {
@@ -111,13 +103,6 @@ define(function(require, exports, module) {
           assert.isFunction(u.process);
           u.process(8);
           assert.equal(u.outputs[0][0], 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("SCALAR", function() {
           var u = cc.createUnit({}, [
@@ -128,13 +113,6 @@ define(function(require, exports, module) {
           u.init();
           assert.isNotFunction(u.process);
           assert.equal(u.outputs[0][0], 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("undefined", function() {
           var u = cc.createUnit({}, [
@@ -461,9 +439,6 @@ define(function(require, exports, module) {
         before(function() {
           specialIndex = ops.BINARY_OPS_MAP.length;
           ops.BINARY_OPS_MAP[specialIndex] = "bopTest";
-          cc.getRateInstance = function() {
-            return { bufLength:8, slopeFactor:1/8 };
-          };
         });
         beforeEach(function() {
           basic_unit.bopFunc.bopTest = function(a, b) {
@@ -569,13 +544,6 @@ define(function(require, exports, module) {
           assert.isFunction(u.process);
           u.process(8);
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("CONTROL x SCALAR", function() {
           basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
@@ -590,13 +558,6 @@ define(function(require, exports, module) {
           assert.isFunction(u.process);
           u.process(8);
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("SCALAR x AUDIO", function() {
           basic_unit.bopFunc.bopTest.ia = basic_unit.binary_ia(basic_unit.bopFunc.bopTest);
@@ -632,13 +593,6 @@ define(function(require, exports, module) {
           assert.isFunction(u.process);
           u.process(8);
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("SCALAR x SCALAR", function() {
           var u = cc.createUnit({}, [
@@ -651,13 +605,6 @@ define(function(require, exports, module) {
           u.init();
           assert.isNotFunction(u.process);
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 0);
-          assert.equal(u.outputs[0][2], 0);
-          assert.equal(u.outputs[0][3], 0);
-          assert.equal(u.outputs[0][4], 0);
-          assert.equal(u.outputs[0][5], 0);
-          assert.equal(u.outputs[0][6], 0);
-          assert.equal(u.outputs[0][7], 0);
         });
         it("undefined", function() {
           var u = cc.createUnit({}, [
@@ -953,10 +900,10 @@ define(function(require, exports, module) {
     },
     { rate  : C.SCALAR,
       inputs: [
-        { name:"in0", rate:C.SCALAR, value:unitTestSuite.in1 },
-        { name:"in1", rate:C.SCALAR, value:unitTestSuite.in2 },
-        { name:"in2", rate:C.SCALAR, value:unitTestSuite.in1 },
-        { name:"in3", rate:C.SCALAR, value:unitTestSuite.in2 },
+        { name:"in0", rate:C.SCALAR, value:1 },
+        { name:"in1", rate:C.SCALAR, value:2 },
+        { name:"in2", rate:C.SCALAR, value:3 },
+        { name:"in3", rate:C.SCALAR, value:4 },
       ]
     },
   ]);

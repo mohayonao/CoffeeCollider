@@ -1,7 +1,6 @@
 define(function(require, exports, module) {
   "use strict";
 
-  var cc = require("./cc");
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
@@ -23,6 +22,10 @@ define(function(require, exports, module) {
     return this;
   });
   
+  fn.defineProperty(String.prototype, "clone", fn(function() {
+    return this;
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(String.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -40,6 +43,10 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(String.prototype, "asUGenInput", function() {
+    throw new Error("String can't cast to a UGen.");
+  });
+  
+  fn.defineProperty(String.prototype, "asString", function() {
     return this;
   });
   
@@ -100,12 +107,6 @@ define(function(require, exports, module) {
       });
     }
     return 0;
-  });
-  fn.defineBinaryProperty(String.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(String.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
   });
   
   // arity operators

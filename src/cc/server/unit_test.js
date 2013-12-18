@@ -2,29 +2,27 @@ define(function(require, exports, module) {
   "use strict";
   
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   var cc = require("./cc");
   var unit = require("./unit");
   
   describe("server/unit.js", function() {
-    var parent, _getRateInstance;
+    var parent;
+    
+    testTools.mock("server");
+    
     before(function() {
       parent = {
         doneAction: function(action) {
           parent.doneAction.result = action;
         }
       };
-      _getRateInstance = cc.getRateInstance;
-      cc.getRateInstance = function(rate) {
-        return { bufLength: 64 };
-      };
       cc.unit.specs.TestUnit = function() {
         cc.unit.specs.TestUnit.called = true;
       };
     });
-    after(function() {
-      cc.getRateInstance = _getRateInstance;
-    });
+    
     it("create", function() {
       var specs = [
         "TestUnit", C.AUDIO, 1, [ 0, 0, 0, 0 ], [ 2 ], ""
@@ -38,9 +36,9 @@ define(function(require, exports, module) {
       assert.equal(u.numOfOutputs, 1);
       assert.isArray(u.inputs);
       assert.isArray(u.outputs);
-      assert.equal(u.numOfInputs, u.inputs.length);
+      assert.equal(u.numOfInputs , u.inputs.length);
       assert.equal(u.numOfOutputs, u.outputs.length);
-      assert.equal(u.bufLength   , 64);
+      assert.equal(u.bufLength   , cc.server.rates[C.AUDIO].bufLength);
     });
     it("init", function() {
       var specs = [

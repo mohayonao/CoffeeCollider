@@ -267,6 +267,7 @@ define(function(require, exports, module) {
     }
     return new Tuning(tuning, octaveRatio, name);
   }).defaults("tuning,octaveRatio,name").build();
+  cc.global.Tuning["new"] = cc.global.Tuning;
   
   var tunings = {};
   Object.keys(tuningInfo).forEach(function(key) {
@@ -780,6 +781,7 @@ define(function(require, exports, module) {
     }
     return new Scale(degrees, pitchesPerOctave, tuning, name);
   }).defaults("degrees,pitchesPerOctave,tuning,name").build();
+  cc.global.Scale["new"] = cc.global.Scale;
   
   var scales = {};
   Object.keys(scaleInfo).forEach(function(key) {
@@ -835,7 +837,7 @@ define(function(require, exports, module) {
   
   module.exports = {
     Scale : Scale,
-    Tuning: Tuning,
+    Tuning: Tuning
   };
 
 });

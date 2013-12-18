@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   require("./boolean");
 
   var testTools = require("../../testTools");
@@ -11,23 +12,10 @@ define(function(require, exports, module) {
   
   describe("lang/boolean.js", function() {
     var actual, expected;
-    var _instanceOfUGen, _createTaskWaitLogic;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
-
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
-    });
-
+    
     describe("class methods", function() {
     });
     
@@ -42,6 +30,10 @@ define(function(require, exports, module) {
           assert.equal(true .copy(), true );
           assert.equal(false.copy(), false);
         });
+        it("clone", function() {
+          assert.equal(true .clone(), true );
+          assert.equal(false.clone(), false);
+        });
         it("dup", function() {
           actual   = true.dup();
           expected = [ true, true ];
@@ -50,6 +42,24 @@ define(function(require, exports, module) {
           actual   = false.dup(5);
           expected = [ false, false, false, false, false ];
           assert.deepEqual(actual, expected);
+        });
+        it("asUGenInput", function() {
+          actual   = true.asUGenInput();
+          expected = 1;
+          assert.equal(actual, expected);
+          
+          actual   = false.asUGenInput();
+          expected = 0;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = true.asString();
+          expected = "true";
+          assert.equal(actual, expected);
+          
+          actual   = false.asString();
+          expected = "false";
+          assert.equal(actual, expected);
         });
       });
       describe("unary operators", function() {
@@ -74,12 +84,6 @@ define(function(require, exports, module) {
               assert.deepEqual(false[selector](1), [ 0, 1 ]);
             });
           });
-        });
-        it("__and__", function() {
-          assert.deepEqual(true.__and__(false), ["and", true, false]);
-        });
-        it("__or__", function() {
-          assert.deepEqual(false.__or__(true), ["or", false, true]);
         });
       });
       describe("arity operators", function() {

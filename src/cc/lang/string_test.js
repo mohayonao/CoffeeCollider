@@ -2,6 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
   require("./string");
 
@@ -11,23 +12,10 @@ define(function(require, exports, module) {
   
   describe("lang/string.js", function() {
     var actual, expected;
-    var _instanceOfUGen, _createTaskWaitLogic;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
-      
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
-    });
-
+    
     describe("class methods", function() {
     });
     
@@ -41,6 +29,9 @@ define(function(require, exports, module) {
         it("copy", function() {
           assert.equal("s".copy(), "s");
         });
+        it("clone", function() {
+          assert.equal("s".clone(), "s");
+        });
         it("dup", function() {
           actual   = "s".dup();
           expected = [ "s", "s" ];
@@ -49,6 +40,16 @@ define(function(require, exports, module) {
           actual   = "s".dup(5);
           expected = [ "s", "s", "s", "s", "s" ];
           assert.deepEqual(actual, expected);
+        });
+        it("asUGenInput", function() {
+          assert.throw(function() {
+            "s".asUGenInput();
+          });
+        });
+        it("asString", function() {
+          actual   = "a".asString();
+          expected = "a";
+          assert.equal(actual, expected);
         });
       });
       describe("unary operators", function() {
@@ -100,12 +101,6 @@ define(function(require, exports, module) {
           assert.deepEqual("+10".__mod__(3), ["+10"]);
           assert.deepEqual("+10".__mod__(4), ["+10"]);
           assert.deepEqual("+10".__mod__(""), 0);
-        });
-        it("__and__", function() {
-          assert.deepEqual("s1".__and__("s2"), ["and", "s1", "s2"]);
-        });
-        it("__or__", function() {
-          assert.deepEqual("s1".__or__("s2"), ["or", "s1", "s2"]);
         });
       });
       describe("arity operators", function() {

@@ -37,29 +37,24 @@ button {
   font-weight: bold;
 }
 
-#boot {
+#run {
   position: absolute;
   top  : 5px;
   right: 225px;
 }
-#run {
+#stop {
   position: absolute;
   top  : 40px;
   right: 225px;
 }
-#reset {
+#link {
   position: absolute;
   top  : 75px;
   right: 225px;
 }
-#link {
+#compile {
   position: absolute;
   top  : 110px;
-  right: 225px;
-}
-#compile-js {
-  position: absolute;
-  top  : 145px;
   right: 225px;
 }
 #panel {
@@ -147,4 +142,14 @@ ul li a {
 }
 .btn-danger:active {
   background-color: #dc2d1b;
+}
+
+#keyboard {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width : 220px;
+  height: 80px;
+  border: solid 1px #2c3e50;
+  display: none;
 }

@@ -7,24 +7,27 @@ define(function(require, exports, module) {
   var syncblock  = require("./syncblock");
   
   describe("lang/syncblock.js", function() {
-    var f, passed;
+    var f, passed, actual, expected;
     beforeEach(function() {
       passed = [];
     });
     describe("SyncBlock", function() {
       it("create", function() {
         f = cc.global.syncblock();
-        assert.instanceOf(f, syncblock.SyncBlock);
-        assert.isFalse(f.performWaitState());
+        assert.isFunction(f);
         assert.isTrue(cc.instanceOfSyncBlock(f));
       });
-      it("clone", function() {
+      it("#performWaitState", function() {
+        f = cc.global.syncblock();
+        assert.isFalse(f.performWaitState());
+      });
+      it("#clone", function() {
         f = cc.global.syncblock();
         var cloned = f.clone();
-        assert.instanceOf(cloned, syncblock.SyncBlock);
+        assert.isTrue(cc.instanceOfSyncBlock(cloned));
         assert.notEqual(f, cloned);
       });
-      it("perform", function() {
+      it("#perform", function() {
         f = cc.global.syncblock(function() {
           var i = 0;
           return [
@@ -42,7 +45,7 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ 0, 1 ]);
         assert.isFalse(f.performWaitState());
       });
-      it("pause", function() {
+      it("#pause", function() {
         f = cc.global.syncblock(function() {
           var i = 0;
           return [
@@ -72,7 +75,7 @@ define(function(require, exports, module) {
         assert.deepEqual(passed, [ 0, 1, 2 ]);
         assert.isFalse(f.performWaitState());
       });
-      it("reset", function() {
+      it("#reset", function() {
         f = cc.global.syncblock(function() {
           return [
             function() { passed.push("a"); },
@@ -137,6 +140,29 @@ define(function(require, exports, module) {
         f.perform();
         assert.deepEqual(passed, [ "begin", "a", "b", "end" ]);
       });      
+      it("#perform (call)", function() {
+        f = cc.global.syncblock(function() {
+          var i = 0;
+          return [
+            function() { passed.push(i++); },
+            function() { passed.push(i++); },
+            function() { return 100; },
+          ];
+        });
+        assert.isTrue(f.performWaitState());
+        
+        actual   = f();
+        expected = 100;
+        assert.deepEqual(passed, [ 0, 1 ]);
+        assert.isFalse(f.performWaitState());
+        assert.equal(actual, expected);
+        
+        actual   = f();
+        expected = 100;
+        assert.deepEqual(passed, [ 0, 1 ]);
+        assert.isFalse(f.performWaitState());
+        assert.equal(actual, expected);
+      });
     });
   });
 

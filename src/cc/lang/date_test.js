@@ -2,7 +2,8 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
-
+  var testTools = require("../../testTools");
+  
   require("./date");
 
   var testTools = require("../../testTools");
@@ -12,22 +13,11 @@ define(function(require, exports, module) {
   describe("lang/date.js", function() {
     var d = new Date(0), n = +d;
     var actual, expected;
-    var _instanceOfUGen, _createTaskWaitLogic;
-    before(function() {
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
-      
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
+    
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
-    });
+    
     describe("class methods", function() {
     });
     
@@ -42,6 +32,10 @@ define(function(require, exports, module) {
           assert.deepEqual(d.copy(), d);
           assert.notEqual(d.copy(), d);
         });
+        it("clone", function() {
+          assert.deepEqual(d.clone(), d);
+          assert.notEqual(d.clone(), d);
+        });
         it("dup", function() {
           actual   = d.dup();
           expected = [ d, d ];
@@ -50,6 +44,16 @@ define(function(require, exports, module) {
           actual   = d.dup(5);
           expected = [ d, d, d, d, d ];
           assert.deepEqual(actual, expected);
+        });
+        it("asUGenInput", function() {
+          assert.throws(function() {
+            d.asUGenInput();
+          });
+        });
+        it("asString", function() {
+          actual   = d.asString();
+          expected = d.toString();
+          assert.equal(actual, expected);
         });
       });
       describe("unary operators", function() {
@@ -74,12 +78,6 @@ define(function(require, exports, module) {
               assert.deepEqual(d[selector](1), [ n, 1 ]);
             });
           });
-        });
-        it("__and__", function() {
-          assert.deepEqual(d.__and__(0), ["and", d, 0]);
-        });
-        it("__or__", function() {
-          assert.deepEqual(d.__or__(0), ["or", d, 0]);
         });
       });
       describe("arity operators", function() {

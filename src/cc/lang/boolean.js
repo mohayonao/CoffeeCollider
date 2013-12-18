@@ -11,6 +11,10 @@ define(function(require, exports, module) {
     return this;
   });
   
+  fn.defineProperty(Boolean.prototype, "clone", fn(function() {
+    return this;
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(Boolean.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -44,7 +48,11 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(Boolean.prototype, "asUGenInput", function() {
-    return !!this;
+    return this ? 1 : 0;
+  });
+
+  fn.defineProperty(Boolean.prototype, "asString", function() {
+    return this ? "true" : "false";
   });
   
   // unary operator methods
@@ -59,12 +67,6 @@ define(function(require, exports, module) {
     fn.defineProperty(Boolean.prototype, selector, function(b) {
       return (this ? 1 : 0)[selector](b);
     });
-  });
-  fn.defineBinaryProperty(Boolean.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(Boolean.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
   });
   
   // arity operators

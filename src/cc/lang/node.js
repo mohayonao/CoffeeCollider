@@ -63,6 +63,10 @@ define(function(require, exports, module) {
     Node.prototype.performWait = function() {
       return this._blocking;
     };
+
+    Node.prototype.asString = function() {
+      return this.klassName + "(" + this.nodeId + ")";
+    };
     
     return Node;
   })();
@@ -165,6 +169,7 @@ define(function(require, exports, module) {
     }
     return new Group(target, addAction);
   };
+  cc.global.Group["new"] = cc.global.Group;
   cc.global.Group.after = function(node) {
     return new Group(node || cc.lang.rootNode, C.ADD_AFTER);
   };
@@ -205,6 +210,7 @@ define(function(require, exports, module) {
     }
     return new Synth(target, addAction, def, args);
   };
+  cc.global.Synth["new"] = cc.global.Synth;
   cc.global.Synth.after = function() {
     var list = sortArgs(arguments);
     return new Synth(list[0], C.ADD_AFTER, list[1], list[2]);
@@ -225,7 +231,7 @@ define(function(require, exports, module) {
     return new Synth(node, C.REPLACE, def, args);
   };
   
-  cc.createRootNode = function() {
+  cc.createLangRootNode = function() {
     return new Group();
   };
   cc.instanceOfNode = function(obj) {
@@ -248,7 +254,7 @@ define(function(require, exports, module) {
     Node : Node,
     Group: Group,
     Synth: Synth,
-    args2controls: args2controls,
+    args2controls: args2controls
   };
 
 });

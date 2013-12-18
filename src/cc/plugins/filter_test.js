@@ -323,8 +323,6 @@ define(function(require, exports, module) {
       checker: function(statistics) {
         // console.log(statistics);
         assert.isFalse(statistics.hasNaN);
-        assert.ok(statistics.min >= -1.0);
-        assert.ok(statistics.max <= +1.0);
       }
     });
 

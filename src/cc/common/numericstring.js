@@ -152,7 +152,7 @@ define(function(require, exports, module) {
     calcBeat : calcBeat,
     calcTicks: calcTicks,
     timevalue: timevalue,
-    notevalue: notevalue,
+    notevalue: notevalue
   };
 
 });

@@ -74,8 +74,8 @@ define(function(require, exports, module) {
       this._dline9 = new Float32Array(1116);
       this._dline10 = new Float32Array(1188);
       this._dline11 = new Float32Array(1356);
-      
-      next.call(this, 1);
+
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];

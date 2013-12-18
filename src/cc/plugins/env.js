@@ -499,7 +499,7 @@ define(function(require, exports, module) {
       this._prevGate = 0;
       this._slope    = 0;
       this._counter  = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function() {
       var out  = this.outputs[0];
@@ -543,7 +543,7 @@ define(function(require, exports, module) {
         break;
       case 3:
         out[0] = 0;
-        this._done = true;
+        this.done = true;
         this._stage++;
         this.doneAction(this.inputs[4][0]);
         break;
@@ -555,6 +555,207 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.Free = {
+    $kr: {
+      defaults: "trig=0,id=0",
+      ctor: function(trig, id) {
+        return this.multiNew(C.CONTROL, trig, id);
+      }
+    }
+  };
+  
+  cc.unit.specs.Free = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = 0;
+      this.process(1);
+    };
+    var next = function(inNumSamples, instance) {
+      var trig = this.inputs[0][0];
+      var id, node;
+      if (trig > 0 && this._prevtrig <= 0) {
+        id = this.inputs[1][0]|0;
+        if (id) { // 0 is ignored
+          node = instance.nodes[id];
+          if (node) {
+            node.end();
+          }
+        }
+      }
+      this._prevtrig = trig;
+      this.outputs[0][0] = trig;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.FreeSelf = {
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.multiNew(C.CONTROL, _in);
+      }
+    }
+  };
+
+  cc.unit.specs.FreeSelf = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = 0;
+      this.process(1);
+    };
+    var next = function() {
+      var trig = this.inputs[0][0];
+      if (trig > 0 && this._prevtrig <= 0) {
+        this.parent.end();
+      }
+      this._prevtrig = trig;
+      this.outputs[0][0] = trig;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.FreeSelfWhenDone = {
+    $kr: {
+      defaults: "src=0",
+      ctor: function(src) {
+        return this.multiNew(C.CONTROL, src);
+      }
+    }
+  };
+
+  cc.unit.specs.FreeSelfWhenDone = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._src = this.fromUnits[0];
+      this.process(1);
+    };
+    var next = function() {
+      var src = this._src;
+      if (src && src.done) {
+        this.parent.end();
+        this.process = clear;
+      }
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    var clear = function() {
+      this.outputs[0][0] = 0;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Pause = {
+    $kr: {
+      defaults: "gate=0,id=0",
+      ctor: function(gate, id) {
+        return this.multiNew(C.CONTROL, gate, id);
+      }
+    }
+  };
+
+  cc.unit.specs.Pause = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._state = 1;
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    var next = function(inNumSamples, instance) {
+      var _in = this.inputs[0][0];
+      var state = (_in === 0) ? 0 : 1;
+      var id, node;
+      if (state !== this._state) {
+        this._state = state;
+        id = this.inputs[1][0]|0;
+        if (id) { // 0 is ignored
+          node = instance.nodes[id];
+          if (node) {
+            node.run(state);
+          }
+        }
+      }
+      this.outputs[0][0] = _in;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.PauseSelf = {
+    $kr: {
+      defaults: "in=0",
+      ctor: function(_in) {
+        return this.multiNew(C.CONTROL, _in);
+      }
+    }
+  };
+
+  cc.unit.specs.PauseSelf = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._prevtrig = 0;
+      this.process(1);
+    };
+    var next = function() {
+      var _in = this.inputs[0][0];
+      if (_in > 0 && this._prevtrig <= 0) {
+        this.parent.run(0);
+      }
+      this._prevtrig = _in;
+      this.outputs[0][0] = _in;
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.PauseSelfWhenDone = {
+    $kr: {
+      defaults: "src=0",
+      ctor: function(src) {
+        return this.multiNew(C.CONTROL, src);
+      }
+    }
+  };
+  
+  cc.unit.specs.PauseSelfWhenDone = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._src = this.fromUnits[0];
+      this.process(1);
+    };
+    var next = function() {
+      var src = this._src;
+      if (src && src.done) {
+        this.parent.run(0);
+        this.process = clear;
+      }
+      this.outputs[0][0] = this.inputs[0][0];
+    };
+    var clear = function() {
+      this.outputs[0][0] = 0;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.Done = {
+    $kr: {
+      defaults: "src=0",
+      ctor: function(src) {
+        return this.multiNew(C.CONTROL, src);
+      }
+    }
+  };
+
+  cc.unit.specs.Done = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._src = this.fromUnits[0];
+      this.process(1);
+    };
+    var next = function() {
+      var src = this._src;
+      this.outputs[0][0] = src && src.done ? 1 : 0;
+    };
+    return ctor;
+  })();
+
+  
   
   module.exports = {};
 

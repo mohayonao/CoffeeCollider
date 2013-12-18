@@ -22,15 +22,8 @@ define(function(require, exports, module) {
     
     SynthDef.prototype.send = function() {
       if (!this._sent) {
-        var consts = this.specs.consts;
-        if (consts[0] === -Infinity) {
-          consts[0] = "-Infinity";
-        }
-        if (consts[consts.length-1] === Infinity) {
-          consts[consts.length-1] = "Infinity";
-        }
         cc.lang.pushToTimeline([
-          "/s_def", this._defId, JSON.stringify(this.specs)
+          "/s_def", this._defId, this.specs
         ]);
         this._sent = true;
       }
@@ -167,7 +160,7 @@ define(function(require, exports, module) {
       if (checkNumber(val) || (Array.isArray(val) && val.every(checkNumber))) {
         continue;
       }
-      throw "bad arguments";
+      throw "bad arguments:" + utils.asString(val);
     }
     return true;
   };
@@ -401,6 +394,8 @@ define(function(require, exports, module) {
     build(instance, func, args, rates, prependArgs, variants);
     return instance;
   };
+  cc.global.SynthDef["new"] = cc.global.SynthDef;
+  
   cc.instanceOfSynthDef = function(obj) {
     return obj instanceof SynthDef;
   };
@@ -424,7 +419,7 @@ define(function(require, exports, module) {
     asJSON: asJSON,
     
     reshape : reshape,
-    topoSort: topoSort,
+    topoSort: topoSort
   };
 
 });

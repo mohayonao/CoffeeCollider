@@ -72,15 +72,15 @@ define(function(require, exports, module) {
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
           { name:"pos"  , rate:C.AUDIO  , value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
-          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1 ] },
         ]
       },
       { rate: C.AUDIO,
         inputs: [
           { name:"inA"  , rate:C.AUDIO  , value:unitTestSuite.in0 },
           { name:"inB"  , rate:C.AUDIO  , value:unitTestSuite.in1 },
-          { name:"pos"  , rate:C.CONTROL, value:[ -1, 0.5, 0, 0, 0.5, 1 ] },
-          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 1 ] },
+          { name:"pos"  , rate:C.CONTROL, value:[ -1, 0.5, 0.5, 0, 1 ] },
+          { name:"level", rate:C.CONTROL, value:[ 0, 0.5, 0.5, 1 ] },
         ]
       }
     ], {

@@ -14,6 +14,10 @@ define(function(require, exports, module) {
     return this;
   });
   
+  fn.defineProperty(Number.prototype, "clone", fn(function() {
+    return this;
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(Number.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -45,12 +49,17 @@ define(function(require, exports, module) {
   fn.defineProperty(Number.prototype, "wait", function() {
     var n = this;
     if (n >= 0 && cc.currentTask) {
-      cc.currentTask.__wait__(cc.createTaskWaitTokenNumber(n));
+      cc.currentTask.__wait__(n);
     }
     return this;
   });
+  
   fn.defineProperty(Number.prototype, "asUGenInput", function() {
     return this;
+  });
+
+  fn.defineProperty(Number.prototype, "asString", function() {
+    return this.toString();
   });
   
   // unary operator methods
@@ -274,12 +283,6 @@ define(function(require, exports, module) {
       return 0; // avoid NaN
     }
     return this % b;
-  });
-  fn.defineBinaryProperty(Number.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(Number.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
   });
   fn.defineBinaryProperty(Number.prototype, "eq", function(b) {
     return this === b ? 1 : 0;
@@ -816,7 +819,7 @@ define(function(require, exports, module) {
     "11+"   : [4, 7, 10, 14, 18],
     "m11+"  : [3, 7, 10, 14, 18],
     "13"    : [4, 7, 10, 14, 17, 21],
-    "m13"   : [3, 7, 10, 14, 17, 21],
+    "m13"   : [3, 7, 10, 14, 17, 21]
   };
   chord_tensions.M           = chord_tensions.major;
   chord_tensions.m           = chord_tensions.minor;
@@ -860,13 +863,39 @@ define(function(require, exports, module) {
     }
     return list;
   };
-  
-  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+
+  fn.defineProperty(Number.prototype, "midichord", fn(function(name, inversion, length) {
     return chord(this, name, inversion, length);
   }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
-
+  
+  fn.defineProperty(Number.prototype, "chord", fn(function(name, inversion, length) {
+    if (!cc.deprecate.chord) {
+      cc.deprecate.chord = true;
+      cc.global.console.log("Number#chord is now called `Number#midichord`");
+    }
+    return chord(this, name, inversion, length);
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "cpschord", fn(function(name, inversion, length) {
+    var num = this;
+    return chord(0, name, inversion, length).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
   fn.defineProperty(Number.prototype, "chordcps", fn(function(name, inversion, length) {
     var num = this;
+    if (!cc.deprecate.chordcps) {
+      cc.deprecate.chordcps = true;
+      cc.global.console.log("Number#chordcps is now called `Number#cpschord`");
+    }
+    return chord(0, name, inversion, length).map(function(midi) {
+      return num * Math.pow(2, midi * 1/12);
+    });
+  }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
+  
+  fn.defineProperty(Number.prototype, "ratiochord", fn(function(name, inversion, length) {
+    var num = Math.pow(2, this * 1/12);
     return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
@@ -874,11 +903,15 @@ define(function(require, exports, module) {
   
   fn.defineProperty(Number.prototype, "chordratio", fn(function(name, inversion, length) {
     var num = Math.pow(2, this * 1/12);
+    if (!cc.deprecate.chordratio) {
+      cc.deprecate.chordratio = true;
+      cc.global.console.log("Number#chordratio is now called `Number#ratiochord`");
+    }
     return chord(0, name, inversion, length).map(function(midi) {
       return num * Math.pow(2, midi * 1/12);
     });
   }).defaults("name=\"\",inversion=0,length=-1").multiCall().build());
-
+  
   (function() {
     var keys = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
     Object.keys(keys).forEach(function(key) {

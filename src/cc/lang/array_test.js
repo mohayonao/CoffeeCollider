@@ -12,31 +12,13 @@ define(function(require, exports, module) {
 
   describe("lang/array.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createBinaryOpUGen;
-    before(function() {
-      _lang = cc.lang;
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
-      _createBinaryOpUGen  = cc.createBinaryOpUGen;
-      
-      cc.lang = {};
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
-      cc.createBinaryOpUGen = function(selector, a, b) {
-        return [selector, a, b];
-      };
+    testTools.mock("lang", {});
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.lang = _lang;
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
-      cc.createBinaryOpUGen  = _createBinaryOpUGen;
+    testTools.mock("createBinaryOpUGen", function(selector, a, b) {
+      return [selector, a, b];
     });
-    
     describe("class methods", function() {
       it("series", function() {
         actual   = Array.series(10);
@@ -199,6 +181,20 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
           assert.notEqual(actual, list);
         });
+        it("clone", function() {
+          var list = [ 1, 2, 3, [null] ];
+          actual   = list.clone();
+          expected = [ 1, 2, 3, [null] ];
+          assert.deepEqual(actual, expected);
+          assert.notEqual(actual, list);
+          assert.equal(actual[3], list[3]);
+          
+          actual   = list.clone(true);
+          expected = [ 1, 2, 3, [null] ];
+          assert.deepEqual(actual, expected);
+          assert.notEqual(actual, list);
+          assert.notEqual(actual[3], list[3]);
+        });
         it("dup", function() {
           actual   = [ 1, 2, 3 ].dup();
           expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ] ];
@@ -206,6 +202,16 @@ define(function(require, exports, module) {
 
           actual   = [ 1, 2, 3 ].dup(5);
           expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ] ];
+          assert.deepEqual(actual, expected);
+        });
+        it("asUGenInput", function() {
+          actual   = [ 1, 2, 3 ].asUGenInput();
+          expected = [ 1, 2, 3 ];
+          assert.deepEqual(actual, expected);
+        });
+        it("asString", function() {
+          actual   = [ 1, 2, 3 ].asString();
+          expected = "[ 1, 2, 3 ]";
           assert.deepEqual(actual, expected);
         });
       });
@@ -229,12 +235,6 @@ define(function(require, exports, module) {
               assert.deepEqual([1,2,3][selector](1), [ [1,1], [2,1], [3,1] ]);
             });
           });
-        });
-        it("__and__", function() {
-          assert.deepEqual([1,2,3].__and__(4), ["and", 1, 2, 3, 4]);
-        });
-        it("__or__", function() {
-          assert.deepEqual([1,2,3].__or__(4), ["or", 1, 2, 3, 4]);
         });
         it("ugen", function() {
           cc.instanceOfUGen = function() {

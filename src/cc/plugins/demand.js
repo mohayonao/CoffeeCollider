@@ -126,7 +126,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._grow  = 0;
       this._value = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -138,7 +138,7 @@ define(function(require, exports, module) {
         }
         if (this._repeats < 0) {
           x = inputDemandA(this, 0, inNumSamples);
-          this._repeats = x|0;
+          this._repeats = Math.floor(x); // Infinity|0 -> 0
           this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
@@ -171,7 +171,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._step  = 0;
       this._value = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -183,7 +183,7 @@ define(function(require, exports, module) {
         }
         if (this._repeats < 0) {
           x = inputDemandA(this, 0, inNumSamples);
-          this._repeats = x|0;
+          this._repeats = Math.floor(x); // Infinity|0 -> 0
           this._value   = inputDemandA(this, 1, inNumSamples);
         }
         if (this._repeatCount >= this._repeats) {
@@ -216,7 +216,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._lo = 0;
       this._hi = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -224,7 +224,7 @@ define(function(require, exports, module) {
       if (inNumSamples) {
         if (this._repeats < 0) {
           x = inputDemandA(this, 0, inNumSamples);
-          this._repeats = x|0;
+          this._repeats = Math.floor(x); // Infinity|0 -> 0
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -260,7 +260,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._lo = 0;
       this._hi = 0;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -268,7 +268,7 @@ define(function(require, exports, module) {
       if (inNumSamples) {
         if (this._repeats < 0) {
           x = inputDemandA(this, 0, inNumSamples);
-          this._repeats = x|0;
+          this._repeats = Math.floor(x); // Infinity|0 -> 0
         }
         if (this._repeatCount >= this._repeats) {
           this.outputs[0][0] = NaN;
@@ -278,9 +278,9 @@ define(function(require, exports, module) {
         lo = inputDemandA(this, 1, inNumSamples);
         hi = inputDemandA(this, 2, inNumSamples);
         
-        if (!isNaN(lo)) { this._lo = lo|0; }
-        if (!isNaN(hi)) { this._hi = hi|0; }
-        this.outputs[0][0] = (Math.random() * (this._hi - this._lo) + this._lo)|0;
+        if (!isNaN(lo)) { this._lo = Math.floor(lo); }
+        if (!isNaN(hi)) { this._hi = Math.floor(hi); }
+        this.outputs[0][0] = Math.floor((Math.random() * (this._hi - this._lo) + this._lo));
       } else {
         this._repeats = -1;
         this._repeatCount = 0;
@@ -304,7 +304,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Dser = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {
@@ -361,7 +361,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Dseq = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -425,7 +425,7 @@ define(function(require, exports, module) {
         indices[i] = i + 1;
       }
       this._indices = indices.sort(scramble);
-      next.call(this, 0);
+      this.process(0);
     };
     var scramble = function() {
       return Math.random() - 0.5;
@@ -488,7 +488,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Drand = (function() {
     var ctor = function() {
       this.process = next;
-      next.call(this, 0);
+      this.process(0);
     };
 
     var next = function(inNumSamples) {

@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var extend = require("../common/extend");
+  var utils  = require("./utils");
   
   var bus_allocator = {
     audio:2, control:0
@@ -20,12 +21,19 @@ define(function(require, exports, module) {
     Bus.prototype.asUGenInput = function() {
       return this.index;
     };
+
+    Bus.prototype.asString = function() {
+      return "Bus(" + utils.asRateString(this.rate) + ", " + this.index + ", " + this.numChannels + ")";
+    };
     
     return Bus;
   })();
 
   cc.global.Bus = function() {
+    return cc.global.Bus.control(1);
   };
+  
+  cc.global.Bus["new"] = cc.global.Bus;
   
   cc.global.Bus.control = fn(function(numChannels) {
     var index = bus_allocator.control;
@@ -37,7 +45,7 @@ define(function(require, exports, module) {
     } else {
       numChannels = 0;
     }
-    return new Bus(C.AUDIO, index, numChannels);
+    return new Bus(C.CONTROL, index, numChannels);
   }).defaults("numChannels=1").build();
   
   cc.global.Bus.audio = fn(function(numChannels) {
@@ -52,12 +60,18 @@ define(function(require, exports, module) {
     }
     return new Bus(C.AUDIO, index, numChannels);
   }).defaults("numChannels=1").build();
+
+  cc.instanceOfBus = function(obj) {
+    return obj instanceof Bus;
+  };
   
   cc.resetBus = function() {
     bus_allocator.audio   = 2;
     bus_allocator.control = 0;
   };
   
-  module.exports = {};
+  module.exports = {
+    Bus: Bus
+  };
 
 });

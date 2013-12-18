@@ -30,7 +30,7 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.play(userId);
+      this.instance.play(userId);
       if (this.api) {
         this._strm = new Int16Array(this.strmLength * this.channels);
         this.strmList = new Array(C.STRM_LIST_LENGTH);
@@ -47,41 +47,43 @@ define(function(require, exports, module) {
       if (!this.timer.isRunning()) {
         var that = this;
         setTimeout(function() {
-          that.timer.start(that.process.bind(that), C.PROCESSING_INTERVAL);
+          that.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
         }, 50); // TODO: ???
       }
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instanceManager.pause(userId);
+      this.instance.pause(userId);
       if (this.api) {
         if (this.api.isPlaying) {
-          if (!this.instanceManager.isRunning()) {
+          if (!this.instance.isRunning()) {
             this.api.pause();
           }
         }
       }
       if (this.timer.isRunning()) {
-        if (!this.instanceManager.isRunning()) {
+        if (!this.instance.isRunning()) {
           this.timer.stop();
         }
       }
     };
     NodeJSSynthServer.prototype.process = function() {
-      if (this.sysSyncCount < this.syncCount[0] - C.STRM_FORWARD_PROCESSING) {
+      if (this.sysSyncCount < this.syncCount - C.STRM_FORWARD_PROCESSING) {
         return;
       }
       var strm = this.strm;
-      var instanceManager = this.instanceManager;
+      var instance = this.instance;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
-      var busOutL = instanceManager.busOutL;
-      var busOutR = instanceManager.busOutR;
+      var busOut  = this.busOut;
+      var busOutL = this.busOutL;
+      var busOutR = this.busOutR;
       var lang = cc.lang;
       var offset = 0;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
-        instanceManager.process(bufLength);
+        instance.process(bufLength);
+        busOut.set(instance.bus);
         var j = bufLength, k = strmLength + bufLength;
         while (k--, j--) {
           strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
@@ -90,7 +92,7 @@ define(function(require, exports, module) {
         offset += bufLength;
       }
       this.sendToLang(strm);
-      this.syncCount[0] += 1;
+      this.syncCount += 1;
       if (this.api) {
         this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = new Int16Array(strm);
         this.strmListWriteIndex += 1;

@@ -5,7 +5,6 @@ define(function(require, exports, module) {
   var fn = require("./fn");
   var utils  = require("./utils");
   var extend = require("../common/extend");
-  var emitter = require("../common/emitter");
   var slice = [].slice;
   
   var BufferSource = (function() {
@@ -66,20 +65,20 @@ define(function(require, exports, module) {
   var Buffer = (function() {
     var bufnum = 0;
     function Buffer(frames, channels) {
-      emitter.mixin(this);
       this.klassName = "Buffer";
       
       this.bufnum     = bufnum++;
       this.frames     = frames  |0;
       this.channels   = channels|0;
+      this.sampleRate = cc.lang.sampleRate;
+      this.path       = null;
       
-      this._blocking = true;
       cc.lang.pushToTimeline([
         "/b_new", this.bufnum, this.frames, this.channels
       ]);
     }
     extend(Buffer, cc.Object);
-
+    
     Buffer.prototype.free = function() {
       cc.lang.pushToTimeline([
         "/b_free", this.bufnum
@@ -96,23 +95,22 @@ define(function(require, exports, module) {
     
     Buffer.prototype.set = function() {
       var args = slice.call(arguments);
-      cc.lang.pushToTimeline([
-        "/b_set", this.bufnum, args
-      ]);
+      if (args.length) {
+        cc.lang.pushToTimeline([
+          "/b_set", this.bufnum, args
+        ]);
+      }
       return this;
     };
-    
-    Buffer.prototype.setn = function() {
-      var args = slice.call(arguments);
-      cc.lang.pushToTimeline([
-        "/b_set", this.bufnum, args
-      ]);
-      return this;
+    Buffer.prototype.setn = Buffer.prototype.set;
+
+    var calcFlag = function(normalize, asWavetable, clearFirst) {
+      return (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
     };
     
     Buffer.prototype.sine1 = fn(function(amps, normalize, asWavetable, clearFirst) {
       amps = utils.asArray(amps);
-      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var flags = calcFlag(normalize, asWavetable, clearFirst);
       cc.lang.pushToTimeline(
         ["/b_gen", this.bufnum, "sine1", flags].concat(amps)
       );
@@ -122,7 +120,7 @@ define(function(require, exports, module) {
     Buffer.prototype.sine2 = fn(function(freqs, amps, normalize, asWavetable, clearFirst) {
       freqs = utils.asArray(freqs);
       amps  = utils.asArray(amps);
-      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var flags = calcFlag(normalize, asWavetable, clearFirst);
       var len = Math.max(freqs.length, amps.length) * 2;
       cc.lang.pushToTimeline(
         ["/b_gen", this.bufnum, "sine2", flags].concat(utils.lace([freqs, amps], len))
@@ -134,7 +132,7 @@ define(function(require, exports, module) {
       freqs  = utils.asArray(freqs);
       amps   = utils.asArray(amps);
       phases = utils.asArray(phases);
-      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var flags = calcFlag(normalize, asWavetable, clearFirst);
       var len = Math.max(freqs.length, amps.length, phases.length) * 3;
       cc.lang.pushToTimeline(
         ["/b_gen", this.bufnum, "sine3", flags].concat(utils.lace([freqs, amps, phases], len))
@@ -144,19 +142,19 @@ define(function(require, exports, module) {
 
     Buffer.prototype.cheby = fn(function(amplitudes, normalize, asWavetable, clearFirst) {
       amplitudes = utils.asArray(amplitudes);
-      var flags = (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
+      var flags = calcFlag(normalize, asWavetable, clearFirst);
       cc.lang.pushToTimeline(
         ["/b_gen", this.bufnum, "cheby", flags].concat(amplitudes)
       );
       return this;
     }).defaults("amplitudes=[],normalize=true,asWavetable=true,clearFirst=true").build();
     
-    Buffer.prototype.performWait = function() {
-      return this._blocking;
-    };
-    
     Buffer.prototype.asUGenInput = function() {
       return this.bufnum;
+    };
+    
+    Buffer.prototype.asString = function() {
+      return "Buffer(" + this.bufnum + ", " + this.frames + ", " + this.channels + ", " + this.sampleRate + ", " + this.path + ")";
     };
     
     return Buffer;
@@ -183,6 +181,8 @@ define(function(require, exports, module) {
     return buffer;
   }).defaults("numFrames=0,numChannels=1,source").build();
   
+  cc.global.Buffer["new"] = cc.global.Buffer;
+  
   cc.global.Buffer.read = fn(function(path, startFrame, numFrames) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: path should be a string.");
@@ -194,6 +194,8 @@ define(function(require, exports, module) {
     } else {
       cc.lang.requestBuffer(path, function(result) {
         if (result) {
+          buffer.sampleRate = result.sampleRate;
+          buffer.path       = path;
           new BufferSource(result, path).bind(buffer, startFrame, numFrames);
         }
       });
@@ -210,7 +212,8 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    Buffer: Buffer,
+    BufferSource: BufferSource,
+    Buffer      : Buffer
   };
 
 });

@@ -7,83 +7,83 @@ define(function(require, exports, module) {
   var graphFunc  = {};
   var doneAction = {};
   
-  graphFunc[C.ADD_TO_HEAD] = function(node) {
+  graphFunc[C.ADD_TO_HEAD] = function(target, node) {
     var prev;
-    if (this instanceof Group) {
-      if (this.head === null) {
-        this.head = this.tail = node;
+    if (target instanceof Group) {
+      if (target.head === null) {
+        target.head = target.tail = node;
       } else {
-        prev = this.head.prev;
+        prev = target.head.prev;
         if (prev) {
           prev.next = node;
         }
-        node.next = this.head;
-        this.head.prev = node;
-        this.head = node;
+        node.next = target.head;
+        target.head.prev = node;
+        target.head = node;
       }
-      node.parent = this;
+      node.parent = target;
     }
   };
-  graphFunc[C.ADD_TO_TAIL] = function(node) {
+  graphFunc[C.ADD_TO_TAIL] = function(target, node) {
     var next;
-    if (this instanceof Group) {
-      if (this.tail === null) {
-        this.head = this.tail = node;
+    if (target instanceof Group) {
+      if (target.tail === null) {
+        target.head = target.tail = node;
       } else {
-        next = this.tail.next;
+        next = target.tail.next;
         if (next) {
           next.prev = node;
         }
-        node.prev = this.tail;
-        this.tail.next = node;
-        this.tail = node;
+        node.prev = target.tail;
+        target.tail.next = node;
+        target.tail = node;
       }
-      node.parent = this;
+      node.parent = target;
     }
   };
-  graphFunc[C.ADD_BEFORE] = function(node) {
-    var prev = this.prev;
-    this.prev = node;
+  graphFunc[C.ADD_BEFORE] = function(target, node) {
+    var prev = target.prev;
+    target.prev = node;
     node.prev = prev;
     if (prev) {
       prev.next = node;
     }
-    node.next = this;
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    node.next = target;
+    if (target.parent && target.parent.head === target) {
+      target.parent.head = node;
     }
-    node.parent = this.parent;
+    node.parent = target.parent;
   };
-  graphFunc[C.ADD_AFTER] = function(node) {
-    var next = this.next;
-    this.next = node;
+  graphFunc[C.ADD_AFTER] = function(target, node) {
+    var next = target.next;
+    target.next = node;
     node.next = next;
     if (next) {
       next.prev = node;
     }
-    node.prev = this;
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    node.prev = target;
+    if (target.parent && target.parent.tail === target) {
+      target.parent.tail = node;
     }
-    node.parent = this.parent;
+    node.parent = target.parent;
   };
-  graphFunc[C.REPLACE] = function(node) {
-    node.next = this.next;
-    node.prev = this.prev;
-    node.head = this.head;
-    node.tail = this.tail;
-    node.parent = this.parent;
-    if (this.prev) {
-      this.prev.next = node;
+  graphFunc[C.REPLACE] = function(target, node) {
+    node.next = target.next;
+    node.prev = target.prev;
+    node.head = target.head;
+    node.tail = target.tail;
+    node.parent = target.parent;
+    if (target.prev) {
+      target.prev.next = node;
     }
-    if (this.next) {
-      this.next.prev = node;
+    if (target.next) {
+      target.next.prev = node;
     }
-    if (this.parent && this.parent.head === this) {
-      this.parent.head = node;
+    if (target.parent && target.parent.head === target) {
+      target.parent.head = node;
     }
-    if (this.parent && this.parent.tail === this) {
-      this.parent.tail = node;
+    if (target.parent && target.parent.tail === target) {
+      target.parent.tail = node;
     }
   };
   
@@ -282,6 +282,12 @@ define(function(require, exports, module) {
     Node.prototype.stop = function() {
       free.call(this);
     };
+    Node.prototype.run = function(inRun) {
+      this.running = !!inRun; // TODO
+    };
+    Node.prototype.end = function() {
+      this.running = false; // TODO
+    };
     Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
@@ -301,7 +307,7 @@ define(function(require, exports, module) {
       this.head = null;
       this.tail = null;
       if (target) {
-        graphFunc[addAction].call(target, this);
+        graphFunc[addAction](target, this);
       }
     }
     extend(Group, Node);
@@ -319,7 +325,7 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, node, addAction, defId, controls, instance) {
+    function Synth(nodeId, target, addAction, defId, controls, instance) {
       Node.call(this, nodeId, instance);
       if (instance) {
         var specs = instance.defs[defId];
@@ -327,8 +333,8 @@ define(function(require, exports, module) {
           this.build(specs, controls, instance);
         }
       }
-      if (node) {
-        graphFunc[addAction].call(node, this);
+      if (target) {
+        graphFunc[addAction](target, this);
       }
     }
     extend(Synth, Node);
@@ -341,11 +347,6 @@ define(function(require, exports, module) {
       fixNumList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
         value = list[i];
-        if (value === "Infinity") {
-          value = Infinity;
-        } else if (value === "-Infinity") {
-          value = -Infinity;
-        }
         fixNumList[i] = instance.getFixNum(value);
       }
       list = specs.defList;
@@ -410,10 +411,22 @@ define(function(require, exports, module) {
     return Synth;
   })();
   
+  cc.createServerRootNode = function(instance) {
+    return new Group(0, 0, 0, instance);
+  };
+
+  cc.createServerGroup = function(nodeId, target, addAction, instance) {
+    return new Group(nodeId, target, addAction, instance);
+  };
+
+  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
+    return new Synth(nodeId, target, addAction, defId, controls, instance);
+  };
+  
   module.exports = {
     Node : Node,
     Group: Group,
-    Synth: Synth,
+    Synth: Synth
   };
 
 });

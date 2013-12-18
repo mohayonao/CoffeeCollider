@@ -11,6 +11,10 @@ define(function(require, exports, module) {
     return new Date(+this);
   });
   
+  fn.defineProperty(Date.prototype, "clone", fn(function() {
+    return new Date(+this);
+  }).defaults(ops.COMMONS.clone).build());
+  
   fn.defineProperty(Date.prototype, "dup", fn(function(n) {
     var a = new Array(n|0);
     for (var i = 0, imax = a.length; i < imax; ++i) {
@@ -44,7 +48,11 @@ define(function(require, exports, module) {
   });
   
   fn.defineProperty(Date.prototype, "asUGenInput", function() {
-    return +this;
+    throw new Error("Date can't cast to a UGen.");
+  });
+  
+  fn.defineProperty(Date.prototype, "asString", function() {
+    return this.toString();
   });
   
   // unary operator methods
@@ -59,12 +67,6 @@ define(function(require, exports, module) {
     fn.defineProperty(Date.prototype, selector, function(b) {
       return (+this)[selector](b);
     });
-  });
-  fn.defineBinaryProperty(Date.prototype, "__and__", function(b) {
-    return cc.createTaskWaitLogic("and", [this].concat(b));
-  });
-  fn.defineBinaryProperty(Date.prototype, "__or__", function(b) {
-    return cc.createTaskWaitLogic("or", [this].concat(b));
   });
   
   // arity operators

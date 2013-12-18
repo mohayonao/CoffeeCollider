@@ -99,7 +99,7 @@ define(function(require, exports, module) {
   };
   
   var shouldBeImplementedMethods = function() {
-    var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__","__and__","__or__" ];
+    var list = [ "__plus__","__minus__","__add__","__sub__","__mul__","__div__","__mod__" ];
     list = list.concat(Object.keys(ops.UNARY_OPS).filter(function(selector) {
       return /^[a-z]/.test(selector);
     }));
@@ -204,18 +204,9 @@ define(function(require, exports, module) {
           throw new Error(name + " is not defined.")
         }
         describe("UGen:" + name, function() {
-          var _createMulAdd, _createBinaryOpUGen;
-          before(function() {
-            _createMulAdd = cc.createMulAdd;
-            _createBinaryOpUGen = cc.createBinaryOpUGen;
-            cc.createMulAdd = function(_in) { return _in; }
-            cc.createBinaryOpUGen = function(selector, a, b) { return a; }
-            
-          });
-          after(function() {
-            cc.createMulAdd = _createMulAdd;
-            cc.createBinaryOpUGen = _createBinaryOpUGen;
-          });
+          mock("createMulAdd", function(_in) { return _in; });
+          mock("createBinaryOpUGen", function(selector, a, b) { return a; });
+          
           var tests = specs;
           var Klass = cc.global[name];
           if (typeof specs === "function") {
@@ -269,29 +260,18 @@ define(function(require, exports, module) {
   })();
   
   var unitTestSuite = (function() {
-    var parent = { controls:new Float32Array(16), doneAction:function() {} };
-    
-    var create_rate = function(bufLength) {
-      var result = {};
-      result.sampleRate = 44100;
-      result.sampleDur  = 1 / 44100;
-      result.radiansPerSample = Math.PI * 2 / 44100;
-      result.bufLength   = bufLength;
-      result.bufDuration = bufLength / 44100;
-      result.bufRate     = 1 / result.bufDuration;
-      result.slopeFactor = 1 / bufLength;
-      result.filterLoops  = (bufLength / 3)|0;
-      result.filterRemain = (bufLength % 3)|0;
-      if (result.filterLoops === 0) {
-        result.filterSlope = 0;
-      } else {
-        result.filterSlope = 1 / result.filterLoops;
-      }
-      return result;
+    var parent = {
+      controls:new Float32Array(16)
     };
-    
-    var audio_rate   = create_rate(64);
-    var control_rate = create_rate( 1);
+    parent.doneAction = function(action) {
+      parent.doneAction.action = action;
+    };
+    parent.run = function(state) {
+      parent.run.state = state;
+    };
+    parent.end = function() {
+      parent.end.called = true;
+    };
     
     Float32Array.prototype.setScalar = function(value) {
       for (var i = this.length; i--;) {
@@ -300,7 +280,7 @@ define(function(require, exports, module) {
       return this;
     };
     
-    var signal = function(pattern, sampleDur) {
+    var signal = function(pattern, sampleDur, name) {
       var index  = 0;
       var remain = 0;
       var prev   = 0;
@@ -309,7 +289,8 @@ define(function(require, exports, module) {
         var value = prev;
         for (var i = 0, imax = _in.length; i < imax; ++i) {
           if (remain <= 0) {
-            value = pattern[(index++) % pattern.length];
+            value = pattern[index % pattern.length];
+            index += 1;
             if (Array.isArray(value)) {
               remain = value[1];
               value  = value[0];
@@ -325,13 +306,18 @@ define(function(require, exports, module) {
       };
     };
     
-    var inputSpec = function(rate, value) {
+    var inputSpec = function(parent, rate, value, name) {
       rate = rate || C.SCALAR;
-      var sampleDur = ((rate === C.AUDIO) ? audio_rate : control_rate).sampleDur;
-      var process   = (rate !== C.SCALAR) ? signal(value, sampleDur) : null;
-      return {rate:rate, sampleDur:sampleDur, process:process, value:value};
+      var sampleDur;
+      if (parent === C.AUDIO && rate !== C.AUDIO) {
+        sampleDur = -1;
+      } else {
+        sampleDur = cc.server.rates[rate].sampleDur;
+      }
+      var process   = (rate !== C.SCALAR) ? signal(value, sampleDur, name) : null;
+      return {rate:rate, sampleDur:sampleDur, process:process, value:value, name:name};
     };
-
+    
     var initInputs = function(num) {
       var list = [];
       for (var i = 0; i < num; i++) {
@@ -356,7 +342,7 @@ define(function(require, exports, module) {
       
       var test = function(items) {
         testSuite.instance = {};
-        
+
         if (opts.before) beforeEach(opts.before);
         if (opts.after ) afterEach (opts.after );
         
@@ -376,20 +362,26 @@ define(function(require, exports, module) {
           it(testName, (function(items, opts) {
             return function() {
               var inputSpecs = items.inputs.map(function(items) {
-                return typeof items === "number" ? inputSpec(C.SCALAR, items) : inputSpec(items.rate, items.value);
+                if (typeof items === "number") {
+                  return inputSpec(rate, C.SCALAR, items);
+                } else {
+                  return inputSpec(rate, items.rate, items.value, items.name);
+                }
               });
-              var statistics = unitTest(unitSpec, inputSpecs, items.checker, opts);
+              var results    = unitTest(unitSpec, inputSpecs, items.checker, opts);
+              var unit       = results[0];
+              var statistics = results[1];
               if (!statistics.checked) {
                 if (opts.checker) {
                   if (typeof opts.checker === "function") {
-                    opts.checker(statistics);
+                    opts.checker.call(unit, statistics);
                   } else if (typeof opts.checker[name] === "function") {
-                    opts.checker[name](statistics);
+                    opts.checker[name].call(unit, statistics);
                   } else {
-                    defaultChecker(statistics);
+                    defaultChecker.call(unit, statistics);
                   }
                 } else {
-                  defaultChecker(statistics);
+                  defaultChecker.call(unit, statistics);
                 }
               }
             };
@@ -397,17 +389,12 @@ define(function(require, exports, module) {
         });
       };
       
-      var _getRateInstance;
       describe("Unit", function() {
+        mock("server");
         before(function() {
-          _getRateInstance = cc.getRateInstance;
-          cc.getRateInstance = function(rate) {
-            return (rate === C.AUDIO) ? audio_rate : control_rate;
-          };
           Math.random = new Random();
         });
         after(function() {
-          cc.getRateInstance = _getRateInstance;
           Math.random = _random;
         });
         specs.forEach(test);
@@ -417,10 +404,24 @@ define(function(require, exports, module) {
     var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
 
-      if (opts.bufLength) {
-        audio_rate = create_rate(opts.bufLength);
+      var bufLength = opts.bufLength || 16384;
+      var saved_rate = mock.server.rates[C.AUDIO];
+      
+      mock.server.rates[C.AUDIO] = {
+        sampleRate      : 44100,
+        sampleDur       : 1 / 44100,
+        radiansPerSample: Math.PI * 2 / 44100,
+        bufLength       : bufLength,
+        bufDuration     : bufLength / 44100,
+        bufRate         : 1 / (bufLength / 44100),
+        slopeFactor     : 1 / bufLength,
+        filterLoops     : (bufLength / 3)|0,
+        filterRemain    : (bufLength % 3)|0
+      };
+      if (mock.server.rates[C.AUDIO].filterLoops === 0) {
+        mock.server.rates[C.AUDIO].filterSlope = 0;
       } else {
-        audio_rate = create_rate(65536);
+        mock.server.rates[C.AUDIO].filterSlope = 1 / mock.server.rates[C.AUDIO].filterLoops;
       }
       
       var i, imax, j;
@@ -431,15 +432,15 @@ define(function(require, exports, module) {
         unit.inRates[i] = inputSpecs[i].rate;
         switch (unit.inRates[i]) {
         case C.AUDIO:
-          unit.inputs[i] = new Float32Array(audio_rate.bufLength);
+          unit.inputs[i] = new Float32Array(cc.server.rates[C.AUDIO].bufLength);
           inputSpecs[i].process.call(inputSpecs[i], unit.inputs[i], 0, imax);
           break;
         case C.SCALAR:
-          unit.inputs[i] = new Float32Array(control_rate.bufLength);
+          unit.inputs[i] = new Float32Array(cc.server.rates[C.CONTROL].bufLength);
           unit.inputs[i].setScalar(inputSpecs[i].value || 0);
           break;
         case C.CONTROL:
-          unit.inputs[i] = new Float32Array(control_rate.bufLength);
+          unit.inputs[i] = new Float32Array(cc.server.rates[C.CONTROL].bufLength);
           inputSpecs[i].process.call(inputSpecs[i], unit.inputs[i]);
           break;
         default:
@@ -489,30 +490,30 @@ define(function(require, exports, module) {
           unit.process(unit.rate.bufLength, testSuite.instance);
           end   = Date.now();
           statistics.time += end - begin;
-          for (j = unit.allOutputs.length; j--; ) {
-            var x = unit.allOutputs[j];
-            statistics.samples += 1;
-            if (isNaN(x)) {
-              statistics.hasNaN = true;
-            } else if (Math.abs(x) === Infinity) {
-              statistics.hasInfinity = true;
-            } else {
-              if (x < statistics.min) {
-                statistics.min = x;
-              }
-              if (statistics.max < x) {
-                statistics.max = x;
-              }
-              if (Math.abs(x) < statistics.absmin) {
-                statistics.absmin = Math.abs(x);
-              }
-              if (statistics.absmax < Math.abs(x)) {
-                statistics.absmax = Math.abs(x);
-              }
-              values.push(x);
-              statistics.mean += x;
-              statistics.rms  += x * x;
+        }
+        for (j = unit.allOutputs.length; j--; ) {
+          var x = unit.allOutputs[j];
+          statistics.samples += 1;
+          if (isNaN(x)) {
+            statistics.hasNaN = true;
+          } else if (Math.abs(x) === Infinity) {
+            statistics.hasInfinity = true;
+          } else {
+            if (x < statistics.min) {
+              statistics.min = x;
             }
+            if (statistics.max < x) {
+              statistics.max = x;
+            }
+            if (Math.abs(x) < statistics.absmin) {
+              statistics.absmin = Math.abs(x);
+            }
+            if (statistics.absmax < Math.abs(x)) {
+              statistics.absmax = Math.abs(x);
+            }
+            values.push(x);
+            statistics.mean += x;
+            statistics.rms  += x * x;
           }
         }
         if (opts.postProcess) {
@@ -526,19 +527,21 @@ define(function(require, exports, module) {
         var x = statistics.mean - values[i];
         variance += x * x;
       }
-      statistics.variance = variance / statistics.samples;
+      statistics.variance = variance / (statistics.samples - 1);
       
       if (checker) {
         if (typeof checker === "function") {
-          checker(statistics);
+          checker.call(unit, statistics);
           statistics.checked = true;
         } else if (typeof checker[spec[0]] === "function") {
-          checker[spec[0]](statistics);
+          checker[spec[0]].call(unit, statistics);
           statistics.checked = true;
         }
       }
       
-      return statistics;      
+      mock.server.rates[C.AUDIO] = saved_rate;
+      
+      return [unit, statistics];
     };
 
     var randomTable = new Array(1024);
@@ -561,7 +564,222 @@ define(function(require, exports, module) {
     
     return testSuite;
   })();
+
+  // mock
+  var mock = function(name, obj) {
+    var target = cc;
+    if (/^global\./.test(name)) {
+      target = cc.global;
+      name   = name.substr(7);
+    }
+    var substitute = obj || mock[name];
+    if (typeof substitute === "undefined") {
+      throw new Error("undefined mock: " + name);
+    }
+    before(function() {
+      mock._saved[name] = target[name];
+      target[name] = substitute;
+    });
+    if (substitute.$beforeEach) {
+      beforeEach(substitute.$beforeEach);
+    }
+    after(function() {
+      target[name] = mock._saved[name];
+    });
+  };
+  mock._saved = {};
+
+  mock.console = {
+    log: function() {
+      mock.console.log.result = slice.apply(arguments);
+    },
+    $beforeEach: function() {
+      mock.console.log.result = null;
+    }
+  };
   
+  mock.createWebWorker = function() {
+    return {};
+  };
+  mock.createTimer = function() {
+    return {
+      isRunning: function() {
+        return false;
+      },
+      start: function() {},
+      stop : function() {}
+    };
+  };
+  
+  mock.lang = {
+    sampleRate: 44100,
+    rootNode  : {},
+    pushToTimeline: function(cmd) {
+      cc.lang.pushToTimeline.result.push(cmd);
+    },
+    sendToServer: function(cmd) {
+      cc.lang.sendToServer.result.push(cmd);
+    },
+    sendToClient: function(cmd) {
+      cc.lang.sendToClient.result.push(cmd);
+    },
+    requestBuffer: function(path, callback) {
+      callback({
+        samples    : new Float32Array([0, 1, 2, 3]),
+        numChannels: 1,
+        sampleRate : 8000,
+        numFrames  : 4
+      });
+    },
+    $beforeEach: function() {
+      cc.lang.pushToTimeline.result = [];
+      cc.lang.sendToServer.result   = [];
+      cc.lang.sendToClient.result   = [];
+    }
+  };
+
+  mock.server = {
+    sampleRate: 44100,
+    rates: [],
+    busClear: new Float32Array(1024),
+  };
+  mock.server.rates[C.AUDIO] = {
+    sampleRate      : 44100,
+    sampleDur       : 1 / 44100,
+    radiansPerSample: Math.PI * 2 / 44100,
+    bufLength       : 8,
+    bufDuration     : 8 / 44100,
+    bufRate         : 1 / (8 / 44100),
+    slopeFactor     : 1 / 8,
+    filterLoops     : 2,
+    filterRemain    : 1,
+    filterSlope     : 1 / 2
+  };
+  mock.server.rates[C.CONTROL] = {
+    sampleRate      : 689.0625,
+    sampleDur       : 1 / 689.0625,
+    radiansPerSample: Math.PI * 2 / 689.0625,
+    bufLength       : 1,
+    bufDuration     : 1 / 689.0625,
+    bufRate         : 1 / (1 / 689.0625),
+    slopeFactor     : 1 / 1,
+    filterLoops     : 0,
+    filterRemain    : 1,
+    filterSlope     : 0
+  };
+  mock.server.rates[C.SCALAR] = mock.server.rates[C.CONTROL];
+  mock.server.rates[C.DEMAND] = mock.server.rates[C.CONTROL];
+  
+  mock.createMulAdd = function(a, mul, add) {
+    return a * mul + add;
+  };
+  
+  mock.createTaskManager = function() {
+    return {
+      start: function() {
+        mock.createTaskManager.called.push("start");
+      },
+      reset: function() {
+        mock.createTaskManager.called.push("reset");
+      },
+      process: function() {
+        mock.createTaskManager.called.push("process");
+      }
+    };
+  };
+  mock.createTaskManager.$beforeEach = function() {
+    mock.createTaskManager.called = [];
+  };
+
+  mock.createInstanceManager = function() {
+    return {
+      init: function() {
+        mock.createInstanceManager.called.push("init");
+      },
+      play: function() {
+        mock.createInstanceManager.called.push("play");
+      },
+      pause: function() {
+        mock.createInstanceManager.called.push("pause");
+      },
+      reset: function() {
+        mock.createInstanceManager.called.push("reset");
+      },
+      pushToTimeline: function() {
+        mock.createInstanceManager.called.push("pushToTimeline");
+      },
+      append: function() {
+        mock.createInstanceManager.called.push("append");
+        return mock.createInstance();
+      },
+      remove: function() {
+        mock.createInstanceManager.called.push("remove");
+      },
+      process:function() {
+        mock.createInstanceManager.called.push("process");
+      }
+    };
+  };
+  mock.createInstanceManager.$beforeEach = function() {
+    mock.createInstanceManager.called = [];
+  };
+  
+  mock.createInstance = function() {
+    return {
+      play: function() {
+        mock.createInstance.called.push("play");
+      },
+      pause: function() {
+        mock.createInstance.called.push("pause");
+      },
+      reset: function() {
+        mock.createInstance.called.push("reset");
+      },
+      pushToTimeline: function() {
+        mock.createInstance.called.push("pushToTimeline");
+      },
+      process: function() {
+        mock.createInstance.called.push("process");
+      },
+      isRunning: function() {
+        return false;
+      }
+    };
+  };
+  mock.createInstance.$beforeEach = function() {
+    mock.createInstance.called = [];
+  };
+
+  mock.createServerGroup = function(nodeId, target, addAction, instance) {
+    return [nodeId, target, addAction, instance ];
+  };
+
+  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
+    return [ nodeId, target, addAction, defId, controls, instance ];
+  };
+
+  mock.createServerBuffer = function(bufnum, frames, channels) {
+    return [ bufnum, frames, channels ];
+  };
+  
+  mock.resetBuffer = function() {
+    mock.resetBuffer.result = true;
+  };
+  mock.resetBuffer.$beforeEach = function() {
+    mock.resetBuffer.result = null;
+  };
+  mock.resetNode = function() {
+    mock.resetNode.result = true;
+  };
+  mock.resetNode.$beforeEach = function() {
+    mock.resetNode.result = null;
+  };
+  mock.resetBuiltin = function() {
+    mock.resetBuiltin.result = true;
+  };
+  mock.resetBuiltin.$beforeEach = function() {
+    mock.resetBuiltin.result = null;
+  };
   
   module.exports = {
     Random: Random,
@@ -573,6 +791,7 @@ define(function(require, exports, module) {
     shouldBeImplementedMethods : shouldBeImplementedMethods,
     ugenTestSuite: ugenTestSuite,
     unitTestSuite: unitTestSuite,
+    mock: mock
   };
 
 });

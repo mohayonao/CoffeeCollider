@@ -1,9 +1,12 @@
 {
+  "es3"     : true,
+  "forin"   : true,
   "curly"   : true,
   "eqeqeq"  : true,
   "latedef" : true,
   "noarg"   : true,
   "noempty" : true,
+  "nonew"   : true,
   "quotmark": "double",
   "undef"   : true,
   "strict"  : true,

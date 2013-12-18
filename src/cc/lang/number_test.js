@@ -2,40 +2,22 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
   
   require("./number");
 
-  var testTools = require("../../testTools");
   var cc     = require("./cc");
   var random = require("../common/random");
   
   describe("lang/number.js", function() {
     var actual, expected;
-    var _lang, _instanceOfUGen, _createTaskWaitLogic, _createMulAdd;
-    before(function() {
-      _lang = cc.lang;
-      _instanceOfUGen = cc.instanceOfUGen;
-      _createTaskWaitLogic = cc.createTaskWaitLogic;
-      _createMulAdd = cc.createMulAdd;
-      
-      cc.lang = {};
-      cc.instanceOfUGen = function() {
-        return false;
-      };
-      cc.createTaskWaitLogic = function(logic, list) {
-        return [logic].concat(list);
-      };
-      cc.createMulAdd = function(a, mul, add) {
-        return a * mul + add;
-      };
+    testTools.mock("lang");
+    testTools.mock("global.console");
+    testTools.mock("createMulAdd");
+    testTools.mock("instanceOfUGen", function() {
+      return false;
     });
-    after(function() {
-      cc.lang = _lang;
-      cc.instanceOfUGen = _instanceOfUGen;
-      cc.createTaskWaitLogic = _createTaskWaitLogic;
-      cc.createMulAdd = _createMulAdd;
-    });
-
+    
     describe("class methods", function() {
     });
     
@@ -54,6 +36,11 @@ define(function(require, exports, module) {
           expected = 10;
           assert.equal(actual, expected);
         });
+        it("clone", function() {
+          actual   = (10).clone();
+          expected = 10;
+          assert.equal(actual, expected);
+        });
         it("dup", function() {
           actual   = (10).dup();
           expected = [ 10, 10 ];
@@ -62,6 +49,16 @@ define(function(require, exports, module) {
           actual   = (10).dup(5);
           expected = [ 10, 10, 10, 10, 10 ];
           assert.deepEqual(actual, expected);
+        });
+        it("asUGenInput", function() {
+          actual   = (1).asUGenInput();
+          expected = 1;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = (1).asString();
+          expected = "1";
+          assert.equal(actual, expected);
         });
       });
       describe("unary operators", function() {
@@ -413,12 +410,6 @@ define(function(require, exports, module) {
           assert.equal((+2.5).__mod__(-3.5),  2.5 % -3.5);
           assert.equal((+2.5).__mod__( 0.0),  0.0); // avoid NaN
           assert.equal((+2.5).__mod__(+3.5),  2.5 % +3.5);
-        });
-        it("__and__", function() {
-          assert.deepEqual((1).__and__(2), ["and", 1, 2]);
-        });
-        it("__or__", function() {
-          assert.deepEqual((1).__or__(2), ["or", 1, 2]);
         });
         it("eq", function() {
           assert.equal((-2.5).eq(-3.5), 0);
@@ -1033,46 +1024,66 @@ define(function(require, exports, module) {
       });
       describe("chord", function() {
         it("default", function() {
-          actual   = (60).chord();
+          actual   = (60).midichord();
           expected = [ 60, 64, 67 ]; // C
           assert.deepEqual(actual, expected);
         });
         it("minor", function() {
-          actual   = (60).chord("m");
+          actual   = (60).midichord("m");
           expected = [ 60, 63, 67 ]; // Cm
           assert.deepEqual(actual, expected);
         });
         it("inversion", function() {
-          actual   = (60).chord("m", 1);
+          actual   = (60).midichord("m", 1);
           expected = [ 63, 67, 72 ]; // Cm
           assert.deepEqual(actual, expected);
 
-          actual   = (60).chord("m", -1);
+          actual   = (60).midichord("m", -1);
           expected = [ 55, 60, 63 ]; // Cm
           assert.deepEqual(actual, expected);
         });
         it("length", function() {
-          actual   = (60).chord("M7", {length:-1});
+          actual   = (60).midichord("M7", {length:-1});
           expected = [ 60, 64, 67, 71 ]; // CM7
           assert.deepEqual(actual, expected);
 
-          actual   = (60).chord("M7", {length:0});
+          actual   = (60).midichord("M7", {length:0});
           expected = []; // CM7
           assert.deepEqual(actual, expected);
 
-          actual   = (60).chord("M", {length:4});
+          actual   = (60).midichord("M", {length:4});
           expected = [ 60, 64, 67, 72 ]; // CM
           assert.deepEqual(actual, expected);
         });
-        it("chordcps", function() {
-          actual   = (261.6255653006).chordcps("m");
+        it("cpschord", function() {
+          actual   = (261.6255653006).cpschord("m");
           expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
           assert.deepCloseTo(expected, expected, 1e-6);
         });
-        it("chordratio", function() {
-          actual   = (12).chordcps("m7");
+        it("ratiochord", function() {
+          actual   = (12).ratiochord("m7");
           expected = [ 1 * 2, 1.1892071150019 * 2, 1.4983070768743 * 2,  1.7817974362766 * 2 ];
           assert.deepCloseTo(expected, expected, 1e-6);
+        });
+        describe("deprecate", function() {
+          it("chord", function() {
+            actual   = (60).chord();
+            expected = [ 60, 64, 67 ]; // C
+            assert.deepEqual(actual, expected);
+            assert.isString(cc.global.console.log.result[0]);
+          });
+          it("chordcps", function() {
+            actual   = (261.6255653006).chordcps("m");
+            expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
+            assert.deepCloseTo(expected, expected, 1e-6);
+            assert.isString(cc.global.console.log.result[0]);
+          });
+          it("chordratio", function() {
+            actual   = (12).chordratio("m7");
+            expected = [ 261.6255653006, 311.12698372208, 391.99543598175 ];
+            assert.deepCloseTo(expected, expected, 1e-6);
+            assert.isString(cc.global.console.log.result[0]);
+          });
         });
       });
     });

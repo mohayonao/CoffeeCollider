@@ -13,31 +13,31 @@ define(function(require, exports, module) {
   var gSine    = utils.gSine;
   var gInvSine = utils.gInvSine;
 
-  var osc_next_aa = function(inNumSamples, calc) {
-    var out = this.outputs[0];
-    var freqIn  = this.inputs[this._freqIndex];
-    var phaseIn = this.inputs[this._phaseIndex];
-    var mask  = this._mask;
-    var table = this._table;
-    var cpstoinc = this._cpstoinc;
-    var radtoinc = this._radtoinc;
-    var x = this._x, i;
+  var osc_next_aa = function(unit, inNumSamples, calc) {
+    var out = unit.outputs[0];
+    var freqIn  = unit.inputs[unit._freqIndex];
+    var phaseIn = unit.inputs[unit._phaseIndex];
+    var mask  = unit._mask;
+    var table = unit._table;
+    var cpstoinc = unit._cpstoinc;
+    var radtoinc = unit._radtoinc;
+    var x = unit._x, i;
     for (i = 0; i < inNumSamples; ++i) {
       out[i] = calc(table, mask, x + radtoinc * phaseIn[i]);
       x += freqIn[i] * cpstoinc;
     }
-    this._x = x;
+    unit._x = x;
   };
-  var osc_next_ak = function(inNumSamples, calc) {
-    var out = this.outputs[0];
-    var freqIn    = this.inputs[this._freqIndex];
-    var nextPhase = this.inputs[this._phaseIndex][0];
-    var mask  = this._mask;
-    var table = this._table;
-    var radtoinc = this._radtoinc;
-    var cpstoinc = this._cpstoinc;
-    var phase = this._phase;
-    var x = this._x, i;
+  var osc_next_ak = function(unit, inNumSamples, calc) {
+    var out = unit.outputs[0];
+    var freqIn    = unit.inputs[unit._freqIndex];
+    var nextPhase = unit.inputs[unit._phaseIndex][0];
+    var mask  = unit._mask;
+    var table = unit._table;
+    var radtoinc = unit._radtoinc;
+    var cpstoinc = unit._cpstoinc;
+    var phase = unit._phase;
+    var x = unit._x, i;
     if (nextPhase === phase) {
       phase *= radtoinc;
       for (i = 0; i < inNumSamples; ++i) {
@@ -45,40 +45,40 @@ define(function(require, exports, module) {
         x += freqIn[i] * cpstoinc;
       }
     } else {
-      var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+      var phase_slope = (nextPhase - phase) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         out[i] = calc(table, mask, x + radtoinc * phase);
         phase += phase_slope;
         x += freqIn[i] * cpstoinc;
       }
-      this._phase = nextPhase;
+      unit._phase = nextPhase;
     }
-    this._x = x;
+    unit._x = x;
   };
-  var osc_next_ai = function(inNumSamples, calc) {
-    var out = this.outputs[0];
-    var freqIn = this.inputs[this._freqIndex];
-    var phase  = this._phase * this._radtoinc;
-    var mask  = this._mask;
-    var table = this._table;
-    var cpstoinc = this._cpstoinc;
-    var x = this._x, i;
+  var osc_next_ai = function(unit, inNumSamples, calc) {
+    var out = unit.outputs[0];
+    var freqIn = unit.inputs[unit._freqIndex];
+    var phase  = unit._phase * unit._radtoinc;
+    var mask  = unit._mask;
+    var table = unit._table;
+    var cpstoinc = unit._cpstoinc;
+    var x = unit._x, i;
     for (i = 0; i < inNumSamples; ++i) {
       out[i] = calc(table, mask, x + phase);
       x += cpstoinc * freqIn[i];
     }
-    this._x = x;
+    unit._x = x;
   };
-  var osc_next_ka = function(inNumSamples, calc) {
-    var out = this.outputs[0];
-    var nextFreq = this.inputs[this._freqIndex][0];
-    var phaseIn = this.inputs[this._phaseIndex];
-    var mask  = this._mask;
-    var table = this._table;
-    var radtoinc = this._radtoinc;
-    var cpstoinc = this._cpstoinc;
-    var freq = this._freq;
-    var x = this._x, i;
+  var osc_next_ka = function(unit, inNumSamples, calc) {
+    var out = unit.outputs[0];
+    var nextFreq = unit.inputs[unit._freqIndex][0];
+    var phaseIn = unit.inputs[unit._phaseIndex];
+    var mask  = unit._mask;
+    var table = unit._table;
+    var radtoinc = unit._radtoinc;
+    var cpstoinc = unit._cpstoinc;
+    var freq = unit._freq;
+    var x = unit._x, i;
     if (nextFreq === freq) {
       freq *= cpstoinc;
       for (i = 0; i < inNumSamples; ++i) {
@@ -86,27 +86,27 @@ define(function(require, exports, module) {
         x += freq;
       }
     } else {
-      var freq_slope = (nextFreq - freq) * this.rate.slopeFactor;
+      var freq_slope = (nextFreq - freq) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         out[i] = calc(table, mask, x + radtoinc * phaseIn[i]);
         x += freq * cpstoinc;
         freq += freq_slope;
       }
-      this._freq = nextFreq;
+      unit._freq = nextFreq;
     }
-    this._x = x;
+    unit._x = x;
   };
-  var osc_next_kk = function(inNumSamples, calc) {
-    var out = this.outputs[0];
-    var nextFreq  = this.inputs[this._freqIndex][0];
-    var nextPhase = this.inputs[this._phaseIndex][0];
-    var mask  = this._mask;
-    var table = this._table;
-    var radtoinc = this._radtoinc;
-    var cpstoinc = this._cpstoinc;
-    var freq = this._freq;
-    var phase = this._phase;
-    var x = this._x, i;
+  var osc_next_kk = function(unit, inNumSamples, calc) {
+    var out = unit.outputs[0];
+    var nextFreq  = unit.inputs[unit._freqIndex][0];
+    var nextPhase = unit.inputs[unit._phaseIndex][0];
+    var mask  = unit._mask;
+    var table = unit._table;
+    var radtoinc = unit._radtoinc;
+    var cpstoinc = unit._cpstoinc;
+    var freq = unit._freq;
+    var phase = unit._phase;
+    var x = unit._x, i;
     if (nextFreq === freq && nextPhase === phase) {
       freq  *= cpstoinc;
       phase *= radtoinc;
@@ -115,35 +115,35 @@ define(function(require, exports, module) {
         x += freq;
       }
     } else {
-      var freq_slope  = (nextFreq  - freq ) * this.rate.slopeFactor;
-      var phase_slope = (nextPhase - phase) * this.rate.slopeFactor;
+      var freq_slope  = (nextFreq  - freq ) * unit.rate.slopeFactor;
+      var phase_slope = (nextPhase - phase) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         out[i] = calc(table, mask, x + radtoinc * phase);
         x += freq * cpstoinc;
         freq  += freq_slope;
         phase += phase_slope;
       }
-      this._freq  = nextFreq;
-      this._phase = nextPhase;
+      unit._freq  = nextFreq;
+      unit._phase = nextPhase;
     }
-    this._x = x;
+    unit._x = x;
   };
-  var get_table = function(instance, shift) {
-    var buffer = instance.buffers[this._bufnumIn[0]|0];
+  var get_table = function(unit, instance, shift) {
+    var buffer = instance.buffers[unit._bufnumIn[0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples) {
-        if (this._table === samples) {
+        if (unit._table === samples) {
           return true;
         }
         var length  = samples.length;
         var logSize = Math.log(length) / Math.log(2);
         if (logSize === (logSize|0)) {
           length >>= shift;
-          this._radtoinc = length / twopi;
-          this._cpstoinc = length * this.rate.sampleDur;
-          this._table    = samples;
-          this._mask     = length - 1;
+          unit._radtoinc = length / twopi;
+          unit._cpstoinc = length * unit.rate.sampleDur;
+          unit._table    = samples;
+          unit._mask     = length - 1;
           return true;
         }
       }
@@ -163,7 +163,7 @@ define(function(require, exports, module) {
       ctor: function(bufnum, freq, phase, mul, add) {
         return this.multiNew(C.CONTROL, bufnum, freq, phase).madd(mul, add);
       }
-    },
+    }
   };
 
   cc.unit.specs.Osc = (function() {
@@ -201,28 +201,28 @@ define(function(require, exports, module) {
       return table[index] + (pphase-(pphase|0)) * table[index+1];
     };
     var next_aa = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 1)) {
-        osc_next_aa.call(this, inNumSamples, wcalc);
+      if (get_table(this, instance, 1)) {
+        osc_next_aa(this, inNumSamples, wcalc);
       }
     };
     var next_ak = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 1)) {
-        osc_next_ak.call(this, inNumSamples, wcalc);
+      if (get_table(this, instance, 1)) {
+        osc_next_ak(this, inNumSamples, wcalc);
       }
     };
     var next_ai = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 1)) {
-        osc_next_ai.call(this, inNumSamples, wcalc);
+      if (get_table(this, instance, 1)) {
+        osc_next_ai(this, inNumSamples, wcalc);
       }
     };
     var next_ka = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 1)) {
-        osc_next_ka.call(this, inNumSamples, wcalc);
+      if (get_table(this, instance, 1)) {
+        osc_next_ka(this, inNumSamples, wcalc);
       }
     };
     var next_kk = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 1)) {
-        osc_next_kk.call(this, inNumSamples, wcalc);
+      if (get_table(this, instance, 1)) {
+        osc_next_kk(this, inNumSamples, wcalc);
       }
     };
     return ctor;
@@ -271,26 +271,26 @@ define(function(require, exports, module) {
         case C.DEMAND : this.process = next_kk; break;
         }
       }
-      osc_next_kk.call(this, 1, wcalc);
+      osc_next_kk(this, 1, wcalc);
     };
     var wcalc = function(table, mask, pphase) {
       var index = (pphase & mask) << 1;
       return table[index] + (pphase-(pphase|0)) * table[index+1];
     };
     var next_aa = function(inNumSamples) {
-      osc_next_aa.call(this, inNumSamples, wcalc);
+      osc_next_aa(this, inNumSamples, wcalc);
     };
     var next_ak = function(inNumSamples) {
-      osc_next_ak.call(this, inNumSamples, wcalc);
+      osc_next_ak(this, inNumSamples, wcalc);
     };
     var next_ai = function(inNumSamples) {
-      osc_next_ai.call(this, inNumSamples, wcalc);
+      osc_next_ai(this, inNumSamples, wcalc);
     };
     var next_ka = function(inNumSamples) {
-      osc_next_ka.call(this, inNumSamples, wcalc);
+      osc_next_ka(this, inNumSamples, wcalc);
     };
     var next_kk = function(inNumSamples) {
-      osc_next_kk.call(this, inNumSamples, wcalc);
+      osc_next_kk(this, inNumSamples, wcalc);
     };
     return ctor;
   })();
@@ -338,7 +338,7 @@ define(function(require, exports, module) {
       this._feedback = this.inputs[1][0] * this._radtoinc;
       this._y = 0;
       this._x = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -431,28 +431,28 @@ define(function(require, exports, module) {
       return table[pphase & mask];
     };
     var next_aa = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 0)) {
-        osc_next_aa.call(this, inNumSamples, calc);
+      if (get_table(this, instance, 0)) {
+        osc_next_aa(this, inNumSamples, calc);
       }
     };
     var next_ak = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 0)) {
-        osc_next_ak.call(this, inNumSamples, calc);
+      if (get_table(this, instance, 0)) {
+        osc_next_ak(this, inNumSamples, calc);
       }
     };
     var next_ai = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 0)) {
-        osc_next_ai.call(this, inNumSamples, calc);
+      if (get_table(this, instance, 0)) {
+        osc_next_ai(this, inNumSamples, calc);
       }
     };
     var next_ka = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 0)) {
-        osc_next_ka.call(this, inNumSamples, calc);
+      if (get_table(this, instance, 0)) {
+        osc_next_ka(this, inNumSamples, calc);
       }
     };
     var next_kk = function(inNumSamples, instance) {
-      if (get_table.call(this, instance, 0)) {
-        osc_next_kk.call(this, inNumSamples, calc);
+      if (get_table(this, instance, 0)) {
+        osc_next_kk(this, inNumSamples, calc);
       }
     };
     return ctor;
@@ -535,7 +535,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._cpstoinc = 2 * this.rate.sampleDur;
       this._phase    = this.inputs[1][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];
@@ -571,7 +571,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._cpstoinc = 4 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];
@@ -605,7 +605,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._cpstoinc = 2 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0] + 0.5;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];
@@ -636,7 +636,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._cpstoinc = 4 * this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];
@@ -675,7 +675,7 @@ define(function(require, exports, module) {
       this._cpstoinc = this.rate.sampleDur;
       this._phase   = this.inputs[1][0];
       this._duty    = this.inputs[2][0];
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out = this.outputs[0];
@@ -722,7 +722,7 @@ define(function(require, exports, module) {
       this._mask = kSineMask;
       this._scale = 0.5 / this._N;
       this._phase = 0;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out  = this.outputs[0];
@@ -883,7 +883,7 @@ define(function(require, exports, module) {
       this._scale = 0.5 / this._N;
       this._phase = 0;
       this._y1 = -0.46;
-      next.call(this, 1);
+      this.process(1);
     };
     var next = function(inNumSamples) {
       var out   = this.outputs[0];

@@ -1,10 +1,10 @@
 {
   "name": "coffee-collider",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "authors": [
     "Nao Yonamine <mohayonao@gmail.com>"
   ],
-  "description": "CoffeeCollider is a language for real time audio synthesis and algorithmic composition.",
+  "description": "Sound Processing Language for Web Audio",
   "main": "./build/coffee-collider.js",
   "keywords": [
     "language", "coffeescript", "supercollider", "music"

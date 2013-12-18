@@ -11,22 +11,18 @@ define(function(require, exports, module) {
   
   describe("lang/ugen/ugen.js", function() {
     var actual, expected;
-    var _createMulAdd, _createUnaryOpUGen, _createBinaryOpUGen;
+    
+    testTools.mock("createMulAdd", function(ugen, a, b) {
+      return ugen.inputs[0] * a + b;
+    });
+    testTools.mock("createUnaryOpUGen", function(selector, a) {
+      return [ selector, a ];
+    });
+    testTools.mock("createBinaryOpUGen", function(selector, a, b) {
+      return [ selector, a, b ];
+    });
+    
     before(function() {
-      _createMulAdd = cc.createMulAdd;
-      _createUnaryOpUGen = cc.createUnaryOpUGen;
-      _createBinaryOpUGen = cc.createBinaryOpUGen;
-      
-      cc.createMulAdd = function(ugen, a, b) {
-        return ugen.inputs[0] * a + b;
-      };
-      cc.createUnaryOpUGen = function(selector, a) {
-        return [ selector, a ];
-      };
-      cc.createBinaryOpUGen = function(selector, a, b) {
-        return [ selector, a, b ];
-      };
-      
       cc.ugen.register("Test", {
         $ar: {
           defaults: "val1=1,val2=2",
@@ -41,11 +37,6 @@ define(function(require, exports, module) {
           }
         },
       });
-    });
-    after(function() {
-      cc.createMulAdd = _createMulAdd;
-      cc.createUnaryOpUGen  = _createUnaryOpUGen;
-      cc.createBinaryOpUGen = _createBinaryOpUGen;
     });
     
     describe("instance", function() {
@@ -91,6 +82,16 @@ define(function(require, exports, module) {
           assert.deepEqual(instance.dup(), [ instance, instance ]);
           assert.deepEqual(instance.dup(5), [ instance, instance, instance, instance, instance ]);
         });
+        it("asUGenInput", function() {
+          actual   = instance.asUGenInput();
+          expected = instance;
+          assert.equal(actual, expected);
+        });
+        it("asString", function() {
+          actual   = instance.asString();
+          expected = "Test";
+          assert.equal(actual, expected);
+        });
       });
       describe("unary operators", function() {
         it("common", function() {
@@ -128,12 +129,6 @@ define(function(require, exports, module) {
               assert.deepEqual(actual, [ugenSelector, instance, 10], selector);
             }
           });
-        });
-        it("__and__", function() {
-          assert.equal(instance.__and__(1), 0);
-        });
-        it("__or__", function() {
-          assert.equal(instance.__or__(1), 0);
         });
         describe("arity operators", function() {
           it("madd", function() {

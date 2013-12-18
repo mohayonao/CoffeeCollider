@@ -61,19 +61,26 @@ define(function(require, exports, module) {
     return [ index0, index1, index2, index3 ];
   };
 
-  var get_buffer = function(instance) {
-    var buffer = instance.buffers[this.inputs[0][0]|0];
+  var get_buffer = function(unit, instance) {
+    var buffer = instance.buffers[unit.inputs[0][0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples) {
-        this._frames     = buffer.frames;
-        this._channels   = buffer.channels;
-        this._sampleRate = buffer.sampleRate;
-        this._samples    = samples;
+        unit._frames     = buffer.frames;
+        unit._channels   = buffer.channels;
+        unit._sampleRate = buffer.sampleRate;
+        unit._samples    = samples;
         return true;
       }
     }
     return false;
+  };
+
+  var asArray = function(obj) {
+    if (Array.isArray(obj)) {
+      return obj;
+    }
+    return [obj];
   };
   
   cc.ugen.specs.PlayBuf = {
@@ -117,7 +124,7 @@ define(function(require, exports, module) {
     };
     
     var next_1ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out   = this.outputs[0];
@@ -155,7 +162,7 @@ define(function(require, exports, module) {
     };
     
     var next_2ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out1  = this.outputs[0];
@@ -200,7 +207,7 @@ define(function(require, exports, module) {
     };
     
     var next = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var outputs = this.outputs;
@@ -301,7 +308,7 @@ define(function(require, exports, module) {
       }
     };
     var next_1ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out = this.outputs[0];
@@ -320,7 +327,7 @@ define(function(require, exports, module) {
       }
     };
     var next_2ch = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var out1 = this.outputs[0];
@@ -341,7 +348,7 @@ define(function(require, exports, module) {
       }
     };
     var next = function(inNumSamples, instance) {
-      if (!get_buffer.call(this, instance)) {
+      if (!get_buffer(this, instance)) {
         return;
       }
       var outputs = this.outputs;
@@ -363,6 +370,219 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.BufWr = {
+    $ar: {
+      defaults: "inputArray=[],bufnum=0,phase=0,loop=1",
+      ctor: function(inputArray, bufnum, phase, loop) {
+        return this.multiNewList([C.AUDIO, bufnum, phase, loop].concat(asArray(inputArray)));
+      }
+    },
+    $kr: {
+      defaults: "inputArray=[],bufnum=0,phase=0,loop=1",
+      ctor: function(inputArray, bufnum, phase, loop) {
+        return this.multiNewList([C.CONTROL, bufnum, phase, loop].concat(asArray(inputArray)));
+      }
+    },
+    checkNInputs: function() {
+      if (this.rate === C.AUDIO && this.inputs[1].rate !== C.AUDIO) {
+        throw new Error("phase input is not audio rate");
+      }
+    }
+  };
+
+  cc.unit.specs.BufWr = (function() {
+    var ctor = function() {
+      switch (this.numOfInputs - 3) {
+      case 1:
+        this.process = next_1ch;
+        break;
+      case 2:
+        this.process = next_2ch;
+        break;
+      default:
+        this.process = next;
+        break;
+      }
+    };
+    var next_1ch = function(inNumSamples, instance) {
+      if (!get_buffer(this, instance)) {
+        return;
+      }
+      var phaseIn = this.inputs[1];
+      var in0In   = this.inputs[3];
+      var loop    = this.inputs[2][0];
+      var loopMax = this._frames - (loop ? 0 : 1);
+      var samples = this._samples;
+      var phase;
+      var i;
+      for (i = 0; i < inNumSamples; ++i) {
+        phase = sc_loop(this, phaseIn[i], loopMax, loop);
+        samples[phase|0] = in0In[i];
+      }
+    };
+    var next_2ch = function(inNumSamples, instance) {
+      if (!get_buffer(this, instance)) {
+        return;
+      }
+      var phaseIn = this.inputs[1];
+      var in0In   = this.inputs[3];
+      var in1In   = this.inputs[4];
+      var loop    = this.inputs[2][0];
+      var loopMax = this._frames - (loop ? 0 : 1);
+      var samples = this._samples;
+      var phase, index;
+      var i;
+      for (i = 0; i < inNumSamples; ++i) {
+        phase = sc_loop(this, phaseIn[i], loopMax, loop);
+        index = phase << 1;
+        samples[index  ] = in0In[i];
+        samples[index+1] = in1In[i];
+      }
+    };
+    var next = function(inNumSamples, instance) {
+      if (!get_buffer(this, instance)) {
+        return;
+      }
+      var phaseIn = this.inputs[1];
+      var inputs  = this.inputs;
+      var loop    = this.inputs[2][0];
+      var loopMax = this._frames - (loop ? 0 : 1);
+      var samples = this._samples;
+      var channels = this._channels;
+      var phase, index;
+      var i, j;
+      for (i = 0; i < inNumSamples; ++i) {
+        phase = sc_loop(this, phaseIn[i], loopMax, loop);
+        index = (phase|0) * channels;
+        for (j = 0; j < channels; ++j) {
+          samples[index+j] = inputs[j+3][i];
+        }
+      }
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.RecordBuf = {
+    $ar: {
+      defaults: "inputArray=[],bufnum=0,offset=0,recLevel=1,preLevel=0,run=1,loop=1,trigger=1,doneAction=0",
+      ctor: function(inputArray, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction) {
+        return this.multiNewList([
+          C.AUDIO, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction
+        ].concat(asArray(inputArray)));
+      }
+    },
+    $kr: {
+      defaults: "inputArray=[],bufnum=0,offset=0,recLevel=1,preLevel=0,run=1,loop=1,trigger=1,doneAction=0",
+      ctor: function(inputArray, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction) {
+        return this.multiNewList([
+          C.CONTROL, bufnum, offset, recLevel, preLevel, run, loop, trigger, doneAction
+        ].concat(asArray(inputArray)));
+      }
+    }
+  };
+
+  cc.unit.specs.RecordBuf = (function() {
+    var ctor = function() {
+      switch (this.numOfInputs - 8) {
+      case 1:
+        this.process = next_1ch;
+        break;
+      case 2:
+        this.process = next_2ch;
+        break;
+      default:
+        this.process = next;
+        break;
+      }
+      this._writepos = this.inputs[1][0];
+      this._recLevel = this.inputs[2][0];
+      this._preLevel = this.inputs[3][0];
+      this._prevtrig = 0;
+      this._preindex = 0;
+    };
+    var recbuf_next = function(func) {
+      return function(inNumSamples, instance) {
+        if (!get_buffer(this, instance)) {
+          return;
+        }
+        var channels = this._channels;
+        var frames   = this._frames;
+        var samples  = this._samples;
+        var inputs   = this.inputs;
+        var recLevel = this.inputs[2][0];
+        var preLevel = this.inputs[3][0];
+        var run      = this.inputs[4][0];
+        var loop     = this.inputs[5][0]|0;
+        var trig     = this.inputs[6][0];
+        var writepos = this._writepos;
+        var recLevel_slope = (recLevel - this._recLevel) * this.rate.slopeFactor;
+        var preLevel_slope = (preLevel - this._preLevel) * this.rate.slopeFactor;
+        var prevpos, posincr;
+        var i;
+        recLevel = this._recLevel;
+        preLevel = this._preLevel;
+        prevpos  = this._prevpos;
+        posincr  = run > 0 ? +1 : -1;
+        if (trig > 0 && this._prevtrig) {
+          this.done = false;
+          writepos  = (this.inputs[1][0] * channels)|0;
+        }
+        if (writepos < 0) {
+          writepos = frames - 1;
+        } else if (writepos >= frames) {
+          writepos = 0;
+        }
+        for (i = 0; i < inNumSamples; ++i) {
+          func(inputs, i, samples, writepos, prevpos, recLevel, preLevel, channels);
+          prevpos   = writepos;
+          writepos += posincr;
+          if (writepos >= frames) {
+            if (loop) {
+              writepos = 0;
+            } else {
+              writepos = frames - 1;
+              this.done = true;
+            }
+          } else if (0 < writepos) {
+            if (loop) {
+              writepos = frames - 1;
+            } else {
+              writepos  = 0;
+              this.done = true;
+            }
+          }
+          recLevel += recLevel_slope;
+          preLevel += preLevel_slope;
+        }
+        if (this.done) {
+          this.doneAction(this.inputs[7][0]|0);
+        }
+        this._prevtrig = trig;
+        this._writepos = writepos;
+        this._prevpos  = prevpos;
+        this._recLevel = recLevel;
+        this._preLevel = preLevel;
+      };
+    };
+
+    var next_1ch = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel) {
+      samples[writepos] = inputs[8][index] * recLevel + samples[prevpos] * preLevel;
+    });
+
+    var next_2ch = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel) {
+      samples[writepos*2  ] = inputs[8][index] * recLevel + samples[prevpos*2  ] * preLevel;
+      samples[writepos*2+1] = inputs[9][index] * recLevel + samples[prevpos*2+1] * preLevel;
+    });
+
+    var next = recbuf_next(function(inputs, index, samples, writepos, prevpos, recLevel, preLevel, channels) {
+      var j;
+      for (j = 0; j < channels; ++j) {
+        samples[writepos*channels+j] = inputs[8+j][index] + recLevel * samples[prevpos*channels+j] * preLevel;
+      }
+    });
+    return ctor;
+  })();
   
   cc.ugen.specs.BufSampleRate = {
     $kr: {
@@ -374,7 +594,7 @@ define(function(require, exports, module) {
     $ir: {
       defaults: "bufnum=0",
       ctor: function(bufnum) {
-        return this.multiNew(C.CONTROL, bufnum); // TODO: SCALAR rate
+        return this.multiNew(C.SCALAR, bufnum);
       }
     }
   };
@@ -384,7 +604,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._sampleRate;
       }
     };
@@ -396,10 +616,10 @@ define(function(require, exports, module) {
   cc.unit.specs.BufRateScale = (function() {
     var ctor = function() {
       this.process = next;
-      this._sampleDur = cc.getRateInstance(C.AUDIO).sampleDur;
+      this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._sampleRate * this._sampleDur;
       }
     };
@@ -413,7 +633,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._frames;
       }
     };
@@ -427,7 +647,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._samples.length;
       }
     };
@@ -439,10 +659,10 @@ define(function(require, exports, module) {
   cc.unit.specs.BufDur = (function() {
     var ctor = function() {
       this.process = next;
-      this._sampleDur = cc.getRateInstance(C.AUDIO).sampleDur;
+      this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._frames * this._sampleDur;
       }
     };
@@ -456,7 +676,7 @@ define(function(require, exports, module) {
       this.process = next;
     };
     var next = function(inNumSamples, instance) {
-      if (get_buffer.call(this, instance)) {
+      if (get_buffer(this, instance)) {
         this.outputs[0][0] = this._channels;
       }
     };
