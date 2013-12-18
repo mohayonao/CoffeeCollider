@@ -43,10 +43,10 @@ app.on("request", function(req, res) {
     break;
   default:
     if (/\.coffee$/.test(req.url)) {
-      if (fs.existsSync(__dirname + "/../examples/" + req.url)) {
+      if (fs.existsSync(__dirname + "/../../examples/" + req.url)) {
         res.writeHead(200, { "Content-Type": "application/coffeescript" });
         res.end(fs.readFileSync(
-          __dirname + "/../examples/" + req.url, "utf-8"
+          __dirname + "/../../examples/" + req.url, "utf-8"
         ), "utf-8");
         return;
       }
