@@ -285,8 +285,8 @@ define(function(require, exports, module) {
       irdphase = iwrphase - (dsamp|0);
       if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
           out[i] = value;
           irdphase++;
           iwrphase++;
@@ -295,8 +295,8 @@ define(function(require, exports, module) {
         next_feedbk  = calcFeedback(delaytime, decaytime);
         feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
           out[i] = value;
           feedbk += feedbk_slope;
           irdphase++;
@@ -312,8 +312,8 @@ define(function(require, exports, module) {
       feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
-        value = perform(dlybuf, mask, irdphase, frac);
-        dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+        value = perform(dlybuf, mask, irdphase, frac) || 0;
+        dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
         out[i] = value;
         dsamp  += dsamp_slope;
         feedbk += feedbk_slope;
@@ -399,8 +399,8 @@ define(function(require, exports, module) {
       frac     = dsamp - (dsamp|0);
       if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dwr = value * feedbk + inIn[i];
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dwr =  (value * feedbk + inIn[i]) || 0;
           dlybuf[iwrphase & mask] = dwr;
           out[i] = value - feedbk * dwr;
           irdphase++;
@@ -410,8 +410,8 @@ define(function(require, exports, module) {
         next_feedbk  = calcFeedback(delaytime, decaytime);
         feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dwr = value * feedbk + inIn[i];
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dwr = (value * feedbk + inIn[i]) || 0;
           dlybuf[iwrphase & mask] = dwr;
           out[i] = value - feedbk * dwr;
           feedbk += feedbk_slope;
@@ -429,8 +429,8 @@ define(function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
         frac     = dsamp - (dsamp|0);
-        value = perform(dlybuf, mask, irdphase, frac);
-        dwr = value * feedbk + inIn[i];
+        value = perform(dlybuf, mask, irdphase, frac) || 0;
+        dwr = (value * feedbk + inIn[i]) || 0;
         dlybuf[iwrphase & mask] = dwr;
         out[i] = value - feedbk * dwr;
         dsamp  += dsamp_slope;

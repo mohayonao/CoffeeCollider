@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.0",
+    version: "0.2.1",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -9599,7 +9599,7 @@ define('cc/plugins/bufio', function(require, exports, module) {
     var buffer = instance.buffers[unit.inputs[0][0]|0];
     if (buffer) {
       var samples = buffer.samples;
-      if (samples) {
+      if (samples.length) {
         unit._frames     = buffer.frames;
         unit._channels   = buffer.channels;
         unit._sampleRate = buffer.sampleRate;
@@ -9840,6 +9840,9 @@ define('cc/plugins/bufio', function(require, exports, module) {
       case 4 : this._perform = perform_C; break;
       default: this._perform = perform_L; break;
       }
+      this._samples  = null;
+      this._channels = 0;
+      this._frames   = 0;
     };
     var next_1ch = function(inNumSamples, instance) {
       if (!get_buffer(this, instance)) {
@@ -9848,11 +9851,11 @@ define('cc/plugins/bufio', function(require, exports, module) {
       var out = this.outputs[0];
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
@@ -9868,11 +9871,11 @@ define('cc/plugins/bufio', function(require, exports, module) {
       var out2 = this.outputs[1];
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
@@ -9888,11 +9891,11 @@ define('cc/plugins/bufio', function(require, exports, module) {
       var outputs = this.outputs;
       var phaseIn = this.inputs[1];
       var loop = this.inputs[2][0];
-      var samples   = this._samples;
-      var numFrames = this._numFrames;
-      var perform   = this._perform;
+      var samples = this._samples;
+      var frames  = this._frames;
+      var perform = this._perform;
       var phase, indices, frac;
-      var hi = numFrames - 1;
+      var hi = frames - 1;
       for (var i = 0; i < inNumSamples; ++i) {
         phase = sc_loop(this, phaseIn[i], hi, loop);
         indices = get_indices(phase, hi, loop);
@@ -10319,7 +10322,7 @@ define('cc/plugins/debug', function(require, exports, module) {
 
   var cc = require("../cc");
 
-  cc.ugen.specs.Debug = {
+  var DebugUGen = {
     $ar: {
       defaults: "in=0",
       ctor: function(_in) {
@@ -10334,6 +10337,8 @@ define('cc/plugins/debug', function(require, exports, module) {
     }
   };
   
+  cc.ugen.specs.Debug = DebugUGen;
+  
   cc.unit.specs.Debug = (function() {
     var ctor = function() {
       this.process = next;
@@ -10341,6 +10346,29 @@ define('cc/plugins/debug', function(require, exports, module) {
     var next = function() {
       this.outputs[0].set(this.inputs[0]);
       cc.global.console.log(this.outputs[0][0]);
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.DebugNaN = DebugUGen;
+  
+  cc.unit.specs.DebugNaN = (function() {
+    var ctor = function() {
+      this.process = next;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var hasNaN = false;
+      for (var i = 0; i < inNumSamples; ++i) {
+        out[i] = inIn[i];
+        if (isNaN(inIn[i])) {
+          hasNaN = true;
+        }
+      }
+      if (hasNaN) {
+        cc.global.console.log("NaN");
+      }
     };
     return ctor;
   })();
@@ -10807,8 +10835,8 @@ define('cc/plugins/delay', function(require, exports, module) {
       irdphase = iwrphase - (dsamp|0);
       if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
           out[i] = value;
           irdphase++;
           iwrphase++;
@@ -10817,8 +10845,8 @@ define('cc/plugins/delay', function(require, exports, module) {
         next_feedbk  = calcFeedback(delaytime, decaytime);
         feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
           out[i] = value;
           feedbk += feedbk_slope;
           irdphase++;
@@ -10834,8 +10862,8 @@ define('cc/plugins/delay', function(require, exports, module) {
       feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
-        value = perform(dlybuf, mask, irdphase, frac);
-        dlybuf[iwrphase & mask] = inIn[i] + feedbk * value;
+        value = perform(dlybuf, mask, irdphase, frac) || 0;
+        dlybuf[iwrphase & mask] = (inIn[i] + feedbk * value) || 0;
         out[i] = value;
         dsamp  += dsamp_slope;
         feedbk += feedbk_slope;
@@ -10921,8 +10949,8 @@ define('cc/plugins/delay', function(require, exports, module) {
       frac     = dsamp - (dsamp|0);
       if (decaytime === unit._decaytime) {
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dwr = value * feedbk + inIn[i];
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dwr =  (value * feedbk + inIn[i]) || 0;
           dlybuf[iwrphase & mask] = dwr;
           out[i] = value - feedbk * dwr;
           irdphase++;
@@ -10932,8 +10960,8 @@ define('cc/plugins/delay', function(require, exports, module) {
         next_feedbk  = calcFeedback(delaytime, decaytime);
         feedbk_slope = (next_feedbk - feedbk) * unit.rate.slopeFactor;
         for (i = 0; i < inNumSamples; ++i) {
-          value = perform(dlybuf, mask, irdphase, frac);
-          dwr = value * feedbk + inIn[i];
+          value = perform(dlybuf, mask, irdphase, frac) || 0;
+          dwr = (value * feedbk + inIn[i]) || 0;
           dlybuf[iwrphase & mask] = dwr;
           out[i] = value - feedbk * dwr;
           feedbk += feedbk_slope;
@@ -10951,8 +10979,8 @@ define('cc/plugins/delay', function(require, exports, module) {
       for (i = 0; i < inNumSamples; ++i) {
         irdphase = iwrphase - (dsamp|0);
         frac     = dsamp - (dsamp|0);
-        value = perform(dlybuf, mask, irdphase, frac);
-        dwr = value * feedbk + inIn[i];
+        value = perform(dlybuf, mask, irdphase, frac) || 0;
+        dwr = (value * feedbk + inIn[i]) || 0;
         dlybuf[iwrphase & mask] = dwr;
         out[i] = value - feedbk * dwr;
         dsamp  += dsamp_slope;
@@ -15722,7 +15750,7 @@ define('cc/plugins/osc', function(require, exports, module) {
     var buffer = instance.buffers[unit._bufnumIn[0]|0];
     if (buffer) {
       var samples = buffer.samples;
-      if (samples) {
+      if (samples.length) {
         if (unit._table === samples) {
           return true;
         }

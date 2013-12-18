@@ -132,7 +132,7 @@ define(function(require, exports, module) {
     var buffer = instance.buffers[unit._bufnumIn[0]|0];
     if (buffer) {
       var samples = buffer.samples;
-      if (samples) {
+      if (samples.length) {
         if (unit._table === samples) {
           return true;
         }
