@@ -4,6 +4,7 @@ $(function() {
   var isEdge = /extras\/edge/.test(location.href);
   
   var srcFragment  = "try:";
+  var gistFragment = "gist:";
   var $keyboard = $("#keyboard");
   
   var editor = ace.edit("editor");
@@ -124,20 +125,39 @@ $(function() {
   
   window.onhashchange = function() {
     var hash = decodeURIComponent(location.hash.replace(/^#/, ""));
-    var code;
+    var code, gistid, path;
     if (hash.indexOf(srcFragment) === 0) {
       code = hash.substr(srcFragment.length);
       editor.setValue(code);
       editor.clearSelection();
       showKeyboard(code);
+    } else if (hash.indexOf(gistFragment) === 0) {
+      gistid = hash.substr(gistFragment.length);
+      $.ajax({
+        url:"https://api.github.com/gists/" + gistid,
+        type:"GET", dataType:"jsonp"
+      }).success(function(data) {
+        data = data.data.files;
+        code = "";
+        Object.keys(data).forEach(function(key) {
+          if (data[key].language === "CoffeeScript") {
+            code += data[key].content;
+          }
+        });
+        editor.setValue(code);
+        editor.clearSelection();
+        editor.moveCursorTo(0, 0);
+        editor.moveCursorToPosition(0);
+        showKeyboard(code);
+      });
     } else if (/.+\.coffee$/.test(hash)) {
-      var path = "./examples/";
+      path = "./examples/";
       if (isEdge) {
         path = "../../examples/";
       }
       $.get(path + hash).then(function(res) {
         code = res;
-        editor.setValue(res);
+        editor.setValue(code);
         editor.clearSelection();
         editor.moveCursorTo(0, 0);
         editor.moveCursorToPosition(0);
