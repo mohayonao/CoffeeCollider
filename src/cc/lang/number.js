@@ -917,7 +917,7 @@ define(function(require, exports, module) {
     Object.keys(keys).forEach(function(key) {
       var note = keys[key];
       for (var i = 0; i <= 9; ++i) {
-        cc.global[key + i] = note + (i * 12);
+        cc.global[key + i] = note + (i+1) * 12;
       }
     });
   })();

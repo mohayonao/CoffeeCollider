@@ -159,7 +159,7 @@ define(function(require, exports, module) {
         
         actual   = f();
         expected = 100;
-        assert.deepEqual(passed, [ 0, 1 ]);
+        assert.deepEqual(passed, [ 0, 1, 2, 3 ]);
         assert.isFalse(f.performWaitState());
         assert.equal(actual, expected);
       });

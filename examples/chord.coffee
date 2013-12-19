@@ -13,16 +13,16 @@ syn = SynthDef (freqs=[0,0,0,0], trig=0)->
 
 Task ->
   score = [
-    [ F4, "M7",  0, "bpm120 l2" ]
-    [ G4, "M" ,  0, "bpm120 l2" ]
-    [ E4, "m7",  0, "bpm120 l2" ]
-    [ A4, "m" , -1, "bpm120 l2" ]
+    [ F3, "M7",  0, "bpm120 l2" ]
+    [ G3, "M" ,  0, "bpm120 l2" ]
+    [ E3, "m7",  0, "bpm120 l2" ]
+    [ A3, "m" , -1, "bpm120 l2" ]
     
-    [ F4, "M7",  0, "bpm120 l2" ]
-    [ G4, "M" ,  0, "bpm120 l2" ]
-    [ E4, "m7",  0, "bpm120 l2" ]
-    [ A4, "m" , -1, "bpm120 l4" ]
-    [ E4, "M7",  0, "bpm120 l4" ]
+    [ F3, "M7",  0, "bpm120 l2" ]
+    [ G3, "M" ,  0, "bpm120 l2" ]
+    [ E3, "m7",  0, "bpm120 l2" ]
+    [ A3, "m" , -1, "bpm120 l4" ]
+    [ E3, "M7",  0, "bpm120 l4" ]
   ]
   Pseq(score, Infinity).do syncblock ([tone, chordname, inv, dur])->
     syn.set trig:1, freqs:tone.midichord(chordname, inversion:inv, length:4).midicps()

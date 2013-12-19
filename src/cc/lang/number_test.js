@@ -1086,6 +1086,18 @@ define(function(require, exports, module) {
           });
         });
       });
+      describe("global", function() {
+        it("global.NoteNumber", function() {
+          assert.equal(cc.global.A4, 69);
+          assert.equal(cc.global.C0, 12);
+          assert.equal(cc.global.D1, 26);
+          assert.equal(cc.global.E2, 40);
+          assert.equal(cc.global.F3, 53);
+          assert.equal(cc.global.G4, 67);
+          assert.equal(cc.global.A5, 81);
+          assert.equal(cc.global.B6, 95);
+        });
+      });
     });
   });
 

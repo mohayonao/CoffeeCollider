@@ -5,6 +5,7 @@ define(function(require, exports, module) {
   
   var syncblock = function(init) {
     var func = function() {
+      syncblock_reset.call(func);
       syncblock_perform.apply(func, arguments);
       return func._result;
     };
