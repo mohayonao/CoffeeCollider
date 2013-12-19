@@ -32,14 +32,10 @@ define(function(require, exports, module) {
     if (cc.instanceOfSyncBlock(func)) {
       if (cc.currentSyncBlockHandler) {
         cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsArray(list));
-      } else {
-        list.forEach(function(x, i) {
-          func.clone().perform([x, i]);
-        });
+        return this;
       }
-    } else {
-      list.forEach(func);
     }
+    list.forEach(func);
     return this;
   });
   

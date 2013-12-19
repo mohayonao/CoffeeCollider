@@ -55,26 +55,20 @@ define(function(require, exports, module) {
     };
 
     Pattern.prototype["do"] = function(func) {
-      var i = 0, val = true;
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsPattern(this));
-        } else {
-          while (val) {
-            val = this.next();
-            if (isNotNull(val)) {
-              func.clone().perform([val, i++]);
-            }
-          }
-        }
-      } else {
-        while (val) {
-          val = this.next();
-          if (isNotNull(val)) {
-            func.clone().perform([val, i++]);
-          }
+          return this;
         }
       }
+      
+      var i = 0, val = true;
+      do {
+        val = this.next();
+        if (isNotNull(val)) {
+          func.apply(null, [val, i++]);
+        }
+      } while (val);
       return this;
     };
     

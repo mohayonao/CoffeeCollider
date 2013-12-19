@@ -29,12 +29,10 @@ define(function(require, exports, module) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
-        } else {
-          func.clone().perform(flag);
+          return this;
         }
-      } else {
-        func(flag);
       }
+      func(flag);
     }
     return this;
   });

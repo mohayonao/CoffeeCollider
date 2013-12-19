@@ -33,15 +33,11 @@ define(function(require, exports, module) {
         if (n > 0) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
         }
-      } else {
-        for (i = 0; i < n; ++i) {
-          func.clone().perform(i);
-        }
+        return this;
       }
-    } else {
-      for (i = 0; i < n; ++i) {
-        func(i);
-      }
+    }
+    for (i = 0; i < n; ++i) {
+      func(i);
     }
     return this;
   });
