@@ -1,4 +1,4 @@
-# CoffeeCollider [![Build Status](https://travis-ci.org/mohayonao/CoffeeCollider.png?branch=master)](https://travis-ci.org/mohayonao/CoffeeCollider) [![Dependency Status](https://david-dm.org/mohayonao/CoffeeCollider.png)](https://david-dm.org/mohayonao/CoffeeCollider) [![Coverage Status](https://coveralls.io/repos/mohayonao/CoffeeCollider/badge.png?branch=master)](https://coveralls.io/r/mohayonao/CoffeeCollider?branch=master)
+# CoffeeCollider [![Build Status](https://travis-ci.org/mohayonao/CoffeeCollider.png?branch=master)](https://travis-ci.org/mohayonao/CoffeeCollider) [![Coverage Status](https://coveralls.io/repos/mohayonao/CoffeeCollider/badge.png?branch=master)](https://coveralls.io/r/mohayonao/CoffeeCollider?branch=master) [![Dependency Status](https://david-dm.org/mohayonao/CoffeeCollider.png)](https://david-dm.org/mohayonao/CoffeeCollider)
 
 CoffeeCollider is a language for real time audio synthesis and algorithmic composition in HTML5. The concept of this project is designed as "write CoffeeScript, and be processed as SuperCollider."
 

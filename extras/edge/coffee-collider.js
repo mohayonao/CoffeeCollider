@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.2+20131219195000",
+    version: "0.2.3+20131220073200",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -2556,14 +2556,10 @@ define('cc/lang/array', function(require, exports, module) {
     if (cc.instanceOfSyncBlock(func)) {
       if (cc.currentSyncBlockHandler) {
         cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsArray(list));
-      } else {
-        list.forEach(function(x, i) {
-          func.clone().perform([x, i]);
-        });
+        return this;
       }
-    } else {
-      list.forEach(func);
     }
+    list.forEach(func);
     return this;
   });
   
@@ -3743,12 +3739,10 @@ define('cc/lang/boolean', function(require, exports, module) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
-        } else {
-          func.clone().perform(flag);
+          return this;
         }
-      } else {
-        func(flag);
       }
+      func(flag);
     }
     return this;
   });
@@ -4172,12 +4166,10 @@ define('cc/lang/date', function(require, exports, module) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
-        } else {
-          func.clone().perform(flag);
+          return this;
         }
-      } else {
-        func(flag);
       }
+      func(flag);
     }
     return this;
   });
@@ -4961,15 +4953,11 @@ define('cc/lang/number', function(require, exports, module) {
         if (n > 0) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(0, n - 1, 1));
         }
-      } else {
-        for (i = 0; i < n; ++i) {
-          func.clone().perform(i);
-        }
+        return this;
       }
-    } else {
-      for (i = 0; i < n; ++i) {
-        func(i);
-      }
+    }
+    for (i = 0; i < n; ++i) {
+      func(i);
     }
     return this;
   });
@@ -5938,26 +5926,20 @@ define('cc/lang/pattern', function(require, exports, module) {
     };
 
     Pattern.prototype["do"] = function(func) {
-      var i = 0, val = true;
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
           cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsPattern(this));
-        } else {
-          while (val) {
-            val = this.next();
-            if (isNotNull(val)) {
-              func.clone().perform([val, i++]);
-            }
-          }
-        }
-      } else {
-        while (val) {
-          val = this.next();
-          if (isNotNull(val)) {
-            func.clone().perform([val, i++]);
-          }
+          return this;
         }
       }
+      
+      var i = 0, val = true;
+      do {
+        val = this.next();
+        if (isNotNull(val)) {
+          func.apply(null, [val, i++]);
+        }
+      } while (val);
       return this;
     };
     
