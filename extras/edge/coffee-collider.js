@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.1+20131218230000",
+    version: "0.2.2+20131219195000",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -5845,7 +5845,7 @@ define('cc/lang/number', function(require, exports, module) {
     Object.keys(keys).forEach(function(key) {
       var note = keys[key];
       for (var i = 0; i <= 9; ++i) {
-        cc.global[key + i] = note + (i * 12);
+        cc.global[key + i] = note + (i+1) * 12;
       }
     });
   })();
@@ -7439,6 +7439,7 @@ define('cc/lang/syncblock', function(require, exports, module) {
   
   var syncblock = function(init) {
     var func = function() {
+      syncblock_reset.call(func);
       syncblock_perform.apply(func, arguments);
       return func._result;
     };
