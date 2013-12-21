@@ -83,10 +83,10 @@ define(function(require, exports, module) {
     };
     var processN = function(bufLength) {
       var list = this.list;
-      var busOut    = this.busOut;
-      var busOutLen = this.busOutLen;
+      var busOut    = cc.server.busOut;
+      var busOutLen = cc.server.busOutLen;
       var instance;
-      busOut.set(this.busClear);
+      busOut.set(cc.server.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
         instance = list[i];
         instance.process(bufLength);

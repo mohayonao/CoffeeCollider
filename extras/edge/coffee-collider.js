@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.3+20131221210600",
+    version: "0.2.3+20131221212100",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -21538,10 +21538,10 @@ define('cc/server/server-socket', function(require, exports, module) {
     };
     var processN = function(bufLength) {
       var list = this.list;
-      var busOut    = this.busOut;
-      var busOutLen = this.busOutLen;
+      var busOut    = cc.server.busOut;
+      var busOutLen = cc.server.busOutLen;
       var instance;
-      busOut.set(this.busClear);
+      busOut.set(cc.server.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
         instance = list[i];
         instance.process(bufLength);
