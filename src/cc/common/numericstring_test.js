@@ -19,8 +19,9 @@ define(function(require, exports, module) {
       assert.isNull(numericstring.hz("hz"));
     });
     it("ms", function() {
-      assert.equal(numericstring.time("50ms")   , 50/1000);
-      assert.equal(numericstring.time("50.5m"), 50.5/1000);
+      assert.equal(numericstring.time("50ms")    , 50/1000);
+      assert.equal(numericstring.time("50.5m")   , 50.5/1000);
+      assert.equal(numericstring.time("50.5msec"), 50.5/1000);
       assert.isNull(numericstring.time("ms"));
     });
     it("sec", function() {
@@ -34,12 +35,19 @@ define(function(require, exports, module) {
       assert.isNull(numericstring.time("min"));
     });
     it("hhmmss", function() {
-      assert.equal(numericstring.hhmmss("1:00"), 60);
+      assert.equal(numericstring.hhmmss("1:2:3.4"), (1 * 3600) + (2 * 60) + 3 + 0.4);
+      assert.equal(numericstring.hhmmss("1:2:3")  , (1 * 3600) + (2 * 60) + 3);
+      assert.equal(numericstring.hhmmss("1:02")   , (1 * 60) + 2);
+      assert.equal(numericstring.hhmmss("61:02")  , (61 * 60) + 2);
+      
+      assert.equal(numericstring.hhmmss("1:00")    , 60);
       assert.equal(numericstring.hhmmss("1:02.3"  ), 62.3);
       assert.equal(numericstring.hhmmss("1:02.345"), 62.345);
-      assert.equal(numericstring.hhmmss("1:02:03"), 3723);
-      assert.isNull(numericstring.hhmmss("65:43"));
-      assert.isNull(numericstring.hhmmss("1.234"));
+      assert.equal(numericstring.hhmmss("1:02:03") , 3723);
+      assert.equal(numericstring.hhmmss("1.234")   , 1.234);
+      assert.equal(numericstring.hhmmss("1234")    , 1234);
+      
+      assert.equal(numericstring.hhmmss("0:00:00.500"), 0.5);
     });
     it("samples", function() {
       assert.equal(numericstring.samples("1000samples"), 1000 / cc.sampleRate);
@@ -50,6 +58,7 @@ define(function(require, exports, module) {
       assert.equal(numericstring.note("bpm140 l8"), calcNote(140, 8, 0));
       assert.equal(numericstring.note("bpm100 l16.."), calcNote(100, 16, 2));
       assert.equal(numericstring.note("bpm100.5 L16"), calcNote(100.5, 16, 0));
+      assert.equal(numericstring.note("bpm100 l16....."), calcNote(100, 16, 5));
       assert.isNull(numericstring.note("bpm100.5"));
     });
     it("beat", function() {
@@ -63,6 +72,8 @@ define(function(require, exports, module) {
       assert.isNull(numericstring.ticks("bpm150.5"));
     });
     it("timevalue", function() {
+      assert.equal(numericstring.timevalue("str")     , "str");
+      
       assert.equal(numericstring.timevalue("50hz")    , 1/50);
       assert.equal(numericstring.timevalue("50.5hz")  , 1/50.5);
       assert.equal(numericstring.timevalue("50ms")    , 50/1000);
@@ -86,6 +97,8 @@ define(function(require, exports, module) {
       assert.equal(numericstring.timevalue("bpm150.5 120ticks"), calcTicks(150.5, 120));
     });
     it("timevalue (freq)", function() {
+      assert.equal(numericstring.timevalue("~0hz")     , 0);
+      
       assert.equal(numericstring.timevalue("~50hz")    , 1/(1/50));
       assert.equal(numericstring.timevalue("~50.5hz")  , 1/(1/50.5));
       assert.equal(numericstring.timevalue("~50ms")    , 1/(50/1000));
@@ -109,6 +122,8 @@ define(function(require, exports, module) {
       assert.equal(numericstring.timevalue("~bpm150.5 120ticks"), 1/calcTicks(150.5, 120));
     });
     it("notevalue", function() {
+      assert.equal(numericstring.notevalue("str"), "str");
+      
       assert.equal(numericstring.notevalue("A4"), 69);
       assert.equal(numericstring.notevalue("C0"), 12);
       assert.equal(numericstring.notevalue("D1"), 26);

@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.3+20131220073200",
+    version: "0.2.3+20131221210600",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -2022,9 +2022,7 @@ define('cc/common/numericstring', function(require, exports, module) {
       if (!freq) {
         return result;
       }
-      if (result !== 0) {
-        return 1 / result;
-      }
+      return result === 0 ? 0 : 1 / result;
     }
     return str;
   };
@@ -2037,21 +2035,24 @@ define('cc/common/numericstring', function(require, exports, module) {
     return null;
   };
   var time = function(str) {
-    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
+    var m = /^(\d+(?:\.\d+)?)(min|sec|m|msec)s?$/i.exec(str);
     if (m) {
       switch (m[2]) {
-      case "min": return +(m[1]||0) * 60;
-      case "sec": return +(m[1]||0);
-      case "m"  : return +(m[1]||0) / 1000;
+      case "min" : return (+m[1]) * 60;
+      case "sec" : return (+m[1]);
+      case "msec": case "m": return (+m[1]) / 1000;
       }
     }
     return null;
   };
 
   var hhmmss = function(str) {
-    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
+    var x = 0, m = /^(?:([1-9]?[0-9]*):)?(?:([0-9]*):)?([0-9]+)(?:\.(\d{1,3}))?$/.exec(str);
     if (m) {
-      var x = 0;
+      if (m[1] !== undefined && m[2] === undefined) {
+        m[2] = m[1];
+        m[1] = 0;
+      }
       x += (m[1]|0) * 3600;
       x += (m[2]|0) * 60;
       x += (m[3]|0);
@@ -2071,7 +2072,15 @@ define('cc/common/numericstring', function(require, exports, module) {
 
   var calcNote = function(bpm, len, dot) {
     var x = (60 / bpm) * (4 / len);
-    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
+    var mul = 1;
+    if (0 <= dot && dot <= 3) {
+      x *= [1, 1.5, 1.75, 1.875][dot];
+    } else {
+      for (var i = 1; i < dot; ++i) {
+        mul += Math.pow(0.5, i);
+      }
+      x *= mul;
+    }
     return x;
   };
   var note = function(str) {
@@ -2106,7 +2115,7 @@ define('cc/common/numericstring', function(require, exports, module) {
   };
   
   var notevalue = function(str) {
-    var m = /^([CDEFGAB])([-+#b])?(\d)$/.exec(str);
+    var m = /^([A-Ga-g])([-+#b])?(\d)$/.exec(str);
     if (m) {
       var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[3] * 12) + 12;
       var acc = m[2];
