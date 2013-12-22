@@ -67,6 +67,7 @@ define(function(require, exports, module) {
       cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
+      cc.resetMessage();
       this.taskManager.reset();
       this.sendToServer(msg);
     };

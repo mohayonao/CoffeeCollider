@@ -18,6 +18,10 @@ define(function(require, exports, module) {
     return cc.global.Message;
   };
   
+  cc.resetMessage = function() {
+    cc.global.Message.off();
+  };
+  
   module.exports = {};
 
 });

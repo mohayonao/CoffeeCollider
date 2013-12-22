@@ -780,6 +780,12 @@ define(function(require, exports, module) {
   mock.resetBuiltin.$beforeEach = function() {
     mock.resetBuiltin.result = null;
   };
+  mock.resetMessage = function() {
+    mock.resetMessage.result = true;
+  };
+  mock.resetMessage.$beforeEach = function() {
+    mock.resetMessage.result = null;
+  };
   
   module.exports = {
     Random: Random,
