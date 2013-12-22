@@ -6,6 +6,9 @@ define(function(require, exports, module) {
       if (!data) {
         return data;
       }
+      if (typeof data === "function") {
+        return { klassName:"Function" };
+      }
       if (stack.indexOf(data) !== -1) {
         return { klassName:"Circular" };
       }
@@ -43,9 +46,6 @@ define(function(require, exports, module) {
   var unpack = (function() {
     var _unpack = function(data) {
       if (!data) {
-        return data;
-      }
-      if (typeof data === "string") {
         return data;
       }
       var result;
