@@ -47,12 +47,12 @@ button {
   top  : 40px;
   right: 225px;
 }
-#link {
+#clear {
   position: absolute;
   top  : 75px;
   right: 225px;
 }
-#compile {
+#link {
   position: absolute;
   top  : 110px;
   right: 225px;
@@ -152,4 +152,9 @@ ul li a {
   height: 80px;
   border: solid 1px #2c3e50;
   display: none;
+}
+
+@-webkit-keyframes blink {
+    5% { background-color: #a0d8ef; }
+  100% { background-color: #ffffff; }
 }
