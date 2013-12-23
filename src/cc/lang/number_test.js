@@ -68,7 +68,41 @@ define(function(require, exports, module) {
           });
           expected = 10;
           assert.equal(actual, expected);
-          assert.equal(x, 4545);
+          assert.equal(x, (0+1+2+3+4+5+6+7+8+9) + (0+1+2+3+4+5+6+7+8+9)*100);
+        });
+        it("forBy", function() {
+          var x = 0;
+          actual   = (1).forBy(11, 2, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+3+5+7+9+11) + (0+1+2+3+4+5)*100);
+          
+          x = 0;
+          actual   = (1).forBy(-11, -2, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+-1+-3+-5+-7+-9+-11) + (0+1+2+3+4+5+6)*100);
+          
+          x = 0;
+          actual   = (1).forBy(11, 0, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, 0);
+        });
+        it("forSeries", function() {
+          var x = 0;
+          actual   = (1).forSeries(3, 11, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+3+5+7+9+11) + (0+1+2+3+4+5)*100);
         });
         it("asUGenInput", function() {
           actual   = (1).asUGenInput();

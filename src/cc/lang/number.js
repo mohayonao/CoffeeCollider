@@ -4,6 +4,7 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var ops = require("../common/ops");
+  var utils = require("./utils");
   
   var drand = function() {
     return cc.lang.random.next();
@@ -48,6 +49,34 @@ define(function(require, exports, module) {
       func(i, i);
     }
     return this;
+  });
+
+  fn.defineProperty(Number.prototype, "forBy", function(endValue, stepValue, func) {
+    var i = 0, x = this;
+    endValue  = utils.asNumber(endValue );
+    stepValue = utils.asNumber(stepValue);
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(x, endValue, stepValue));
+        return this;
+      }
+    }
+    if (stepValue < 0) {
+      for (i = 0; x >= endValue; i++) {
+        func(x, i);
+        x += stepValue;
+      }
+    } else if (stepValue > 0) {
+      for (i = 0; x <= endValue; i++) {
+        func(x, i);
+        x += stepValue;
+      }
+    }
+    return this;
+  });
+
+  fn.defineProperty(Number.prototype, "forSeries", function(second, last, func) {
+    return this.forBy(last, (utils.asNumber(second) - this), func);
   });
   
   fn.defineProperty(Number.prototype, "wait", function() {
