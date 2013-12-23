@@ -24,7 +24,7 @@ $ ->
   
   run = (code, append)->
     cc.run code, append, (res)-> console.log res if res
-      
+    
   changeFavicon = (mode)->
     path = if isEdgeVer then '..' else './extras'
     $('#favicon').attr href: "#{path}/img/#{mode}.gif"
@@ -73,12 +73,7 @@ $ ->
 
   $('#link').on 'click', ->
     window.location = "##{srcFragment}#{encodeURIComponent(editor.getValue())}"
-    
-  $('a', '#example-list').each (i, a)->
-    $(a).on 'click', ->
-      window.location = "##{$(@).attr('data-path')}"
-      false
-    
+      
   $('#version').text cc.version
   
   

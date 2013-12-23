@@ -96,12 +96,6 @@
     $('#link').on('click', function() {
       return window.location = "#" + srcFragment + (encodeURIComponent(editor.getValue()));
     });
-    $('a', '#example-list').each(function(i, a) {
-      return $(a).on('click', function() {
-        window.location = "#" + ($(this).attr('data-path'));
-        return false;
-      });
-    });
     $('#version').text(cc.version);
     srcFragment = 'try:';
     gistFragment = 'gist:';

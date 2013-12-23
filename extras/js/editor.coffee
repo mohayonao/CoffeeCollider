@@ -16,10 +16,11 @@ window.Editor = class Editor
     @editor = ace.edit id
     @editor.setTheme 'ace/theme/github'
     @editor.setPrintMarginColumn -1
-    @editor.getSession().setTabSize 2
     @editor.setSelectionStyle 'text'
-    @setLangType 'coffee'
-
+    @editor.session.setTabSize 2
+    @editor.session.setUseWrapMode true
+    @editor.session.setMode 'ace/mode/coffee'
+    
     @editor.commands.addCommand
       bindKey: mac:'Command+Enter', win:'Alt+Enter'
       name: 'run', exec: => @_callback['run']?()
@@ -38,27 +39,54 @@ window.Editor = class Editor
   clear: ->
     @editor.setValue ''
     
-  setSourceCode: (code, lang='coffee')->
+  setSourceCode: (code)->
     @editor.setValue code
     @editor.clearSelection()
     @editor.moveCursorTo 0, 0
-    @editor.moveCursorToPosition 0
-    @setLangType lang
       
-  setLangType: (lang)->
-    @editor.getSession().setMode "ace/mode/#{lang}"
-  
   getSmartRegion: ->
     session = @editor.session
     range   = @editor.getSelectionRange()
     if range.isEmpty()
-      @editor.getSelection().setSelectionRange(
-        new Range(range.start.row, 0, range.start.row, Infinity)
-      )
+      [begin, end] = @findRange session, range.start.row
+      if begin isnt null
+        @editor.getSelection().setSelectionRange(
+          new Range(begin, 0, end, Infinity)
+        )
     @blink '.ace_marker-layer .ace_selection', =>
       @editor.getSelection().setSelectionRange range
     session.getTextRange @editor.getSelectionRange()
 
+  findRange: (session, begin)->
+    lookAt = begin
+    end    = begin
+    last   = session.getLength()
+    depth  = 0
+    loop
+      line = session.getLine lookAt
+      for i in [0...line.length]
+        switch line.charAt(i)
+          when "(", "[", "{" then depth += 1
+          when "}", "]", ")" then depth -= 1
+      if depth is 0
+        code = session.getLines(begin, end).join '\n'
+        break
+      else if depth < 0
+        begin -= 1
+        if begin < 0 then break
+        lookAt = begin
+      else
+        end += 1
+        if end > last then break
+        lookAt = end
+    if code
+      try
+        CoffeeScript.tokens code
+        return [ begin, end ]
+      catch e
+        console.log e.toString()
+    [ null, null ]
+  
   blink: (selector, callback)->
     rule = getCssRule selector
     if rule

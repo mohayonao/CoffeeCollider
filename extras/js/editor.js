@@ -29,9 +29,10 @@
       this.editor = ace.edit(id);
       this.editor.setTheme('ace/theme/github');
       this.editor.setPrintMarginColumn(-1);
-      this.editor.getSession().setTabSize(2);
       this.editor.setSelectionStyle('text');
-      this.setLangType('coffee');
+      this.editor.session.setTabSize(2);
+      this.editor.session.setUseWrapMode(true);
+      this.editor.session.setMode('ace/mode/coffee');
       this.editor.commands.addCommand({
         bindKey: {
           mac: 'Command+Enter',
@@ -69,33 +70,77 @@
       return this.editor.setValue('');
     };
 
-    Editor.prototype.setSourceCode = function(code, lang) {
-      if (lang == null) {
-        lang = 'coffee';
-      }
+    Editor.prototype.setSourceCode = function(code) {
       this.editor.setValue(code);
       this.editor.clearSelection();
-      this.editor.moveCursorTo(0, 0);
-      this.editor.moveCursorToPosition(0);
-      return this.setLangType(lang);
-    };
-
-    Editor.prototype.setLangType = function(lang) {
-      return this.editor.getSession().setMode("ace/mode/" + lang);
+      return this.editor.moveCursorTo(0, 0);
     };
 
     Editor.prototype.getSmartRegion = function() {
-      var range, session,
+      var begin, end, range, session, _ref,
         _this = this;
       session = this.editor.session;
       range = this.editor.getSelectionRange();
       if (range.isEmpty()) {
-        this.editor.getSelection().setSelectionRange(new Range(range.start.row, 0, range.start.row, Infinity));
+        _ref = this.findRange(session, range.start.row), begin = _ref[0], end = _ref[1];
+        if (begin !== null) {
+          this.editor.getSelection().setSelectionRange(new Range(begin, 0, end, Infinity));
+        }
       }
       this.blink('.ace_marker-layer .ace_selection', function() {
         return _this.editor.getSelection().setSelectionRange(range);
       });
       return session.getTextRange(this.editor.getSelectionRange());
+    };
+
+    Editor.prototype.findRange = function(session, begin) {
+      var code, depth, e, end, i, last, line, lookAt, _i, _ref;
+      lookAt = begin;
+      end = begin;
+      last = session.getLength();
+      depth = 0;
+      while (true) {
+        line = session.getLine(lookAt);
+        for (i = _i = 0, _ref = line.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+          switch (line.charAt(i)) {
+            case "(":
+            case "[":
+            case "{":
+              depth += 1;
+              break;
+            case "}":
+            case "]":
+            case ")":
+              depth -= 1;
+          }
+        }
+        if (depth === 0) {
+          code = session.getLines(begin, end).join('\n');
+          break;
+        } else if (depth < 0) {
+          begin -= 1;
+          if (begin < 0) {
+            break;
+          }
+          lookAt = begin;
+        } else {
+          end += 1;
+          if (end > last) {
+            break;
+          }
+          lookAt = end;
+        }
+      }
+      if (code) {
+        try {
+          CoffeeScript.tokens(code);
+          return [begin, end];
+        } catch (_error) {
+          e = _error;
+          console.log(e.toString());
+        }
+      }
+      return [null, null];
     };
 
     Editor.prototype.blink = function(selector, callback) {
