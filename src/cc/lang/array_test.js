@@ -19,6 +19,7 @@ define(function(require, exports, module) {
     testTools.mock("createBinaryOpUGen", function(selector, a, b) {
       return [selector, a, b];
     });
+    testTools.mock("instanceOfSyncBlock");
     describe("class methods", function() {
       it("series", function() {
         actual   = Array.series(10);
@@ -203,6 +204,28 @@ define(function(require, exports, module) {
           actual   = [ 1, 2, 3 ].dup(5);
           expected = [ [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ], [ 1, 2, 3 ] ];
           assert.deepEqual(actual, expected);
+        });
+        it("value", function() {
+          var list = [ 1, 2, 3 ];
+          actual   = list.value();
+          expected = list;
+          assert.equal(list, actual);
+        });
+        it("valueArray", function() {
+          var list = [ 1, 2, 3 ];
+          actual   = list.valueArray();
+          expected = list;
+          assert.equal(list, actual);
+        });
+        it("do", function() {
+          var list = [ 1, 2, 3 ];
+          var x = 0;
+          actual = list.do(function(a) {
+            x += a;
+          });
+          expected = list;
+          assert.equal(actual, expected);
+          assert.equal(x, 6);
         });
         it("asUGenInput", function() {
           actual   = [ 1, 2, 3 ].asUGenInput();

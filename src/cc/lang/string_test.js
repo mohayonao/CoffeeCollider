@@ -41,6 +41,16 @@ define(function(require, exports, module) {
           expected = [ "s", "s", "s", "s", "s" ];
           assert.deepEqual(actual, expected);
         });
+        it("value", function() {
+          actual   = "s".value();
+          expected = "s";
+          assert.equal(actual, expected);
+        });
+        it("valueArray", function() {
+          actual   = "s".valueArray();
+          expected = "s";
+          assert.equal(actual, expected);
+        });
         it("asUGenInput", function() {
           assert.throw(function() {
             "s".asUGenInput();

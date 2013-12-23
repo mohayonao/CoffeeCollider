@@ -16,7 +16,26 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
+  
+  fn.defineProperty(cc.Object.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(cc.Object.prototype, "valueArray", function() {
+    return this;
+  });
+  
+  fn.defineProperty(cc.Object.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(this));
+        return this;
+      }
+    }
+    func(this, 0);
+    return this;
+  });
+  
   fn.defineProperty(cc.Object.prototype, "asUGenInput", function() {
     throw new Error(this.klassName + " can't cast to a UGen.");
   });

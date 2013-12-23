@@ -17,6 +17,7 @@ define(function(require, exports, module) {
     testTools.mock("instanceOfUGen", function() {
       return false;
     });
+    testTools.mock("instanceOfSyncBlock");
     
     describe("class methods", function() {
     });
@@ -44,6 +45,25 @@ define(function(require, exports, module) {
           actual   = d.dup(5);
           expected = [ d, d, d, d, d ];
           assert.deepEqual(actual, expected);
+        });
+        it("value", function() {
+          assert.equal(d.value(), d);
+        });
+        it("valueArray", function() {
+          assert.equal(d.valueArray(), d);
+        });
+        it("do", function() {
+          var x = 0;
+          actual = d.do(function() {
+            x = 1;
+          });
+          expected = d;
+          assert.equal(actual, expected);
+          assert.equal(x, 1);
+          
+          new Date(Date.now() + 10000).do(function() {
+            throw "should not be called";
+          });
         });
         it("asUGenInput", function() {
           assert.throws(function() {

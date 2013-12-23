@@ -26,6 +26,14 @@ define(function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Number.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Number.prototype, "do", function(func) {
     var i, n = this;
     if (cc.instanceOfSyncBlock(func)) {
@@ -37,7 +45,7 @@ define(function(require, exports, module) {
       }
     }
     for (i = 0; i < n; ++i) {
-      func(i);
+      func(i, i);
     }
     return this;
   });

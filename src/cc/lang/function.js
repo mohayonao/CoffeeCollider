@@ -33,8 +33,23 @@ define(function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
-  fn.defineProperty(Function.prototype, "do", function() {
-    throw "not implemented";
+  fn.defineProperty(Function.prototype, "value", function() {
+    return this.apply(null, arguments);
+  });
+
+  fn.defineProperty(Function.prototype, "valueArray", function(args) {
+    return this.apply(null, utils.asArray(args));
+  });
+  
+  fn.defineProperty(Function.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(true));
+        return this;
+      }
+    }
+    func(this, 0);
+    return this;
   });
   
   fn.defineProperty(Function.prototype, "wait", function() {
