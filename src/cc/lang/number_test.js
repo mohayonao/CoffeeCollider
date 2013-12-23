@@ -17,6 +17,7 @@ define(function(require, exports, module) {
     testTools.mock("instanceOfUGen", function() {
       return false;
     });
+    testTools.mock("instanceOfSyncBlock");
     
     describe("class methods", function() {
     });
@@ -49,6 +50,59 @@ define(function(require, exports, module) {
           actual   = (10).dup(5);
           expected = [ 10, 10, 10, 10, 10 ];
           assert.deepEqual(actual, expected);
+        });
+        it("value", function() {
+          actual   = (10).value();
+          expected = 10;
+          assert.equal(actual, expected);
+        });
+        it("valueArray", function() {
+          actual   = (10).valueArray();
+          expected = 10;
+          assert.equal(actual, expected);
+        });
+        it("do", function() {
+          var x = 0;
+          actual   = (10).do(function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 10;
+          assert.equal(actual, expected);
+          assert.equal(x, (0+1+2+3+4+5+6+7+8+9) + (0+1+2+3+4+5+6+7+8+9)*100);
+        });
+        it("forBy", function() {
+          var x = 0;
+          actual   = (1).forBy(11, 2, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+3+5+7+9+11) + (0+1+2+3+4+5)*100);
+          
+          x = 0;
+          actual   = (1).forBy(-11, -2, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+-1+-3+-5+-7+-9+-11) + (0+1+2+3+4+5+6)*100);
+          
+          x = 0;
+          actual   = (1).forBy(11, 0, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, 0);
+        });
+        it("forSeries", function() {
+          var x = 0;
+          actual   = (1).forSeries(3, 11, function(a, b) {
+            x += a + b * 100;
+          });
+          expected = 1;
+          assert.equal(actual, expected);
+          assert.equal(x, (1+3+5+7+9+11) + (0+1+2+3+4+5)*100);
         });
         it("asUGenInput", function() {
           actual   = (1).asUGenInput();

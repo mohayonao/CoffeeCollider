@@ -567,11 +567,8 @@ define(function(require, exports, module) {
   cc.createTaskArgumentsArray = function(list, reversed) {
     return new TaskArgumentsArray(list, !!reversed);
   };
-  cc.createTaskArgumentsFunction = function(func) {
-    return new TaskArgumentsFunction(func);
-  };
-  cc.createTaskArgumentsBoolean = function(flag) {
-    return new TaskArgumentsArray([flag]);
+  cc.createTaskArgumentsOnce = function(item) {
+    return new TaskArgumentsArray([item]);
   };
   cc.createTaskArgumentsPattern = function(p) {
     return new TaskArgumentsPattern(p);

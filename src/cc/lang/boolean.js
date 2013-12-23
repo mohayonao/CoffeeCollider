@@ -23,16 +23,23 @@ define(function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Boolean.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Boolean.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Boolean.prototype, "do", function(func) {
-    var flag = this;
-    if (flag) {
+    if (this) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
-          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(this));
           return this;
         }
       }
-      func(flag);
+      func(this, 0);
     }
     return this;
   });

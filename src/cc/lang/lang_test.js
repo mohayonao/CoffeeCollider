@@ -13,6 +13,7 @@ define(function(require, exports, module) {
     testTools.mock("resetBuffer");
     testTools.mock("resetNode");
     testTools.mock("resetBuiltin");
+    testTools.mock("resetMessage");
     testTools.mock("createTaskManager");
     
     describe("SynthLang", function() {
@@ -61,6 +62,7 @@ define(function(require, exports, module) {
           assert.isTrue(cc.resetBuffer .result);
           assert.isTrue(cc.resetNode   .result);
           assert.isTrue(cc.resetBuiltin.result);
+          assert.isTrue(cc.resetMessage.result);
           assert.deepEqual(cc.createTaskManager.called, ["reset"]);
           assert.deepEqual(sendToServer, ["/reset"]);
         });

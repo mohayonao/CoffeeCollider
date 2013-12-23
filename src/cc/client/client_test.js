@@ -2,6 +2,7 @@ define(function(require, exports, module) {
   "use strict";
 
   var assert = require("chai").assert;
+  var testTools = require("../../testTools");
 
   var cc = require("../cc");
   var client = require("./client");
@@ -33,13 +34,6 @@ define(function(require, exports, module) {
           sampleRate:8000, channels:2, strmLength:1024,
           init:nop, play:nop, pause:nop,
         };
-      };
-      cc.createXMLHttpRequest = function() {
-        var xhr = { open:nop, readyState:4, status:200, response:"xhr" };
-        xhr.send = function() {
-          setTimeout(function() { xhr.onreadystatechange(); }, 10);
-        };
-        return xhr;
       };
     });
     after(function() {
@@ -76,9 +70,17 @@ define(function(require, exports, module) {
             pause: function() { mock.pause.result = [].slice.apply(arguments); },
             reset: function() { mock.reset.result = [].slice.apply(arguments); },
             execute: function() { mock.execute.result = [].slice.apply(arguments); },
+            run    : function() { mock.run    .result = [].slice.apply(arguments); },
             compile: function() { mock.compile.result = [].slice.apply(arguments); return "compile"; },
             getStream: function() { mock.getStream.result = [].slice.apply(arguments); return "getStream"; },
             getWebAudioComponents: function() { mock.getWebAudioComponents.result = [].slice.apply(arguments); return "getWebAudioComponents"; },
+            load: function() { mock.load.result = [].slice.apply(arguments); },
+            send: function() { mock.send.result = [].slice.apply(arguments); },
+            getListeners: function() { mock.getListeners.result = [].slice.apply(arguments); return "getListeners"; },
+            hasListeners: function() { mock.hasListeners.result = [].slice.apply(arguments); return "hasListeners"; },
+            on  : function() { mock.on  .result = [].slice.apply(arguments); },
+            once: function() { mock.once.result = [].slice.apply(arguments); },
+            off : function() { mock.off .result = [].slice.apply(arguments); },
           };
           instance = cc.createSynthClient();
           instance.impl = mock;
@@ -107,6 +109,12 @@ define(function(require, exports, module) {
           assert.equal(actual, expected);
           assert.deepEqual(mock.execute.result, [1, 2]);
         });
+        it("#run", function() {
+          actual   = instance.run(1, 2);
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.run.result, [1, 2]);
+        });
         it("#compile", function() {
           actual   = instance.compile(1, 2);
           expected = "compile";
@@ -124,6 +132,54 @@ define(function(require, exports, module) {
           expected = "getWebAudioComponents";
           assert.equal(actual, expected);
           assert.deepEqual(mock.getWebAudioComponents.result, [1, 2]);
+        });
+        it("#load", function() {
+          actual   = instance.load("filepath", "callback");
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.load.result, ["filepath", "callback"]);
+        });
+        it("#send", function() {
+          actual   = instance.send("message", {value:100});
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.send.result, ["message", {value:100}]);
+        });
+        it("#isPlaying", function() {
+          instance.impl.isPlaying = true;
+          actual   = instance.isPlaying();
+          expected = true;
+          assert.equal(actual, expected);
+        });
+        it("#getListeners", function() {
+          actual   = instance.getListeners(1, 2);
+          expected = "getListeners";
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.getListeners.result, [1, 2]);
+        });
+        it("#hasListeners", function() {
+          actual   = instance.hasListeners(1, 2);
+          expected = "hasListeners";
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.hasListeners.result, [1, 2]);
+        });
+        it("#on", function() {
+          actual   = instance.on("event", "callback");
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.on.result, ["event", "callback"]);
+        });
+        it("#once", function() {
+          actual   = instance.once("event", "callback");
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.once.result, ["event", "callback"]);
+        });
+        it("#off", function() {
+          actual   = instance.off("event", "callback");
+          expected = instance;
+          assert.equal(actual, expected);
+          assert.deepEqual(mock.off.result, ["event", "callback"]);
         });
       });
     });
@@ -217,6 +273,21 @@ define(function(require, exports, module) {
           }, Error);
         });
       });
+      it("#run", function() {
+        instance.pendingExecution = null; // ready
+        instance.run("code1");
+        assert.deepEqual(posted, [
+          ["/play"],
+          ["/execute", 0, "code1.coffee", false, false]
+        ]);
+        
+        instance.run("code2");
+        assert.deepEqual(posted, [
+          ["/play"],
+          ["/execute", 0, "code1.coffee", false, false],
+          ["/execute", 1, "code2.coffee", false, false]
+        ]);
+      });
       describe("#compile", function() {
         it("basis", function() {
           actual   = instance.compile("code");
@@ -269,6 +340,77 @@ define(function(require, exports, module) {
         expected = [ "context", "jsNode" ];
         assert.deepEqual(actual, expected);
       });
+      describe("#load", function() {
+        var saved_opmode, xhr;
+        var xhrStatus = 200;
+        testTools.mock("createXMLHttpRequest", function() {
+          var response = "";
+          xhr = {};
+          xhr.open = function(method, payload) {
+            response = payload;
+          };
+          xhr.send = function() {
+            xhr.response   = response;
+            xhr.readyState = 1;
+            xhr.onreadystatechange();
+            
+            xhr.readyState = 4;
+            xhr.status     = xhrStatus;
+            xhr.onreadystatechange();
+          };
+          return xhr;
+        });
+        before(function() {
+          saved_opmode = cc.opmode;
+        });
+        after(function() {
+          cc.opmode = saved_opmode;
+        });
+        it("nodejs", function(done) {
+          var code;
+          cc.opmode = "nodejs";
+          instance.load(__dirname + "/client_test.js", function(result) {
+            assert.isString(result);
+            code = result;
+          });
+          instance.load([__dirname + "/client_test.js"], function(result) {
+            assert.deepEqual([code], result);
+          });
+          instance.load(__dirname + "/not-exists", function(result) {
+            assert.isNull(result);
+            done();
+          });
+        });
+        it("worker", function(done) {
+          var code;
+          cc.opmode = "worker";
+          xhrStatus = 200;
+          instance.load("client_test.js", function(result) {
+            assert.isString(result);
+            code = result;
+          });
+          instance.load(["client_test.js"], function(result) {
+            assert.deepEqual([code], result);
+          });
+          
+          xhrStatus = 404;
+          instance.load("/not-exists", function(result) {
+            assert.isNull(result);
+            done();
+          });
+        });
+        it("error", function() {
+          assert.throws(function() {
+            instance.load("client_test.js");
+          }, "cc#load requires a callback function.");
+        });
+      });
+      it("#send", function() {
+        instance.send([1, 2, 3], 4);
+        assert.deepEqual(posted, [
+          [ '/send', [ [ 1, 2, 3 ], 4 ] ]
+        ]);
+      });
       it("#process", function() {
         var i16;
         for (var i = 0; i < C.STRM_LIST_LENGTH; i++) {
@@ -303,6 +445,25 @@ define(function(require, exports, module) {
         }
       });
       describe("#readAudioFile", function(done) {
+        var xhrStatus = 200;
+        testTools.mock("createXMLHttpRequest", function() {
+          var xhr;
+          var response = "";
+          xhr = {};
+          xhr.open = function(method, payload) {
+            response = payload;
+          };
+          xhr.send = function() {
+            xhr.response   = response;
+            xhr.readyState = 1;
+            xhr.onreadystatechange();
+            
+            xhr.readyState = 4;
+            xhr.status     = xhrStatus;
+            xhr.onreadystatechange();
+          };
+          return xhr;
+        });
         it("no api", function() {
           instance.api = null;
           instance.readAudioFile();

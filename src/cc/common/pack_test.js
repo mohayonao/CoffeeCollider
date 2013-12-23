@@ -58,14 +58,23 @@ define(function(require, exports, module) {
       assert.deepEqual(actual, expected);
     });
     it("function", function() {
-      var object = {
-        list: [ 1, 2, 3, 4, 5 ],
-        dict: {
-          a: 10, b: 20, c: 30
-        }
+      var object = function() {
       };
-      var actual = pack.unpack(pack.pack(object));
-      assert.equal(JSON.stringify(actual), JSON.stringify(object));
+      var actual = pack.pack(object);
+      var expected = {
+        klassName:"Function"
+      };
+      assert.deepEqual(actual, expected);
+    });
+    it("null", function() {
+      var actual   = pack.unpack(pack.pack(null));
+      var expected = null;
+      assert.equal(actual, expected);
+    });
+    it("ArrayBuffer", function() {
+      var actual   = pack.unpack(pack.pack(new Float32Array([1,2,3])));
+      var expected = new Float32Array([1,2,3]);
+      assert.deepEqual(actual, expected);
     });
   });
 

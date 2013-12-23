@@ -780,6 +780,27 @@ define(function(require, exports, module) {
   mock.resetBuiltin.$beforeEach = function() {
     mock.resetBuiltin.result = null;
   };
+  mock.resetMessage = function() {
+    mock.resetMessage.result = true;
+  };
+  mock.resetMessage.$beforeEach = function() {
+    mock.resetMessage.result = null;
+  };
+  
+  mock.instanceOfSyncBlock = function(func) {
+    return !!func.$$syncBlock;
+  };
+  mock.currentSyncBlockHandler = {
+    __sync__: function(func, args) {
+      mock.currentSyncBlockHandler.__sync__.called = [ func, args ];
+    }
+  };
+  mock.currentSyncBlockHandler.$beforeEach = function() {
+    mock.currentSyncBlockHandler.__sync__.called = null;
+  };
+  mock.createTaskArgumentsOnce = function(item) {
+    return item;
+  };
   
   module.exports = {
     Random: Random,

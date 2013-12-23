@@ -39,6 +39,10 @@ define(function(require, exports, module) {
       this.impl.execute.apply(this.impl, arguments);
       return this;
     };
+    SynthClient.prototype.run = function() {
+      this.impl.run.apply(this.impl, arguments);
+      return this;
+    };
     SynthClient.prototype.compile = function() {
       return this.impl.compile.apply(this.impl, arguments);
     };
@@ -48,11 +52,18 @@ define(function(require, exports, module) {
     SynthClient.prototype.getWebAudioComponents = function() {
       return this.impl.getWebAudioComponents.apply(this.impl, arguments);
     };
-
+    SynthClient.prototype.load = function() {
+      this.impl.load.apply(this.impl, arguments);
+      return this;
+    };
     SynthClient.prototype.send = function() {
       this.impl.send.apply(this.impl, arguments);
       return this;
     };
+    SynthClient.prototype.isPlaying = function() {
+      return this.impl.isPlaying;
+    };
+    
     SynthClient.prototype.getListeners = function() {
       return this.impl.getListeners.apply(this.impl, arguments);
     };
@@ -206,6 +217,14 @@ define(function(require, exports, module) {
       ]);
       this.execId += 1;
     };
+    SynthClientImpl.prototype.run = function() {
+      if (!this.isPlaying) {
+        this.play();
+      }
+      this.execute.apply(this, arguments);
+
+      // TODO: auto stop
+    };
     SynthClientImpl.prototype.compile = function(code) {
       if (typeof code !== "string") {
         throw new Error("cc.execute requires a code, but got: " + (typeof code));
@@ -234,6 +253,52 @@ define(function(require, exports, module) {
         return [ this.api.context, this.api.jsNode ];
       }
       return [];
+    };
+    
+    SynthClientImpl.prototype.load = function(files, callback) {
+      if (typeof callback !== "function") {
+        throw new Error("cc#load requires a callback function.");
+      }
+      var isNotArray = false;
+      if (!Array.isArray(files)) {
+        files = [ files ];
+        isNotArray = true;
+      }
+      
+      var results = [];
+      var load = function(files) {
+        var path = files.shift();
+        if (typeof path !== "string") {
+          if (isNotArray) {
+            results = results[0];
+          }
+          return callback(results);
+        }
+        if (cc.opmode === "nodejs") {
+          var fs = global.require("fs");
+          if (fs.existsSync(path)) {
+            results.push(fs.readFileSync(path, "utf-8"));
+          } else {
+            results.push(null);
+          }
+          load(files);
+        } else {
+          var xhr = cc.createXMLHttpRequest();
+          xhr.open("GET", path);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                results.push(xhr.response);
+              } else {
+                results.push(null);
+              }
+              load(files);
+            }
+          };
+          xhr.send();
+        }
+      };
+      load(files);
     };
     SynthClientImpl.prototype.send = function() {
       this.sendToLang([

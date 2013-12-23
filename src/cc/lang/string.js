@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var cc = require("./cc");
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
@@ -33,9 +34,24 @@ define(function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
-  fn.defineProperty(String.prototype, "do", function() {
-    throw "not implemented";
+  
+  fn.defineProperty(String.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(String.prototype, "valueArray", function() {
+    return this;
+  });
+  
+  fn.defineProperty(String.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsString(this));
+        return this;
+      }
+    }
+    this.split("").forEach(func);
+    return this;
   });
   
   fn.defineProperty(String.prototype, "wait", function() {

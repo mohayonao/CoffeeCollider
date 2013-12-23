@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.3+20131220073200",
+    version: "0.2.3+20131223164000",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -169,6 +169,10 @@ define('cc/client/client', function(require, exports, module) {
       this.impl.execute.apply(this.impl, arguments);
       return this;
     };
+    SynthClient.prototype.run = function() {
+      this.impl.run.apply(this.impl, arguments);
+      return this;
+    };
     SynthClient.prototype.compile = function() {
       return this.impl.compile.apply(this.impl, arguments);
     };
@@ -178,11 +182,18 @@ define('cc/client/client', function(require, exports, module) {
     SynthClient.prototype.getWebAudioComponents = function() {
       return this.impl.getWebAudioComponents.apply(this.impl, arguments);
     };
-
+    SynthClient.prototype.load = function() {
+      this.impl.load.apply(this.impl, arguments);
+      return this;
+    };
     SynthClient.prototype.send = function() {
       this.impl.send.apply(this.impl, arguments);
       return this;
     };
+    SynthClient.prototype.isPlaying = function() {
+      return this.impl.isPlaying;
+    };
+    
     SynthClient.prototype.getListeners = function() {
       return this.impl.getListeners.apply(this.impl, arguments);
     };
@@ -336,6 +347,14 @@ define('cc/client/client', function(require, exports, module) {
       ]);
       this.execId += 1;
     };
+    SynthClientImpl.prototype.run = function() {
+      if (!this.isPlaying) {
+        this.play();
+      }
+      this.execute.apply(this, arguments);
+
+      // TODO: auto stop
+    };
     SynthClientImpl.prototype.compile = function(code) {
       if (typeof code !== "string") {
         throw new Error("cc.execute requires a code, but got: " + (typeof code));
@@ -364,6 +383,52 @@ define('cc/client/client', function(require, exports, module) {
         return [ this.api.context, this.api.jsNode ];
       }
       return [];
+    };
+    
+    SynthClientImpl.prototype.load = function(files, callback) {
+      if (typeof callback !== "function") {
+        throw new Error("cc#load requires a callback function.");
+      }
+      var isNotArray = false;
+      if (!Array.isArray(files)) {
+        files = [ files ];
+        isNotArray = true;
+      }
+      
+      var results = [];
+      var load = function(files) {
+        var path = files.shift();
+        if (typeof path !== "string") {
+          if (isNotArray) {
+            results = results[0];
+          }
+          return callback(results);
+        }
+        if (cc.opmode === "nodejs") {
+          var fs = global.require("fs");
+          if (fs.existsSync(path)) {
+            results.push(fs.readFileSync(path, "utf-8"));
+          } else {
+            results.push(null);
+          }
+          load(files);
+        } else {
+          var xhr = cc.createXMLHttpRequest();
+          xhr.open("GET", path);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                results.push(xhr.response);
+              } else {
+                results.push(null);
+              }
+              load(files);
+            }
+          };
+          xhr.send();
+        }
+      };
+      load(files);
     };
     SynthClientImpl.prototype.send = function() {
       this.sendToLang([
@@ -595,6 +660,9 @@ define('cc/common/pack', function(require, exports, module) {
       if (!data) {
         return data;
       }
+      if (typeof data === "function") {
+        return { klassName:"Function" };
+      }
       if (stack.indexOf(data) !== -1) {
         return { klassName:"Circular" };
       }
@@ -632,9 +700,6 @@ define('cc/common/pack', function(require, exports, module) {
   var unpack = (function() {
     var _unpack = function(data) {
       if (!data) {
-        return data;
-      }
-      if (typeof data === "string") {
         return data;
       }
       var result;
@@ -2022,9 +2087,7 @@ define('cc/common/numericstring', function(require, exports, module) {
       if (!freq) {
         return result;
       }
-      if (result !== 0) {
-        return 1 / result;
-      }
+      return result === 0 ? 0 : 1 / result;
     }
     return str;
   };
@@ -2037,21 +2100,24 @@ define('cc/common/numericstring', function(require, exports, module) {
     return null;
   };
   var time = function(str) {
-    var m = /^(\d+(?:\.\d+)?)(min|sec|m)s?$/i.exec(str);
+    var m = /^(\d+(?:\.\d+)?)(min|sec|m|msec)s?$/i.exec(str);
     if (m) {
       switch (m[2]) {
-      case "min": return +(m[1]||0) * 60;
-      case "sec": return +(m[1]||0);
-      case "m"  : return +(m[1]||0) / 1000;
+      case "min" : return (+m[1]) * 60;
+      case "sec" : return (+m[1]);
+      case "msec": case "m": return (+m[1]) / 1000;
       }
     }
     return null;
   };
 
   var hhmmss = function(str) {
-    var m = /^(?:([1-9][0-9]*):)?([0-5]?[0-9]):([0-5][0-9])(?:\.(\d{1,3}))?$/.exec(str);
+    var x = 0, m = /^(?:([1-9]?[0-9]*):)?(?:([0-9]*):)?([0-9]+)(?:\.(\d{1,3}))?$/.exec(str);
     if (m) {
-      var x = 0;
+      if (m[1] !== undefined && m[2] === undefined) {
+        m[2] = m[1];
+        m[1] = 0;
+      }
       x += (m[1]|0) * 3600;
       x += (m[2]|0) * 60;
       x += (m[3]|0);
@@ -2071,7 +2137,15 @@ define('cc/common/numericstring', function(require, exports, module) {
 
   var calcNote = function(bpm, len, dot) {
     var x = (60 / bpm) * (4 / len);
-    x *= [1, 1.5, 1.75, 1.875][dot] || 1;
+    var mul = 1;
+    if (0 <= dot && dot <= 3) {
+      x *= [1, 1.5, 1.75, 1.875][dot];
+    } else {
+      for (var i = 1; i < dot; ++i) {
+        mul += Math.pow(0.5, i);
+      }
+      x *= mul;
+    }
     return x;
   };
   var note = function(str) {
@@ -2106,7 +2180,7 @@ define('cc/common/numericstring', function(require, exports, module) {
   };
   
   var notevalue = function(str) {
-    var m = /^([CDEFGAB])([-+#b])?(\d)$/.exec(str);
+    var m = /^([A-Ga-g])([-+#b])?(\d)$/.exec(str);
     if (m) {
       var midi = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[3] * 12) + 12;
       var acc = m[2];
@@ -2328,6 +2402,7 @@ define('cc/lang/lang', function(require, exports, module) {
       cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
+      cc.resetMessage();
       this.taskManager.reset();
       this.sendToServer(msg);
     };
@@ -2550,6 +2625,14 @@ define('cc/lang/array', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
+  
+  fn.defineProperty(Array.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Array.prototype, "valueArray", function() {
+    return this;
+  });
   
   fn.defineProperty(Array.prototype, "do", function(func) {
     var list = this;
@@ -3680,11 +3763,13 @@ define('cc/common/ops', function(require, exports, module) {
   };
 
   var COMMONS = {
-    copy: "",
+    copy : "",
     clone: "deep=false",
-    dup : "n=2,deep=false",
-    "do": "",
-    wait: "",
+    dup  : "n=2,deep=false",
+    value: "",
+    valueArray: "",
+    "do" : "",
+    wait : "",
     asUGenInput: ""
   };
   
@@ -3733,16 +3818,23 @@ define('cc/lang/boolean', function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Boolean.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Boolean.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Boolean.prototype, "do", function(func) {
-    var flag = this;
-    if (flag) {
+    if (this) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
-          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(this));
           return this;
         }
       }
-      func(flag);
+      func(this, 0);
     }
     return this;
   });
@@ -4160,16 +4252,24 @@ define('cc/lang/date', function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Date.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Date.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Date.prototype, "do", function(func) {
     var flag = Date.now() > (+this);
     if (flag) {
       if (cc.instanceOfSyncBlock(func)) {
         if (cc.currentSyncBlockHandler) {
-          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsBoolean(true));
+          cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(this));
           return this;
         }
       }
-      func(flag);
+      func(this, 0);
     }
     return this;
   });
@@ -4434,8 +4534,23 @@ define('cc/lang/function', function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
-  fn.defineProperty(Function.prototype, "do", function() {
-    throw "not implemented";
+  fn.defineProperty(Function.prototype, "value", function() {
+    return this.apply(null, arguments);
+  });
+
+  fn.defineProperty(Function.prototype, "valueArray", function(args) {
+    return this.apply(null, utils.asArray(args));
+  });
+  
+  fn.defineProperty(Function.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(true));
+        return this;
+      }
+    }
+    func(this, 0);
+    return this;
   });
   
   fn.defineProperty(Function.prototype, "wait", function() {
@@ -4541,6 +4656,10 @@ define('cc/lang/message', function(require, exports, module) {
       "/send", slice.call(arguments)
     ]);
     return cc.global.Message;
+  };
+  
+  cc.resetMessage = function() {
+    cc.global.Message.off();
   };
   
   module.exports = {};
@@ -4924,6 +5043,7 @@ define('cc/lang/number', function(require, exports, module) {
   var cc = require("./cc");
   var fn = require("./fn");
   var ops = require("../common/ops");
+  var utils = require("./utils");
   
   var drand = function() {
     return cc.lang.random.next();
@@ -4946,6 +5066,14 @@ define('cc/lang/number', function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Number.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Number.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Number.prototype, "do", function(func) {
     var i, n = this;
     if (cc.instanceOfSyncBlock(func)) {
@@ -4957,9 +5085,37 @@ define('cc/lang/number', function(require, exports, module) {
       }
     }
     for (i = 0; i < n; ++i) {
-      func(i);
+      func(i, i);
     }
     return this;
+  });
+
+  fn.defineProperty(Number.prototype, "forBy", function(endValue, stepValue, func) {
+    var i = 0, x = this;
+    endValue  = utils.asNumber(endValue );
+    stepValue = utils.asNumber(stepValue);
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsNumber(x, endValue, stepValue));
+        return this;
+      }
+    }
+    if (stepValue < 0) {
+      for (i = 0; x >= endValue; i++) {
+        func(x, i);
+        x += stepValue;
+      }
+    } else if (stepValue > 0) {
+      for (i = 0; x <= endValue; i++) {
+        func(x, i);
+        x += stepValue;
+      }
+    }
+    return this;
+  });
+
+  fn.defineProperty(Number.prototype, "forSeries", function(second, last, func) {
+    return this.forBy(last, (utils.asNumber(second) - this), func);
   });
   
   fn.defineProperty(Number.prototype, "wait", function() {
@@ -5858,7 +6014,26 @@ define('cc/lang/object', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
+  
+  fn.defineProperty(cc.Object.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(cc.Object.prototype, "valueArray", function() {
+    return this;
+  });
+  
+  fn.defineProperty(cc.Object.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsOnce(this));
+        return this;
+      }
+    }
+    func(this, 0);
+    return this;
+  });
+  
   fn.defineProperty(cc.Object.prototype, "asUGenInput", function() {
     throw new Error(this.klassName + " can't cast to a UGen.");
   });
@@ -7280,6 +7455,7 @@ define('cc/lang/scale', function(require, exports, module) {
 });
 define('cc/lang/string', function(require, exports, module) {
 
+  var cc = require("./cc");
   var fn = require("./fn");
   var utils = require("./utils");
   var ops = require("../common/ops");
@@ -7312,9 +7488,24 @@ define('cc/lang/string', function(require, exports, module) {
     }
     return a;
   }).defaults(ops.COMMONS.dup).build());
-
-  fn.defineProperty(String.prototype, "do", function() {
-    throw "not implemented";
+  
+  fn.defineProperty(String.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(String.prototype, "valueArray", function() {
+    return this;
+  });
+  
+  fn.defineProperty(String.prototype, "do", function(func) {
+    if (cc.instanceOfSyncBlock(func)) {
+      if (cc.currentSyncBlockHandler) {
+        cc.currentSyncBlockHandler.__sync__(func, cc.createTaskArgumentsString(this));
+        return this;
+      }
+    }
+    this.split("").forEach(func);
+    return this;
   });
   
   fn.defineProperty(String.prototype, "wait", function() {
@@ -8513,11 +8704,8 @@ define('cc/lang/task', function(require, exports, module) {
   cc.createTaskArgumentsArray = function(list, reversed) {
     return new TaskArgumentsArray(list, !!reversed);
   };
-  cc.createTaskArgumentsFunction = function(func) {
-    return new TaskArgumentsFunction(func);
-  };
-  cc.createTaskArgumentsBoolean = function(flag) {
-    return new TaskArgumentsArray([flag]);
+  cc.createTaskArgumentsOnce = function(item) {
+    return new TaskArgumentsArray([item]);
   };
   cc.createTaskArgumentsPattern = function(p) {
     return new TaskArgumentsPattern(p);
@@ -21529,10 +21717,10 @@ define('cc/server/server-socket', function(require, exports, module) {
     };
     var processN = function(bufLength) {
       var list = this.list;
-      var busOut    = this.busOut;
-      var busOutLen = this.busOutLen;
+      var busOut    = cc.server.busOut;
+      var busOutLen = cc.server.busOutLen;
       var instance;
-      busOut.set(this.busClear);
+      busOut.set(cc.server.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
         instance = list[i];
         instance.process(bufLength);

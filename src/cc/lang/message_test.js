@@ -17,6 +17,20 @@ define(function(require, exports, module) {
         ]);
       });
     });
+    it("reset", function() {
+      cc.global.Message.on("error", function() {
+        throw "should be reset";
+      });
+      assert.throws(function() {
+        cc.global.Message.emit("error");
+      }, "should be reset");
+      
+      cc.resetMessage();
+      
+      assert.doesNotThrow(function() {
+        cc.global.Message.emit("error");
+      });
+    });
   });
 
 });

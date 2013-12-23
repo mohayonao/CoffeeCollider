@@ -27,6 +27,14 @@ define(function(require, exports, module) {
     return a;
   }).defaults(ops.COMMONS.dup).build());
   
+  fn.defineProperty(Array.prototype, "value", function() {
+    return this;
+  });
+  
+  fn.defineProperty(Array.prototype, "valueArray", function() {
+    return this;
+  });
+  
   fn.defineProperty(Array.prototype, "do", function(func) {
     var list = this;
     if (cc.instanceOfSyncBlock(func)) {

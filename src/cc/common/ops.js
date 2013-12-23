@@ -46,11 +46,13 @@ define(function(require, exports, module) {
   };
 
   var COMMONS = {
-    copy: "",
+    copy : "",
     clone: "deep=false",
-    dup : "n=2,deep=false",
-    "do": "",
-    wait: "",
+    dup  : "n=2,deep=false",
+    value: "",
+    valueArray: "",
+    "do" : "",
+    wait : "",
     asUGenInput: ""
   };
   

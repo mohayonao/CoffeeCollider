@@ -43,6 +43,20 @@ define(function(require, exports, module) {
           expected = [ 1, 1, 1, 1, 1 ];
           assert.deepEqual(actual, expected);
         });
+        it("value", function() {
+          actual   = function(a, b) {
+            return a + b;
+          }.value(1, 2);
+          expected = 3;
+          assert.equal(actual, expected);
+        });
+        it("valueArray", function() {
+          actual   = function(a, b) {
+            return a + b;
+          }.valueArray([1, 2]);
+          expected = 3;
+          assert.equal(actual, expected);
+        });
         it("asUGenInput", function() {
           actual   = f_1.asUGenInput();
           expected = 1;

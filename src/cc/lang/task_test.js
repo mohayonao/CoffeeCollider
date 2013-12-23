@@ -139,41 +139,13 @@ define(function(require, exports, module) {
           assert.isFalse(iter.performWaitState());
         });
       });
-      describe("TaskArgumentsFunction", function() {
+      describe("TaskArgumentsOnce", function() {
         it("create", function() {
-          iter = cc.createTaskArgumentsFunction(function() {
-            return 1;
-          });
-          assert.instanceOf(iter, task.TaskArgumentsFunction);
+          iter = cc.createTaskArgumentsOnce(true);
           assert.isTrue(cc.instanceOfTaskArguments(iter));
         });
         it("next", function() {
-          var block = true;
-          var index = 0, list = [ 10, 20, 30 ];
-          iter = cc.createTaskArgumentsFunction(function() {
-            if (block) {
-              throw "should not be called";
-            }
-            return list[index++];
-          });
-          block = false;
-          assert.deepEqual(iter.valueOf(), [10, 0]);
-          assert.deepEqual(iter.valueOf(), [10, 0]);
-          assert.deepEqual(iter.next()   , [20, 1]);
-          assert.deepEqual(iter.next()   , [30, 2]);
-          assert.isTrue(iter.performWaitState());
-          assert.isNull(iter.next());
-          assert.isFalse(iter.performWaitState());
-          assert.isNull(iter.next());
-        });
-      });
-      describe("TaskArgumentsBoolean", function() {
-        it("create", function() {
-          iter = cc.createTaskArgumentsBoolean(true);
-          assert.isTrue(cc.instanceOfTaskArguments(iter));
-        });
-        it("next", function() {
-          iter = cc.createTaskArgumentsBoolean(true);
+          iter = cc.createTaskArgumentsOnce(true);
           assert.deepEqual(iter.valueOf(), [true, 0]);
           assert.isTrue(iter.performWaitState());
           assert.isNull(iter.next());
