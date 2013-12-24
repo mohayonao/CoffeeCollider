@@ -36,8 +36,8 @@ define(function(require, exports, module) {
           var msec = (sys.strmLength / sys.sampleRate) * 1000;
           var written = 0;
           var start = Date.now();
-          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
-          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
+          var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
+          var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
             if (written - C.PROCESS_MARGIN > Date.now() - start) {
@@ -47,8 +47,8 @@ define(function(require, exports, module) {
             var j = inL.length;
             sys.process();
             while (j--) {
-              interleaved[--i] = inR[j] * 0.000030517578125;
-              interleaved[--i] = inL[j] * 0.000030517578125;
+              interleaved[--i] = inR[j];
+              interleaved[--i] = inL[j];
             }
             audio.mozWriteAudio(interleaved);
             written += msec;

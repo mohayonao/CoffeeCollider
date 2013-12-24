@@ -60,9 +60,11 @@ define(function(require, exports, module) {
                   return;
                 }
                 sys.process();
-                var _in = sys.strm;
+                var x, _in = sys.strm;
                 for (var i = 0; i < len; ++i) {
-                  out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
+                  x = (_in[i] * 16384 + 32768)|0;
+                  x = Math.max(16384, Math.min(x, 49152));
+                  out[i] = String.fromCharCode(x);
                 }
                 swf.writeAudio(out.join(""));
                 written += msec;

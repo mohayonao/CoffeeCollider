@@ -40,7 +40,7 @@ define(function(require, exports, module) {
       throw "SynthLang#sendToServer: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.sendToClient(msg);
       } else {
         var func = commands[msg[0]];

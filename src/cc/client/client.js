@@ -104,8 +104,8 @@ define(function(require, exports, module) {
       if (this.api.strmLength) {
         this.strmLength = this.api.strmLength;
       }
-      this.strm  = new Int16Array(this.strmLength * this.channels);
-      this.clear = new Int16Array(this.strmLength * this.channels);
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
       this.strmList = new Array(C.STRM_LIST_LENGTH);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
@@ -232,17 +232,15 @@ define(function(require, exports, module) {
       return this.compiler.compile(code.trim());
     };
     SynthClientImpl.prototype.getStream = function() {
-      var f32 = new Float32Array(this.strm);
-      for (var i = f32.length; i--; ) {
-        f32[i] *= 0.000030517578125;
-      }
-      var strmLength = this.strmLength;
+      var f32 = this.strm;
+      var strmLength  = this.strmLength;
+      var strmLength4 = strmLength * 4;
       return {
         getChannelData: function(channel) {
           if (channel === 0) {
             return new Float32Array(f32.buffer, 0, strmLength);
           } else if (channel === 1) {
-            return new Float32Array(f32.buffer, strmLength * 4);
+            return new Float32Array(f32.buffer, strmLength4);
           }
           throw new Error("bad channel");
         }
@@ -321,7 +319,7 @@ define(function(require, exports, module) {
       }
     };
     SynthClientImpl.prototype.recvFromLang = function(msg) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = msg;
         this.strmListWriteIndex += 1;
       } else {

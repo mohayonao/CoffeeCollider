@@ -246,12 +246,9 @@ module.exports = function(grunt) {
       source: { value:footer },
       dest  : cc
     });
-    copy({
-      source: cc,
-      dest  : dest + ".js"
-    });
+    grunt.file.write(dest + ".js", cc.value);
   });
-
+  
   grunt.registerTask("swf", function() {
     var done = this.async();
     var child = grunt.util.spawn({

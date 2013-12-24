@@ -32,13 +32,13 @@ define(function(require, exports, module) {
       userId = userId|0;
       this.instance.play(userId);
       if (this.api) {
-        this._strm = new Int16Array(this.strmLength * this.channels);
+        this._strm = new Float32Array(this.strmLength * this.channels);
         this.strmList = new Array(C.STRM_LIST_LENGTH);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         var strmList = this.strmList;
         for (var i = strmList.length; i--; ) {
-          strmList[i] = new Int16Array(this._strm);
+          strmList[i] = new Float32Array(this._strm);
         }
         if (!this.api.isPlaying) {
           this.api.play();
@@ -79,22 +79,21 @@ define(function(require, exports, module) {
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
       var lang = cc.lang;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
         instance.process(bufLength);
         busOut.set(instance.bus);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.syncCount += 1;
       if (this.api) {
-        this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = new Int16Array(strm);
+        this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = new Float32Array(strm);
         this.strmListWriteIndex += 1;
       }
     };

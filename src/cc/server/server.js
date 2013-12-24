@@ -46,7 +46,7 @@ define(function(require, exports, module) {
           this.channels   = msg[2]|0;
           this.strmLength = msg[3]|0;
         }
-        this.strm = new Int16Array(this.strmLength * this.channels);
+        this.strm = new Float32Array(this.strmLength * this.channels);
 
         var busLength  = this.bufLength * C.AUDIO_BUS_LEN + C.CONTROL_BUS_LEN;
         var bufLength  = this.bufLength;
