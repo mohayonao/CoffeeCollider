@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.4+20131223172100",
+    version: "0.2.5+20131224221100",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -234,8 +234,8 @@ define('cc/client/client', function(require, exports, module) {
       if (this.api.strmLength) {
         this.strmLength = this.api.strmLength;
       }
-      this.strm  = new Int16Array(this.strmLength * this.channels);
-      this.clear = new Int16Array(this.strmLength * this.channels);
+      this.strm  = new Float32Array(this.strmLength * this.channels);
+      this.clear = new Float32Array(this.strmLength * this.channels);
       this.strmList = new Array(8);
       this.strmListReadIndex  = 0;
       this.strmListWriteIndex = 0;
@@ -362,17 +362,15 @@ define('cc/client/client', function(require, exports, module) {
       return this.compiler.compile(code.trim());
     };
     SynthClientImpl.prototype.getStream = function() {
-      var f32 = new Float32Array(this.strm);
-      for (var i = f32.length; i--; ) {
-        f32[i] *= 0.000030517578125;
-      }
-      var strmLength = this.strmLength;
+      var f32 = this.strm;
+      var strmLength  = this.strmLength;
+      var strmLength4 = strmLength * 4;
       return {
         getChannelData: function(channel) {
           if (channel === 0) {
             return new Float32Array(f32.buffer, 0, strmLength);
           } else if (channel === 1) {
-            return new Float32Array(f32.buffer, strmLength * 4);
+            return new Float32Array(f32.buffer, strmLength4);
           }
           throw new Error("bad channel");
         }
@@ -451,7 +449,7 @@ define('cc/client/client', function(require, exports, module) {
       }
     };
     SynthClientImpl.prototype.recvFromLang = function(msg) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.strmList[this.strmListWriteIndex & 7] = msg;
         this.strmListWriteIndex += 1;
       } else {
@@ -796,19 +794,17 @@ define('cc/common/audioapi-webaudio', function(require, exports, module) {
           var sys = this.sys;
           var onaudioprocess;
           var strm = sys.strm;
-          var strmLength = sys.strmLength;
+          var strmLength  = sys.strmLength;
+          var strmLength4 = strmLength * 4;
+          var strmL = new Float32Array(strm.buffer, 0, strmLength);
+          var strmR = new Float32Array(strm.buffer, strmLength4);
           if (this.sys.speaker) {
             if (this.sys.sampleRate === this.sampleRate) {
               onaudioprocess = function(e) {
                 var outs = e.outputBuffer;
-                var outL = outs.getChannelData(0);
-                var outR = outs.getChannelData(1);
-                var i = strmLength, j = strmLength << 1;
                 sys.process();
-                while (j--, i--) {
-                  outL[i] = strm[i] * 0.000030517578125;
-                  outR[i] = strm[j] * 0.000030517578125;
-                }
+                outs.getChannelData(0).set(strmL);
+                outs.getChannelData(1).set(strmR);
               };
             }
           } else {
@@ -919,8 +915,8 @@ define('cc/common/audioapi-audiodata', function(require, exports, module) {
           var msec = (sys.strmLength / sys.sampleRate) * 1000;
           var written = 0;
           var start = Date.now();
-          var inL = new Int16Array(sys.strm.buffer, 0, sys.strmLength);
-          var inR = new Int16Array(sys.strm.buffer, sys.strmLength * 2);
+          var inL = new Float32Array(sys.strm.buffer, 0, sys.strmLength);
+          var inR = new Float32Array(sys.strm.buffer, sys.strmLength * 2);
 
           var onaudioprocess = function() {
             if (written - 20 > Date.now() - start) {
@@ -930,8 +926,8 @@ define('cc/common/audioapi-audiodata', function(require, exports, module) {
             var j = inL.length;
             sys.process();
             while (j--) {
-              interleaved[--i] = inR[j] * 0.000030517578125;
-              interleaved[--i] = inL[j] * 0.000030517578125;
+              interleaved[--i] = inR[j];
+              interleaved[--i] = inL[j];
             }
             audio.mozWriteAudio(interleaved);
             written += msec;
@@ -1022,9 +1018,11 @@ define('cc/common/audioapi-flashfallback', function(require, exports, module) {
                   return;
                 }
                 sys.process();
-                var _in = sys.strm;
+                var x, _in = sys.strm;
                 for (var i = 0; i < len; ++i) {
-                  out[i] = String.fromCharCode( ((_in[i] + 32768)>>1) + 16384 );
+                  x = (_in[i] * 16384 + 32768)|0;
+                  x = Math.max(16384, Math.min(x, 49152));
+                  out[i] = String.fromCharCode(x);
                 }
                 swf.writeAudio(out.join(""));
                 written += msec;
@@ -1088,13 +1086,14 @@ define('cc/common/audioapi-nodeaudio', function(require, exports, module) {
           var buf  = new Buffer(n);
           var x, i, j, k = 0;
           n = (n >> 2) / sys.strmLength;
-          x = strm;
           while (n--) {
             sys._process();
             for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
-              buf.writeInt16LE(strm[i], k);
+              x = Math.max(-32768, Math.min((strm[i] * 32768)|0, 32767));
+              buf.writeInt16LE(x, k);
               k += 2;
-              buf.writeInt16LE(strm[j], k);
+              x = Math.max(-32768, Math.min((strm[j] * 32768)|0, 32767));
+              buf.writeInt16LE(x, k);
               k += 2;
             }
           }
@@ -2375,7 +2374,7 @@ define('cc/lang/lang', function(require, exports, module) {
       throw "SynthLang#sendToServer: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromServer = function(msg) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.sendToClient(msg);
       } else {
         var func = commands[msg[0]];
@@ -20105,7 +20104,7 @@ define('cc/lang/lang-socket', function(require, exports, module) {
         // receive a message from the socket-server
         var msg = e.data;
         if (typeof msg !== "string") {
-          that.sendToClient(new Int16Array(msg));
+          that.sendToClient(new Float32Array(msg));
           return;
         }
         that.recvFromServer(JSON.parse(msg));
@@ -20226,7 +20225,7 @@ define('cc/server/server', function(require, exports, module) {
           this.channels   = msg[2]|0;
           this.strmLength = msg[3]|0;
         }
-        this.strm = new Int16Array(this.strmLength * this.channels);
+        this.strm = new Float32Array(this.strmLength * this.channels);
 
         var busLength  = this.bufLength * 16 + 128;
         var bufLength  = this.bufLength;
@@ -21484,17 +21483,16 @@ define('cc/server/server-worker', function(require, exports, module) {
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
       var lang = cc.lang;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
         instance.process(bufLength);
         busOut.set(instance.bus);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.syncCount += 1;
@@ -21545,13 +21543,13 @@ define('cc/server/server-nodejs', function(require, exports, module) {
       userId = userId|0;
       this.instance.play(userId);
       if (this.api) {
-        this._strm = new Int16Array(this.strmLength * this.channels);
+        this._strm = new Float32Array(this.strmLength * this.channels);
         this.strmList = new Array(8);
         this.strmListReadIndex  = 0;
         this.strmListWriteIndex = 0;
         var strmList = this.strmList;
         for (var i = strmList.length; i--; ) {
-          strmList[i] = new Int16Array(this._strm);
+          strmList[i] = new Float32Array(this._strm);
         }
         if (!this.api.isPlaying) {
           this.api.play();
@@ -21592,22 +21590,21 @@ define('cc/server/server-nodejs', function(require, exports, module) {
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
       var lang = cc.lang;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
         instance.process(bufLength);
         busOut.set(instance.bus);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.syncCount += 1;
       if (this.api) {
-        this.strmList[this.strmListWriteIndex & 7] = new Int16Array(strm);
+        this.strmList[this.strmListWriteIndex & 7] = new Float32Array(strm);
         this.strmListWriteIndex += 1;
       }
     };
@@ -21800,7 +21797,7 @@ define('cc/server/server-socket', function(require, exports, module) {
     SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToLang = function(msg, userId) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
             ws.send(msg.buffer, {binary:true, mask:false});
@@ -21832,22 +21829,21 @@ define('cc/server/server-socket', function(require, exports, module) {
       var bufLength  = this.bufLength;
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instance.process(bufLength);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.sendToLang(["/process"]);
       this.syncCount += 1;
       
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
+        this.strmList[this.strmListWriteIndex] = new Float32Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & 7;
       }
     };
