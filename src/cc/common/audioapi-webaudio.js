@@ -21,19 +21,17 @@ define(function(require, exports, module) {
           var sys = this.sys;
           var onaudioprocess;
           var strm = sys.strm;
-          var strmLength = sys.strmLength;
+          var strmLength  = sys.strmLength;
+          var strmLength4 = strmLength * 4;
+          var strmL = new Float32Array(strm.buffer, 0, strmLength);
+          var strmR = new Float32Array(strm.buffer, strmLength4);
           if (this.sys.speaker) {
             if (this.sys.sampleRate === this.sampleRate) {
               onaudioprocess = function(e) {
                 var outs = e.outputBuffer;
-                var outL = outs.getChannelData(0);
-                var outR = outs.getChannelData(1);
-                var i = strmLength, j = strmLength << 1;
                 sys.process();
-                while (j--, i--) {
-                  outL[i] = strm[i] * 0.000030517578125;
-                  outR[i] = strm[j] * 0.000030517578125;
-                }
+                outs.getChannelData(0).set(strmL);
+                outs.getChannelData(1).set(strmR);
               };
             }
           } else {

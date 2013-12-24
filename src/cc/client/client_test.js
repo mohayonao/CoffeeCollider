@@ -304,9 +304,9 @@ define(function(require, exports, module) {
         var strm = instance.strm;
         for (var i = 0; i < strm.length; i++) {
           if (i < strm.length * 0.5) {
-            strm[i] =  32767;
+            strm[i] =  1;
           } else {
-            strm[i] = -32768;
+            strm[i] = -1;
           }
         }
         actual = instance.getStream();
@@ -412,17 +412,17 @@ define(function(require, exports, module) {
         ]);
       });
       it("#process", function() {
-        var i16;
+        var f32;
         for (var i = 0; i < C.STRM_LIST_LENGTH; i++) {
-          i16 = new Int16Array(instance.strmLength * 2);
-          instance.recvFromLang(i16);
+          f32 = new Float32Array(instance.strmLength * 2);
+          instance.recvFromLang(f32);
           instance.process();
-          assert.deepEqual(instance.strm, i16);
+          assert.deepEqual(instance.strm, f32);
         }
         assert.equal(instance.syncCount, C.STRM_LIST_LENGTH);
         
         instance.process();
-        assert.deepEqual(instance.strm, i16);
+        assert.deepEqual(instance.strm, f32);
       });
       it("#sendToLang", function() {
         instance.sendToLang(["/sendToLang(1)", 1, 2, 3]);
@@ -436,11 +436,11 @@ define(function(require, exports, module) {
         instance.sendToLang();
       });
       it("#recvFromLang", function() {
-        var i16;
+        var f32;
         for (var i = 0; i <= C.STRM_LIST_LENGTH; i++) {
-          i16 = new Int16Array(instance.strmLength * 2);
-          instance.recvFromLang(i16);
-          assert.equal(instance.strmList[i & C.STRM_LIST_MASK], i16);
+          f32 = new Float32Array(instance.strmLength * 2);
+          instance.recvFromLang(f32);
+          assert.equal(instance.strmList[i & C.STRM_LIST_MASK], f32);
           assert.equal(instance.strmListWriteIndex, i+1);
         }
       });

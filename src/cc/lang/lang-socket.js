@@ -47,7 +47,7 @@ define(function(require, exports, module) {
         // receive a message from the socket-server
         var msg = e.data;
         if (typeof msg !== "string") {
-          that.sendToClient(new Int16Array(msg));
+          that.sendToClient(new Float32Array(msg));
           return;
         }
         that.recvFromServer(JSON.parse(msg));

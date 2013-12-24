@@ -166,7 +166,7 @@ define(function(require, exports, module) {
     SocketSynthServer.prototype.connect = function() {
     };
     SocketSynthServer.prototype.sendToLang = function(msg, userId) {
-      if (msg instanceof Int16Array) {
+      if (msg instanceof Float32Array) {
         this.list.forEach(function(ws) {
           if (ws.readyState === 1) {
             ws.send(msg.buffer, {binary:true, mask:false});
@@ -198,22 +198,21 @@ define(function(require, exports, module) {
       var bufLength  = this.bufLength;
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         instance.process(bufLength);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.sendToLang(["/process"]);
       this.syncCount += 1;
       
       if (this.api) {
-        this.strmList[this.strmListWriteIndex] = new Int16Array(strm);
+        this.strmList[this.strmListWriteIndex] = new Float32Array(strm);
         this.strmListWriteIndex = (this.strmListWriteIndex + 1) & C.STRM_LIST_MASK;
       }
     };

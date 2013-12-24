@@ -31,13 +31,14 @@ define(function(require, exports, module) {
           var buf  = new Buffer(n);
           var x, i, j, k = 0;
           n = (n >> 2) / sys.strmLength;
-          x = strm;
           while (n--) {
             sys._process();
             for (i = 0, j = strmLength; i < strmLength; ++i, ++j) {
-              buf.writeInt16LE(strm[i], k);
+              x = Math.max(-32768, Math.min((strm[i] * 32768)|0, 32767));
+              buf.writeInt16LE(x, k);
               k += 2;
-              buf.writeInt16LE(strm[j], k);
+              x = Math.max(-32768, Math.min((strm[j] * 32768)|0, 32767));
+              buf.writeInt16LE(x, k);
               k += 2;
             }
           }

@@ -35,17 +35,16 @@ define(function(require, exports, module) {
       var busOutL = this.busOutL;
       var busOutR = this.busOutR;
       var lang = cc.lang;
-      var offset = 0;
+      var offsetL = 0;
+      var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
         instance.process(bufLength);
         busOut.set(instance.bus);
-        var j = bufLength, k = strmLength + bufLength;
-        while (k--, j--) {
-          strm[j + offset] = Math.max(-32768, Math.min(busOutL[j] * 32768, 32767));
-          strm[k + offset] = Math.max(-32768, Math.min(busOutR[j] * 32768, 32767));
-        }
-        offset += bufLength;
+        strm.set(busOutL, offsetL);
+        strm.set(busOutR, offsetR);
+        offsetL += bufLength;
+        offsetR += bufLength;
       }
       this.sendToLang(strm);
       this.syncCount += 1;
