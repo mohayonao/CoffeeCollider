@@ -80,7 +80,7 @@
       if (e.shiftKey) {
         _ref = [editor.getSmartRegion(), true], code = _ref[0], append = _ref[1];
       } else {
-        _ref1 = [editor.getValue(), true], code = _ref1[0], append = _ref1[1];
+        _ref1 = [editor.getValue(), false], code = _ref1[0], append = _ref1[1];
       }
       if (code) {
         run(code, append);

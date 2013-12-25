@@ -60,7 +60,7 @@ $ ->
     if e.shiftKey
       [code, append] = [ editor.getSmartRegion(), true ]
     else
-      [code, append] = [ editor.getValue(), true ]
+      [code, append] = [ editor.getValue(), false ]
     if code
       run code, append
       showKeyboard code
