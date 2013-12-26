@@ -34,13 +34,17 @@ define(function(require, exports, module) {
           if (this.context.createScriptProcessor) {
             jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
           } else {
+            // deprecated interface
             jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
           }
           
-          if (bufSrc.noteOn) {
+          if (bufSrc.start) {
+            bufSrc.start(0);
+          } else if (bufSrc.noteOn) {
+            // deprecated interface
             bufSrc.noteOn(0);
-            bufSrc.connect(jsNode);
           }
+          bufSrc.connect(jsNode);
           
           if (sys.speaker) {
             if (sys.sampleRate === this.sampleRate) {
