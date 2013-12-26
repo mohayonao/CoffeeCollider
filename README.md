@@ -27,12 +27,23 @@ Open the below links, and press the "Run" button.
 - [noise](http://mohayonao.github.io/CoffeeCollider/#noise.coffee)
 - [sequence](http://mohayonao.github.io/CoffeeCollider/#sequence.coffee)
 - [chord](http://mohayonao.github.io/CoffeeCollider/#chord.coffee)
-- [khoomii](http://mohayonao.github.io/CoffeeCollider/#khoomii.coffee)
+- [reich](http://mohayonao.github.io/CoffeeCollider/#reich.coffee)
 
 ## Documents
 
 https://github.com/mohayonao/CoffeeCollider/wiki/_pages
 
-## Inspired from
+# Contributing
+
+1. Fork me
+2. Create a branch for your changes: `git checkout -b my-new-feature`
+3. Add your changes, and please include tests: `git commit -am 'Add some feature'`
+4. Make sure the tests pass by running: `grunt test`
+5. Create a pull request :D
+
+## License
+MIT
+
+## Inspired by
 - [CoffeeScript](http://coffeescript.org/)
 - [SuperCollider](http://supercollider.sourceforge.net/)
