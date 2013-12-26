@@ -69,26 +69,29 @@ define(function(require, exports, module) {
           }
         };
         WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
-          buffer = this.context.createBuffer(buffer, false);
-          var bufLength   = buffer.length;
-          var numChannels = buffer.numberOfChannels;
-          var numSamples  = bufLength * numChannels;
-          var samples = new Float32Array(numSamples);
-          var i, j, k = 0;
-          var channelData = new Array(numChannels);
-          for (j = 0; j < numChannels; ++j) {
-            channelData[j] = buffer.getChannelData(j);
-          }
-          for (i = 0; i < bufLength; ++i) {
+          this.context.decodeAudioData(buffer, function(buffer) {
+            var bufLength   = buffer.length;
+            var numChannels = buffer.numberOfChannels;
+            var numSamples  = bufLength * numChannels;
+            var samples = new Float32Array(numSamples);
+            var i, j, k = 0;
+            var channelData = new Array(numChannels);
             for (j = 0; j < numChannels; ++j) {
-              samples[k++] = channelData[j][i];
+              channelData[j] = buffer.getChannelData(j);
             }
-          }
-          callback(null, {
-            sampleRate : buffer.sampleRate,
-            numChannels: buffer.numberOfChannels,
-            numFrames  : buffer.length,
-            samples    : samples
+            for (i = 0; i < bufLength; ++i) {
+              for (j = 0; j < numChannels; ++j) {
+                samples[k++] = channelData[j][i];
+              }
+            }
+            callback(null, {
+              sampleRate : buffer.sampleRate,
+              numChannels: buffer.numberOfChannels,
+              numFrames  : buffer.length,
+              samples    : samples
+            });
+          }, function(err) {
+            callback(err);
           });
         };
         return WebAudioAPI;
