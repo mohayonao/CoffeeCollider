@@ -17,7 +17,6 @@ define(function(require, exports, module) {
           this.type = "Web Audio API";
           this.delegate = !!opts.AudioContext;
           this.jsNode = null;
-          this.bufSrc = null;
         }
         WebAudioAPI.prototype.init = function() {
         };
@@ -28,23 +27,9 @@ define(function(require, exports, module) {
           var strmLength4 = strmLength * 4;
           var strmL = new Float32Array(strm.buffer, 0, strmLength);
           var strmR = new Float32Array(strm.buffer, strmLength4);
-          var onaudioprocess, bufSrc, jsNode;
+          var onaudioprocess, jsNode;
           
-          bufSrc = this.context.createBufferSource();
-          if (this.context.createScriptProcessor) {
-            jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
-          } else {
-            // deprecated interface
-            jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
-          }
-          
-          if (bufSrc.start) {
-            bufSrc.start(0);
-          } else if (bufSrc.noteOn) {
-            // deprecated interface
-            bufSrc.noteOn(0);
-          }
-          bufSrc.connect(jsNode);
+          jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
           
           if (sys.speaker) {
             if (sys.sampleRate === this.sampleRate) {
@@ -66,19 +51,16 @@ define(function(require, exports, module) {
             jsNode.connect(this.context.destination);
           }
           this.jsNode = jsNode;
-          this.bufSrc = bufSrc;
         };
         WebAudioAPI.prototype.pause = function() {
           if (!this.jsNode) {
             return; // TODO: throw an error
           }
-          this.bufSrc.disconnect();
           if (!this.delegate) {
             this.jsNode.disconnect();
           }
           this.jsNode.onaudioprocess = null;
           this.jsNode = null;
-          this.bufSrc = null;
         };
         WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
           this.context.decodeAudioData(buffer, function(buffer) {
