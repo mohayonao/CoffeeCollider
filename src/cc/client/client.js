@@ -309,6 +309,8 @@ define(function(require, exports, module) {
         strm = this.strmList[this.strmListReadIndex & C.STRM_LIST_MASK];
         this.strmListReadIndex += 1;
         this.strm.set(strm);
+      } else {
+        this.strm.set(this.clear);
       }
       this.syncItemsUInt32[C.SYNC_COUNT] = ++this.syncCount;
       this.sendToLang(this.syncItems);
