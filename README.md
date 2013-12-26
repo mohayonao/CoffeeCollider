@@ -33,7 +33,7 @@ Open the below links, and press the "Run" button.
 
 https://github.com/mohayonao/CoffeeCollider/wiki/_pages
 
-# Contributing
+## Contributing
 
 1. Fork me
 2. Create a branch for your changes: `git checkout -b my-new-feature`
