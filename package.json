@@ -1,6 +1,6 @@
 {
   "name": "coffee-collider",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Sound Processing Language for Web Audio",
   "keywords": [
     "language",
