@@ -120,7 +120,7 @@ define('cc/loader', function(require, exports, module) {
 define('cc/cc', function(require, exports, module) {
   
   module.exports = {
-    version: "0.2.5",
+    version: "0.2.6",
     global : {},
     Object : function() {},
     ugen   : {specs:{}},
@@ -439,6 +439,8 @@ define('cc/client/client', function(require, exports, module) {
         strm = this.strmList[this.strmListReadIndex & 7];
         this.strmListReadIndex += 1;
         this.strm.set(strm);
+      } else {
+        this.strm.set(this.clear);
       }
       this.syncItemsUInt32[1] = ++this.syncCount;
       this.sendToLang(this.syncItems);
@@ -789,17 +791,23 @@ define('cc/common/audioapi-webaudio', function(require, exports, module) {
           this.channels   = 2;
           this.type = "Web Audio API";
           this.delegate = !!opts.AudioContext;
+          this.jsNode = null;
         }
         WebAudioAPI.prototype.init = function() {
-          var sys = this.sys;
-          var onaudioprocess;
+        };
+        WebAudioAPI.prototype.play = function() {
+          var sys  = this.sys;
           var strm = sys.strm;
           var strmLength  = sys.strmLength;
           var strmLength4 = strmLength * 4;
           var strmL = new Float32Array(strm.buffer, 0, strmLength);
           var strmR = new Float32Array(strm.buffer, strmLength4);
-          if (this.sys.speaker) {
-            if (this.sys.sampleRate === this.sampleRate) {
+          var onaudioprocess, jsNode;
+          
+          jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
+          
+          if (sys.speaker) {
+            if (sys.sampleRate === this.sampleRate) {
               onaudioprocess = function(e) {
                 var outs = e.outputBuffer;
                 sys.process();
@@ -812,56 +820,47 @@ define('cc/common/audioapi-webaudio', function(require, exports, module) {
               sys.process();
             };
           }
-          this.bufSrc = this.context.createBufferSource();
-          if (this.context.createScriptProcessor) {
-            this.jsNode = this.context.createScriptProcessor(strmLength, 2, this.channels);
-          } else {
-            this.jsNode = this.context.createJavaScriptNode(strmLength, 2, this.channels);
-          }
-          this.jsNode.onaudioprocess = onaudioprocess;
-        };
-        WebAudioAPI.prototype.play = function() {
-          if (!this.bufSrc) {
-            return; // TODO: throw an error
-          }
-          if (this.bufSrc.noteOn) {
-            this.bufSrc.noteOn(0);
-            this.bufSrc.connect(this.jsNode);
-          }
+          jsNode.onaudioprocess = onaudioprocess;
+          
           if (!this.delegate) {
-            this.jsNode.connect(this.context.destination);
+            jsNode.connect(this.context.destination);
           }
+          this.jsNode = jsNode;
         };
         WebAudioAPI.prototype.pause = function() {
-          if (!this.bufSrc) {
+          if (!this.jsNode) {
             return; // TODO: throw an error
           }
-          this.bufSrc.disconnect();
           if (!this.delegate) {
             this.jsNode.disconnect();
           }
+          this.jsNode.onaudioprocess = null;
+          this.jsNode = null;
         };
         WebAudioAPI.prototype.decodeAudioFile = function(buffer, callback) {
-          buffer = this.context.createBuffer(buffer, false);
-          var bufLength   = buffer.length;
-          var numChannels = buffer.numberOfChannels;
-          var numSamples  = bufLength * numChannels;
-          var samples = new Float32Array(numSamples);
-          var i, j, k = 0;
-          var channelData = new Array(numChannels);
-          for (j = 0; j < numChannels; ++j) {
-            channelData[j] = buffer.getChannelData(j);
-          }
-          for (i = 0; i < bufLength; ++i) {
+          this.context.decodeAudioData(buffer, function(buffer) {
+            var bufLength   = buffer.length;
+            var numChannels = buffer.numberOfChannels;
+            var numSamples  = bufLength * numChannels;
+            var samples = new Float32Array(numSamples);
+            var i, j, k = 0;
+            var channelData = new Array(numChannels);
             for (j = 0; j < numChannels; ++j) {
-              samples[k++] = channelData[j][i];
+              channelData[j] = buffer.getChannelData(j);
             }
-          }
-          callback(null, {
-            sampleRate : buffer.sampleRate,
-            numChannels: buffer.numberOfChannels,
-            numFrames  : buffer.length,
-            samples    : samples
+            for (i = 0; i < bufLength; ++i) {
+              for (j = 0; j < numChannels; ++j) {
+                samples[k++] = channelData[j][i];
+              }
+            }
+            callback(null, {
+              sampleRate : buffer.sampleRate,
+              numChannels: buffer.numberOfChannels,
+              numFrames  : buffer.length,
+              samples    : samples
+            });
+          }, function(err) {
+            callback(err);
           });
         };
         return WebAudioAPI;
