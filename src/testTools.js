@@ -762,12 +762,6 @@ define(function(require, exports, module) {
     return [ bufnum, frames, channels ];
   };
   
-  mock.resetBuffer = function() {
-    mock.resetBuffer.result = true;
-  };
-  mock.resetBuffer.$beforeEach = function() {
-    mock.resetBuffer.result = null;
-  };
   mock.resetNode = function() {
     mock.resetNode.result = true;
   };

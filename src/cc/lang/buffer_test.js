@@ -11,19 +11,6 @@ define(function(require, exports, module) {
     var instance, actual, expected;
     testTools.mock("lang");
     
-    describe("BufferSource", function() {
-      it("new", function() {
-        instance = new buffer.BufferSource({
-          samples    : new Float32Array([0, 1, 2, 3]),
-          numChannels: 1,
-          sampleRate : 8000,
-          numFrames  : 4
-        }, "id");
-        assert.equal(buffer.BufferSource.get("id"), instance);
-        cc.resetBuffer();
-        assert.isUndefined(buffer.BufferSource.get("id"));
-      });
-    });
     describe("Buffer", function() {
       it("create", function() {
         instance = cc.global.Buffer();
@@ -38,7 +25,6 @@ define(function(require, exports, module) {
         assert.equal(instance.frames, 8);
         assert.deepEqual(cc.lang.pushToTimeline.result, [
           ["/b_new" , instance.bufnum, instance.frames, instance.channels],
-          ["/b_bind", instance.bufnum, 1, 0, -1],
         ]);
       });
       describe("*read", function() {
@@ -46,20 +32,6 @@ define(function(require, exports, module) {
           instance = cc.global.Buffer.read("id");
           assert.deepEqual(cc.lang.pushToTimeline.result, [
             ["/b_new" , instance.bufnum, instance.frames, instance.channels],
-            ["/b_bind", instance.bufnum, 2, 0, -1]
-          ]);
-        });
-        it("read from cache", function() {
-          new buffer.BufferSource({
-            samples    : new Float32Array([0, 1, 2, 3]),
-            numChannels: 1,
-            sampleRate : 8000,
-            numFrames  : 4
-          }, "id");
-          instance = cc.global.Buffer.read("id");
-          assert.deepEqual(cc.lang.pushToTimeline.result, [
-            ["/b_new" , instance.bufnum, instance.frames, instance.channels],
-            ["/b_bind", instance.bufnum, 3, 0, -1]
           ]);
         });
         it("error", function() {

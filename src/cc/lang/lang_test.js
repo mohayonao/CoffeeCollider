@@ -10,7 +10,6 @@ define(function(require, exports, module) {
   
   describe("lang/lang.js", function() {
     testTools.mock("createWebWorker");
-    testTools.mock("resetBuffer");
     testTools.mock("resetNode");
     testTools.mock("resetBuiltin");
     testTools.mock("resetMessage");
@@ -59,7 +58,6 @@ define(function(require, exports, module) {
         });
         it("#reset", function() {
           instance.reset(["/reset"]);
-          assert.isTrue(cc.resetBuffer .result);
           assert.isTrue(cc.resetNode   .result);
           assert.isTrue(cc.resetBuiltin.result);
           assert.isTrue(cc.resetMessage.result);

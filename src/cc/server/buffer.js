@@ -3,31 +3,6 @@ define(function(require, exports, module) {
 
   var cc = require("./cc");
   
-  var BufferSource = (function() {
-    function BufferSource(bufSrcId) {
-      this.bufSrcId   = bufSrcId;
-      this.channels   = 0;
-      this.sampleRate = 0;
-      this.frames     = 0;
-      this.samples    = null;
-      this.pendings   = [];
-    }
-    BufferSource.prototype.set = function(channels, sampleRate, frames, samples) {
-      this.channels   = channels;
-      this.sampleRate = sampleRate;
-      this.frames     = frames;
-      this.samples    = samples;
-      this.pendings.forEach(function(items) {
-        var buffer     = items[0];
-        var startFrame = items[1];
-        var frames  = items[2];
-        buffer.bindBufferSource(this, startFrame, frames);
-      }, this);
-      this.pendings = null;
-    };
-    return BufferSource;
-  })();
-  
   var Buffer = (function() {
     function Buffer(bufnum, frames, channels) {
       this.bufnum     = bufnum;
@@ -36,28 +11,11 @@ define(function(require, exports, module) {
       this.sampleRate = cc.server.sampleRate;
       this.samples    = new Float32Array(frames * channels);
     }
-    Buffer.prototype.bindBufferSource = function(bufSrc, startFrame, frames) {
-      startFrame = Math.max( 0, Math.min(startFrame|0, bufSrc.frames));
-      frames     = Math.max(-1, Math.min(frames    |0, bufSrc.frames - startFrame));
-      if (startFrame === 0) {
-        if (frames === -1) {
-          this.samples = bufSrc.samples;
-          this.frames  = bufSrc.frames;
-        } else {
-          this.samples = new Float32Array(bufSrc.samples.buffer, 0, frames);
-          this.frames = frames;
-        }
-      } else {
-        if (frames === -1) {
-          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4);
-          this.frames = bufSrc.frames - startFrame;
-        } else {
-          this.samples = new Float32Array(bufSrc.samples.buffer, startFrame * 4, frames);
-          this.frames = frames;
-        }
-      }
-      this.channels   = bufSrc.channels;
-      this.sampleRate = bufSrc.sampleRate;
+    Buffer.prototype.bindData = function(sampleRate, channels, frames, samples) {
+      this.sampleRate = sampleRate;
+      this.channels   = channels;
+      this.frames     = frames;
+      this.samples    = samples;
     };
     Buffer.prototype.zero = function() {
       var i, samples = this.samples;
@@ -263,17 +221,12 @@ define(function(require, exports, module) {
       }
     }
   };
-
-  cc.createServerBufferSource = function(bufSrcId) {
-    return new BufferSource(bufSrcId);
-  };
   
   cc.createServerBuffer = function(bufnum, frames, channels) {
     return new Buffer(bufnum, frames, channels);
   };
   
   module.exports = {
-    BufferSource: BufferSource,
     Buffer: Buffer
   };
 

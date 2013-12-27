@@ -64,7 +64,6 @@ define(function(require, exports, module) {
     };
     SynthLang.prototype.reset = function(msg) {
       this.currentTime = 0;
-      cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
       cc.resetMessage();

@@ -136,23 +136,6 @@ define(function(require, exports, module) {
     var channels = args[3]|0;
     instance.buffers[bufnum] = cc.createServerBuffer(bufnum, frames, channels);
   };
-  commands["/b_bind"] = function(instance, args) {
-    var bufnum     = args[1]|0;
-    var bufSrcId   = args[2]|0;
-    var startFrame = args[3]|0;
-    var frames     = args[4]|0;
-    var buffer = instance.buffers[bufnum];
-    var bufSrc = instance.bufSrc[bufSrcId];
-    if (buffer) {
-      if (bufSrc) {
-        buffer.bindBufferSource(bufSrc, startFrame, frames);
-      } else {
-        bufSrc = cc.createServerBufferSource(bufSrcId);
-        bufSrc.pendings.push([buffer, startFrame, frames]);
-        instance.bufSrc[bufSrcId] = bufSrc;
-      }
-    }
-  };
   commands["/b_free"] = function(instance, args) {
     var bufnum = args[1]|0;
     delete instance.buffers[bufnum];
@@ -192,17 +175,15 @@ define(function(require, exports, module) {
     }
   };
   commands[C.BINARY_CMD_SET_BUFSRC] = function(instance, binary) {
-    var bufSrcId = (binary[3] << 8) + binary[2];
+    var bufnum   = (binary[3] << 8) + binary[2];
     var channels = (binary[7] << 8) + binary[6];
     var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
     var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
     var samples = new Float32Array(binary.buffer, C.BUFSRC_HEADER_SIZE);
-    var bufSrc = instance.bufSrc[bufSrcId];
-    if (!bufSrc) {
-      bufSrc = cc.createServerBufferSource(bufSrcId);
+    var buffer  = instance.buffers[bufnum];
+    if (buffer) {
+      buffer.bindData(sampleRate, channels, frames, samples);
     }
-    bufSrc.set(channels, sampleRate, frames, samples);
-    instance.bufSrc[bufSrcId] = bufSrc;
   };
   
   cc.createInstance = function(userId) {
