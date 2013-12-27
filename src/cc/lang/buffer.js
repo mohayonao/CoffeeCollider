@@ -157,9 +157,9 @@ define(function(require, exports, module) {
     var f32   = new Float32Array(uint8.buffer);
     int16[0] = C.BINARY_CMD_SET_BUFFER;
     int16[1] = buffer.bufnum;
-    int16[3] = data.numChannels;
+    int16[3] = data.channels;
     int32[2] = data.sampleRate;
-    int32[3] = data.numFrames;
+    int32[3] = data.frames;
     f32.set(data.samples, 4);
     cc.lang.sendToServer(uint8);
   };
@@ -170,13 +170,13 @@ define(function(require, exports, module) {
     }
     if (numFrames instanceof Float32Array) {
       source = {
-        sampleRate : cc.lang.sampleRate,
-        numChannels: 1,
-        numFrames  : numFrames.length,
-        samples    : numFrames
+        sampleRate: cc.lang.sampleRate,
+        channels  : 1,
+        frames    : numFrames.length,
+        samples   : numFrames
       };
-      numFrames   = source.numFrames;
-      numChannels = source.numChannels;
+      numFrames   = source.frames;
+      numChannels = source.channels;
     }
     var buffer = new Buffer(numFrames, numChannels);
     if (source) {
@@ -194,41 +194,41 @@ define(function(require, exports, module) {
     var buffer = new Buffer();
     cc.lang.requestBuffer(path, function(result) {
       var data = {
-        samples    : result.samples,
-        sampleRate : result.sampleRate,
-        numChannels: result.numChannels,
-        numFrames  : result.numFrames
+        samples   : result.samples,
+        sampleRate: result.sampleRate,
+        channels  : result.channels,
+        frames    : result.frames
       }, samples;
       
       buffer.sampleRate = data.sampleRate;
       buffer.path       = path;
       
       samples    = data.samples;
-      startFrame = Math.max( 0, Math.min(startFrame|0, data.numFrames));
-      numFrames  = Math.max(-1, Math.min(numFrames |0, data.numFrames - startFrame));
-      var numChannels = data.numChannels;
+      startFrame = Math.max( 0, Math.min(startFrame|0, data.frames));
+      numFrames  = Math.max(-1, Math.min(numFrames |0, data.frames - startFrame));
+      var numChannels = data.channels;
       
       if (startFrame === 0) {
         if (numFrames !== -1) {
           data.samples   = new Float32Array(
             samples.buffer, 0, numFrames * numChannels
           );
-          buffer.frames  = numFrames;
-          data.numFrames = numFrames;
+          buffer.frames = numFrames;
+          data.frames   = numFrames;
         }
       } else {
         if (numFrames === -1) {
           data.samples = new Float32Array(
             samples.buffer, startFrame * numChannels * 4
           );
-          buffer.frames  = data.samples.length / numChannels;
+          buffer.frames = data.samples.length / numChannels;
         } else {
           data.samples = new Float32Array(
             samples.buffer, startFrame * numChannels * 4, numFrames * numChannels
           );
-          buffer.frames  = numFrames;
+          buffer.frames = numFrames;
         }
-        data.numFrames = buffer.frames;
+        data.frames = buffer.frames;
       }
       sendBufferData(buffer, data);
     });

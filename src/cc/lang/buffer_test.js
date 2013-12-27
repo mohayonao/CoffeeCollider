@@ -43,10 +43,10 @@ define(function(require, exports, module) {
       });
       describe("*read", function() {
         var data = {
-          sampleRate : 44100,
-          numChannels: 2,
-          numFrames  : 4,
-          samples: new Float32Array([1, 2, 3, 4, 5, 6, 7, 8])
+          sampleRate: 44100,
+          channels  : 2,
+          frames    : 4,
+          samples   : new Float32Array([1, 2, 3, 4, 5, 6, 7, 8])
         };
         before(function() {
           cc.lang.requestBuffer = function(path, callback) {

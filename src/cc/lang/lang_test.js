@@ -137,13 +137,13 @@ define(function(require, exports, module) {
           });
         });
         it("/buffer/response", function(done) {
-          var reqId = instance.bufferRequestId;
+          var reqId = instance.callbacks.length;
           instance.requestBuffer("path/to/audio", function(result) {
             assert.equal(result, "buffer");
             done()
           });
           setTimeout(function() {
-            instance.recvFromClient(["/buffer/response", "buffer", reqId]);
+            instance.recvFromClient(["/buffer/response", "buffer", 0]);
           }, 0);
         });
         describe("socket", function() {

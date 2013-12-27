@@ -16,8 +16,6 @@ define(function(require, exports, module) {
       this.rootNode    = cc.createLangRootNode();
       this.taskManager = cc.createTaskManager();
       this.timelineResult  = [];
-      this.bufferRequestId = 0;
-      this.bufferRequestCallback = {};
       this.phase = 0;
       this.random = new random.Random();
       this.currentTime = 0;
@@ -75,9 +73,8 @@ define(function(require, exports, module) {
       if (!(typeof path === "string" && typeof callback === "function")) {
         return;
       }
-      var requestId = this.bufferRequestId++;
-      this.bufferRequestCallback[requestId] = callback;
-      this.sendToClient(["/buffer/request", path, requestId]);
+      var callbackId = this.setCallback(callback);
+      this.sendToClient(["/buffer/request", path, callbackId]);
     };
     SynthLang.prototype.process = function() {
       throw "SynthLang#process: should be overridden";
@@ -88,6 +85,11 @@ define(function(require, exports, module) {
       var callbackId = this.callbacks.length;
       this.callbacks[callbackId] = callback;
       return callbackId;
+    };
+    SynthLang.prototype.getCallback = function(callbackId) {
+      var callback = this.callbacks[callbackId];
+      this.callbacks[callbackId] = null;
+      return callback;
     };
     
     return SynthLang;
@@ -144,11 +146,10 @@ define(function(require, exports, module) {
   };
   commands["/buffer/response"] = function(msg) {
     var buffer = msg[1];
-    var requestId = msg[2];
-    var callback = this.bufferRequestCallback[requestId];
+    var callbackId = msg[2];
+    var callback = this.getCallback(callbackId);
     if (callback) {
       callback(buffer);
-      delete this.bufferRequestCallback[requestId];
     }
   };
   commands["/send"] = function(msg) {
@@ -158,10 +159,9 @@ define(function(require, exports, module) {
 
   commands["/b_get"] = function(msg) {
     var callbackId = msg[1];
-    var callback = this.callbacks[callbackId];
+    var callback = this.getCallback(callbackId);
     if (callback) {
       callback(msg[2]);
-      this.callbacks[callbackId] = null;
     }
   };
   commands["/b_getn"] = function(msg) {

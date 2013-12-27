@@ -629,10 +629,10 @@ define(function(require, exports, module) {
     },
     requestBuffer: function(path, callback) {
       callback({
-        samples    : new Float32Array([0, 1, 2, 3]),
-        numChannels: 1,
-        sampleRate : 8000,
-        numFrames  : 4
+        sampleRate: 8000,
+        channels  : 1,
+        frames    : 4,
+        samples   : new Float32Array([0, 1, 2, 3])
       });
     },
     $beforeEach: function() {
