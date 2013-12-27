@@ -5,12 +5,12 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   
   var SynthClientNodeJSImpl = (function() {
-    function SynthClientNodeJSImpl(exports, opts) {
+    function SynthClientNodeJSImpl(client, opts) {
       cc.opmode = "nodejs";
       this.strmLength = C.NODEJS_STRM_LENGTH;
       this.bufLength  = C.NODEJS_BUF_LENGTH;
       
-      cc.SynthClientImpl.call(this, exports, opts);
+      cc.SynthClientImpl.call(this, client, opts);
       
       this.api = null;
     }
@@ -19,8 +19,8 @@ define(function(require, exports, module) {
     return SynthClientNodeJSImpl;
   })();
   
-  cc.createSynthClientNodeJSImpl = function(exports, opts) {
-    return new SynthClientNodeJSImpl(exports, opts);
+  cc.createSynthClientNodeJSImpl = function(client, opts) {
+    return new SynthClientNodeJSImpl(client, opts);
   };
   
   module.exports = {};

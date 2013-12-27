@@ -87,7 +87,7 @@ define(function(require, exports, module) {
   })();
 
   var SynthClientImpl = (function() {
-    function SynthClientImpl(exports, opts) {
+    function SynthClientImpl(client, opts) {
       emitter.mixin(this);
       
       this.compiler = cc.createCompiler("coffee");
@@ -95,7 +95,7 @@ define(function(require, exports, module) {
       this.isPlaying = false;
       this.execId = 0;
       this.execCallbacks = {};
-
+      
       this.sampleRate = 44100;
       this.channels   = 2;
       this.api = cc.createAudioAPI(this, opts);
@@ -439,8 +439,8 @@ define(function(require, exports, module) {
   cc.createSynthClient = function(opts) {
     return new SynthClient(opts);
   };
-  cc.createSynthClientImpl = function(exports, opts) {
-    return new SynthClientImpl(exports, opts);
+  cc.createSynthClientImpl = function(client, opts) {
+    return new SynthClientImpl(client, opts);
   };
   
   // TODO: moved
