@@ -15,11 +15,11 @@ define(function(require, exports, module) {
     var ins, actual, expected;
     
     testTools.mock("server");
-    testTools.mock("createInstance");
+    testTools.mock("createWorld");
 
-    describe("InstanceManager", function() {
+    describe("WorldManager", function() {
       it("append/remove", function() {
-        ins = new server.InstanceManager();
+        ins = new server.WorldManager();
         assert.equal(ins.list.length, 0);
         ins.append(0);
         assert.equal(ins.list.length, 1);
@@ -39,43 +39,43 @@ define(function(require, exports, module) {
         assert.equal(ins.list.length, 0);
       });
       it("play/pause", function() {
-        ins = new server.InstanceManager();
+        ins = new server.WorldManager();
         assert.isFalse(ins.isRunning());
         
         ins.append(0);
         
         ins.play(0);
-        assert.deepEqual(cc.createInstance.called, ["play"]);
+        assert.deepEqual(cc.createWorld.called, ["play"]);
         
         ins.play(1);
-        assert.deepEqual(cc.createInstance.called, ["play"]);
+        assert.deepEqual(cc.createWorld.called, ["play"]);
         
         ins.reset(0);
-        assert.deepEqual(cc.createInstance.called, ["play", "reset"]);
+        assert.deepEqual(cc.createWorld.called, ["play", "reset"]);
         
         ins.reset(1);
-        assert.deepEqual(cc.createInstance.called, ["play", "reset"]);
+        assert.deepEqual(cc.createWorld.called, ["play", "reset"]);
         
         ins.pause(0);
-        assert.deepEqual(cc.createInstance.called, ["play", "reset", "pause"]);
+        assert.deepEqual(cc.createWorld.called, ["play", "reset", "pause"]);
         
         ins.pause(1);
-        assert.deepEqual(cc.createInstance.called, ["play", "reset", "pause"]);
+        assert.deepEqual(cc.createWorld.called, ["play", "reset", "pause"]);
       });
       it("isRunning", function() {
-        ins = new server.InstanceManager();
+        ins = new server.WorldManager();
         ins.append(0);
         assert.isFalse(ins.isRunning());
       });
       it("pushToTimeline", function() {
-        ins = new server.InstanceManager();
+        ins = new server.WorldManager();
         ins.append(0);
         
         ins.pushToTimeline(["test"], 0);
-        assert.deepEqual(cc.createInstance.called, ["pushToTimeline"]);
+        assert.deepEqual(cc.createWorld.called, ["pushToTimeline"]);
         
         ins.pushToTimeline(["test"], 1);
-        assert.deepEqual(cc.createInstance.called, ["pushToTimeline"]);
+        assert.deepEqual(cc.createWorld.called, ["pushToTimeline"]);
       });
     });
     

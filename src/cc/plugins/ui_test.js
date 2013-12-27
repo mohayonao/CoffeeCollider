@@ -25,14 +25,14 @@ define(function(require, exports, module) {
       },
     ], {
       before: function() {
-        unitTestSuite.instance = {
+        unitTestSuite.world = {
           f32_syncItems: new Float32Array(10),
         };
       },
       preProcess: function(i, imax) {
         if (i % 64 === 0) {
-          unitTestSuite.instance.f32_syncItems[C.POS_X ] = (i / imax);
-          unitTestSuite.instance.f32_syncItems[C.POS_Y ] = (i / imax);
+          unitTestSuite.world.f32_syncItems[C.POS_X ] = (i / imax);
+          unitTestSuite.world.f32_syncItems[C.POS_Y ] = (i / imax);
         }
       },
       checker: function(statistics) {
@@ -55,13 +55,13 @@ define(function(require, exports, module) {
       },
     ], {
       before: function() {
-        unitTestSuite.instance = {
+        unitTestSuite.world = {
           f32_syncItems: new Float32Array(10),
         };
       },
       preProcess: function(i, imax) {
         if (i % 64 === 0) {
-          unitTestSuite.instance.f32_syncItems[C.BUTTON] = (i / imax) < 0.5 ? 0 : 1;
+          unitTestSuite.world.f32_syncItems[C.BUTTON] = (i / imax) < 0.5 ? 0 : 1;
         }
       },
       checker: function(statistics) {

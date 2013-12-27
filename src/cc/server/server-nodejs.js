@@ -30,7 +30,7 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instance.play(userId);
+      this.world.play(userId);
       if (this.api) {
         this._strm = new Float32Array(this.strmLength * this.channels);
         this.strmList = new Array(C.STRM_LIST_LENGTH);
@@ -53,16 +53,16 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instance.pause(userId);
+      this.world.pause(userId);
       if (this.api) {
         if (this.api.isPlaying) {
-          if (!this.instance.isRunning()) {
+          if (!this.world.isRunning()) {
             this.api.pause();
           }
         }
       }
       if (this.timer.isRunning()) {
-        if (!this.instance.isRunning()) {
+        if (!this.world.isRunning()) {
           this.timer.stop();
         }
       }
@@ -72,7 +72,7 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var instance = this.instance;
+      var world = this.world;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
       var busOut  = this.busOut;
@@ -83,8 +83,8 @@ define(function(require, exports, module) {
       var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
-        instance.process(bufLength);
-        busOut.set(instance.bus);
+        world.process(bufLength);
+        busOut.set(world.bus);
         strm.set(busOutL, offsetL);
         strm.set(busOutR, offsetR);
         offsetL += bufLength;

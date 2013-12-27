@@ -571,13 +571,13 @@ define(function(require, exports, module) {
       this._prevtrig = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, instance) {
+    var next = function(inNumSamples, world) {
       var trig = this.inputs[0][0];
       var id, node;
       if (trig > 0 && this._prevtrig <= 0) {
         id = this.inputs[1][0]|0;
         if (id) { // 0 is ignored
-          node = instance.nodes[id];
+          node = world.nodes[id];
           if (node) {
             node.end();
           }
@@ -659,7 +659,7 @@ define(function(require, exports, module) {
       this._state = 1;
       this.outputs[0][0] = this.inputs[0][0];
     };
-    var next = function(inNumSamples, instance) {
+    var next = function(inNumSamples, world) {
       var _in = this.inputs[0][0];
       var state = (_in === 0) ? 0 : 1;
       var id, node;
@@ -667,7 +667,7 @@ define(function(require, exports, module) {
         this._state = state;
         id = this.inputs[1][0]|0;
         if (id) { // 0 is ignored
-          node = instance.nodes[id];
+          node = world.nodes[id];
           if (node) {
             node.run(state);
           }

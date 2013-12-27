@@ -233,28 +233,28 @@ define(function(require, exports, module) {
       };
     };
     testSuite.audio = function() {
-      var instance = new cc.UGen("Audio");
-      instance.rate = C.AUDIO;
+      var ugen = new cc.UGen("Audio");
+      ugen.rate = C.AUDIO;
       this.inputs   = [ 1 ];
-      return instance;
+      return ugen;
     };
     testSuite.control = function() {
-      var instance = new cc.UGen("Control");
-      instance.rate = C.CONTROL;
+      var ugen = new cc.UGen("Control");
+      ugen.rate = C.CONTROL;
       this.inputs   = [ 2 ];
-      return instance;
+      return ugen;
     };
     testSuite.scalar = function() {
-      var instance = new cc.UGen("Scalar");
-      instance.rate = C.SCALAR;
+      var ugen = new cc.UGen("Scalar");
+      ugen.rate = C.SCALAR;
       this.inputs   = [ 3 ];
-      return instance;
+      return ugen;
     };
     testSuite.demand = function() {
-      var instance = new cc.UGen("Demand");
-      instance.rate = C.DEMAND;
+      var ugen = new cc.UGen("Demand");
+      ugen.rate = C.DEMAND;
       this.inputs   = [ 4 ];
-      return instance;
+      return ugen;
     };
     return testSuite;
   })();
@@ -341,7 +341,7 @@ define(function(require, exports, module) {
       opts = opts || {};
       
       var test = function(items) {
-        testSuite.instance = {};
+        testSuite.world = {};
 
         if (opts.before) beforeEach(opts.before);
         if (opts.after ) afterEach (opts.after );
@@ -487,7 +487,7 @@ define(function(require, exports, module) {
             opts.preProcess.call(unit, i, imax);
           }
           begin = Date.now();
-          unit.process(unit.rate.bufLength, testSuite.instance);
+          unit.process(unit.rate.bufLength, testSuite.world);
           end   = Date.now();
           statistics.time += end - begin;
         }
@@ -702,74 +702,74 @@ define(function(require, exports, module) {
     mock.createTaskManager.called = [];
   };
 
-  mock.createInstanceManager = function() {
+  mock.createWorldManager = function() {
     return {
       init: function() {
-        mock.createInstanceManager.called.push("init");
+        mock.createWorldManager.called.push("init");
       },
       play: function() {
-        mock.createInstanceManager.called.push("play");
+        mock.createWorldManager.called.push("play");
       },
       pause: function() {
-        mock.createInstanceManager.called.push("pause");
+        mock.createWorldManager.called.push("pause");
       },
       reset: function() {
-        mock.createInstanceManager.called.push("reset");
+        mock.createWorldManager.called.push("reset");
       },
       pushToTimeline: function() {
-        mock.createInstanceManager.called.push("pushToTimeline");
+        mock.createWorldManager.called.push("pushToTimeline");
       },
       append: function() {
-        mock.createInstanceManager.called.push("append");
-        return mock.createInstance();
+        mock.createWorldManager.called.push("append");
+        return mock.createWorld();
       },
       remove: function() {
-        mock.createInstanceManager.called.push("remove");
+        mock.createWorldManager.called.push("remove");
       },
       process:function() {
-        mock.createInstanceManager.called.push("process");
+        mock.createWorldManager.called.push("process");
       }
     };
   };
-  mock.createInstanceManager.$beforeEach = function() {
-    mock.createInstanceManager.called = [];
+  mock.createWorldManager.$beforeEach = function() {
+    mock.createWorldManager.called = [];
   };
   
-  mock.createInstance = function() {
+  mock.createWorld = function() {
     return {
       play: function() {
-        mock.createInstance.called.push("play");
+        mock.createWorld.called.push("play");
       },
       pause: function() {
-        mock.createInstance.called.push("pause");
+        mock.createWorld.called.push("pause");
       },
       reset: function() {
-        mock.createInstance.called.push("reset");
+        mock.createWorld.called.push("reset");
       },
       pushToTimeline: function() {
-        mock.createInstance.called.push("pushToTimeline");
+        mock.createWorld.called.push("pushToTimeline");
       },
       process: function() {
-        mock.createInstance.called.push("process");
+        mock.createWorld.called.push("process");
       },
       isRunning: function() {
         return false;
       }
     };
   };
-  mock.createInstance.$beforeEach = function() {
-    mock.createInstance.called = [];
+  mock.createWorld.$beforeEach = function() {
+    mock.createWorld.called = [];
   };
 
-  mock.createServerGroup = function(nodeId, target, addAction, instance) {
-    return [nodeId, target, addAction, instance ];
+  mock.createServerGroup = function(nodeId, target, addAction, world) {
+    return [nodeId, target, addAction, world ];
   };
 
-  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
-    return [ nodeId, target, addAction, defId, controls, instance ];
+  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, world) {
+    return [ nodeId, target, addAction, defId, controls, world ];
   };
 
-  mock.createServerBuffer = function(instance, bufnum, frames, channels) {
+  mock.createServerBuffer = function(world, bufnum, frames, channels) {
     return [ bufnum, frames, channels ];
   };
   

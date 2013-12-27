@@ -228,16 +228,16 @@ define(function(require, exports, module) {
       }
 
       var userId;
-      if (this.instance) {
-        userId = this.instance.userId;
+      if (this.world) {
+        userId = this.world.userId;
       }
     }
     this.prev = null;
     this.next = null;
     this.parent = null;
     this.blocking = false;
-    if (this.instance) {
-      delete this.instance.nodes[this.nodeId];
+    if (this.world) {
+      delete this.world.nodes[this.nodeId];
     }
   };
   var g_freeAll = function(node) {
@@ -265,13 +265,13 @@ define(function(require, exports, module) {
   };
   
   var Node = (function() {
-    function Node(nodeId, instance) {
+    function Node(nodeId, world) {
       this.nodeId = nodeId|0;
       this.next   = null;
       this.prev   = null;
       this.parent = null;
       this.running = true;
-      this.instance = instance;
+      this.world = world;
     }
     Node.prototype.play = function() {
       this.running = true;
@@ -293,8 +293,8 @@ define(function(require, exports, module) {
       if (func) {
         func.call(this);
         var userId;
-        if (this.instance) {
-          userId = this.instance.userId;
+        if (this.world) {
+          userId = this.world.userId;
         }
       }
     };
@@ -302,8 +302,8 @@ define(function(require, exports, module) {
   })();
 
   var Group = (function() {
-    function Group(nodeId, target, addAction, instance) {
-      Node.call(this, nodeId, instance);
+    function Group(nodeId, target, addAction, world) {
+      Node.call(this, nodeId, world);
       this.head = null;
       this.tail = null;
       if (target) {
@@ -312,12 +312,12 @@ define(function(require, exports, module) {
     }
     extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples, instance) {
+    Group.prototype.process = function(inNumSamples, world) {
       if (this.head && this.running) {
-        this.head.process(inNumSamples, instance);
+        this.head.process(inNumSamples, world);
       }
       if (this.next) {
-        this.next.process(inNumSamples, instance);
+        this.next.process(inNumSamples, world);
       }
     };
     
@@ -325,12 +325,12 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, target, addAction, defId, controls, instance) {
-      Node.call(this, nodeId, instance);
-      if (instance) {
-        var specs = instance.defs[defId];
+    function Synth(nodeId, target, addAction, defId, controls, world) {
+      Node.call(this, nodeId, world);
+      if (world) {
+        var specs = world.defs[defId];
         if (specs) {
-          this.build(specs, controls, instance);
+          this.build(specs, controls, world);
         }
       }
       if (target) {
@@ -339,7 +339,7 @@ define(function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, controls, instance) {
+    Synth.prototype.build = function(specs, controls, world) {
       this.specs = specs;
       var list, value, unit, i, imax;
       var fixNumList, unitList, filteredUnitList;
@@ -347,7 +347,7 @@ define(function(require, exports, module) {
       fixNumList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
         value = list[i];
-        fixNumList[i] = instance.getFixNum(value);
+        fixNumList[i] = world.getFixNum(value);
       }
       list = specs.defList;
       unitList = new Array(list.length);
@@ -393,34 +393,34 @@ define(function(require, exports, module) {
       }
     };
     
-    Synth.prototype.process = function(inNumSamples, instance) {
+    Synth.prototype.process = function(inNumSamples, world) {
       if (this.running && this.unitList) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
           if (unit.calcRate !== C.DEMAND) {
-            unit.process(unit.rate.bufLength, instance);
+            unit.process(unit.rate.bufLength, world);
           }
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples, instance);
+        this.next.process(inNumSamples, world);
       }
     };
     
     return Synth;
   })();
   
-  cc.createServerRootNode = function(instance) {
-    return new Group(0, 0, 0, instance);
+  cc.createServerRootNode = function(world) {
+    return new Group(0, 0, 0, world);
   };
 
-  cc.createServerGroup = function(nodeId, target, addAction, instance) {
-    return new Group(nodeId, target, addAction, instance);
+  cc.createServerGroup = function(nodeId, target, addAction, world) {
+    return new Group(nodeId, target, addAction, world);
   };
 
-  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
-    return new Synth(nodeId, target, addAction, defId, controls, instance);
+  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, world) {
+    return new Synth(nodeId, target, addAction, defId, controls, world);
   };
   
   module.exports = {

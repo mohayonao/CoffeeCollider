@@ -5,19 +5,19 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   var emitter = require("../common/emitter");
   
-  var InstanceManager = (function() {
-    function InstanceManager() {
+  var WorldManager = (function() {
+    function WorldManager() {
       this.map  = {};
       this.list = [];
       this.server = null;
       this.process = process0;
     }
     
-    InstanceManager.prototype.append = function(userId) {
+    WorldManager.prototype.append = function(userId) {
       if (!this.map[userId]) {
-        var instance = cc.createInstance(userId);
-        this.map[userId] = instance;
-        this.list.push(instance);
+        var world = cc.createWorld(userId);
+        this.map[userId] = world;
+        this.list.push(world);
         if (this.list.length === 1) {
           this.process = process1;
         } else {
@@ -26,10 +26,10 @@ define(function(require, exports, module) {
       }
       return this.map[userId];
     };
-    InstanceManager.prototype.remove = function(userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        this.list.splice(this.list.indexOf(instance), 1);
+    WorldManager.prototype.remove = function(userId) {
+      var world = this.map[userId];
+      if (world) {
+        this.list.splice(this.list.indexOf(world), 1);
         delete this.map[userId];
         if (this.list.length === 1) {
           this.process = process1;
@@ -38,39 +38,39 @@ define(function(require, exports, module) {
         }
       }
     };
-    InstanceManager.prototype.play = function(userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.play();
+    WorldManager.prototype.play = function(userId) {
+      var world = this.map[userId];
+      if (world) {
+        world.play();
       }
     };
-    InstanceManager.prototype.pause = function(userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.pause();
+    WorldManager.prototype.pause = function(userId) {
+      var world = this.map[userId];
+      if (world) {
+        world.pause();
       }
     };
-    InstanceManager.prototype.reset = function(userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.reset();
+    WorldManager.prototype.reset = function(userId) {
+      var world = this.map[userId];
+      if (world) {
+        world.reset();
       }
     };
-    InstanceManager.prototype.isRunning = function() {
-      return this.list.some(function(instance) {
-        return instance.isRunning();
+    WorldManager.prototype.isRunning = function() {
+      return this.list.some(function(world) {
+        return world.isRunning();
       });
     };
-    InstanceManager.prototype.pushToTimeline = function(timeline, userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.pushToTimeline(timeline);
+    WorldManager.prototype.pushToTimeline = function(timeline, userId) {
+      var world = this.map[userId];
+      if (world) {
+        world.pushToTimeline(timeline);
       }
     };
-    InstanceManager.prototype.doBinayCommand = function(binary, userId) {
-      var instance = this.map[userId];
-      if (instance) {
-        instance.doBinayCommand(binary);
+    WorldManager.prototype.doBinayCommand = function(binary, userId) {
+      var world = this.map[userId];
+      if (world) {
+        world.doBinayCommand(binary);
       }
     };
     
@@ -85,20 +85,20 @@ define(function(require, exports, module) {
       var list = this.list;
       var busOut    = cc.server.busOut;
       var busOutLen = cc.server.busOutLen;
-      var instance;
+      var world;
       busOut.set(cc.server.busClear);
       for (var i = 0, imax = list.length; i < imax; ++i) {
-        instance = list[i];
-        instance.process(bufLength);
-        var inBus = instance.bus;
-        var inAmp = instance.busAmp;
+        world = list[i];
+        world.process(bufLength);
+        var inBus = world.bus;
+        var inAmp = world.busAmp;
         for (var j = busOutLen; j--; ) {
           busOut[j] += inBus[j] * inAmp;
         }
       }
     };
     
-    return InstanceManager;
+    return WorldManager;
   })();
 
   var SocketSynthServer = (function() {
@@ -112,7 +112,7 @@ define(function(require, exports, module) {
       this.channels   = C.SOCKET_CHANNELS;
       this.strmLength = C.SOCKET_STRM_LENGTH;
       this.bufLength  = C.SOCKET_BUF_LENGTH;
-      this.instance   = new InstanceManager();
+      this.world   = new WorldManager();
       this.list = [];
       this.map  = {};
       this.exports = null; // bind after
@@ -134,7 +134,7 @@ define(function(require, exports, module) {
         var userId = _userId++;
         that.list.push(ws);
         that.map[userId] = ws;
-        that.instance.append(userId);
+        that.world.append(userId);
         ws.on("message", function(msg) {
           // receive a message from the lang
           if (typeof msg !== "string") {
@@ -147,7 +147,7 @@ define(function(require, exports, module) {
         ws.on("close", function() {
           if (that.map[userId]) {
             that.pause([], userId);
-            that.instance.remove(userId);
+            that.world.remove(userId);
             that.list.splice(that.list.indexOf(ws), 1);
             delete that.map[userId];
           }
@@ -193,7 +193,7 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var instance = this.instance;
+      var world = this.world;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
       var busOutL = this.busOutL;
@@ -201,7 +201,7 @@ define(function(require, exports, module) {
       var offsetL = 0;
       var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
-        instance.process(bufLength);
+        world.process(bufLength);
         strm.set(busOutL, offsetL);
         strm.set(busOutR, offsetR);
         offsetL += bufLength;
@@ -221,16 +221,16 @@ define(function(require, exports, module) {
   })();
 
   var SocketSynthServerExports = (function() {
-    var instance = null;
+    var singleton = null;
     function SocketSynthServerExports(server, opts) {
-      if (instance) {
-        return instance;
+      if (singleton) {
+        return singleton;
       }
       emitter.mixin(this);
       this.server = server;
       this.server.exports = this;
       this.server._init(opts||{});
-      instance = this;
+      singleton = this;
     }
     SocketSynthServerExports.prototype.send = function(msg, userId) {
       this.server.sendToLang([
@@ -253,7 +253,7 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    InstanceManager: InstanceManager
+    WorldManager: WorldManager
   };
 
 });
