@@ -27,6 +27,9 @@ define(function(require, exports, module) {
     SynthLang.prototype.sendToClient = function() {
       throw "SynthLang#sendToClient: should be overridden[" + cc.opmode + "]";
     };
+    SynthLang.prototype.sendToClientWithTransferable = function() {
+      throw "SynthLang#sendToClientWithTransferable: should be overridden[" + cc.opmode + "]";
+    };
     SynthLang.prototype.recvFromClient = function(msg) {
       if (msg) {
         var func = commands[msg[0]];

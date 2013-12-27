@@ -320,6 +320,11 @@ define(function(require, exports, module) {
         this.lang.postMessage(msg);
       }
     };
+    SynthClientImpl.prototype.sendToLangWithTransferable = function(uint8) {
+      if (this.lang) {
+        this.lang.postMessage(uint8, [uint8.buffer]);
+      }
+    };
     SynthClientImpl.prototype.recvFromLang = function(msg) {
       if (msg instanceof Float32Array) {
         this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = msg;
@@ -415,9 +420,7 @@ define(function(require, exports, module) {
         int32[2] = result.sampleRate;
         int32[3] = result.frames;
         f32.set(result.samples, 4);
-        that.sendToLang(uint8);
-        // TODO: use transferable object
-        // that.sendToLang(["/buffer/response", buffer, requestId]);
+        that.sendToLangWithTransferable(uint8);
       }
     });
   };

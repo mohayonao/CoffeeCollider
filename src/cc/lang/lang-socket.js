@@ -24,6 +24,9 @@ define(function(require, exports, module) {
     SocketSynthLang.prototype.sendToClient = function(msg) {
       postMessage(msg);
     };
+    SocketSynthLang.prototype.sendToClientWithTransferable = function(uint8) {
+      postMessage(uint8, [uint8.buffer]);
+    };
     SocketSynthLang.prototype.sendToServer = function() {
     };
     SocketSynthLang.prototype.process = function() {

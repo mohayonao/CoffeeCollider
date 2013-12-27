@@ -20,6 +20,9 @@ define(function(require, exports, module) {
     WorkerSynthLang.prototype.sendToClient = function(msg) {
       postMessage(msg);
     };
+    WorkerSynthLang.prototype.sendToClientWithTransferable = function(uint8) {
+      postMessage(uint8, [uint8.buffer]);
+    };
     WorkerSynthLang.prototype.process = function() {
       this.currentTime += this.currentTimeIncr;
       this.taskManager.process();
