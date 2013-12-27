@@ -79,8 +79,9 @@ define(function(require, exports, module) {
       return asNumber(this)[selector](b);
     });
   });
-  fn.defineBinaryProperty(String.prototype, "__add__", function(b) {
-    return this + b.toString();
+  fn.defineProperty(String.prototype, "__add__", function(b) {
+    b = b ? b.asString ? b.asString() : b.toString() : b;
+    return this + b;
   });
   
   var repeat = (function() {
