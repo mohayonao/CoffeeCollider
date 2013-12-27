@@ -11,7 +11,7 @@ define(function(require, exports, module) {
       this.sampleRate = cc.server.sampleRate;
       this.samples    = new Float32Array(frames * channels);
     }
-    Buffer.prototype.bindData = function(sampleRate, channels, frames, samples) {
+    Buffer.prototype.bind = function(sampleRate, channels, frames, samples) {
       this.sampleRate = sampleRate;
       this.channels   = channels;
       this.frames     = frames;
@@ -227,7 +227,13 @@ define(function(require, exports, module) {
   };
   
   module.exports = {
-    Buffer: Buffer
+    Buffer: Buffer,
+    add_partial   : add_partial,
+    add_wpartial  : add_wpartial,
+    add_chebyshev : add_chebyshev,
+    add_wchebyshev: add_wchebyshev,
+    normalize_samples : normalize_samples,
+    normalize_wsamples: normalize_wsamples
   };
 
 });

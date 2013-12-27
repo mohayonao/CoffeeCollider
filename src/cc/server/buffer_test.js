@@ -13,6 +13,10 @@ define(function(require, exports, module) {
     testTools.mock("server");
     
     describe("Buffer", function() {
+      it("create", function() {
+        instance = cc.createServerBuffer(0, 16, 2);
+        assert.instanceOf(instance, buffer.Buffer);
+      });
       it("new", function() {
         instance = new buffer.Buffer(0, 16, 2);
         assert.equal(instance.bufnum, 0);
@@ -20,6 +24,15 @@ define(function(require, exports, module) {
         assert.equal(instance.channels, 2);
         assert.equal(instance.sampleRate, 44100);
         assert.equal(instance.samples.length, 32);
+      });
+      it("bind", function() {
+        instance = new buffer.Buffer(0, 16, 2);
+        instance.bind(8000, 4, 16, null);
+        assert.equal(instance.frames, 16);
+        assert.equal(instance.channels, 4);
+        assert.equal(instance.sampleRate, 8000);
+        assert.equal(instance.samples, null);
+        
       });
       it("set", function() {
         instance = new buffer.Buffer(0, 16, 2);
@@ -146,6 +159,25 @@ define(function(require, exports, module) {
           0, 0, 0, 0, 0, 0, 0, 0
         ]);
         assert.deepEqual(actual, expected);
+      });
+    });
+    describe("private methods", function() {
+      var data, w_data;
+      beforeEach(function() {
+        data   = new Float32Array([10, 5, 0, -5, -10]);
+        w_data = new Float32Array([10, 0, 5, 0, 0, 0, -5, 0, -10, 0]);
+      });
+      it("normalize", function() {
+        buffer.normalize_samples(5, data, 1);
+        actual   = data;
+        expected = new Float32Array([1, 0.5, 0, -0.5, -1]);
+        assert.deepCloseTo(actual, expected, 1e-6);
+      });
+      it("normalize_w", function() {
+        buffer.normalize_wsamples(10, w_data, 1);
+        actual   = w_data;
+        expected = new Float32Array([1, 0, 0.5, 0, 0, 0, -0.5, 0, -1, 0]);
+        assert.deepCloseTo(actual, expected, 1e-6);
       });
     });
   });

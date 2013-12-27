@@ -147,29 +147,45 @@ define(function(require, exports, module) {
       throw new TypeError("Buffer.Read: path should be a string.");
     }
     var buffer = new Buffer();
-    cc.lang.requestBuffer(path, function(data) {
-      var samples;
-      if (data) {
-        buffer.sampleRate = data.sampleRate;
-        buffer.path       = path;
-        
-        samples    = data.samples;
-        startFrame = Math.max( 0, Math.min(startFrame|0, data.numFrames));
-        numFrames  = Math.max(-1, Math.min(numFrames |0, data.numFrames - startFrame));
-        
-        if (startFrame === 0) {
-          if (numFrames !== -1) {
-            samples = new Float32Array(samples.buffer, 0, numFrames);
-          }
-        } else {
-          if (numFrames === -1) {
-            samples = new Float32Array(samples.buffer, startFrame * 4);
-          } else {
-            samples = new Float32Array(samples.buffer, startFrame * 4, numFrames);
-          }
+    cc.lang.requestBuffer(path, function(result) {
+      var data = {
+        samples    : result.samples,
+        sampleRate : result.sampleRate,
+        numChannels: result.numChannels,
+        numFrames  : result.numFrames
+      }, samples;
+      
+      buffer.sampleRate = data.sampleRate;
+      buffer.path       = path;
+      
+      samples    = data.samples;
+      startFrame = Math.max( 0, Math.min(startFrame|0, data.numFrames));
+      numFrames  = Math.max(-1, Math.min(numFrames |0, data.numFrames - startFrame));
+      var numChannels = data.numChannels;
+      
+      if (startFrame === 0) {
+        if (numFrames !== -1) {
+          data.samples   = new Float32Array(
+            samples.buffer, 0, numFrames * numChannels
+          );
+          buffer.frames  = numFrames;
+          data.numFrames = numFrames;
         }
-        sendBufferData(buffer, data);
+      } else {
+        if (numFrames === -1) {
+          data.samples = new Float32Array(
+            samples.buffer, startFrame * numChannels * 4
+          );
+          buffer.frames  = data.samples.length / numChannels;
+        } else {
+          data.samples = new Float32Array(
+            samples.buffer, startFrame * numChannels * 4, numFrames * numChannels
+          );
+          buffer.frames  = numFrames;
+        }
+        data.numFrames = buffer.frames;
       }
+      sendBufferData(buffer, data);
     });
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").build();

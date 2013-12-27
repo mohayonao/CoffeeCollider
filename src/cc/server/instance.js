@@ -182,7 +182,7 @@ define(function(require, exports, module) {
     var samples = new Float32Array(binary.buffer, C.BUFSRC_HEADER_SIZE);
     var buffer  = instance.buffers[bufnum];
     if (buffer) {
-      buffer.bindData(sampleRate, channels, frames, samples);
+      buffer.bind(sampleRate, channels, frames, samples);
     }
   };
   
