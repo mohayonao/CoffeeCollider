@@ -405,6 +405,7 @@ define(function(require, exports, module) {
     var requestId = msg[2];
     this.readAudioFile(msg[1], function(err, buffer) {
       if (!err) {
+        // TODO: use transferable object
         that.sendToLang(["/buffer/response", buffer, requestId]);
       }
     });
