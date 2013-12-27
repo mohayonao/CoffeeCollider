@@ -312,12 +312,12 @@ define(function(require, exports, module) {
     }
     extend(Group, Node);
     
-    Group.prototype.process = function(inNumSamples, world) {
+    Group.prototype.process = function(inNumSamples) {
       if (this.head && this.running) {
-        this.head.process(inNumSamples, world);
+        this.head.process(inNumSamples);
       }
       if (this.next) {
-        this.next.process(inNumSamples, world);
+        this.next.process(inNumSamples);
       }
     };
     
@@ -393,18 +393,18 @@ define(function(require, exports, module) {
       }
     };
     
-    Synth.prototype.process = function(inNumSamples, world) {
+    Synth.prototype.process = function(inNumSamples) {
       if (this.running && this.unitList) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
           if (unit.calcRate !== C.DEMAND) {
-            unit.process(unit.rate.bufLength, world);
+            unit.process(unit.rate.bufLength);
           }
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples, world);
+        this.next.process(inNumSamples);
       }
     };
     

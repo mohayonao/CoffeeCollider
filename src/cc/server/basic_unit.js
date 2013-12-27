@@ -977,9 +977,9 @@ define(function(require, exports, module) {
         this._busOffset = this.bufLength * C.AUDIO_BUS_LEN;
       }
     };
-    var next_a = function(inNumSamples, world) {
+    var next_a = function(inNumSamples) {
       var inputs = this.inputs;
-      var bus    = world.bus;
+      var bus    = this.world.bus;
       var bufLength = this.bufLength;
       var offset, _in;
       var fbusChannel = (inputs[0][0]|0) - 1;
@@ -991,9 +991,9 @@ define(function(require, exports, module) {
         }
       }
     };
-    var next_k = function(inNumSamples, world) {
+    var next_k = function() {
       var inputs = this.inputs;
-      var bus    = world.bus;
+      var bus    = this.world.bus;
       var offset    = this._busOffset + (inputs[0][0]|0) - 1;
       for (var i = 1, imax = inputs.length; i < imax; ++i) {
         bus[offset + i] += inputs[i][0];

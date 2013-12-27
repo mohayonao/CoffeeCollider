@@ -6,6 +6,7 @@ define(function(require, exports, module) {
   var Unit = (function() {
     function Unit(parent, specs) {
       this.parent = parent;
+      this.world  = parent.world;
       this.specs  = specs;
       this.name         = specs[0];
       this.calcRate     = specs[1];

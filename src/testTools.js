@@ -427,6 +427,7 @@ define(function(require, exports, module) {
       var i, imax, j;
       var unit = cc.createUnit(parent, spec);
       var imax = Math.ceil(unit.rate.sampleRate / unit.rate.bufLength);
+      unit.world = testSuite.world;
       
       for (i = 0; i < unit.numOfInputs; ++i) {
         unit.inRates[i] = inputSpecs[i].rate;

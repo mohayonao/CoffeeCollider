@@ -128,8 +128,8 @@ define(function(require, exports, module) {
     }
     unit._x = x;
   };
-  var get_table = function(unit, world, shift) {
-    var buffer = world.buffers[unit._bufnumIn[0]|0];
+  var get_table = function(unit, shift) {
+    var buffer = unit.world.buffers[unit._bufnumIn[0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples.length) {
@@ -200,28 +200,28 @@ define(function(require, exports, module) {
       var index = (pphase & mask) << 1;
       return table[index] + (pphase-(pphase|0)) * table[index+1];
     };
-    var next_aa = function(inNumSamples, world) {
-      if (get_table(this, world, 1)) {
+    var next_aa = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_aa(this, inNumSamples, wcalc);
       }
     };
-    var next_ak = function(inNumSamples, world) {
-      if (get_table(this, world, 1)) {
+    var next_ak = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ak(this, inNumSamples, wcalc);
       }
     };
-    var next_ai = function(inNumSamples, world) {
-      if (get_table(this, world, 1)) {
+    var next_ai = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ai(this, inNumSamples, wcalc);
       }
     };
-    var next_ka = function(inNumSamples, world) {
-      if (get_table(this, world, 1)) {
+    var next_ka = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ka(this, inNumSamples, wcalc);
       }
     };
-    var next_kk = function(inNumSamples, world) {
-      if (get_table(this, world, 1)) {
+    var next_kk = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_kk(this, inNumSamples, wcalc);
       }
     };
@@ -430,28 +430,28 @@ define(function(require, exports, module) {
     var calc = function(table, mask, pphase) {
       return table[pphase & mask];
     };
-    var next_aa = function(inNumSamples, world) {
-      if (get_table(this, world, 0)) {
+    var next_aa = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_aa(this, inNumSamples, calc);
       }
     };
-    var next_ak = function(inNumSamples, world) {
-      if (get_table(this, world, 0)) {
+    var next_ak = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ak(this, inNumSamples, calc);
       }
     };
-    var next_ai = function(inNumSamples, world) {
-      if (get_table(this, world, 0)) {
+    var next_ai = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ai(this, inNumSamples, calc);
       }
     };
-    var next_ka = function(inNumSamples, world) {
-      if (get_table(this, world, 0)) {
+    var next_ka = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ka(this, inNumSamples, calc);
       }
     };
-    var next_kk = function(inNumSamples, world) {
-      if (get_table(this, world, 0)) {
+    var next_kk = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_kk(this, inNumSamples, calc);
       }
     };

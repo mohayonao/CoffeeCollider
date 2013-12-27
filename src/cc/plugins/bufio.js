@@ -61,8 +61,8 @@ define(function(require, exports, module) {
     return [ index0, index1, index2, index3 ];
   };
 
-  var get_buffer = function(unit, world) {
-    var buffer = world.buffers[unit.inputs[0][0]|0];
+  var get_buffer = function(unit) {
+    var buffer = unit.world.buffers[unit.inputs[0][0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples.length) {
@@ -123,8 +123,8 @@ define(function(require, exports, module) {
       this._trig  = 0;
     };
     
-    var next_1ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_1ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var out   = this.outputs[0];
@@ -161,8 +161,8 @@ define(function(require, exports, module) {
       this._phase = phase;
     };
     
-    var next_2ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_2ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var out1  = this.outputs[0];
@@ -206,8 +206,8 @@ define(function(require, exports, module) {
       this._phase = phase;
     };
     
-    var next = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var outputs = this.outputs;
@@ -310,8 +310,8 @@ define(function(require, exports, module) {
       this._channels = 0;
       this._frames   = 0;
     };
-    var next_1ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_1ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var out = this.outputs[0];
@@ -329,8 +329,8 @@ define(function(require, exports, module) {
         out[i] = perform(samples, indices, 1, 0, frac);
       }
     };
-    var next_2ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_2ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var out1 = this.outputs[0];
@@ -350,8 +350,8 @@ define(function(require, exports, module) {
         out2[i] = perform(samples, indices, 2, 1, frac);
       }
     };
-    var next = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var outputs = this.outputs;
@@ -408,8 +408,8 @@ define(function(require, exports, module) {
         break;
       }
     };
-    var next_1ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_1ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -424,8 +424,8 @@ define(function(require, exports, module) {
         samples[phase|0] = in0In[i];
       }
     };
-    var next_2ch = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next_2ch = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -443,8 +443,8 @@ define(function(require, exports, module) {
         samples[index+1] = in1In[i];
       }
     };
-    var next = function(inNumSamples, world) {
-      if (!get_buffer(this, world)) {
+    var next = function(inNumSamples) {
+      if (!get_buffer(this)) {
         return;
       }
       var phaseIn = this.inputs[1];
@@ -505,8 +505,8 @@ define(function(require, exports, module) {
       this._preindex = 0;
     };
     var recbuf_next = function(func) {
-      return function(inNumSamples, world) {
-        if (!get_buffer(this, world)) {
+      return function(inNumSamples) {
+        if (!get_buffer(this)) {
           return;
         }
         var channels = this._channels;
@@ -606,8 +606,8 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._sampleRate;
       }
     };
@@ -621,8 +621,8 @@ define(function(require, exports, module) {
       this.process = next;
       this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._sampleRate * this._sampleDur;
       }
     };
@@ -635,8 +635,8 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._frames;
       }
     };
@@ -649,8 +649,8 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._samples.length;
       }
     };
@@ -664,8 +664,8 @@ define(function(require, exports, module) {
       this.process = next;
       this._sampleDur = cc.server.rates[C.AUDIO].sampleDur;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._frames * this._sampleDur;
       }
     };
@@ -678,8 +678,8 @@ define(function(require, exports, module) {
     var ctor = function() {
       this.process = next;
     };
-    var next = function(inNumSamples, world) {
-      if (get_buffer(this, world)) {
+    var next = function() {
+      if (get_buffer(this)) {
         this.outputs[0][0] = this._channels;
       }
     };
