@@ -172,6 +172,13 @@ define(function(require, exports, module) {
       this.callbacks[callbackId] = null;
     }
   };
+  commands[C.BINARY_CMD_SET_BUFFER] = function(binary) {
+    var callbackId = (binary[3] << 8) + binary[2];
+    var callback = this.getCallback(callbackId);
+    if (callback) {
+      callback(binary);
+    }
+  };
   
   cc.SynthLang = SynthLang;
   

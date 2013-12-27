@@ -192,13 +192,18 @@ define(function(require, exports, module) {
       throw new TypeError("Buffer.Read: path should be a string.");
     }
     var buffer = new Buffer();
-    cc.lang.requestBuffer(path, function(result) {
+    cc.lang.requestBuffer(path, function(binary) {
+      var channels   = (binary[7] << 8) + binary[6];
+      var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
+      var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
+      var samples    = new Float32Array(binary.buffer, C.SET_BUFFER_HEADER_SIZE);
+      
       var data = {
-        samples   : result.samples,
-        sampleRate: result.sampleRate,
-        channels  : result.channels,
-        frames    : result.frames
-      }, samples;
+        sampleRate: sampleRate,
+        channels  : channels,
+        frames    : frames,
+        samples   : samples
+      };
       
       buffer.sampleRate = data.sampleRate;
       buffer.path       = path;
@@ -211,7 +216,7 @@ define(function(require, exports, module) {
       if (startFrame === 0) {
         if (numFrames !== -1) {
           data.samples   = new Float32Array(
-            samples.buffer, 0, numFrames * numChannels
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE, numFrames * numChannels
           );
           buffer.frames = numFrames;
           data.frames   = numFrames;
@@ -219,12 +224,12 @@ define(function(require, exports, module) {
       } else {
         if (numFrames === -1) {
           data.samples = new Float32Array(
-            samples.buffer, startFrame * numChannels * 4
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE + startFrame * numChannels * 4
           );
           buffer.frames = data.samples.length / numChannels;
         } else {
           data.samples = new Float32Array(
-            samples.buffer, startFrame * numChannels * 4, numFrames * numChannels
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE + startFrame * numChannels * 4, numFrames * numChannels
           );
           buffer.frames = numFrames;
         }

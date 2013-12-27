@@ -42,15 +42,20 @@ define(function(require, exports, module) {
         assert.deepEqual(cc.lang.sendToServer.result, [uint8]);
       });
       describe("*read", function() {
-        var data = {
-          sampleRate: 44100,
-          channels  : 2,
-          frames    : 4,
-          samples   : new Float32Array([1, 2, 3, 4, 5, 6, 7, 8])
-        };
+        var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + 8 * 4);
+        var int16 = new Uint16Array(uint8.buffer);
+        var int32 = new Uint32Array(uint8.buffer);
+        var f32   = new Float32Array(uint8.buffer);
         before(function() {
           cc.lang.requestBuffer = function(path, callback) {
-            callback(data);
+            int16[0] = C.BINARY_CMD_SET_BUFFER;
+            int16[1] = 0;
+            int16[3] = 2;
+            int32[2] = 44100;
+            int32[3] = 4;
+            f32[ 4] = 1; f32[ 5] = 2; f32[ 6] = 3; f32[ 7] = 4;
+            f32[ 8] = 5; f32[ 9] = 6; f32[10] = 7; f32[11] = 8;
+            callback(uint8);
           };
         });
         it("read(empty)", function() {

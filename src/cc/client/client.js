@@ -402,11 +402,22 @@ define(function(require, exports, module) {
   };
   commands["/buffer/request"] = function(msg) {
     var that = this;
-    var requestId = msg[2];
-    this.readAudioFile(msg[1], function(err, buffer) {
+    var callbackId = msg[2];
+    this.readAudioFile(msg[1], function(err, result) {
       if (!err) {
+        var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + result.samples.length * 4);
+        var int16 = new Uint16Array(uint8.buffer);
+        var int32 = new Uint32Array(uint8.buffer);
+        var f32   = new Float32Array(uint8.buffer);
+        int16[0] = C.BINARY_CMD_SET_BUFFER;
+        int16[1] = callbackId;
+        int16[3] = result.channels;
+        int32[2] = result.sampleRate;
+        int32[3] = result.frames;
+        f32.set(result.samples, 4);
+        that.sendToLang(uint8);
         // TODO: use transferable object
-        that.sendToLang(["/buffer/response", buffer, requestId]);
+        // that.sendToLang(["/buffer/response", buffer, requestId]);
       }
     });
   };
