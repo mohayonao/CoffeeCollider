@@ -623,6 +623,10 @@ define(function(require, exports, module) {
     sendToClient: function(cmd) {
       cc.lang.sendToClient.result.push(cmd);
     },
+    setCallback: function(action) {
+      cc.lang.setCallback.result = action;
+      return 1000;
+    },
     requestBuffer: function(path, callback) {
       callback({
         samples    : new Float32Array([0, 1, 2, 3]),
@@ -635,13 +639,20 @@ define(function(require, exports, module) {
       cc.lang.pushToTimeline.result = [];
       cc.lang.sendToServer.result   = [];
       cc.lang.sendToClient.result   = [];
+      cc.lang.setCallback.result    = null;
     }
   };
-
+  
   mock.server = {
     sampleRate: 44100,
     rates: [],
     busClear: new Float32Array(1024),
+    sendToLang: function(cmd) {
+      cc.server.sendToLang.result.push(cmd);
+    },
+    $beforeEach: function() {
+      cc.server.sendToLang.result = [];
+    }
   };
   mock.server.rates[C.AUDIO] = {
     sampleRate      : 44100,
@@ -758,7 +769,7 @@ define(function(require, exports, module) {
     return [ nodeId, target, addAction, defId, controls, instance ];
   };
 
-  mock.createServerBuffer = function(bufnum, frames, channels) {
+  mock.createServerBuffer = function(instance, bufnum, frames, channels) {
     return [ bufnum, frames, channels ];
   };
   

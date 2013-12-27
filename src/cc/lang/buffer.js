@@ -48,7 +48,52 @@ define(function(require, exports, module) {
       return this;
     };
     Buffer.prototype.setn = Buffer.prototype.set;
+    
+    Buffer.prototype.get = function(index, action) {
+      index = index|0;
+      if (typeof action === "function") {
+        var callbackId = cc.lang.setCallback(action);
+        cc.lang.pushToTimeline([
+          "/b_get", this.bufnum, index, callbackId
+        ]);
+      }
+      return this;
+    };
+    
+    Buffer.prototype.getn = function(index, count, action) {
+      index = index|0;
+      count = count|0;
+      if (typeof action === "function") {
+        var callbackId = cc.lang.setCallback(action);
+        cc.lang.pushToTimeline([
+          "/b_getn", this.bufnum, index, count, callbackId
+        ]);
+      }
+      return this;
+    };
+    
+    Buffer.prototype.normalize = function(newmax, asWaveable) {
+      cc.lang.pushToTimeline([
+        "/b_gen", this.bufnum, "normalize", asWaveable ? 2 : 0, utils.asNumber(newmax)
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.fill = function() {
+      cc.lang.pushToTimeline([
+        "/b_fill", this.bufnum, slice.call(arguments)
+      ]);
+      return this;
+    };
 
+    Buffer.prototype.copyData = fn(function(buf, dstStartAt, srcStartAt, numSamples) {
+      buf = buf.bufnum|0;
+      cc.lang.pushToTimeline([
+        "/b_gen", this.bufnum, "copy", 0, buf, dstStartAt, srcStartAt, numSamples
+      ]);
+      return this;
+    }).defaults("buf=0,dstStartAt=0,srcStartAt=0,numSamples=-1").build();
+    
     var calcFlag = function(normalize, asWavetable, clearFirst) {
       return (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
     };
@@ -106,11 +151,11 @@ define(function(require, exports, module) {
   })();
   
   var sendBufferData = function(buffer, data) {
-    var uint8 = new Uint8Array(C.BUFSRC_HEADER_SIZE + data.samples.length * 4);
+    var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + data.samples.length * 4);
     var int16 = new Uint16Array(uint8.buffer);
     var int32 = new Uint32Array(uint8.buffer);
     var f32   = new Float32Array(uint8.buffer);
-    int16[0] = C.BINARY_CMD_SET_BUFSRC;
+    int16[0] = C.BINARY_CMD_SET_BUFFER;
     int16[1] = buffer.bufnum;
     int16[3] = data.numChannels;
     int32[2] = data.sampleRate;

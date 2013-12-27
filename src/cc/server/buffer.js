@@ -4,7 +4,8 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   
   var Buffer = (function() {
-    function Buffer(bufnum, frames, channels) {
+    function Buffer(world, bufnum, frames, channels) {
+      this.world      = world;
       this.bufnum     = bufnum;
       this.frames     = frames;
       this.channels   = channels;
@@ -21,6 +22,23 @@ define(function(require, exports, module) {
       var i, samples = this.samples;
       for (i = samples.length; i--; ) {
         samples[i] = 0;
+      }
+    };
+    Buffer.prototype.fill = function(params) {
+      var n = (params.length / 3)|0;
+      var samples = this.samples;
+      var startAt, length, value;
+      var i, j, k = 0;
+      for (i = 0; i < n; i++) {
+        startAt = params[k++];
+        length  = params[k++];
+        value   = params[k++];
+        for (j = 0; j < length; ++j) {
+          if (startAt + j >= samples.length) {
+            break;
+          }
+          samples[startAt + j] = value;
+        }
       }
     };
     Buffer.prototype.set = function(params) {
@@ -52,36 +70,71 @@ define(function(require, exports, module) {
         }
       }
     };
+    Buffer.prototype.get = function(index, callbackId) {
+      var samples = this.samples;
+      var msg = [ "/b_get", callbackId, samples[index] || 0 ];
+      cc.server.sendToLang(msg); // TODO: userId
+    };
+    Buffer.prototype.getn = function(index, count, callbackId) {
+      var samples = this.samples;
+      var msg  = new Array(count + 2);
+      msg[0] = "/b_getn";
+      msg[1] = callbackId;
+      for (var i = 0; i < count; ++i) {
+        msg[i + 2] = samples[i + index] || 0;
+      }
+      cc.server.sendToLang(msg); // TODO: userId
+    };
     Buffer.prototype.gen = function(cmd, flags, params) {
       var func = gen_func[cmd];
       if (func) {
-        var samples = this.samples;
-        var normalize = !!(flags & 1);
-        var wavetable = !!(flags & 2);
-        var clear     = !!(flags & 4);
-        if (clear) {
-          for (var i = samples.length; i--; ) {
-            samples[i] = 0;
-          }
-        }
-        func(samples, wavetable, params);
-        if (normalize) {
-          if (wavetable) {
-            normalize_wsamples(samples.length, samples, 1);
-          } else {
-            normalize_samples(samples.length, samples, 1);
-          }
-        }
+        func(this, flags, params);
       }
     };
     return Buffer;
   })();
 
   var gen_func = {};
+
+  gen_func.copy = function(buf, flags, params) {
+    var bufnum     = params[0];
+    var dstStartAt = params[1];
+    var srcStartAt = params[2];
+    var numSamples = params[3];
+    var target = buf.world.buffers[bufnum];
+    if (target) {
+      var samples;
+      if (numSamples > 0) {
+        samples = target.samples.slice(srcStartAt, srcStartAt + numSamples);
+      } else {
+        samples = target.samples.slice(srcStartAt);
+      }
+      buf.samples.set(samples, dstStartAt);
+    }
+  };
   
-  gen_func.sine1 = function(samples, wavetable, params) {
+  gen_func.normalize = function(buf, flags, params) {
+    var samples   = buf.samples;
+    var wavetable = flags & 2;
+    if (wavetable) {
+      normalize_wsamples(samples.length, samples, params[0]);
+    } else {
+      normalize_samples(samples.length, samples, params[0]);
+    }
+  };
+  
+  gen_func.sine1 = function(buf, flags, params) {
+    var samples   = buf.samples;
+    var normalize = flags & 1;
+    var wavetable = flags & 2;
+    var clear     = flags & 4;
     var len = samples.length;
     var i, imax;
+    if (clear) {
+      for (i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    }
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; ++i) {
         add_wpartial(len, samples, i+1, params[i], 0);
@@ -91,11 +144,27 @@ define(function(require, exports, module) {
         add_partial(len, samples, i+1, params[i], 0);
       }
     }
+    if (normalize) {
+      if (wavetable) {
+        normalize_wsamples(samples.length, samples, 1);
+      } else {
+        normalize_samples(samples.length, samples, 1);
+      }
+    }
   };
   
-  gen_func.sine2 = function(samples, wavetable, params) {
+  gen_func.sine2 = function(buf, flags, params) {
+    var samples   = buf.samples;
+    var normalize = flags & 1;
+    var wavetable = flags & 2;
+    var clear     = flags & 4;
     var len = samples.length;
     var i, imax;
+    if (clear) {
+      for (i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    }
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; i += 2) {
         add_wpartial(len, samples, params[i], params[i+1], 0);
@@ -105,11 +174,27 @@ define(function(require, exports, module) {
         add_partial(len, samples, params[i], params[i+1], 0);
       }
     }
+    if (normalize) {
+      if (wavetable) {
+        normalize_wsamples(samples.length, samples, 1);
+      } else {
+        normalize_samples(samples.length, samples, 1);
+      }
+    }
   };
   
-  gen_func.sine3 = function(samples, wavetable, params) {
+  gen_func.sine3 = function(buf, flags, params) {
+    var samples   = buf.samples;
+    var normalize = flags & 1;
+    var wavetable = flags & 2;
+    var clear     = flags & 4;
     var len = samples.length;
     var i, imax;
+    if (clear) {
+      for (i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    }
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; i += 3) {
         add_wpartial(len, samples, params[i], params[i+1], params[i+2]);
@@ -119,11 +204,27 @@ define(function(require, exports, module) {
         add_partial(len, samples, params[i], params[i+1], params[i+2]);
       }
     }
+    if (normalize) {
+      if (wavetable) {
+        normalize_wsamples(samples.length, samples, 1);
+      } else {
+        normalize_samples(samples.length, samples, 1);
+      }
+    }
   };
 
-  gen_func.cheby = function(samples, wavetable, params) {
+  gen_func.cheby = function(buf, flags, params) {
+    var samples   = buf.samples;
+    var normalize = flags & 1;
+    var wavetable = flags & 2;
+    var clear     = flags & 4;
     var len = samples.length;
     var i, imax;
+    if (clear) {
+      for (i = samples.length; i--; ) {
+        samples[i] = 0;
+      }
+    }
     if (wavetable) {
       for (i = 0, imax = params.length; i < imax; ++i) {
         add_wchebyshev(len, samples, i+1, params[i]);
@@ -131,6 +232,13 @@ define(function(require, exports, module) {
     } else {
       for (i = 0, imax = params.length; i < imax; ++i) {
         add_chebyshev(len, samples, i+1, params[i]);
+      }
+    }
+    if (normalize) {
+      if (wavetable) {
+        normalize_wsamples(samples.length, samples, 1);
+      } else {
+        normalize_samples(samples.length, samples, 1);
       }
     }
   };
@@ -222,8 +330,8 @@ define(function(require, exports, module) {
     }
   };
   
-  cc.createServerBuffer = function(bufnum, frames, channels) {
-    return new Buffer(bufnum, frames, channels);
+  cc.createServerBuffer = function(world, bufnum, frames, channels) {
+    return new Buffer(world, bufnum, frames, channels);
   };
   
   module.exports = {

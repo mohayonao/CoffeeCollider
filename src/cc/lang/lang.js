@@ -21,6 +21,7 @@ define(function(require, exports, module) {
       this.phase = 0;
       this.random = new random.Random();
       this.currentTime = 0;
+      this.callbacks   = [];
       
       this.extendCommands(commands);
     }
@@ -82,6 +83,11 @@ define(function(require, exports, module) {
       throw "SynthLang#process: should be overridden";
     };
     SynthLang.prototype.extendCommands = function() {
+    };
+    SynthLang.prototype.setCallback = function(callback) {
+      var callbackId = this.callbacks.length;
+      this.callbacks[callbackId] = callback;
+      return callbackId;
     };
     
     return SynthLang;
@@ -148,6 +154,23 @@ define(function(require, exports, module) {
   commands["/send"] = function(msg) {
     var args = msg[1];
     cc.global.Message.emit.apply(cc.global.Message, args);
+  };
+
+  commands["/b_get"] = function(msg) {
+    var callbackId = msg[1];
+    var callback = this.callbacks[callbackId];
+    if (callback) {
+      callback(msg[2]);
+      this.callbacks[callbackId] = null;
+    }
+  };
+  commands["/b_getn"] = function(msg) {
+    var callbackId = msg[1];
+    var callback = this.callbacks[callbackId];
+    if (callback) {
+      callback(msg.slice(2));
+      this.callbacks[callbackId] = null;
+    }
   };
   
   cc.SynthLang = SynthLang;

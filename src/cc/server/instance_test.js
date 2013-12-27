@@ -142,25 +142,167 @@ define(function(require, exports, module) {
           instance.commands["/s_new"](ins, ["/s_new", 2, 3, 1, 4, ["controls"]]);
           assert.deepEqual(ins.nodes[2], [2, "target", 3, 4, ["controls"], ins]);
         });
-        it("/b_new", function() {
-          ins = cc.createInstance(0);
-          instance.commands["/b_new"](ins, ["/b_new", 0, 1, 2]);
-          assert.deepEqual(ins.buffers[0], [0, 1, 2]);
-        });
-        it.skip("/b_bind", function() {
-        });
-        it("/b_free", function() {
-          ins = cc.createInstance(0);
-          ins.buffers[1] = "buffer1";
-          ins.buffers[2] = "buffer2";
-          instance.commands["/b_free"](ins, ["/b_free", 1]);
-          assert.deepEqual(ins.buffers, {2:"buffer2"});
-        });
-        it.skip("/b_zero", function() {
-        });
-        it.skip("/b_set", function() {
-        });
-        it.skip("/b_gen", function() {
+        describe("buffer", function() {
+          describe("/b_new", function() {
+            it("normal", function() {
+              ins = cc.createInstance(0);
+              instance.commands["/b_new"](ins, ["/b_new", 0, 1, 2]);
+              assert.deepEqual(ins.buffers[0], [ 0, 1, 2 ]);
+            });
+          });
+          describe("/b_free", function() {
+            it("normal", function() {
+              ins = cc.createInstance(0);
+              ins.buffers[0] = "buffer1";
+              ins.buffers[1] = "buffer2";
+              instance.commands["/b_free"](ins, ["/b_free", 0]);
+              assert.deepEqual(ins.buffers, [ null, "buffer2" ]);
+            });
+          });
+          describe("/b_zero", function() {
+            it("normal", function() {
+              var passed = false;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                zero: function() { passed = true; }
+              };
+              instance.commands["/b_zero"](ins, ["/b_zero", 0]);
+              assert.isTrue(passed);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_zero"](ins, ["/b_zero", 10]);
+              });
+            });
+          });
+          describe("/b_set", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                set: function() { params = [].slice.call(arguments); }
+              };
+              instance.commands["/b_set"](ins, ["/b_set", 0, [ 1, 2, 3 ]]);
+              assert.deepEqual(params, [[ 1, 2, 3 ]]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_set"](ins, ["/b_set", 10]);
+              });
+            });
+          });
+          describe("/b_get", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                get: function() { params = [].slice.call(arguments); }
+              };
+              instance.commands["/b_get"](ins, ["/b_get", 0, 1, 2 ]);
+              assert.deepEqual(params, [ 1, 2 ]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_get"](ins, ["/b_get", 10]);
+              });
+            });
+          });
+          describe("/b_getn", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                getn: function() { params = [].slice.call(arguments); }
+              };
+              instance.commands["/b_getn"](ins, ["/b_getn", 0, 1, 2, 3 ]);
+              assert.deepEqual(params, [ 1, 2, 3 ]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_getn"](ins, ["/b_getn", 10]);
+              });
+            });
+          });
+          describe("/b_fill", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                fill: function() { params = [].slice.call(arguments); }
+              };
+              instance.commands["/b_fill"](ins, ["/b_fill", 0, [1, 2, 3] ]);
+              assert.deepEqual(params, [[ 1, 2, 3 ]]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_fill"](ins, ["/b_fill", 10]);
+              });
+            });
+          });
+          describe("/b_gen", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                gen: function() { params = [].slice.call(arguments); }
+              };
+              instance.commands["/b_gen"](ins, ["/b_gen", 0, "cmd", 7, 1, 2, 3 ]);
+              assert.deepEqual(params, [ "cmd", 7, [ 1, 2, 3 ] ]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              assert.doesNotThrow(function() {
+                instance.commands["/b_gen"](ins, ["/b_gen", 10]);
+              });
+            });
+          });
+          describe("BINARY_CMD_SET_BUFFER", function() {
+            it("normal", function() {
+              var params = null;
+              ins = cc.createInstance(0);
+              ins.buffers[0] = {
+                bind: function() {
+                  params = [].slice.call(arguments);
+                  params[params.length-1] = new Float32Array(params[params.length-1]);
+                }
+              };
+              var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + 2 * 4);
+              var int16 = new Uint16Array(uint8.buffer);
+              var int32 = new Uint32Array(uint8.buffer);
+              var f32   = new Float32Array(uint8.buffer);
+              int16[0] = C.BINARY_CMD_SET_BUFFER;
+              int16[1] = 0;
+              int16[3] = 2;
+              int32[2] = 44100;
+              int32[3] = 16;
+              f32[4] = 1;
+              f32[5] = 2;
+              ins.doBinayCommand(uint8);
+              assert.deepEqual(params, [ 44100, 2, 16, new Float32Array([ 1, 2 ]) ]);
+            });
+            it("missing", function() {
+              ins = cc.createInstance(0);
+              var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + 2 * 4);
+              var int16 = new Uint16Array(uint8.buffer);
+              var int32 = new Uint32Array(uint8.buffer);
+              var f32   = new Float32Array(uint8.buffer);
+              int16[0] = C.BINARY_CMD_SET_BUFFER;
+              int16[1] = 100;
+              int16[3] = 2;
+              int32[2] = 44100;
+              int32[3] = 2;
+              f32[4] = 1;
+              f32[5] = 2;
+              assert.doesNotThrow(function() {
+                ins.doBinayCommand(uint8);
+              });
+            });
+          });
         });
       });
     });

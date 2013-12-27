@@ -20,7 +20,7 @@ define(function(require, exports, module) {
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
-      this.buffers = {};
+      this.buffers = [];
       this.bufSrc  = {};
       this.syncItems     = new Uint8Array(C.SYNC_ITEM_LEN);
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
@@ -134,11 +134,11 @@ define(function(require, exports, module) {
     var bufnum   = args[1]|0;
     var frames   = args[2]|0;
     var channels = args[3]|0;
-    instance.buffers[bufnum] = cc.createServerBuffer(bufnum, frames, channels);
+    instance.buffers[bufnum] = cc.createServerBuffer(instance, bufnum, frames, channels);
   };
   commands["/b_free"] = function(instance, args) {
     var bufnum = args[1]|0;
-    delete instance.buffers[bufnum];
+    instance.buffers[bufnum] = null;
   };
   commands["/b_zero"] = function(instance, args) {
     var bufnum = args[1]|0;
@@ -153,6 +153,33 @@ define(function(require, exports, module) {
     var buffer = instance.buffers[bufnum];
     if (buffer) {
       buffer.set(params);
+    }
+  };
+  commands["/b_get"] = function(instance, args) {
+    var bufnum = args[1]|0;
+    var index  = args[2]|0;
+    var callbackId = args[3]|0;
+    var buffer = instance.buffers[bufnum];
+    if (buffer) {
+      buffer.get(index, callbackId);
+    }
+  };
+  commands["/b_getn"] = function(instance, args) {
+    var bufnum = args[1]|0;
+    var index  = args[2]|0;
+    var count  = args[3]|0;
+    var callbackId = args[4]|0;
+    var buffer = instance.buffers[bufnum];
+    if (buffer) {
+      buffer.getn(index, count, callbackId);
+    }
+  };
+  commands["/b_fill"] = function(instance, args) {
+    var bufnum = args[1]|0;
+    var params = args[2];
+    var buffer = instance.buffers[bufnum];
+    if (buffer) {
+      buffer.fill(params);
     }
   };
   commands["/b_gen"] = function(instance, args) {
@@ -174,12 +201,12 @@ define(function(require, exports, module) {
       server.sysSyncCount = syncCount;
     }
   };
-  commands[C.BINARY_CMD_SET_BUFSRC] = function(instance, binary) {
+  commands[C.BINARY_CMD_SET_BUFFER] = function(instance, binary) {
     var bufnum   = (binary[3] << 8) + binary[2];
     var channels = (binary[7] << 8) + binary[6];
     var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
     var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
-    var samples = new Float32Array(binary.buffer, C.BUFSRC_HEADER_SIZE);
+    var samples = new Float32Array(binary.buffer, C.SET_BUFFER_HEADER_SIZE);
     var buffer  = instance.buffers[bufnum];
     if (buffer) {
       buffer.bind(sampleRate, channels, frames, samples);
