@@ -340,56 +340,54 @@ define(function(require, exports, module) {
     extend(Synth, Node);
     
     Synth.prototype.build = function(specs, controls, world) {
-      this.specs = specs;
-      var list, value, unit, i, imax;
-      var fixNumList, unitList, filteredUnitList;
-      var heapSize = specs.heapSize;
-      var heap     = new Float32Array(heapSize);
+      var list, fixNumList, unitList = [];
+      var heap = new Float32Array(specs.heapSize);
+      var unit, inputs, inRates, fromUnits, inSpec;
+      var i, imax, j, jmax, k, u, x1, x2;
       
-      this.params   = specs.params;
+      this.specs  = specs;
+      this.params = specs.params;
       
-      this.heap = heap;
+      this.heap      = heap;
       this.heapIndex = this.params.values.length;
       heap.set(this.params.values);
-      
-      list = specs.consts;
-      fixNumList = new Array(list.length);
-      for (i = 0, imax = list.length; i < imax; ++i) {
-        value = list[i];
-        fixNumList[i] = world.getFixNum(value);
-      }
-      list = specs.defList;
-      unitList = new Array(list.length);
-      for (i = 0, imax = list.length; i < imax; ++i) {
-        unitList[i] = cc.createUnit(this, list[i]);
-      }
       
       this.controls = heap;
       this.set(controls);
       
-      this.unitList = filteredUnitList = [];
-      for (i = 0, imax = unitList.length; i < imax; ++i) {
-        unit = unitList[i];
-        var inputs    = unit.inputs;
-        var inRates   = unit.inRates;
-        var fromUnits = unit.fromUnits;
-        var inSpec  = unit.specs[3];
-        for (var j = 0, jmax = inputs.length; j < jmax; ++j) {
-          var j2 = j << 1;
-          if (inSpec[j2] === -1) {
-            inputs[j]  = fixNumList[inSpec[j2+1]].outputs[0];
+      list = specs.consts;
+      fixNumList = new Array(list.length);
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        fixNumList[i] = world.getFixNum(list[i]);
+      }
+      
+      list = specs.defList;
+      for (i = 0, imax = list.length; i < imax; ++i) {
+        unit      = cc.createUnit(this, list[i]);
+        inputs    = unit.inputs;
+        inRates   = unit.inRates;
+        fromUnits = unit.fromUnits;
+        inSpec    = unit.specs[3];
+        for (j = k = 0, jmax = inputs.length; j < jmax; ++j) {
+          x1 = inSpec[k++];
+          x2 = inSpec[k++];
+          if (x1 === -1) {
+            inputs[j]  = fixNumList[x2].outputs[0];
             inRates[j] = C.SCALAR;
           } else {
-            inputs[j]    = unitList[inSpec[j2]].outputs[inSpec[j2+1]];
-            inRates[j]   = unitList[inSpec[j2]].outRates[inSpec[j2+1]];
-            fromUnits[j] = unitList[inSpec[j2]];
+            u = unitList[x1];
+            inputs[j]    = u.outputs[x2];
+            inRates[j]   = u.outRates[x2];
+            fromUnits[j] = u;
           }
         }
         unit.init();
         if (unit.process) {
-          filteredUnitList.push(unit);
+          unitList.push(unit);
         }
       }
+      this.unitList = unitList;
+      
       return this;
     };
 
