@@ -4,86 +4,86 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   
-  var graphFunc  = {};
-  var doneAction = {};
+  var graphFunc  = [];
+  var doneAction = [];
   
-  graphFunc[C.ADD_TO_HEAD] = function(target, node) {
-    var prev;
-    if (target instanceof Group) {
-      if (target.head === null) {
-        target.head = target.tail = node;
+  graphFunc[C.ADD_TO_HEAD] = function(child, addThisOne) {
+    if (child.nodeId !== 0 && addThisOne instanceof Group) {
+      child.prev = null;
+      child.next = addThisOne.head;
+      if (addThisOne.head) {
+        addThisOne.head.prev = child;
+        addThisOne.head = child;
       } else {
-        prev = target.head.prev;
-        if (prev) {
-          prev.next = node;
-        }
-        node.next = target.head;
-        target.head.prev = node;
-        target.head = node;
+        addThisOne.head = addThisOne.tail = child;
       }
-      node.parent = target;
+      child.parent = addThisOne;
     }
   };
-  graphFunc[C.ADD_TO_TAIL] = function(target, node) {
-    var next;
-    if (target instanceof Group) {
-      if (target.tail === null) {
-        target.head = target.tail = node;
+  graphFunc[C.ADD_TO_TAIL] = function(child, addThisOne) {
+    if (child.nodeId !== 0 && addThisOne instanceof Group) {
+      child.prev = addThisOne.tail;
+      child.next = null;
+      if (addThisOne.tail) {
+        addThisOne.tail.next = child;
+        addThisOne.tail = child;
       } else {
-        next = target.tail.next;
-        if (next) {
-          next.prev = node;
-        }
-        node.prev = target.tail;
-        target.tail.next = node;
-        target.tail = node;
+        addThisOne.head = addThisOne.tail = child;
       }
-      node.parent = target;
+      child.parent = addThisOne;
     }
   };
-  graphFunc[C.ADD_BEFORE] = function(target, node) {
-    var prev = target.prev;
-    target.prev = node;
-    node.prev = prev;
-    if (prev) {
-      prev.next = node;
+  graphFunc[C.ADD_BEFORE] = function(node, beforeThisOne) {
+    if (node.nodeId !== 0 && beforeThisOne.parent) {
+      node.parent = beforeThisOne.parent;
+      node.prev = beforeThisOne.prev;
+      node.next = beforeThisOne;
+      
+      if (beforeThisOne.prev) {
+        beforeThisOne.prev.next = node;
+      } else {
+        node.parent.head = node;
+      }
+      beforeThisOne.prev = node;
     }
-    node.next = target;
-    if (target.parent && target.parent.head === target) {
-      target.parent.head = node;
-    }
-    node.parent = target.parent;
   };
-  graphFunc[C.ADD_AFTER] = function(target, node) {
-    var next = target.next;
-    target.next = node;
-    node.next = next;
-    if (next) {
-      next.prev = node;
+  graphFunc[C.ADD_AFTER] = function(node, afterThisOne) {
+    if (node.nodeId !== 0 && afterThisOne.parent) {
+      node.parent = afterThisOne.parent;
+      node.prev = afterThisOne;
+      node.next = afterThisOne.next;
+      
+      if (afterThisOne.next) {
+        afterThisOne.next.prev = node;
+      } else {
+        node.parent.tail = node;
+      }
+      afterThisOne.next = node;
     }
-    node.prev = target;
-    if (target.parent && target.parent.tail === target) {
-      target.parent.tail = node;
-    }
-    node.parent = target.parent;
   };
-  graphFunc[C.REPLACE] = function(target, node) {
-    node.next = target.next;
-    node.prev = target.prev;
-    node.head = target.head;
-    node.tail = target.tail;
-    node.parent = target.parent;
-    if (target.prev) {
-      target.prev.next = node;
-    }
-    if (target.next) {
-      target.next.prev = node;
-    }
-    if (target.parent && target.parent.head === target) {
-      target.parent.head = node;
-    }
-    if (target.parent && target.parent.tail === target) {
-      target.parent.tail = node;
+  graphFunc[C.REPLACE] = function(node, replaceThisOne) {
+    if (node.node !== 0 && replaceThisOne.parent) {
+      var parent = node.parent = replaceThisOne.parent;
+      node.prev = replaceThisOne.prev;
+      node.next = replaceThisOne.next;
+      
+      if (node instanceof Group) {
+        node.head = replaceThisOne.head;
+        node.tail = replaceThisOne.tail;
+      }
+      
+      if (replaceThisOne.prev) {
+        replaceThisOne.prev.next = node;
+      }
+      if (replaceThisOne.next) {
+        replaceThisOne.next.prev = node;
+      }
+      if (parent.head === replaceThisOne) {
+        parent.head = node;
+      }
+      if (parent.tail === replaceThisOne) {
+        parent.tail = node;
+      }
     }
   };
   
@@ -307,7 +307,7 @@ define(function(require, exports, module) {
       this.head = null;
       this.tail = null;
       if (target) {
-        graphFunc[addAction](target, this);
+        graphFunc[addAction](this, target);
       }
     }
     extend(Group, Node);
@@ -334,7 +334,7 @@ define(function(require, exports, module) {
         }
       }
       if (target) {
-        graphFunc[addAction](target, this);
+        graphFunc[addAction](this, target);
       }
     }
     extend(Synth, Node);
@@ -432,7 +432,8 @@ define(function(require, exports, module) {
   module.exports = {
     Node : Node,
     Group: Group,
-    Synth: Synth
+    Synth: Synth,
+    graphFunc: graphFunc
   };
 
 });
