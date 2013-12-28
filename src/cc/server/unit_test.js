@@ -14,6 +14,8 @@ define(function(require, exports, module) {
     
     before(function() {
       parent = {
+        heap: new Float32Array(256),
+        heapIndex: 0,
         doneAction: function(action) {
           parent.doneAction.result = action;
         }

@@ -258,10 +258,14 @@ define(function(require, exports, module) {
     };
     return testSuite;
   })();
+
+  var heap = new Float32Array(1024 * 32);
   
   var unitTestSuite = (function() {
     var parent = {
-      controls:new Float32Array(16)
+      heap     : heap,
+      heapIndex: 0,
+      controls : new Float32Array(16)
     };
     parent.doneAction = function(action) {
       parent.doneAction.action = action;
@@ -425,6 +429,7 @@ define(function(require, exports, module) {
       }
       
       var i, imax, j;
+      parent.heapIndex = 0;
       var unit = cc.createUnit(parent, spec);
       var imax = Math.ceil(unit.rate.sampleRate / unit.rate.bufLength);
       unit.world = testSuite.world;
@@ -481,8 +486,8 @@ define(function(require, exports, module) {
           }
         }
         if (unit.process) {
-          for (j = unit.allOutputs.length; j--; ) {
-            unit.allOutputs[j] = NaN;
+          for (j = unit.heap.length; j--; ) {
+            unit.heap[j] = NaN;
           }
           if (opts.preProcess) {
             opts.preProcess.call(unit, i, imax);
@@ -492,8 +497,8 @@ define(function(require, exports, module) {
           end   = Date.now();
           statistics.time += end - begin;
         }
-        for (j = unit.allOutputs.length; j--; ) {
-          var x = unit.allOutputs[j];
+        for (j = unit.heap.length; j--; ) {
+          var x = unit.heap[j];
           statistics.samples += 1;
           if (isNaN(x)) {
             statistics.hasNaN = true;

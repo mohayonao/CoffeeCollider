@@ -343,6 +343,15 @@ define(function(require, exports, module) {
       this.specs = specs;
       var list, value, unit, i, imax;
       var fixNumList, unitList, filteredUnitList;
+      var heapSize = specs.heapSize;
+      var heap     = new Float32Array(heapSize);
+      
+      this.params   = specs.params;
+      
+      this.heap = heap;
+      this.heapIndex = this.params.values.length;
+      heap.set(this.params.values);
+      
       list = specs.consts;
       fixNumList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
@@ -355,8 +364,7 @@ define(function(require, exports, module) {
         unitList[i] = cc.createUnit(this, list[i]);
       }
       
-      this.params   = specs.params;
-      this.controls = new Float32Array(this.params.values);
+      this.controls = heap;
       this.set(controls);
       
       this.unitList = filteredUnitList = [];

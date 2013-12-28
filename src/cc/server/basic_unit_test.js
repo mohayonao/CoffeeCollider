@@ -75,7 +75,9 @@ define(function(require, exports, module) {
         });
         it("AUDIO", function() {
           basic_unit.uopFunc.uopTest.a = basic_unit.unary_a(basic_unit.uopFunc.uopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "UnaryOpUGen", C.AUDIO, specialIndex, [ 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
@@ -94,7 +96,9 @@ define(function(require, exports, module) {
         });
         it("CONTROL", function() {
           basic_unit.uopFunc.uopTest.k = basic_unit.unary_k(basic_unit.uopFunc.uopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "UnaryOpUGen", C.CONTROL, specialIndex, [ 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
@@ -105,7 +109,9 @@ define(function(require, exports, module) {
           assert.equal(u.outputs[0][0], 1);
         });
         it("SCALAR", function() {
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "UnaryOpUGen", C.SCALAR, specialIndex, [ 0,0 ], [ C.SCALAR ]
           ]);
           u.inRates[0] = C.SCALAR;
@@ -115,7 +121,9 @@ define(function(require, exports, module) {
           assert.equal(u.outputs[0][0], 1);
         });
         it("undefined", function() {
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "UnaryOpUGen", C.AUDIO, -1, [ 0,0 ], [ C.AUDIO ]
           ]);
           assert.throws(function() {
@@ -447,7 +455,9 @@ define(function(require, exports, module) {
         });
         it("AUDIO x AUDIO", function() {
           basic_unit.bopFunc.bopTest.aa = basic_unit.binary_aa(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
@@ -468,7 +478,9 @@ define(function(require, exports, module) {
         });
         it("AUDIO x CONTROL", function() {
           basic_unit.bopFunc.bopTest.ak = basic_unit.binary_ak(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
@@ -490,7 +502,9 @@ define(function(require, exports, module) {
         });
         it("AUDIO x SCALAR", function() {
           basic_unit.bopFunc.bopTest.ai = basic_unit.binary_ai(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
@@ -511,7 +525,9 @@ define(function(require, exports, module) {
         });
         it("CONTROL x AUDIO", function() {
           basic_unit.bopFunc.bopTest.ka = basic_unit.binary_ka(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.CONTROL;
@@ -533,7 +549,9 @@ define(function(require, exports, module) {
         });
         it("CONTROL x CONTROL", function() {
           basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
@@ -547,7 +565,9 @@ define(function(require, exports, module) {
         });
         it("CONTROL x SCALAR", function() {
           basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
@@ -561,7 +581,9 @@ define(function(require, exports, module) {
         });
         it("SCALAR x AUDIO", function() {
           basic_unit.bopFunc.bopTest.ia = basic_unit.binary_ia(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.SCALAR;
@@ -582,7 +604,9 @@ define(function(require, exports, module) {
         });
         it("SCALAR x CONTROL", function() {
           basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.SCALAR;
@@ -595,7 +619,9 @@ define(function(require, exports, module) {
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
         });
         it("SCALAR x SCALAR", function() {
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
             "BinaryOpUGen", C.SCALAR, specialIndex, [ 0,0, 0,0 ], [ C.SCALAR ]
           ]);
           u.inRates[0] = C.SCALAR;
@@ -607,7 +633,9 @@ define(function(require, exports, module) {
           assert.equal(u.outputs[0][0], 1 + 10 + 1);
         });
         it("undefined", function() {
-          var u = cc.createUnit({}, [
+          var u = cc.createUnit({
+            heap:new Float32Array(64), heapIndex:0
+          }, [
             "BinaryOpUGen", C.AUDIO, -1, [ 0,0 ], [ C.AUDIO ]
           ]);
           

@@ -26,7 +26,7 @@ define(function(require, exports, module) {
       },
       preProcess: function(i) {
         if (i === 0) {
-          this.allOutputs.setScalar(0);
+          this.heap.setScalar(0);
         }
         if (i === 1) {
           var samples = new Float32Array(1024 * 4);

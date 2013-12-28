@@ -223,7 +223,8 @@ define(function(require, exports, module) {
             consts  : [],
             params  : { names:[], indices:[], length:[], values:[] },
             defList : [],
-            variants: {}
+            variants: {},
+            heapSize: 0
           };
           assert.deepEqual(actual, expected);
         });
@@ -258,7 +259,8 @@ define(function(require, exports, module) {
               [ "SinOsc", ar, 0, [  0, 0, -1, 0 ], [ ar ] ],
               [ "Out"   , ar, 0, [  1, 0        ], [    ] ],
             ],
-            variants: {}
+            variants: {},
+            heapSize: (1 + 64) + 0
           };
           assert.deepEqual(actual, expected);
         });
@@ -351,7 +353,8 @@ define(function(require, exports, module) {
               [ "TSinOsc"    , ar, 0, [  1, 0,  0, 0,  0, 1 ], [ ar         ] ],
               [ "Out"        , ar, 0, [  3, 0,  2, 0        ], [            ] ],
             ],
-            variants: {}
+            variants: {},
+            heapSize: ((1 + 1 + 1) + 1 + 64 + 64) + 4
           };
           assert.deepEqual(actual, expected);
         });
