@@ -111,7 +111,7 @@ define(function(require, exports, module) {
 
   cc.unit.specs.PlayBuf = (function() {
     var ctor = function() {
-      switch (this.numOfOutputs) {
+      switch (this.numOutputs) {
       case 1: this.process = next_1ch; break;
       case 2: this.process = next_2ch; break;
       default: this.process = next;
@@ -291,7 +291,7 @@ define(function(require, exports, module) {
   };
   cc.unit.specs.BufRd = (function() {
     var ctor = function() {
-      switch (this.numOfOutputs) {
+      switch (this.numOutputs) {
       case 1:
         this.process = next_1ch;
         break;
@@ -396,7 +396,7 @@ define(function(require, exports, module) {
 
   cc.unit.specs.BufWr = (function() {
     var ctor = function() {
-      switch (this.numOfInputs - 3) {
+      switch (this.numInputs - 3) {
       case 1:
         this.process = next_1ch;
         break;
@@ -487,7 +487,7 @@ define(function(require, exports, module) {
 
   cc.unit.specs.RecordBuf = (function() {
     var ctor = function() {
-      switch (this.numOfInputs - 8) {
+      switch (this.numInputs - 8) {
       case 1:
         this.process = next_1ch;
         break;

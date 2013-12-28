@@ -34,13 +34,13 @@ define(function(require, exports, module) {
       assert.equal(u.name, "TestUnit");
       assert.equal(u.calcRate, C.AUDIO);
       assert.equal(u.specialIndex, 1);
-      assert.equal(u.numOfInputs , 2);
-      assert.equal(u.numOfOutputs, 1);
+      assert.equal(u.numInputs , 2);
+      assert.equal(u.numOutputs, 1);
       assert.isArray(u.inputs);
       assert.isArray(u.outputs);
-      assert.equal(u.numOfInputs , u.inputs.length);
-      assert.equal(u.numOfOutputs, u.outputs.length);
-      assert.equal(u.bufLength   , cc.server.rates[C.AUDIO].bufLength);
+      assert.equal(u.numInputs , u.inputs.length);
+      assert.equal(u.numOutputs, u.outputs.length);
+      assert.equal(u.bufLength , cc.server.rates[C.AUDIO].bufLength);
     });
     it("init", function() {
       var specs = [

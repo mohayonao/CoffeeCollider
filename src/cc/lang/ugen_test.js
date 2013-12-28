@@ -47,7 +47,7 @@ define(function(require, exports, module) {
       });
       it("inputs", function() {
         var instance = cc.global.Test.ar();
-        assert.equal(2, instance.numOfInputs);
+        assert.equal(2, instance.numInputs);
         assert.deepEqual([1, 2], instance.inputs);
       });
       it("rate", function() {
@@ -56,7 +56,7 @@ define(function(require, exports, module) {
       });
       it("args", function() {
         var instance = cc.global.Test.ar(10);
-        assert.equal(2, instance.numOfInputs);
+        assert.equal(2, instance.numInputs);
         assert.deepEqual([10, 2], instance.inputs);
       });
     });

@@ -11,11 +11,11 @@ define(function(require, exports, module) {
       this.name         = specs[0];
       this.calcRate     = specs[1];
       this.specialIndex = specs[2];
-      this.numOfInputs  = specs[3].length >> 1;
-      this.numOfOutputs = specs[4].length;
-      this.inputs    = new Array(this.numOfInputs);
-      this.inRates   = new Array(this.numOfInputs);
-      this.fromUnits = new Array(this.numOfInputs);
+      this.numInputs    = specs[3].length >> 1;
+      this.numOutputs   = specs[4].length;
+      this.inputs    = new Array(this.numInputs);
+      this.inRates   = new Array(this.numInputs);
+      this.fromUnits = new Array(this.numInputs);
       this.outRates = specs[4];
       this.rate     = cc.server.rates[this.calcRate];
       var bufLength = this.rate.bufLength;
@@ -25,11 +25,11 @@ define(function(require, exports, module) {
       var heap = new Float32Array(
         parent.heap.buffer,
         parent.heapIndex * BYTES_PER_ELEMENT,
-        bufLength * this.numOfOutputs
+        bufLength * this.numOutputs
       );
-      parent.heapIndex += bufLength * this.numOfOutputs;
+      parent.heapIndex += bufLength * this.numOutputs;
       
-      var outputs    = new Array(this.numOfOutputs);
+      var outputs    = new Array(this.numOutputs);
       for (var i = 0, imax = outputs.length; i < imax; ++i) {
         outputs[i] = new Float32Array(
           heap.buffer,

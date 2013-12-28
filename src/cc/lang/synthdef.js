@@ -325,7 +325,7 @@ define(function(require, exports, module) {
       var outputs = [];
       if (ugen.channels) {
         outputs = ugen.channels.map(getRate);
-      } else if (ugen.numOfOutputs === 1) {
+      } else if (ugen.numOutputs === 1) {
         outputs = [ ugen.rate ];
       }
       for (var i = 0, imax = outputs.length; i < imax; ++i) {

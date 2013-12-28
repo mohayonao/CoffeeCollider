@@ -74,7 +74,7 @@ define(function(require, exports, module) {
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a];
-      this.numOfInputs = 1;
+      this.numInputs = 1;
       return this;
     };
     
@@ -155,7 +155,7 @@ define(function(require, exports, module) {
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
-      this.numOfInputs = 2;
+      this.numInputs = 2;
       return this;
     };
     

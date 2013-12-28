@@ -434,7 +434,7 @@ define(function(require, exports, module) {
       var imax = Math.ceil(unit.rate.sampleRate / unit.rate.bufLength);
       unit.world = testSuite.world;
       
-      for (i = 0; i < unit.numOfInputs; ++i) {
+      for (i = 0; i < unit.numInputs; ++i) {
         unit.inRates[i] = inputSpecs[i].rate;
         switch (unit.inRates[i]) {
         case C.AUDIO:
@@ -479,7 +479,7 @@ define(function(require, exports, module) {
       var begin, end;
       for (i = 0; i < imax; ++i) {
         statistics.process += 1;
-        for (j = unit.numOfInputs; j--; ) {
+        for (j = unit.numInputs; j--; ) {
           if (inputSpecs[j].rate !== C.SCALAR) {
             unit.inputs[j].setScalar(0);
             inputSpecs[j].process.call(inputSpecs[j], unit.inputs[j], i, imax);

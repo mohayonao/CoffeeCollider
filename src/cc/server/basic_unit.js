@@ -875,7 +875,7 @@ define(function(require, exports, module) {
   
   cc.unit.specs.Control = (function() {
     var ctor = function() {
-      if (this.numOfOutputs === 1) {
+      if (this.numOutputs === 1) {
         this.process = next_1;
       } else {
         this.process = next_k;
@@ -898,12 +898,12 @@ define(function(require, exports, module) {
   
   cc.unit.specs.LagControl = (function() {
     var ctor = function() {
-      if (this.numOfOutputs === 1) {
+      if (this.numOutputs === 1) {
         this.process = next_1;
       } else {
         this.process = next_k;
       }
-      var numChannels = this.numOfOutputs;
+      var numChannels = this.numOutputs;
       var y1 = this._y1 = new Float32Array(numChannels);
       var b1 = this._b1 = new Float32Array(numChannels);
       var controls = this.parent.controls;
@@ -942,7 +942,7 @@ define(function(require, exports, module) {
   
   cc.unit.specs.TrigControl = (function() {
     var ctor = function() {
-      if (this.numOfOutputs === 1) {
+      if (this.numOutputs === 1) {
         this.process = next_1;
       } else {
         this.process = next_k;

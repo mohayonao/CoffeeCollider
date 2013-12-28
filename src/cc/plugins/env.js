@@ -91,7 +91,7 @@ define(function(require, exports, module) {
         counter = Math.max(1, (dur * this.rate.sampleRate)|0) + counterOffset;
         this._stage = numstages;
         this._shape = shape_Linear;
-        this._endLevel = this.inputs[this.numOfInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
+        this._endLevel = this.inputs[this.numInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
         this._grow     = (this._endLevel - level) / counter;
         this._released = true;
         checkGate = true;
@@ -133,7 +133,7 @@ define(function(require, exports, module) {
 
         if (initSegment) {
           stageOffset = (this._stage << 2) + kEnvGen_nodeOffset;
-          if (stageOffset + 4 > this.numOfInputs) {
+          if (stageOffset + 4 > this.numInputs) {
             // oops;
             return;
           }
@@ -313,7 +313,7 @@ define(function(require, exports, module) {
         counter = Math.max(1, (dur * this.rate.sampleRate)|0) + counterOffset;
         this._stage = numstages;
         this._shape = shape_Linear;
-        this._endLevel = this.inputs[this.numOfInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
+        this._endLevel = this.inputs[this.numInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
         this._grow     = (this._endLevel - level) / counter;
         this._released = true;
         checkGate = true;
@@ -353,7 +353,7 @@ define(function(require, exports, module) {
 
       if (initSegment) {
         stageOffset = (this._stage << 2) + kEnvGen_nodeOffset;
-        if (stageOffset + 4 > this.numOfInputs) {
+        if (stageOffset + 4 > this.numInputs) {
           // oops;
           return;
         }
