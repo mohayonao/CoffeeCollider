@@ -766,8 +766,8 @@ define(function(require, exports, module) {
     return [nodeId, target, addAction, world ];
   };
 
-  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, world) {
-    return [ nodeId, target, addAction, defId, controls, world ];
+  mock.createServerSynth = function(world, nodeId, target, addAction, defId, controls) {
+    return [ world, nodeId, target, addAction, defId, controls ];
   };
 
   mock.createServerBuffer = function(world, bufnum, frames, channels) {

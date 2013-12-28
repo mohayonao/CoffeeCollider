@@ -111,7 +111,7 @@ define(function(require, exports, module) {
     var targetNodeId = args[3]|0;
     var target = world.nodes[targetNodeId];
     if (target) {
-      world.nodes[nodeId] = cc.createServerGroup(nodeId, target, addAction, world);
+      world.nodes[nodeId] = cc.createServerGroup(world, nodeId, target, addAction);
     }
   };
   commands["/s_def"] = function(world, args) {
@@ -127,7 +127,7 @@ define(function(require, exports, module) {
     var controls     = args[5];
     var target = world.nodes[targetNodeId];
     if (target) {
-      world.nodes[nodeId] = cc.createServerSynth(nodeId, target, addAction, defId, controls, world);
+      world.nodes[nodeId] = cc.createServerSynth(world, nodeId, target, addAction, defId, controls);
     }
   };
   commands["/b_new"] = function(world, args) {

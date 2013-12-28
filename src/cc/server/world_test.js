@@ -8,7 +8,7 @@ define(function(require, exports, module) {
   var world = require("./world");
 
   describe("server/world.js", function() {
-    var ins, actual, expected;
+    var w, actual, expected;
     var rootNode = {
       running: false,
       process: function(bufLength, world) {
@@ -35,64 +35,64 @@ define(function(require, exports, module) {
     
     describe("World", function() {
       it("create", function() {
-        ins = cc.createWorld(0);
-        assert.instanceOf(ins, world.World);
+        w = cc.createWorld(0);
+        assert.instanceOf(w, world.World);
       });
       it("play/pause/reset", function() {
-        ins = cc.createWorld(0);
+        w = cc.createWorld(0);
         
-        ins.play();
-        assert.isTrue(ins.isRunning());
+        w.play();
+        assert.isTrue(w.isRunning());
         
-        ins.pause();
-        assert.isFalse(ins.isRunning());
+        w.pause();
+        assert.isFalse(w.isRunning());
         
-        ins.reset();
+        w.reset();
       });
       it("pushToTimeline", function() {
-        ins = cc.createWorld(0);
-        ins.pushToTimeline(["test"]);
-        assert.deepEqual(ins.timeline, ["test"]);
+        w = cc.createWorld(0);
+        w.pushToTimeline(["test"]);
+        assert.deepEqual(w.timeline, ["test"]);
       });
       it("getFixNum", function() {
-        ins = cc.createWorld(0);
-        actual   = ins.getFixNum(10);
+        w = cc.createWorld(0);
+        actual   = w.getFixNum(10);
         expected = { outputs:[new Float32Array([10])] };
         assert.deepEqual(actual, expected);
 
         expected = actual;
-        actual   = ins.getFixNum(10);
+        actual   = w.getFixNum(10);
         assert.equal(actual, expected);
       });
       it("process", function() {
         var passed = 0;
-        ins = cc.createWorld(0);
-        ins.pushToTimeline([["/none"], ["/test", 100], 0, ["/test", 200]]);
+        w = cc.createWorld(0);
+        w.pushToTimeline([["/none"], ["/test", 100], 0, ["/test", 200]]);
         world.commands["/test"] = function(world, args) {
           passed += args[1];
         };
-        ins.process(64);
-        assert.deepEqual(rootNode.process.result, [64, ins]);
+        w.process(64);
+        assert.deepEqual(rootNode.process.result, [64, w]);
       });
       describe("commands", function() {
         it("/n_run", function() {
-          ins = cc.createWorld(0);
-          ins.nodes[1] = { running:false };
+          w = cc.createWorld(0);
+          w.nodes[1] = { running:false };
           
-          world.commands["/n_run"](ins, ["/n_run", 1, 0]);
-          assert.isFalse(ins.nodes[1].running);
+          world.commands["/n_run"](w, ["/n_run", 1, 0]);
+          assert.isFalse(w.nodes[1].running);
 
-          world.commands["/n_run"](ins, ["/n_run", 1, 1]);
-          assert.isTrue(ins.nodes[1].running);
+          world.commands["/n_run"](w, ["/n_run", 1, 1]);
+          assert.isTrue(w.nodes[1].running);
 
-          world.commands["/n_run"](ins, ["/n_run", 2, 0]);
-          assert.isTrue(ins.nodes[1].running);
-          assert.isUndefined(ins.nodes[2]);
+          world.commands["/n_run"](w, ["/n_run", 2, 0]);
+          assert.isTrue(w.nodes[1].running);
+          assert.isUndefined(w.nodes[2]);
         });
         it("/n_free", function() {
           var doneAction = null;
-          ins = cc.createWorld(0);
-          ins.nodes[1] = {
+          w = cc.createWorld(0);
+          w.nodes[1] = {
             doneAction: function(action) {
               if (doneAction === null) {
                 doneAction = action;
@@ -102,15 +102,15 @@ define(function(require, exports, module) {
             }
           };
 
-          world.commands["/n_free"](ins, ["/n_free", 1]);
+          world.commands["/n_free"](w, ["/n_free", 1]);
           assert.equal(doneAction, 2);
           
-          world.commands["/n_free"](ins, ["/n_free", 2]);
+          world.commands["/n_free"](w, ["/n_free", 2]);
         });
         it("/n_set", function() {
           var controls = null;
-          ins = cc.createWorld(0);
-          ins.nodes[1] = {
+          w = cc.createWorld(0);
+          w.nodes[1] = {
             set: function(_controls) {
               if (controls === null) {
                 controls = _controls;
@@ -120,152 +120,152 @@ define(function(require, exports, module) {
             }
           };
 
-          world.commands["/n_set"](ins, ["/n_set", 1, [0,1,2,3]]);
+          world.commands["/n_set"](w, ["/n_set", 1, [0,1,2,3]]);
           assert.deepEqual(controls, [0,1,2,3]);
           
-          world.commands["/n_set"](ins, ["/n_set", 2, [0,1,2,3]]);
+          world.commands["/n_set"](w, ["/n_set", 2, [0,1,2,3]]);
         });
         it.skip("/g_new", function() {
-          ins = cc.createWorld(0);
-          ins.nodes[1] = "target";
-          world.commands["/g_new"](ins, ["/g_new", 2, 3, 1]);
-          assert.deepEqual(ins.nodes[2], [2, "target", 3, ins]);
+          w = cc.createWorld(0);
+          w.nodes[1] = "target";
+          world.commands["/g_new"](w, ["/g_new", 2, 3, 1]);
+          assert.deepEqual(w.nodes[2], [2, "target", 3, w]);
         });
         it("/s_def", function() {
-          ins = cc.createWorld(0);
-          world.commands["/s_def"](ins, ["/s_def", 1, {spec:"spec"}]);
-          assert.deepEqual(ins.defs[1], {spec:"spec"});
+          w = cc.createWorld(0);
+          world.commands["/s_def"](w, ["/s_def", 1, {spec:"spec"}]);
+          assert.deepEqual(w.defs[1], {spec:"spec"});
         });
         it("/s_new", function() {
-          ins = cc.createWorld(0);
-          ins.nodes[1] = "target";
-          world.commands["/s_new"](ins, ["/s_new", 2, 3, 1, 4, ["controls"]]);
-          assert.deepEqual(ins.nodes[2], [2, "target", 3, 4, ["controls"], ins]);
+          w = cc.createWorld(0);
+          w.nodes[1] = "target";
+          world.commands["/s_new"](w, ["/s_new", 2, 3, 1, 4, ["controls"]]);
+          assert.deepEqual(w.nodes[2], [w, 2, "target", 3, 4, ["controls"]]);
         });
         describe("buffer", function() {
           describe("/b_new", function() {
             it("normal", function() {
-              ins = cc.createWorld(0);
-              world.commands["/b_new"](ins, ["/b_new", 0, 1, 2]);
-              assert.deepEqual(ins.buffers[0], [ 0, 1, 2 ]);
+              w = cc.createWorld(0);
+              world.commands["/b_new"](w, ["/b_new", 0, 1, 2]);
+              assert.deepEqual(w.buffers[0], [ 0, 1, 2 ]);
             });
           });
           describe("/b_free", function() {
             it("normal", function() {
-              ins = cc.createWorld(0);
-              ins.buffers[0] = "buffer1";
-              ins.buffers[1] = "buffer2";
-              world.commands["/b_free"](ins, ["/b_free", 0]);
-              assert.deepEqual(ins.buffers, [ null, "buffer2" ]);
+              w = cc.createWorld(0);
+              w.buffers[0] = "buffer1";
+              w.buffers[1] = "buffer2";
+              world.commands["/b_free"](w, ["/b_free", 0]);
+              assert.deepEqual(w.buffers, [ null, "buffer2" ]);
             });
           });
           describe("/b_zero", function() {
             it("normal", function() {
               var passed = false;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 zero: function() { passed = true; }
               };
-              world.commands["/b_zero"](ins, ["/b_zero", 0]);
+              world.commands["/b_zero"](w, ["/b_zero", 0]);
               assert.isTrue(passed);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_zero"](ins, ["/b_zero", 10]);
+                world.commands["/b_zero"](w, ["/b_zero", 10]);
               });
             });
           });
           describe("/b_set", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 set: function() { params = [].slice.call(arguments); }
               };
-              world.commands["/b_set"](ins, ["/b_set", 0, [ 1, 2, 3 ]]);
+              world.commands["/b_set"](w, ["/b_set", 0, [ 1, 2, 3 ]]);
               assert.deepEqual(params, [[ 1, 2, 3 ]]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_set"](ins, ["/b_set", 10]);
+                world.commands["/b_set"](w, ["/b_set", 10]);
               });
             });
           });
           describe("/b_get", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 get: function() { params = [].slice.call(arguments); }
               };
-              world.commands["/b_get"](ins, ["/b_get", 0, 1, 2 ]);
+              world.commands["/b_get"](w, ["/b_get", 0, 1, 2 ]);
               assert.deepEqual(params, [ 1, 2 ]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_get"](ins, ["/b_get", 10]);
+                world.commands["/b_get"](w, ["/b_get", 10]);
               });
             });
           });
           describe("/b_getn", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 getn: function() { params = [].slice.call(arguments); }
               };
-              world.commands["/b_getn"](ins, ["/b_getn", 0, 1, 2, 3 ]);
+              world.commands["/b_getn"](w, ["/b_getn", 0, 1, 2, 3 ]);
               assert.deepEqual(params, [ 1, 2, 3 ]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_getn"](ins, ["/b_getn", 10]);
+                world.commands["/b_getn"](w, ["/b_getn", 10]);
               });
             });
           });
           describe("/b_fill", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 fill: function() { params = [].slice.call(arguments); }
               };
-              world.commands["/b_fill"](ins, ["/b_fill", 0, [1, 2, 3] ]);
+              world.commands["/b_fill"](w, ["/b_fill", 0, [1, 2, 3] ]);
               assert.deepEqual(params, [[ 1, 2, 3 ]]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_fill"](ins, ["/b_fill", 10]);
+                world.commands["/b_fill"](w, ["/b_fill", 10]);
               });
             });
           });
           describe("/b_gen", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 gen: function() { params = [].slice.call(arguments); }
               };
-              world.commands["/b_gen"](ins, ["/b_gen", 0, "cmd", 7, 1, 2, 3 ]);
+              world.commands["/b_gen"](w, ["/b_gen", 0, "cmd", 7, 1, 2, 3 ]);
               assert.deepEqual(params, [ "cmd", 7, [ 1, 2, 3 ] ]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               assert.doesNotThrow(function() {
-                world.commands["/b_gen"](ins, ["/b_gen", 10]);
+                world.commands["/b_gen"](w, ["/b_gen", 10]);
               });
             });
           });
           describe("BINARY_CMD_SET_BUFFER", function() {
             it("normal", function() {
               var params = null;
-              ins = cc.createWorld(0);
-              ins.buffers[0] = {
+              w = cc.createWorld(0);
+              w.buffers[0] = {
                 bind: function() {
                   params = [].slice.call(arguments);
                   params[params.length-1] = new Float32Array(params[params.length-1]);
@@ -282,11 +282,11 @@ define(function(require, exports, module) {
               int32[3] = 16;
               f32[4] = 1;
               f32[5] = 2;
-              ins.doBinayCommand(uint8);
+              w.doBinayCommand(uint8);
               assert.deepEqual(params, [ 44100, 2, 16, new Float32Array([ 1, 2 ]) ]);
             });
             it("missing", function() {
-              ins = cc.createWorld(0);
+              w = cc.createWorld(0);
               var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + 2 * 4);
               var int16 = new Uint16Array(uint8.buffer);
               var int32 = new Uint32Array(uint8.buffer);
@@ -299,7 +299,7 @@ define(function(require, exports, module) {
               f32[4] = 1;
               f32[5] = 2;
               assert.doesNotThrow(function() {
-                ins.doBinayCommand(uint8);
+                w.doBinayCommand(uint8);
               });
             });
           });

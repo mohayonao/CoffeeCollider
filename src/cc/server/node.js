@@ -265,13 +265,13 @@ define(function(require, exports, module) {
   };
   
   var Node = (function() {
-    function Node(nodeId, world) {
-      this.nodeId = nodeId|0;
-      this.next   = null;
-      this.prev   = null;
-      this.parent = null;
+    function Node(world, nodeId) {
+      this.world   = world;
+      this.nodeId  = nodeId|0;
+      this.next    = null;
+      this.prev    = null;
+      this.parent  = null;
       this.running = true;
-      this.world = world;
     }
     Node.prototype.play = function() {
       this.running = true;
@@ -302,8 +302,8 @@ define(function(require, exports, module) {
   })();
 
   var Group = (function() {
-    function Group(nodeId, target, addAction, world) {
-      Node.call(this, nodeId, world);
+    function Group(world, nodeId, target, addAction) {
+      Node.call(this, world, nodeId);
       this.head = null;
       this.tail = null;
       if (target) {
@@ -325,8 +325,8 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, target, addAction, defId, controls, world) {
-      Node.call(this, nodeId, world);
+    function Synth(world, nodeId, target, addAction, defId, controls) {
+      Node.call(this, world, nodeId);
       if (world) {
         var specs = world.defs[defId];
         if (specs) {
@@ -412,15 +412,15 @@ define(function(require, exports, module) {
   })();
   
   cc.createServerRootNode = function(world) {
-    return new Group(0, 0, 0, world);
+    return new Group(world, 0, 0, 0);
   };
 
-  cc.createServerGroup = function(nodeId, target, addAction, world) {
-    return new Group(nodeId, target, addAction, world);
+  cc.createServerGroup = function(world, nodeId, target, addAction) {
+    return new Group(world, nodeId, target, addAction);
   };
 
-  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, world) {
-    return new Synth(nodeId, target, addAction, defId, controls, world);
+  cc.createServerSynth = function(world, nodeId, target, addAction, defId, controls) {
+    return new Synth(world, nodeId, target, addAction, defId, controls);
   };
   
   module.exports = {
