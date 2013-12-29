@@ -11,7 +11,7 @@ define(function(require, exports, module) {
     
   describe("server/node.js", function() {
     var actual, expected;
-    var nodes, rootNode;
+    var world, nodes, rootNode;
     
     testTools.mock("server", {
       timeline: {
@@ -21,10 +21,12 @@ define(function(require, exports, module) {
     });
     
     beforeEach(function() {
-      nodes = [
-        new Group(null, 0), new Synth(null, 1), new Group(null, 2), new Synth(null, 3), new Synth(null, 4),
-        new Group(null, 5), new Synth(null, 6), new Synth(null, 7), new Group(null, 8), new Synth(null, 9),
+      world = { defs:[] };
+      world.nodes = [
+        new Group(world, 0), new Synth(world, 1), new Group(world, 2), new Synth(world, 3), new Synth(world, 4),
+        new Group(world, 5), new Synth(world, 6), new Synth(world, 7), new Group(world, 8), new Synth(world, 9),
       ];
+      nodes    = world.nodes.slice();
       rootNode = nodes[0];
       nodes[0].head = nodes[1]; nodes[0].tail = nodes[3];
       nodes[1].parent = nodes[0]; nodes[1].next = nodes[2];
@@ -59,11 +61,106 @@ define(function(require, exports, module) {
       }
       return function(node, sort) { return _walk(node, sort, []); }
     })();
-    
+
+    describe("Node", function() {
+      describe("#end", function() {
+        it("nodes[0].end()", function() {
+          nodes[0].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 2, 6, 5, 9, 8, 7, 4, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[0].running);
+        });
+        it("nodes[1].end()", function() {
+          nodes[1].end();
+
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 2, 4, 5, 7, 8, 9, 6, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 2, 6, 5, 9, 8, 7, 4 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[1].running);
+        });
+        it("nodes[2].end()", function() {
+          nodes[2].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[2].running);
+        });
+        it("nodes[3].end()", function() {
+          nodes[3].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 2, 6, 5, 9, 8, 7, 4, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[3].running);
+        });
+        it("nodes[4].end()", function() {
+          nodes[4].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 2, 5, 7, 8, 9, 6, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 2, 6, 5, 9, 8, 7, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[4].running);
+        });
+        it("nodes[5].end()", function() {
+          nodes[5].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 2, 4, 6, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 2, 6, 4, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[5].running);
+        });
+        it("nodes[6].end()", function() {
+          nodes[6].end();
+          
+          actual   = walk(rootNode, "ASC");
+          expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 3 ];
+          assert.deepEqual(actual, expected);
+          
+          actual   = walk(rootNode, "DESC");
+          expected = [ 0, 3, 2, 5, 9, 8, 7, 4, 1 ];
+          assert.deepEqual(actual, expected);
+          
+          assert.isFalse(nodes[6].running);
+        });
+      });
+    });
     describe("graphFunction", function() {
       describe("addToHead", function() {
         it("first item", function() {
-          new Synth(null, 10, nodes[8], C.ADD_TO_HEAD);
+          new Synth(world, 10, nodes[8], C.ADD_TO_HEAD);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 10, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -73,7 +170,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("subsequent item", function() {
-          new Synth(null, 10, nodes[2], C.ADD_TO_HEAD);
+          new Synth(world, 10, nodes[2], C.ADD_TO_HEAD);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 10, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -83,7 +180,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("add to a synth", function() {
-          new Synth(null, 10, nodes[9], C.ADD_TO_HEAD);
+          new Synth(world, 10, nodes[9], C.ADD_TO_HEAD);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -95,7 +192,7 @@ define(function(require, exports, module) {
       });
       describe("addToTail", function() {
         it("first item", function() {
-          new Synth(null, 10, nodes[8], C.ADD_TO_TAIL);
+          new Synth(world, 10, nodes[8], C.ADD_TO_TAIL);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 10, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -105,7 +202,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("subsequent item", function() {
-          new Synth(null, 10, nodes[2], C.ADD_TO_TAIL);
+          new Synth(world, 10, nodes[2], C.ADD_TO_TAIL);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 10, 3 ];
           assert.deepEqual(actual, expected);
@@ -115,7 +212,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("add to a synth", function() {
-          new Synth(null, 10, nodes[9], C.ADD_TO_TAIL);
+          new Synth(world, 10, nodes[9], C.ADD_TO_TAIL);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -127,7 +224,7 @@ define(function(require, exports, module) {
       });
       describe("addBefore", function() {
         it("append", function() {
-          new Synth(null, 10, nodes[1], C.ADD_BEFORE);
+          new Synth(world, 10, nodes[1], C.ADD_BEFORE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 10, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -137,7 +234,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("insert", function() {
-          new Synth(null, 10, nodes[3], C.ADD_BEFORE);
+          new Synth(world, 10, nodes[3], C.ADD_BEFORE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 10, 3 ];
           assert.deepEqual(actual, expected);
@@ -147,7 +244,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("add to the root", function() {
-          new Synth(null, 10, nodes[0], C.ADD_BEFORE);
+          new Synth(world, 10, nodes[0], C.ADD_BEFORE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -159,7 +256,7 @@ define(function(require, exports, module) {
       });
       describe("addAfter", function() {
         it("append", function() {
-          new Synth(null, 10, nodes[3], C.ADD_AFTER);
+          new Synth(world, 10, nodes[3], C.ADD_AFTER);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3, 10 ];
           assert.deepEqual(actual, expected);
@@ -169,7 +266,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("insert", function() {
-          new Synth(null, 10, nodes[1], C.ADD_AFTER);
+          new Synth(world, 10, nodes[1], C.ADD_AFTER);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 10, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -179,7 +276,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("add to the root", function() {
-          new Synth(null, 10, nodes[0], C.ADD_AFTER);
+          new Synth(world, 10, nodes[0], C.ADD_AFTER);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -191,7 +288,7 @@ define(function(require, exports, module) {
       });
       describe("replace", function() {
         it("replace a synth(head)", function() {
-          new Synth(null, 10, nodes[1], C.REPLACE);
+          new Synth(world, 10, nodes[1], C.REPLACE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 10, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -201,7 +298,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("replace a synth(tail)", function() {
-          new Synth(null, 10, nodes[3], C.REPLACE);
+          new Synth(world, 10, nodes[3], C.REPLACE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 10 ];
           assert.deepEqual(actual, expected);
@@ -211,7 +308,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("replace a group", function() {
-          new Group(null, 10, nodes[2], C.REPLACE);
+          new Group(world, 10, nodes[2], C.REPLACE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 10, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -221,7 +318,7 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("replace a root", function() {
-          new Synth(null, 10, nodes[0], C.REPLACE);
+          new Synth(world, 10, nodes[0], C.REPLACE);
           actual   = walk(rootNode, "ASC");
           expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
           assert.deepEqual(actual, expected);
@@ -237,110 +334,844 @@ define(function(require, exports, module) {
       it("0", function() {
         desc = "do nothing when the UGen is finished";
         nodes[2].doneAction(0);
-        var expected = [0, 1, 2, 4, 5, 7, 8, 9, 6, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("1", function() {
         desc = "pause the enclosing synth, but do not free it";
         nodes[2].doneAction(1);
-        var expected = [0, 1, 2, 4, 5, 7, 8, 9, 6, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
         assert.deepEqual(actual, expected, desc);
-        assert.isFalse(nodes[2].running, desc);
+
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("2", function() {
         desc = "free the enclosing synth";
         nodes[2].doneAction(2);
-        var expected = [0, 1, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 3 ];
         assert.deepEqual(actual, expected, desc);
+
+        actual   = walk(nodes[2], "ASC");
+        expected = [ 2, 4, 5, 7, 8, 9, 6 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("3", function() {
         desc = "free both this synth and the preceding node";
         nodes[2].doneAction(3);
-        var expected = [0, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 3 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("3 (preceding node is not exists)", function() {
+        desc = "free both this synth and the preceding node";
+        nodes[1].doneAction(3);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 2, 4, 5, 7, 8, 9, 6, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("4", function() {
         desc = "free both this synth and the following node";
         nodes[2].doneAction(4);
-        var expected = [0, 1];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("4 (following node is not exists)", function() {
+        desc = "free both this synth and the following node";
+        nodes[3].doneAction(4);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6 ];
+        assert.deepEqual(actual, expected, desc);
+
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("5", function() {
         desc = "free this synth; if the preceding node is a group then do g_freeAll on it, else free it";
         nodes[3].doneAction(5);
-        var expected = [0, 1];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, false);
+        assert.equal(nodes[5].running, false);
+        assert.equal(nodes[6].running, false);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], null);
+        assert.equal(world.nodes[5], null);
+        assert.equal(world.nodes[6], null);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("5 (preceding is not a group)", function() {
+        desc = "free this synth; if the preceding node is a group then do g_freeAll on it, else free it";
+        nodes[2].doneAction(5);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 3 ];
+        assert.deepEqual(actual, expected, desc);
+
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("5 (preceding node is not exists)", function() {
+        desc = "free this synth; if the preceding node is a group then do g_freeAll on it, else free it";
+        nodes[1].doneAction(5);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 2, 4, 5, 7, 8, 9, 6, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("6", function() {
         desc = "free this synth; if the following node is a group then do g_freeAll on it, else free it";
         nodes[1].doneAction(6);
-        var expected = [0, 3];
-        var actual = walk(rootNode);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 3 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, false);
+        assert.equal(nodes[5].running, false);
+        assert.equal(nodes[6].running, false);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], null);
+        assert.equal(world.nodes[5], null);
+        assert.equal(world.nodes[6], null);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("6 (following is not a group)", function() {
+        desc = "free this synth; if the following node is a group then do g_freeAll on it, else free it";
+        nodes[2].doneAction(6);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("6 (following node is not exists)", function() {
+        desc = "free this synth; if the following node is a group then do g_freeAll on it, else free it";
+        nodes[3].doneAction(6);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("7", function() {
         desc = "free this synth and all preceding nodes in this group";
         nodes[3].doneAction(7);
-        var expected = [0];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("8", function() {
         desc = "free this synth and all following nodes in this group";
         nodes[1].doneAction(8);
-        var expected = [0];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("9", function() {
         desc = "free this synth and pause the preceding node";
         nodes[2].doneAction(9);
-        var expected = [0, 1, 3];
-        var actual = walk(rootNode);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 3 ];
         assert.deepEqual(actual, expected, desc);
-        assert.isFalse(nodes[1].running);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
+      it("9 (preceding node is not exists)", function() {
+        desc = "free this synth and pause the preceding node";
+        nodes[1].doneAction(9);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 2, 4, 5, 7, 8, 9, 6, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });      
       it("10", function() {
         desc = "free this synth and pause the following node";
         nodes[2].doneAction(10);
-        var expected = [0, 1, 3];
-        var actual = walk(rootNode);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 3 ];
         assert.deepEqual(actual, expected, desc);
-        assert.isFalse(nodes[3].running);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
+      it("10 (following node is not exists)", function() {
+        desc = "free this synth and pause the preceding node";
+        nodes[3].doneAction(10);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });      
       it("11", function() {
         desc = "free this synth and if the preceding node is a group then do g_deepFree on it, else free it";
         nodes[3].doneAction(11);
-        var expected = [0, 1];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, false);
+        assert.equal(nodes[5].running, false);
+        assert.equal(nodes[6].running, false);
+        assert.equal(nodes[7].running, false);
+        assert.equal(nodes[8].running, false);
+        assert.equal(nodes[9].running, false);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], null);
+        assert.equal(world.nodes[5], null);
+        assert.equal(world.nodes[6], null);
+        assert.equal(world.nodes[7], null);
+        assert.equal(world.nodes[8], null);
+        assert.equal(world.nodes[9], null);
+      });
+      it("11 (preceding is not a group)", function() {
+        desc = "free this synth and if the preceding node is a group then do g_deepFree on it, else free it";
+        nodes[2].doneAction(11);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("11 (preceding node is not exists)", function() {
+        desc = "free this synth and if the preceding node is a group then do g_deepFree on it, else free it";
+        nodes[1].doneAction(11);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 2, 4, 5, 7, 8, 9, 6, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("12", function() {
         desc = "free this synth and if the following node is a group then do g_deepFree on it, else free it";
         nodes[1].doneAction(12);
-        var expected = [0, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 3 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, false);
+        assert.equal(nodes[5].running, false);
+        assert.equal(nodes[6].running, false);
+        assert.equal(nodes[7].running, false);
+        assert.equal(nodes[8].running, false);
+        assert.equal(nodes[9].running, false);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], null);
+        assert.equal(world.nodes[5], null);
+        assert.equal(world.nodes[6], null);
+        assert.equal(world.nodes[7], null);
+        assert.equal(world.nodes[8], null);
+        assert.equal(world.nodes[9], null);
+      });
+      it("12 (following is not a group)", function() {
+        desc = "free this synth and if the following node is a group then do g_deepFree on it, else free it";
+        nodes[2].doneAction(12);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
+      });
+      it("12 (following node is not exists)", function() {
+        desc = "free this synth and if the following node is a group then do g_deepFree on it, else free it";
+        nodes[3].doneAction(12);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("13", function() {
         desc = "free this synth and all other nodes in this group (before and after)";
         nodes[2].doneAction(13);
-        var expected = [0];
-        var actual = walk(rootNode);
+
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
       it("14", function() {
         desc = "free the enclosing group and all nodes within it (including this synth)";
         nodes[2].doneAction(14);
-        var expected = [0, 1, 3];
-        var actual = walk(rootNode);
+        
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0 ];
         assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, false);
+        assert.equal(nodes[1].running, false);
+        assert.equal(nodes[2].running, false);
+        assert.equal(nodes[3].running, false);
+        assert.equal(nodes[4].running, false);
+        assert.equal(nodes[5].running, false);
+        assert.equal(nodes[6].running, false);
+        assert.equal(nodes[7].running, false);
+        assert.equal(nodes[8].running, false);
+        assert.equal(nodes[9].running, false);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], null);
+        assert.equal(world.nodes[2], null);
+        assert.equal(world.nodes[3], null);
+        assert.equal(world.nodes[4], null);
+        assert.equal(world.nodes[5], null);
+        assert.equal(world.nodes[6], null);
+        assert.equal(world.nodes[7], null);
+        assert.equal(world.nodes[8], null);
+        assert.equal(world.nodes[9], null);
+      });
+      it("none", function() {
+        nodes[2].doneAction(100);
+        actual   = walk(rootNode, "ASC");
+        expected = [ 0, 1, 2, 4, 5, 7, 8, 9, 6, 3 ];
+        assert.deepEqual(actual, expected, desc);
+        
+        assert.equal(nodes[0].running, true);
+        assert.equal(nodes[1].running, true);
+        assert.equal(nodes[2].running, true);
+        assert.equal(nodes[3].running, true);
+        assert.equal(nodes[4].running, true);
+        assert.equal(nodes[5].running, true);
+        assert.equal(nodes[6].running, true);
+        assert.equal(nodes[7].running, true);
+        assert.equal(nodes[8].running, true);
+        assert.equal(nodes[9].running, true);
+        
+        assert.equal(world.nodes[0], nodes[0]);
+        assert.equal(world.nodes[1], nodes[1]);
+        assert.equal(world.nodes[2], nodes[2]);
+        assert.equal(world.nodes[3], nodes[3]);
+        assert.equal(world.nodes[4], nodes[4]);
+        assert.equal(world.nodes[5], nodes[5]);
+        assert.equal(world.nodes[6], nodes[6]);
+        assert.equal(world.nodes[7], nodes[7]);
+        assert.equal(world.nodes[8], nodes[8]);
+        assert.equal(world.nodes[9], nodes[9]);
       });
     });
   });

@@ -86,182 +86,130 @@ define(function(require, exports, module) {
       }
     }
   };
-  
-  doneAction[0] = function() {
-    // do nothing when the UGen is finished
-  };
-  doneAction[1] = function() {
-    // pause the enclosing synth, but do not free it
-    this.running = false;
-  };
-  doneAction[2] = function() {
-    // free the enclosing synth
-    free.call(this);
-  };
-  doneAction[3] = function() {
-    // free both this synth and the preceding node
-    var prev = this.prev;
-    if (prev) {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[4] = function() {
-    // free both this synth and the following node
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      free.call(next);
-    }
-  };
-  doneAction[5] = function() {
-    // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prev;
-    if (prev instanceof Group) {
-      g_freeAll(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[6] = function() {
-    // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      g_freeAll(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[7] = function() {
-    // free this synth and all preceding nodes in this group
-    var next = this.parent.head;
-    if (next) {
-      var node = next;
-      while (node && node !== this) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-    free.call(this);
-  };
-  doneAction[8] = function() {
-    // free this synth and all following nodes in this group
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[9] = function() {
-    // free this synth and pause the preceding node
-    var prev = this.prev;
-    free.call(this);
-    if (prev) {
-      prev.running = false;
-    }
-  };
-  doneAction[10] = function() {
-    // free this synth and pause the following node
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      next.running = false;
-    }
-  };
-  doneAction[11] = function() {
-    // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prev;
-    if (prev instanceof Group) {
-      g_deepFree(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[12] = function() {
-    // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      g_deepFree(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[13] = function() {
-    // free this synth and all other nodes in this group (before and after)
-    var next = this.parent.head;
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[14] = function() {
-    // free the enclosing group and all nodes within it (including this synth)
-    g_deepFree(this);
-  };
-  var free = function() {
-    if (this.prev) {
-      this.prev.next = this.next;
-    }
-    if (this.next) {
-      this.next.prev = this.prev;
-    }
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
-      }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
-      }
 
-      var userId;
-      if (this.world) {
-        userId = this.world.userId;
-      }
+  // do nothing when the UGen is finished
+  doneAction[0] = null;
+  
+  // pause the enclosing synth, but do not free it
+  doneAction[1] = function(node) {
+    node.running = false;
+  };
+  
+  // free the enclosing synth
+  doneAction[2] = function(node) {
+    node.end();
+  };
+
+  // free both this synth and the preceding node
+  doneAction[3] = function(node) {
+    if (node.prev) {
+      node.prev.end();
     }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
-    this.blocking = false;
-    if (this.world) {
-      delete this.world.nodes[this.nodeId];
+    node.end();
+  };
+
+  // free both this synth and the following node
+  doneAction[4] = function(node) {
+    if (node.next) {
+      node.next.end();
+    }
+    node.end();
+  };
+  
+  // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
+  doneAction[5] = function(node) {
+    var prev = node.prev;
+    if (prev instanceof Group) {
+      prev.endAll();
+    } else if (prev) {
+      prev.end();
+    }
+    node.end();
+  };
+  
+  // free this synth; if the following node is a group then do g_freeAll on it, else free it
+  doneAction[6] = function(node) {
+    var next = node.next;
+    node.end();
+    if (next instanceof Group) {
+      next.endAll();
+    } else if (next) {
+      next.end();
     }
   };
-  var g_freeAll = function(node) {
-    var next = node.head;
-    free.call(node);
-    node = next;
+
+  // free this synth and all preceding nodes in this group
+  doneAction[7] = function(node) {
+    var prev;
+    while (node) {
+      prev = node.prev;
+      node.end();
+      node = prev;
+    }
+  };
+  
+  // free this synth and all following nodes in this group
+  doneAction[8] = function(node) {
+    var next;
     while (node) {
       next = node.next;
-      free.call(node);
+      node.end();
       node = next;
     }
   };
-  var g_deepFree = function(node) {
-    var next = node.head;
-    free.call(node);
-    node = next;
+  
+  // free this synth and pause the preceding node
+  doneAction[9] = function(node) {
+    if (node.prev) {
+      node.prev.running = false;
+    }
+    node.end();
+  };
+  
+  // free this synth and pause the following node
+  doneAction[10] = function(node) {
+    if (node.next) {
+      node.next.running = false;
+    }
+    node.end();
+  };
+  
+  // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
+  doneAction[11] = function(node) {
+    var prev = node.prev;
+    if (prev instanceof Group) {
+      prev.endDeep();
+    } else if (prev) {
+      prev.end();
+    }
+    node.end();
+  };
+
+  // free this synth and if the following node is a group then do g_deepFree on it, else free it
+  doneAction[12] = function(node) {
+    var next = node.next;
+    if (next instanceof Group) {
+      next.endDeep();
+    } else if (next) {
+      next.end();
+    }
+    node.end();
+  };
+  
+  // free this synth and all other nodes in this group (before and after)
+  doneAction[13] = function(node) {
+    var next;
+    node = node.parent.head;
     while (node) {
       next = node.next;
-      free.call(node);
-      if (node instanceof Group) {
-        g_deepFree(node);
-      }
+      node.end();
       node = next;
     }
+  };
+  
+  // free the enclosing group and all nodes within it (including this synth)
+  doneAction[14] = function(node) {
+    node.parent.endDeep();
   };
   
   var Node = (function() {
@@ -279,23 +227,34 @@ define(function(require, exports, module) {
     Node.prototype.pause = function() {
       this.running = false;
     };
-    Node.prototype.stop = function() {
-      free.call(this);
+    Node.prototype.end = function() {
+      if (this.nodeId !== 0) {
+        if (this.prev) {
+          this.prev.next = this.next;
+        }
+        if (this.next) {
+          this.next.prev = this.prev;
+        }
+        if (this.parent.head === this) {
+          this.parent.head = this.next;
+        }
+        if (this.parent.tail === this) {
+          this.parent.tail = this.prev;
+        }
+        this.prev   = null;
+        this.next   = null;
+        this.parent = null;
+        this.world.nodes[this.nodeId] = null;
+      }
+      this.running = false;
     };
     Node.prototype.run = function(inRun) {
       this.running = !!inRun; // TODO
     };
-    Node.prototype.end = function() {
-      this.running = false; // TODO
-    };
     Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
-        func.call(this);
-        var userId;
-        if (this.world) {
-          userId = this.world.userId;
-        }
+        func(this);
       }
     };
     return Node;
@@ -311,6 +270,30 @@ define(function(require, exports, module) {
       }
     }
     extend(Group, Node);
+
+    Group.prototype.endAll = function() {
+      var next, node = this.head;
+      while (node) {
+        next = node.next;
+        node.end();
+        node = next;
+      }
+      this.end();
+    };
+
+    Group.prototype.endDeep = function() {
+      var next, node = this.head;
+      while (node) {
+        next = node.next;
+        if (node instanceof Group) {
+          node.endDeep();
+        } else {
+          node.end();
+        }
+        node = next;
+      }
+      this.end();
+    };
     
     Group.prototype.process = function(inNumSamples) {
       if (this.head && this.running) {
