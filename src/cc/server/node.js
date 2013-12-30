@@ -221,12 +221,11 @@ define(function(require, exports, module) {
       this.parent  = null;
       this.running = true;
     }
-    Node.prototype.play = function() {
-      this.running = true;
+    
+    Node.prototype.run = function(inRun) {
+      this.running = !!inRun;
     };
-    Node.prototype.pause = function() {
-      this.running = false;
-    };
+    
     Node.prototype.end = function() {
       if (this.nodeId !== 0) {
         if (this.prev) {
@@ -248,18 +247,17 @@ define(function(require, exports, module) {
       }
       this.running = false;
     };
-    Node.prototype.run = function(inRun) {
-      this.running = !!inRun; // TODO
-    };
+    
     Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
         func(this);
       }
     };
+    
     return Node;
   })();
-
+  
   var Group = (function() {
     function Group(world, nodeId, target, addAction) {
       Node.call(this, world, nodeId);

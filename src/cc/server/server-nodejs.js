@@ -30,7 +30,7 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.world.play(userId);
+      this.world.run(true, userId);
       if (this.api) {
         this._strm = new Float32Array(this.strmLength * this.channels);
         this.strmList = new Array(C.STRM_LIST_LENGTH);
@@ -53,7 +53,7 @@ define(function(require, exports, module) {
     };
     NodeJSSynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.world.pause(userId);
+      this.world.run(false, userId);
       if (this.api) {
         if (this.api.isPlaying) {
           if (!this.world.isRunning()) {

@@ -707,47 +707,11 @@ define(function(require, exports, module) {
   mock.createTaskManager.$beforeEach = function() {
     mock.createTaskManager.called = [];
   };
-
-  mock.createWorldManager = function() {
-    return {
-      init: function() {
-        mock.createWorldManager.called.push("init");
-      },
-      play: function() {
-        mock.createWorldManager.called.push("play");
-      },
-      pause: function() {
-        mock.createWorldManager.called.push("pause");
-      },
-      reset: function() {
-        mock.createWorldManager.called.push("reset");
-      },
-      pushToTimeline: function() {
-        mock.createWorldManager.called.push("pushToTimeline");
-      },
-      append: function() {
-        mock.createWorldManager.called.push("append");
-        return mock.createWorld();
-      },
-      remove: function() {
-        mock.createWorldManager.called.push("remove");
-      },
-      process:function() {
-        mock.createWorldManager.called.push("process");
-      }
-    };
-  };
-  mock.createWorldManager.$beforeEach = function() {
-    mock.createWorldManager.called = [];
-  };
   
   mock.createWorld = function() {
     return {
-      play: function() {
-        mock.createWorld.called.push("play");
-      },
-      pause: function() {
-        mock.createWorld.called.push("pause");
+      run: function(flag) {
+        mock.createWorld.called.push("run:" + flag);
       },
       reset: function() {
         mock.createWorld.called.push("reset");

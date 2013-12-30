@@ -9,12 +9,7 @@ define(function(require, exports, module) {
 
   describe("server/world.js", function() {
     var w, actual, expected;
-    var rootNode = {
-      running: false,
-      process: function(bufLength, world) {
-        rootNode.process.result = [bufLength, world];
-      }
-    };
+    var rootNode;
     
     testTools.mock("server");
     testTools.mock("createServerRootNode", function() {
@@ -27,6 +22,9 @@ define(function(require, exports, module) {
     beforeEach(function() {
       rootNode = {
         running: false,
+        run: function(flag) {
+          rootNode.running = !!flag;
+        },
         process: function(bufLength, world) {
           rootNode.process.result = [bufLength, world];
         }
@@ -41,10 +39,10 @@ define(function(require, exports, module) {
       it("play/pause/reset", function() {
         w = cc.createWorld(0);
         
-        w.play();
+        w.run(true);
         assert.isTrue(w.isRunning());
         
-        w.pause();
+        w.run(false);
         assert.isFalse(w.isRunning());
         
         w.reset();
@@ -77,7 +75,7 @@ define(function(require, exports, module) {
       describe("commands", function() {
         it("/n_run", function() {
           w = cc.createWorld(0);
-          w.nodes[1] = { running:false };
+          w.nodes[1] = { running:false, run:function(flag) {w.nodes[1].running = !!flag;} };
           
           world.commands["/n_run"](w, ["/n_run", 1, 0]);
           assert.isFalse(w.nodes[1].running);

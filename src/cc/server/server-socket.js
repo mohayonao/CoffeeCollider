@@ -38,16 +38,10 @@ define(function(require, exports, module) {
         }
       }
     };
-    WorldManager.prototype.play = function(userId) {
+    WorldManager.prototype.run = function(flag, userId) {
       var world = this.map[userId];
       if (world) {
-        world.play();
-      }
-    };
-    WorldManager.prototype.pause = function(userId) {
-      var world = this.map[userId];
-      if (world) {
-        world.pause();
+        world.run(flag);
       }
     };
     WorldManager.prototype.reset = function(userId) {

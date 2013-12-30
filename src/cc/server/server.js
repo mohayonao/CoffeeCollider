@@ -70,7 +70,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.world.play(userId);
+      this.world.run(true, userId);
       if (!this.timer.isRunning()) {
         var that = this;
         this.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
@@ -81,7 +81,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.world.pause(userId);
+      this.world.run(false, userId);
       if (this.timer.isRunning()) {
         if (!this.world.isRunning()) {
           this.timer.stop();

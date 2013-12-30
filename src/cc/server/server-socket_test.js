@@ -44,23 +44,23 @@ define(function(require, exports, module) {
         
         ins.append(0);
         
-        ins.play(0);
-        assert.deepEqual(cc.createWorld.called, ["play"]);
+        ins.run(true, 0);
+        assert.deepEqual(cc.createWorld.called, ["run:true"]);
         
-        ins.play(1);
-        assert.deepEqual(cc.createWorld.called, ["play"]);
+        ins.run(true, 1);
+        assert.deepEqual(cc.createWorld.called, ["run:true"]);
         
         ins.reset(0);
-        assert.deepEqual(cc.createWorld.called, ["play", "reset"]);
+        assert.deepEqual(cc.createWorld.called, ["run:true", "reset"]);
         
         ins.reset(1);
-        assert.deepEqual(cc.createWorld.called, ["play", "reset"]);
+        assert.deepEqual(cc.createWorld.called, ["run:true", "reset"]);
         
-        ins.pause(0);
-        assert.deepEqual(cc.createWorld.called, ["play", "reset", "pause"]);
+        ins.run(false, 0);
+        assert.deepEqual(cc.createWorld.called, ["run:true", "reset", "run:false"]);
         
-        ins.pause(1);
-        assert.deepEqual(cc.createWorld.called, ["play", "reset", "pause"]);
+        ins.run(false, 1);
+        assert.deepEqual(cc.createWorld.called, ["run:true", "reset", "run:false"]);
       });
       it("isRunning", function() {
         ins = new server.WorldManager();

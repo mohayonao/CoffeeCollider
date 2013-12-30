@@ -26,13 +26,8 @@ define(function(require, exports, module) {
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
-    World.prototype.play = function() {
-      this.rootNode.running = true;
-      this.bus.set(this.busClear);
-      this.timeline = [];
-    };
-    World.prototype.pause = function() {
-      this.rootNode.running = false;
+    World.prototype.run = function(flag) {
+      this.rootNode.run(flag);
       this.bus.set(this.busClear);
       this.timeline = [];
     };
@@ -87,7 +82,7 @@ define(function(require, exports, module) {
     var flag   = !!args[2];
     var target = world.nodes[nodeId];
     if (target) {
-      target.running = flag;
+      target.run(flag);
     }
   };
   commands["/n_free"] = function(world, args) {

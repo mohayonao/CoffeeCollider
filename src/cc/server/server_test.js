@@ -12,7 +12,6 @@ define(function(require, exports, module) {
     testTools.mock("lang");
     testTools.mock("createTimer");
     testTools.mock("createWorld");
-    testTools.mock("createWorldManager");
     
     describe("SynthServer", function() {
       describe("createSynthServer", function() {
