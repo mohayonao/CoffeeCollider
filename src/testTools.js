@@ -731,10 +731,10 @@ define(function(require, exports, module) {
     mock.createWorld.called = [];
   };
 
-  mock.createServerGroup = function(nodeId, target, addAction, world) {
-    return [nodeId, target, addAction, world ];
+  mock.createServerGroup = function(world, nodeId, target, addAction) {
+    return [ world, nodeId, target, addAction ];
   };
-
+  
   mock.createServerSynth = function(world, nodeId, target, addAction, defId, controls) {
     return [ world, nodeId, target, addAction, defId, controls ];
   };

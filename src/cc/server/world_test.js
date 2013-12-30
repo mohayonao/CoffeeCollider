@@ -25,8 +25,8 @@ define(function(require, exports, module) {
         run: function(flag) {
           rootNode.running = !!flag;
         },
-        process: function(bufLength, world) {
-          rootNode.process.result = [bufLength, world];
+        process: function(bufLength) {
+          rootNode.process.result = [ bufLength ];
         }
       };
     });
@@ -47,10 +47,20 @@ define(function(require, exports, module) {
         
         w.reset();
       });
+      it("isRunning", function() {
+        w = cc.createWorld(0);
+        assert.isFalse(w.isRunning());
+      });
       it("pushToTimeline", function() {
         w = cc.createWorld(0);
         w.pushToTimeline(["test"]);
         assert.deepEqual(w.timeline, ["test"]);
+      });
+      it("doBinayCommand", function() {
+        w = cc.createWorld(0);
+        assert.doesNotThrow(function() {
+          w.doBinayCommand(new Uint8Array([255, 255]));
+        });
       });
       it("getFixNum", function() {
         w = cc.createWorld(0);
@@ -70,7 +80,8 @@ define(function(require, exports, module) {
           passed += args[1];
         };
         w.process(64);
-        assert.deepEqual(rootNode.process.result, [64, w]);
+        assert.deepEqual(rootNode.process.result, [ 64 ]);
+        assert.equal(passed, 100);
       });
       describe("commands", function() {
         it("/n_run", function() {
@@ -123,11 +134,16 @@ define(function(require, exports, module) {
           
           world.commands["/n_set"](w, ["/n_set", 2, [0,1,2,3]]);
         });
-        it.skip("/g_new", function() {
+        it("/g_new", function() {
           w = cc.createWorld(0);
           w.nodes[1] = "target";
           world.commands["/g_new"](w, ["/g_new", 2, 3, 1]);
-          assert.deepEqual(w.nodes[2], [2, "target", 3, w]);
+          assert.deepEqual(w.nodes[2], [ w, 2, "target", 3 ]);
+        });
+        it("/g_new (failed)", function() {
+          w = cc.createWorld(0);
+          world.commands["/g_new"](w, ["/g_new", 2, 3, 1]);
+          assert.isUndefined(w.nodes[2]);
         });
         it("/s_def", function() {
           w = cc.createWorld(0);
@@ -138,7 +154,12 @@ define(function(require, exports, module) {
           w = cc.createWorld(0);
           w.nodes[1] = "target";
           world.commands["/s_new"](w, ["/s_new", 2, 3, 1, 4, ["controls"]]);
-          assert.deepEqual(w.nodes[2], [w, 2, "target", 3, 4, ["controls"]]);
+          assert.deepEqual(w.nodes[2], [ w, 2, "target", 3, 4, ["controls"] ]);
+        });
+        it("/s_new (failed)", function() {
+          w = cc.createWorld(0);
+          world.commands["/s_new"](w, ["/s_new", 2, 3, 1, 4, ["controls"]]);
+          assert.isUndefined(w.nodes[2]);
         });
         describe("buffer", function() {
           describe("/b_new", function() {
@@ -257,6 +278,46 @@ define(function(require, exports, module) {
               assert.doesNotThrow(function() {
                 world.commands["/b_gen"](w, ["/b_gen", 10]);
               });
+            });
+          });
+          describe("BINARY_CMD_SET_SYNC", function() {
+            it("normal", function() {
+              var uint8 = new Uint8Array(C.SYNC_ITEM_LEN);
+              var int16 = new Uint16Array(uint8.buffer);
+              var int32 = new Uint32Array(uint8.buffer);
+              var f32   = new Float32Array(uint8.buffer);
+              int16[0] = C.BINARY_CMD_SET_SYNC;
+              int32[C.SYNC_COUNT] = 1;
+              f32[C.POS_X]        = 2;
+              f32[C.POS_Y]        = 3;
+              f32[C.BUTTON]       = 4;
+              
+              w = cc.createWorld(0);
+              
+              cc.server.sysSyncCount = 0;
+              w.doBinayCommand(uint8);
+              
+              assert.deepEqual(w.syncItems, uint8);
+              assert.equal(cc.server.sysSyncCount, int32[C.SYNC_COUNT]);
+            });
+            it("not update", function() {
+              var uint8 = new Uint8Array(C.SYNC_ITEM_LEN);
+              var int16 = new Uint16Array(uint8.buffer);
+              var int32 = new Uint32Array(uint8.buffer);
+              var f32   = new Float32Array(uint8.buffer);
+              int16[0] = C.BINARY_CMD_SET_SYNC;
+              int32[C.SYNC_COUNT] = 1;
+              f32[C.POS_X]        = 2;
+              f32[C.POS_Y]        = 3;
+              f32[C.BUTTON]       = 4;
+              
+              w = cc.createWorld(0);
+              
+              cc.server.sysSyncCount = 10;
+              w.doBinayCommand(uint8);
+              
+              assert.deepEqual(w.syncItems, uint8);
+              assert.equal(cc.server.sysSyncCount, 10);
             });
           });
           describe("BINARY_CMD_SET_BUFFER", function() {
