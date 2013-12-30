@@ -308,11 +308,9 @@ define(function(require, exports, module) {
   var Synth = (function() {
     function Synth(world, nodeId, target, addAction, defId, controls) {
       Node.call(this, world, nodeId);
-      if (world) {
-        var specs = world.defs[defId];
-        if (specs) {
-          this.build(specs, controls, world);
-        }
+      var specs = world.defs[defId];
+      if (specs) {
+        this.build(specs, controls);
       }
       if (target) {
         graphFunc[addAction](this, target);
@@ -320,8 +318,9 @@ define(function(require, exports, module) {
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, controls, world) {
+    Synth.prototype.build = function(specs, controls) {
       var list, fixNumList, unitList = [];
+      var world = this.world;
       var heap = new Float32Array(specs.heapSize);
       var unit, inputs, inRates, fromUnits, inSpec;
       var i, imax, j, jmax, k, u, x1, x2;
@@ -371,12 +370,11 @@ define(function(require, exports, module) {
       
       return this;
     };
-
-    Synth.prototype.set = function(controls) {
-      for (var i = 0, imax = controls.length; i < imax; i += 2) {
-        var index = controls[i    ];
-        var value = controls[i + 1];
-        this.controls[index] = value;
+    
+    Synth.prototype.set = function(params) {
+      var controls = this.controls;
+      for (var i = 0, imax = params.length; i < imax; i += 2) {
+        controls[params[i]] = params[i + 1];
       }
     };
     

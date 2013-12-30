@@ -8,7 +8,8 @@ define(function(require, exports, module) {
   var node = require("./node");
   var Group = node.Group;
   var Synth = node.Synth;
-    
+  var ir = C.SCALAR, kr = C.CONTROL, ar = C.AUDIO;
+  
   describe("server/node.js", function() {
     var actual, expected;
     var world, nodes, rootNode;
@@ -167,12 +168,98 @@ define(function(require, exports, module) {
       });
     });
     describe("Group", function() {
+      it("createRootNode", function() {
+        var g = cc.createServerRootNode({});
+        assert.instanceOf(g, Group);
+        assert.equal(g.nodeId, 0);
+      });
+      it("createNode", function() {
+        var g = cc.createServerGroup({}, 100, nodes[9], C.ADD_AFTER);
+        assert.instanceOf(g, Group);
+        assert.equal(g.nodeId, 100);
+        
+        actual   = walk(nodes[9], "ASC");
+        expected = [ 9, 100 ];
+        assert.deepEqual(actual, expected);
+      });
       it("#process", function() {
         nodes[0].process(1);
         assert.deepEqual(processed, [ 1, 4, 7, 9, 6, 3 ]);
       });
     });
     describe("Synth", function() {
+      testTools.mock("createUnit", function(synth, spec) {
+        var u = {};
+        u.specs     = spec;
+        u.inputs    = new Array(spec[3].length >> 1);
+        u.outputs   = [ [], [] ];
+        u.inRates   = [];
+        u.outRates  = spec[4];
+        u.fromUnits = [];
+        u.init = function() {
+          if (spec[4].length) {
+            u.process = function() {};
+          }
+        };
+        return u;
+      });
+      it("createSynth", function() {
+        var s = cc.createServerSynth({defs:[]}, 100, nodes[9], C.ADD_AFTER, 0, []);
+        assert.instanceOf(s, Synth);
+        assert.equal(s.nodeId, 100);
+        
+        actual   = walk(nodes[9], "ASC");
+        expected = [ 9, 100 ];
+        assert.deepEqual(actual, expected);
+      });
+      it("new with build", function() {
+        world = {
+          defs: [
+            {
+              name  : "test",
+              consts: [ 0, 880 ], 
+              params: {
+                names  : [],
+                indices: [],
+                length : [],
+                values : [],
+              },
+              defList: [
+                [ "Scalar", ir, 0, [ -1, 1        ], [ ir ] ],
+                [ "SinOsc", ar, 0, [  0, 0, -1, 0 ], [ ar ] ],
+                [ "Pass"  , ar, 0, [  1, 0        ], [ ar ] ],
+                [ "Out"   , ar, 0, [ -1, 0,  2, 0 ], [    ] ],
+              ],
+              variants: {},
+              heapSize: 100
+            }
+          ],
+          getFixNum: function(value) {
+            return { outputs:[new Float32Array([value])] };
+          }
+        };
+        var s = new Synth(world, 0, null, 0, 0, [0, 1, 1, 2]);
+        assert.equal(s.unitList[0].inputs[0][0], 880);
+        assert.equal(s.unitList[0].inRates[0], C.SCALAR);
+        
+        assert.equal(s.unitList[1].fromUnits[0], s.unitList[0]);
+        assert.equal(s.unitList[1].inputs[0], s.unitList[0].outputs[0]);
+        assert.equal(s.unitList[1].inputs[1][0], 0);
+        assert.equal(s.unitList[1].inRates[0], C.SCALAR);
+        assert.equal(s.unitList[1].inRates[1], C.SCALAR);
+        
+        assert.equal(s.unitList[2].fromUnits[0], s.unitList[1]);
+        assert.equal(s.unitList[2].inputs[0], s.unitList[1].outputs[0]);
+        assert.equal(s.unitList[2].inRates[0], C.AUDIO);
+        
+        assert.isUndefined(s.unitList[3]);
+      });
+      it("#set", function() {
+        var s = new Synth({defs:[]}, 0);
+        s.controls = [];
+        s.set([0,1, 1,2, 2,3]);
+        assert.deepEqual(s.controls, [ 1, 2, 3 ]);
+      });
       it("#process", function() {
         nodes[4].process(1);
         assert.deepEqual(processed, [ 4, 7, 9, 6 ]);
