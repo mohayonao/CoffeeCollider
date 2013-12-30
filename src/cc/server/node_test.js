@@ -12,6 +12,7 @@ define(function(require, exports, module) {
   describe("server/node.js", function() {
     var actual, expected;
     var world, nodes, rootNode;
+    var processed;
     
     testTools.mock("server", {
       timeline: {
@@ -38,6 +39,14 @@ define(function(require, exports, module) {
       nodes[7].parent = nodes[5]; nodes[7].next = nodes[8];
       nodes[8].parent = nodes[5]; nodes[8].prev = nodes[7]; nodes[8].next = nodes[9];
       nodes[9].parent = nodes[5]; nodes[9].prev = nodes[8];
+      
+      processed = [];
+      nodes[1].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(1) }} ];
+      nodes[3].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(3) }} ];
+      nodes[4].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(4) }} ];
+      nodes[6].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(6) }} ];
+      nodes[7].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(7) }} ];
+      nodes[9].unitList = [ {rate:{ bufLength:64 }, process:function() { processed.push(9) }} ];
     });
     
     var walk = (function() {
@@ -155,6 +164,23 @@ define(function(require, exports, module) {
           
           assert.isFalse(nodes[6].running);
         });
+      });
+    });
+    describe("Group", function() {
+      it("#process", function() {
+        nodes[0].process(1);
+        assert.deepEqual(processed, [ 1, 4, 7, 9, 6, 3 ]);
+      });
+    });
+    describe("Synth", function() {
+      it("#process", function() {
+        nodes[4].process(1);
+        assert.deepEqual(processed, [ 4, 7, 9, 6 ]);
+      });
+      it("#process (run:false)", function() {
+        nodes[4].run(false);
+        nodes[4].process(1);
+        assert.deepEqual(processed, [ 7, 9, 6 ]);
       });
     });
     describe("graphFunction", function() {

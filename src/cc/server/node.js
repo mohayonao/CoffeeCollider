@@ -365,7 +365,7 @@ define(function(require, exports, module) {
           }
         }
         unit.init();
-        if (unit.process) {
+        if (unit.process && unit.rate !== C.DEMAND) {
           unitList.push(unit);
         }
       }
@@ -383,13 +383,11 @@ define(function(require, exports, module) {
     };
     
     Synth.prototype.process = function(inNumSamples) {
-      if (this.running && this.unitList) {
+      if (this.running) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
-          if (unit.calcRate !== C.DEMAND) {
-            unit.process(unit.rate.bufLength);
-          }
+          unit.process(unit.rate.bufLength);
         }
       }
       if (this.next) {
