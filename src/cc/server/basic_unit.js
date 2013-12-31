@@ -4,17 +4,6 @@ define(function(require, exports, module) {
   var cc = require("../cc");
   var ops = require("../common/ops");
   var log001 = Math.log(0.001);
-  
-  var avoidzero = function(a) {
-    if (a < 0) {
-      if (-1e-6 < a) {
-        a = -1e-6;
-      }
-    } else if (a < +1e-6) {
-      a = 1e-6;
-    }
-    return a;
-  };
 
   var calcDemandInput = function(unit, index, offset) {
     var fromUnit = unit.fromUnits[index];
@@ -24,13 +13,10 @@ define(function(require, exports, module) {
         return unit.inputs[index][offset-1];
       case C.DEMAND:
         fromUnit.process(offset);
-        /* fall through */
-      default:
-        return unit.inputs[index][0];
+        break;
       }
-    } else {
-      return unit.inputs[index][0];
     }
+    return unit.inputs[index][0];
   };
   
   var resetDemandInput = function(unit, index) {
@@ -140,40 +126,40 @@ define(function(require, exports, module) {
     return Math.exp(a);
   };
   uopFunc.reciprocal = function(a) {
-    return 1 / avoidzero(a);
+    return 1 / a;
   };
   uopFunc.midicps = function(a) {
     return 440 * Math.pow(2, (a - 69) * 1/12);
   };
   uopFunc.cpsmidi = function(a) {
-    return Math.log(Math.abs(avoidzero(a)) * 1/440) * Math.LOG2E * 12 + 69;
+    return Math.log(Math.abs(a) * 1/440) * Math.LOG2E * 12 + 69;
   };
   uopFunc.midiratio = function(a) {
     return Math.pow(2, a * 1/12);
   };
   uopFunc.ratiomidi = function(a) {
-    return Math.log(Math.abs(avoidzero(a))) * Math.LOG2E * 12;
+    return Math.log(Math.abs(a)) * Math.LOG2E * 12;
   };
   uopFunc.dbamp = function(a) {
     return Math.pow(10, a * 0.05);
   };
   uopFunc.ampdb = function(a) {
-    return Math.log(Math.abs(avoidzero(a))) * Math.LOG10E * 20;
+    return Math.log(Math.abs(a)) * Math.LOG10E * 20;
   };
   uopFunc.octcps = function(a) {
-    return 440 * Math.pow(2, avoidzero(a) - 4.75);
+    return 440 * Math.pow(2, a - 4.75);
   };
   uopFunc.cpsoct = function(a) {
     return Math.log(Math.abs(a) * 1/440) * Math.LOG2E + 4.75;
   };
   uopFunc.log = function(a) {
-    return Math.log(Math.abs(avoidzero(a)));
+    return Math.log(Math.abs(a));
   };
   uopFunc.log2 = function(a) {
-    return Math.log(Math.abs(avoidzero(a))) * Math.LOG2E;
+    return Math.log(Math.abs(a)) * Math.LOG2E;
   };
   uopFunc.log10 = function(a) {
-    return Math.log(Math.abs(avoidzero(a))) * Math.LOG10E;
+    return Math.log(Math.abs(a)) * Math.LOG10E;
   };
   uopFunc.sin = function(a) {
     return Math.sin(a);
@@ -277,13 +263,13 @@ define(function(require, exports, module) {
             switch (this.inRates[1]) {
             case C.AUDIO  : process = func.ka; break;
             case C.CONTROL: process = func.kk; break;
-            case C.SCALAR : process = func.kk; break;
+            case C.SCALAR : process = func.ki; break;
             }
             break;
           case C.SCALAR:
             switch (this.inRates[1]) {
             case C.AUDIO  : process = func.ia; break;
-            case C.CONTROL: process = func.kk; break;
+            case C.CONTROL: process = func.ik; break;
             case C.SCALAR : process = null   ; break;
             }
             break;
@@ -377,6 +363,11 @@ define(function(require, exports, module) {
       this.outputs[0][0] = func(this.inputs[0][0], this.inputs[1][0]);
     };
   };
+  var binary_ki = function(func) {
+    return function() {
+      this.outputs[0][0] = func(this.inputs[0][0], this._b);
+    };
+  };
   var binary_ia = function(func) {
     return function(inNumSamples) {
       var out = this.outputs[0];
@@ -393,6 +384,12 @@ define(function(require, exports, module) {
       }
     };
   };
+  var binary_ik = function(func) {
+    return function() {
+      this.outputs[0][0] = func(this._a, this.inputs[1][0]);
+    };
+  };
+  
   var binary_dd = function(func) {
     return function(inNumSamples) {
       if (inNumSamples) {
@@ -474,6 +471,9 @@ define(function(require, exports, module) {
   bopFunc["+"].kk = function() {
     this.outputs[0][0] = this.inputs[0][0] + this.inputs[1][0];
   };
+  bopFunc["+"].ki = function() {
+    this.outputs[0][0] = this.inputs[0][0] + this._b;
+  };
   bopFunc["+"].ia = function(inNumSamples) {
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
@@ -487,6 +487,9 @@ define(function(require, exports, module) {
       out[i+6] = a + bIn[i+6];
       out[i+7] = a + bIn[i+7];
     }
+  };
+  bopFunc["+"].ik = function() {
+    this.outputs[0][0] = this._a + this.inputs[1][0];
   };
   
   bopFunc["-"] = function(a, b) {
@@ -557,6 +560,9 @@ define(function(require, exports, module) {
   bopFunc["-"].kk = function() {
     this.outputs[0][0] = this.inputs[0][0] - this.inputs[1][0];
   };
+  bopFunc["-"].ki = function() {
+    this.outputs[0][0] = this.inputs[0][0] - this._b;
+  };
   bopFunc["-"].ia = function(inNumSamples) {
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
@@ -571,7 +577,10 @@ define(function(require, exports, module) {
       out[i+7] = a - bIn[i+7];
     }
   };
-
+  bopFunc["-"].ik = function() {
+    this.outputs[0][0] = this._a - this.inputs[1][0];
+  };
+  
   bopFunc["*"] = function(a, b) {
     return a * b;
   };
@@ -640,6 +649,9 @@ define(function(require, exports, module) {
   bopFunc["*"].kk = function() {
     this.outputs[0][0] = this.inputs[0][0] * this.inputs[1][0];
   };
+  bopFunc["*"].ki = function() {
+    this.outputs[0][0] = this.inputs[0][0] * this._b;
+  };
   bopFunc["*"].ia = function(inNumSamples) {
     var out = this.outputs[0];
     var a = this._a, bIn = this.inputs[1];
@@ -654,14 +666,17 @@ define(function(require, exports, module) {
       out[i+7] = a * bIn[i+7];
     }
   };
-
+  bopFunc["*"].ik = function() {
+    this.outputs[0][0] = this._a * this.inputs[1][0];
+  };
+  
   bopFunc["/"] = function(a, b) {
     return b === 0 ? 0 : a / b;
   };
   bopFunc["%"] = function(a, b) {
     return b === 0 ? 0 : a % b;
   };
-
+  
   bopFunc.eq = function(a, b) {
     return a === b ? 1 : 0;
   };
@@ -865,11 +880,15 @@ define(function(require, exports, module) {
     if (!func.kk) {
       func.kk = binary_kk(func);
     }
+    if (!func.ki) {
+      func.ki = binary_ki(func);
+    }
     if (!func.ia) {
       func.ia = binary_ia(func);
     }
-    func.ki = func.kk;
-    func.ik = func.kk;
+    if (!func.ik) {
+      func.ik = binary_ik(func);
+    }
     func.dd = binary_dd(func);
   });
   
@@ -1600,15 +1619,19 @@ define(function(require, exports, module) {
   
   module.exports = {
     uopFunc: uopFunc,
-    unary_k: unary_k,
     unary_a: unary_a,
+    unary_k: unary_k,
+    unary_d: unary_d,
     bopFunc: bopFunc,
     binary_aa: binary_aa,
     binary_ak: binary_ak,
     binary_ai: binary_ai,
     binary_ka: binary_ka,
     binary_kk: binary_kk,
-    binary_ia: binary_ia
+    binary_ki: binary_ki,
+    binary_ia: binary_ia,
+    binary_ik: binary_ik,
+    binary_dd: binary_dd
   };
 
 });

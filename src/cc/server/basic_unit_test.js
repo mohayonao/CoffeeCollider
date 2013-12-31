@@ -11,7 +11,10 @@ define(function(require, exports, module) {
   var ops  = require("../common/ops");
   
   describe("server/basic_unit.js", function() {
+    var actual, expected;
+    
     testTools.mock("server");
+    
     describe("unary operators", function() {
       describe("uopFunc", function() {
         Object.keys(basic_unit.uopFunc).forEach(function(selector) {
@@ -26,29 +29,12 @@ define(function(require, exports, module) {
       });
       describe("process", function() {
         var that, func;
-        before(function() {
-          that = {
-            inputs : [
-              new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8])
-            ]
-          };
-          func = function(a) {
-            return a * 2;
-          };
-        });
         beforeEach(function() {
-          that.outputs = [ new Float32Array(8) ];
-        });
-        it("unary_k", function() {
-          basic_unit.unary_k(func).call(that, 8);
-          assert.equal(that.outputs[0][0], 2);
-          assert.equal(that.outputs[0][1], 0);
-          assert.equal(that.outputs[0][2], 0);
-          assert.equal(that.outputs[0][3], 0);
-          assert.equal(that.outputs[0][4], 0);
-          assert.equal(that.outputs[0][5], 0);
-          assert.equal(that.outputs[0][6], 0);
-          assert.equal(that.outputs[0][7], 0);
+          that = {
+            inputs : [ new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8 ]) ],
+            outputs: [ new Float32Array([ 0, 0, 0, 0, 0, 0, 0, 0 ]) ],
+          };
+          func = function(a) { return a * 2; };
         });
         it("unary_a", function() {
           basic_unit.unary_a(func).call(that, 8);
@@ -61,70 +47,173 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][6], 14);
           assert.equal(that.outputs[0][7], 16);
         });
+        it("unary_k", function() {
+          basic_unit.unary_k(func).call(that, 1);
+          assert.equal(that.outputs[0][0], 2);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
+        });
+        it("unary_d (AUDIO)", function() {
+          that.fromUnits = [
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            }
+          ];
+          actual = basic_unit.unary_d(func).call(that, 8);
+          assert.equal(that.outputs[0][0], 16);
+        });
+        it("unary_d (CONTROL)", function() {
+          that.fromUnits = [
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            }
+          ];
+          actual = basic_unit.unary_d(func).call(that, 1);
+          assert.equal(that.outputs[0][0], 2);
+        });
+        it("unary_d (SCALAR)", function() {
+          that.fromUnits = [
+            null // constant value
+          ];
+          actual = basic_unit.unary_d(func).call(that, 1);
+          assert.equal(that.outputs[0][0], 2);
+        });
+        it("unary_d (DEMAND)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = 100;
+                passed += 1;
+              }
+            }
+          ];
+          actual = basic_unit.unary_d(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 200);
+        });
+        it("unary_d (DEMAND:NaN)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = NaN;
+                passed += 1;
+              }
+            }
+          ];
+          actual = basic_unit.unary_d(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("unary_d (reset)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process: function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            }
+          ];
+          basic_unit.unary_d(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("unary_d (reset:not demand)", function() {
+          that.fromUnits = [
+            {
+              calcRate: C.CONTROL,
+              process: function() {
+                throw "should not be called"
+              }
+            }
+          ];
+          assert.doesNotThrow(function() {
+            basic_unit.unary_d(func).call(that, 0);
+          });
+        });
       });
-      describe("unit", function() {
+      describe("unit.process", function() {
         var specialIndex;
         before(function() {
           specialIndex = ops.UNARY_OPS_MAP.length;
           ops.UNARY_OPS_MAP[specialIndex] = "uopTest";
-        });
-        beforeEach(function() {
           basic_unit.uopFunc.uopTest = function(a) {
-            return a + 1;
+            return a * 2;
           };
+          basic_unit.uopFunc.uopTest.a = basic_unit.unary_a(basic_unit.uopFunc.uopTest);
+          basic_unit.uopFunc.uopTest.k = basic_unit.unary_k(basic_unit.uopFunc.uopTest);
+          basic_unit.uopFunc.uopTest.d = basic_unit.unary_k(basic_unit.uopFunc.uopTest);
         });
         it("AUDIO", function() {
-          basic_unit.uopFunc.uopTest.a = basic_unit.unary_a(basic_unit.uopFunc.uopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "UnaryOpUGen", C.AUDIO, specialIndex, [ 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
-          u.inputs[0]  = new Float32Array([0,1,2,3,4,5,6,7]);
+          u.inputs[0]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1);
-          assert.equal(u.outputs[0][1], 2);
-          assert.equal(u.outputs[0][2], 3);
-          assert.equal(u.outputs[0][3], 4);
-          assert.equal(u.outputs[0][4], 5);
-          assert.equal(u.outputs[0][5], 6);
-          assert.equal(u.outputs[0][6], 7);
-          assert.equal(u.outputs[0][7], 8);
+          
+          assert.equal(u.process, basic_unit.uopFunc.uopTest.a);
         });
         it("CONTROL", function() {
-          basic_unit.uopFunc.uopTest.k = basic_unit.unary_k(basic_unit.uopFunc.uopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "UnaryOpUGen", C.CONTROL, specialIndex, [ 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
-          u.inputs[0]  = new Float32Array([0]);
+          u.inputs[0]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1);
+          
+          assert.equal(u.process, basic_unit.uopFunc.uopTest.k);
         });
         it("SCALAR", function() {
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "UnaryOpUGen", C.SCALAR, specialIndex, [ 0,0 ], [ C.SCALAR ]
           ]);
           u.inRates[0] = C.SCALAR;
-          u.inputs[0]  = new Float32Array([0]);
+          u.inputs[0]  = new Float32Array(1);
           u.init();
+          
           assert.isNotFunction(u.process);
-          assert.equal(u.outputs[0][0], 1);
+        });
+        it("DEMAND", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(100), heapIndex:0
+          }, [
+            "UnaryOpUGen", C.DEMAND, specialIndex, [ 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.DEMAND;
+          u.inputs[0]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.uopFunc.uopTest.d);
         });
         it("undefined", function() {
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
-            "UnaryOpUGen", C.AUDIO, -1, [ 0,0 ], [ C.AUDIO ]
+            "UnaryOpUGen", C.CONTROL, -1, [ 0,0 ], [ C.CONTROL ]
           ]);
           assert.throws(function() {
             u.init();
@@ -216,15 +305,12 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][7], 80.875);
         });
         it("binary_kk", function() {
-          basic_unit.binary_kk(func).call(that, 8);
+          basic_unit.binary_kk(func).call(that, 1);
           assert.equal(that.outputs[0][0], 11);
-          assert.equal(that.outputs[0][1],  0);
-          assert.equal(that.outputs[0][2],  0);
-          assert.equal(that.outputs[0][3],  0);
-          assert.equal(that.outputs[0][4],  0);
-          assert.equal(that.outputs[0][5],  0);
-          assert.equal(that.outputs[0][6],  0);
-          assert.equal(that.outputs[0][7],  0);
+        });
+        it("binary_ki", function() {
+          basic_unit.binary_ki(func).call(that, 1);
+          assert.equal(that.outputs[0][0], 11);
         });
         it("binary_ia", function() {
           basic_unit.binary_ia(func).call(that, 8);
@@ -236,6 +322,432 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][5], 61);
           assert.equal(that.outputs[0][6], 71);
           assert.equal(that.outputs[0][7], 81);
+        });
+        it("binary_ik", function() {
+          basic_unit.binary_ik(func).call(that, 1);
+          assert.equal(that.outputs[0][0], 11);
+        });
+        it("binary_dd (AUDIO x DEMAND)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function() {
+                that.inputs[1][0] = 100;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 8);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 108);
+        });
+        it("binay_dd (CONTROL x DEMAND)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = 100;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 101);
+        });
+        it("binay_dd (SCALAR x DEMAND)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            null, // constant value
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = 100;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 101);
+        });
+        it("binay_dd (DEMAND x AUDIO)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 8);
+                that.inputs[0][0] = 100;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 8);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 180);
+        });
+        it("binay_dd (DEMAND x CONTROL)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = 100;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 110);
+        });
+        it("binay_dd (DEMAND x SCALAR)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = 100;
+                passed += 1;
+              }
+            },
+            null // constant value
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.equal(that.outputs[0][0], 110);
+        });
+        it("binay_dd (DEMAND x DEMAND)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = 100;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = 100;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 2);
+          assert.equal(that.outputs[0][0], 200);
+        });
+        it("binay_dd (AUDIO x DEMAND:NaN)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 8);
+                that.inputs[1][0] = NaN;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 8);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (CONTROL x DEMAND:NaN)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = NaN;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (SCALAR x DEMAND:NaN)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            null, // constant value
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = NaN;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (DEMAND:NaN x AUDIO)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = NaN;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (DEMAND:NaN x CONTROL)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = NaN;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (DEMAND:NaN x SCALAR)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = NaN;
+                passed += 1;
+              }
+            },
+            null // constant value
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 1);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (DEMAND:NaN x DEMAND:NaN)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[0][0] = NaN;
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 1);
+                that.inputs[1][0] = NaN;
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 1);
+          assert.equal(passed, 2);
+          assert.isTrue(isNaN(that.outputs[0][0]));
+        });
+        it("binay_dd (AUDIO x DEMAND:reset)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (CONTROL x DEMAND:reset)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (SCALAR x DEMAND:reset)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            null, // constant value
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (DEMAND:reset x AUDIO)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.AUDIO,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (DEMAND:reset x CONTROL)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.CONTROL,
+              process : function() {
+                throw "should not be called"
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (DEMAND:reset x SCALAR)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+            null // constant value
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 1);
+        });
+        it("binay_dd (DEMAND:reset x DEMAND:reset)", function() {
+          var passed = 0;
+          that.fromUnits = [
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+            {
+              calcRate: C.DEMAND,
+              process : function(inNumSamples) {
+                assert.equal(inNumSamples, 0);
+                passed += 1;
+              }
+            },
+          ];
+          actual = basic_unit.binary_dd(func).call(that, 0);
+          assert.equal(passed, 2);
         });
         it("+.aa", function() {
           basic_unit.bopFunc["+"].aa.call(that, 8);
@@ -294,6 +806,17 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][6], 0);
           assert.equal(that.outputs[0][7], 0);
         });
+        it("+.ki", function() {
+          basic_unit.bopFunc["+"].ki.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 + 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
+        });
         it("+.ia", function() {
           basic_unit.bopFunc["+"].ia.call(that, 8);
           assert.equal(that.outputs[0][0], 1 + 10);
@@ -304,6 +827,17 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][5], 1 + 60);
           assert.equal(that.outputs[0][6], 1 + 70);
           assert.equal(that.outputs[0][7], 1 + 80);
+        });
+        it("+.ik", function() {
+          basic_unit.bopFunc["+"].ik.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 + 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
         });
         it("-.aa", function() {
           basic_unit.bopFunc["-"].aa.call(that, 8);
@@ -362,6 +896,17 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][6], 0);
           assert.equal(that.outputs[0][7], 0);
         });
+        it("-.ki", function() {
+          basic_unit.bopFunc["-"].ki.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 - 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
+        });
         it("-.ia", function() {
           basic_unit.bopFunc["-"].ia.call(that, 8);
           assert.equal(that.outputs[0][0], 1 - 10);
@@ -372,6 +917,17 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][5], 1 - 60);
           assert.equal(that.outputs[0][6], 1 - 70);
           assert.equal(that.outputs[0][7], 1 - 80);
+        });
+        it("-.ik", function() {
+          basic_unit.bopFunc["-"].ik.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 - 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
         });
         it("*.aa", function() {
           basic_unit.bopFunc["*"].aa.call(that, 8);
@@ -430,6 +986,17 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][6], 0);
           assert.equal(that.outputs[0][7], 0);
         });
+        it("*.ki", function() {
+          basic_unit.bopFunc["*"].ki.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 * 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
+        });
         it("*.ia", function() {
           basic_unit.bopFunc["*"].ia.call(that, 8);
           assert.equal(that.outputs[0][0], 1 * 10);
@@ -441,200 +1008,249 @@ define(function(require, exports, module) {
           assert.equal(that.outputs[0][6], 1 * 70);
           assert.equal(that.outputs[0][7], 1 * 80);
         });
+        it("*.ik", function() {
+          basic_unit.bopFunc["*"].ik.call(that, 8);
+          assert.equal(that.outputs[0][0], 1 * 10);
+          assert.equal(that.outputs[0][1], 0);
+          assert.equal(that.outputs[0][2], 0);
+          assert.equal(that.outputs[0][3], 0);
+          assert.equal(that.outputs[0][4], 0);
+          assert.equal(that.outputs[0][5], 0);
+          assert.equal(that.outputs[0][6], 0);
+          assert.equal(that.outputs[0][7], 0);
+        });
       });
-      describe("unit", function() {
+      describe("unit.process", function() {
         var specialIndex;
         before(function() {
           specialIndex = ops.BINARY_OPS_MAP.length;
           ops.BINARY_OPS_MAP[specialIndex] = "bopTest";
-        });
-        beforeEach(function() {
           basic_unit.bopFunc.bopTest = function(a, b) {
             return a + b + 1;
           };
+          basic_unit.bopFunc.bopTest.aa = basic_unit.binary_aa(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ak = basic_unit.binary_ak(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ai = basic_unit.binary_ai(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ka = basic_unit.binary_ka(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ki = basic_unit.binary_ki(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ia = basic_unit.binary_ia(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.ik = basic_unit.binary_ik(basic_unit.bopFunc.bopTest);
+          basic_unit.bopFunc.bopTest.dd = basic_unit.binary_dd(basic_unit.bopFunc.bopTest);
         });
         it("AUDIO x AUDIO", function() {
-          basic_unit.bopFunc.bopTest.aa = basic_unit.binary_aa(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
           u.inRates[1] = C.AUDIO;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 2 + 20 + 1);
-          assert.equal(u.outputs[0][2], 3 + 30 + 1);
-          assert.equal(u.outputs[0][3], 4 + 40 + 1);
-          assert.equal(u.outputs[0][4], 5 + 50 + 1);
-          assert.equal(u.outputs[0][5], 6 + 60 + 1);
-          assert.equal(u.outputs[0][6], 7 + 70 + 1);
-          assert.equal(u.outputs[0][7], 8 + 80 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.aa);
         });
         it("AUDIO x CONTROL", function() {
-          basic_unit.bopFunc.bopTest.ak = basic_unit.binary_ak(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
           u.inRates[1] = C.CONTROL;
-          u.inputs[0]  = new Float32Array([1,2,3,4,5,6,7,8]);
-          u.inputs[1]  = new Float32Array([0,0,0,0,0,0,0,0]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 0.00 + 1);
-          assert.equal(u.outputs[0][1], 2 + 1.25 + 1);
-          assert.equal(u.outputs[0][2], 3 + 2.50 + 1);
-          assert.equal(u.outputs[0][3], 4 + 3.75 + 1);
-          assert.equal(u.outputs[0][4], 5 + 5.00 + 1);
-          assert.equal(u.outputs[0][5], 6 + 6.25 + 1);
-          assert.equal(u.outputs[0][6], 7 + 7.50 + 1);
-          assert.equal(u.outputs[0][7], 8 + 8.75 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ak);
         });
         it("AUDIO x SCALAR", function() {
-          basic_unit.bopFunc.bopTest.ai = basic_unit.binary_ai(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
-            "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
+            "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, -1,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.AUDIO;
           u.inRates[1] = C.SCALAR;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 2 + 10 + 1);
-          assert.equal(u.outputs[0][2], 3 + 10 + 1);
-          assert.equal(u.outputs[0][3], 4 + 10 + 1);
-          assert.equal(u.outputs[0][4], 5 + 10 + 1);
-          assert.equal(u.outputs[0][5], 6 + 10 + 1);
-          assert.equal(u.outputs[0][6], 7 + 10 + 1);
-          assert.equal(u.outputs[0][7], 8 + 10 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ai);
         });
         it("CONTROL x AUDIO", function() {
-          basic_unit.bopFunc.bopTest.ka = basic_unit.binary_ka(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.CONTROL;
           u.inRates[1] = C.AUDIO;
-          u.inputs[0]  = new Float32Array([ 0, 0, 0, 0, 0, 0, 0, 0]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          u.inputs[0]  = new Float32Array([1,2,3,4,5,6,7,8]);
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 0.000 + 10 + 1);
-          assert.equal(u.outputs[0][1], 0.125 + 20 + 1);
-          assert.equal(u.outputs[0][2], 0.250 + 30 + 1);
-          assert.equal(u.outputs[0][3], 0.375 + 40 + 1);
-          assert.equal(u.outputs[0][4], 0.500 + 50 + 1);
-          assert.equal(u.outputs[0][5], 0.625 + 60 + 1);
-          assert.equal(u.outputs[0][6], 0.750 + 70 + 1);
-          assert.equal(u.outputs[0][7], 0.875 + 80 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ka);
         });
         it("CONTROL x CONTROL", function() {
-          basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
           u.inRates[1] = C.CONTROL;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.kk);
         });
         it("CONTROL x SCALAR", function() {
-          basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.CONTROL;
           u.inRates[1] = C.SCALAR;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ki);
         });
         it("SCALAR x AUDIO", function() {
-          basic_unit.bopFunc.bopTest.ia = basic_unit.binary_ia(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.AUDIO, specialIndex, [ 0,0, 0,0 ], [ C.AUDIO ]
           ]);
           u.inRates[0] = C.SCALAR;
           u.inRates[1] = C.AUDIO;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
-          assert.equal(u.outputs[0][1], 1 + 20 + 1);
-          assert.equal(u.outputs[0][2], 1 + 30 + 1);
-          assert.equal(u.outputs[0][3], 1 + 40 + 1);
-          assert.equal(u.outputs[0][4], 1 + 50 + 1);
-          assert.equal(u.outputs[0][5], 1 + 60 + 1);
-          assert.equal(u.outputs[0][6], 1 + 70 + 1);
-          assert.equal(u.outputs[0][7], 1 + 80 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ia);
         });
         it("SCALAR x CONTROL", function() {
-          basic_unit.bopFunc.bopTest.kk = basic_unit.binary_kk(basic_unit.bopFunc.bopTest);
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.CONTROL, specialIndex, [ 0,0, 0,0 ], [ C.CONTROL ]
           ]);
           u.inRates[0] = C.SCALAR;
           u.inRates[1] = C.CONTROL;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
-          assert.isFunction(u.process);
-          u.process(8);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.ik);
         });
         it("SCALAR x SCALAR", function() {
           var u = cc.createUnit({
-            heap:new Float32Array(1), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.SCALAR, specialIndex, [ 0,0, 0,0 ], [ C.SCALAR ]
           ]);
           u.inRates[0] = C.SCALAR;
           u.inRates[1] = C.SCALAR;
-          u.inputs[0]  = new Float32Array([ 1, 2, 3, 4, 5, 6, 7, 8]);
-          u.inputs[1]  = new Float32Array([10,20,30,40,50,60,70,80]);
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
           u.init();
+          
           assert.isNotFunction(u.process);
-          assert.equal(u.outputs[0][0], 1 + 10 + 1);
+        });
+        it("AUDIO x DEMAND", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.AUDIO;
+          u.inRates[1] = C.DEMAND;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
+        });
+        it("CONTROL x DEMAND", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.CONTROL;
+          u.inRates[1] = C.DEMAND;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
+        });
+        it("SCALAR x DEMAND", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.SCALAR;
+          u.inRates[1] = C.DEMAND;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
+        });
+        it("DEMAND x AUDIO", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.DEMAND;
+          u.inRates[1] = C.AUDIO;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
+        });
+        it("DEMAND x CONTROL", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.DEMAND;
+          u.inRates[1] = C.CONTROL;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
+        });
+        it("DEMAND x SCALAR", function() {
+          var u = cc.createUnit({
+            heap:new Float32Array(1), heapIndex:0
+          }, [
+            "BinaryOpUGen", C.DEMAND, specialIndex, [ 0,0, 0,0 ], [ C.DEMAND ]
+          ]);
+          u.inRates[0] = C.DEMAND;
+          u.inRates[1] = C.SCALAR;
+          u.inputs[0]  = new Float32Array(1);
+          u.inputs[1]  = new Float32Array(1);
+          u.init();
+          
+          assert.equal(u.process, basic_unit.bopFunc.bopTest.dd);
         });
         it("undefined", function() {
           var u = cc.createUnit({
-            heap:new Float32Array(64), heapIndex:0
+            heap:new Float32Array(100), heapIndex:0
           }, [
             "BinaryOpUGen", C.AUDIO, -1, [ 0,0 ], [ C.AUDIO ]
           ]);
