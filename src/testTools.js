@@ -408,7 +408,7 @@ define(function(require, exports, module) {
     var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
 
-      var bufLength = opts.bufLength || 16384;
+      var bufLength = opts.bufLength || 4096;
       var saved_rate = mock.server.rates[C.AUDIO];
       
       mock.server.rates[C.AUDIO] = {
