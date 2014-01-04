@@ -2,8 +2,6 @@ define(function(require, exports, module) {
   "use strict";
 
   var cc = require("../cc");
-  var utils = require("./utils");
-  var zapgremlins = utils.zapgremlins;
   var log001 = Math.log(0.001);
   var sqrt2  = Math.sqrt(2);
 
@@ -97,8 +95,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -163,7 +161,7 @@ define(function(require, exports, module) {
           }
         }
       }
-      this._y1 = zapgremlins(y1);
+      this._y1 = y1;
     };
     return ctor;
   })();
@@ -291,8 +289,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -430,8 +428,8 @@ define(function(require, exports, module) {
         x2 = x1;
         x1 = x0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
       this._x1 = x1;
       this._x2 = x2;
     };
@@ -512,8 +510,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -578,8 +576,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -661,8 +659,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -731,8 +729,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -904,8 +902,8 @@ define(function(require, exports, module) {
         out[j++] = y0 + 2.0 * y1 + y2;
         y2 = y1; y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -974,8 +972,8 @@ define(function(require, exports, module) {
         
         y2 = y1; y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
@@ -1064,8 +1062,8 @@ define(function(require, exports, module) {
         y2 = y1;
         y1 = y0;
       }
-      this._y1 = zapgremlins(y1);
-      this._y2 = zapgremlins(y2);
+      this._y1 = y1;
+      this._y2 = y2;
     };
     return ctor;
   })();
