@@ -736,6 +736,95 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.LeakDC = {
+    $ar: {
+      defaults: "in=0,coef=0.995,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.multiNew(C.AUDIO, _in, coef).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,coef=0.995,mul=1,add=0",
+      ctor: function(_in, coef, mul, add) {
+        return this.multiNew(C.CONTROL, _in, coef).madd(mul, add);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.LeakDC = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        if (this.inRates[1] === C.SCALAR) {
+          this.process = next_i;
+        } else {
+          this.process = next;
+        }
+      }
+      this._b1 = 0;
+      this._x1 = this.inputs[0][0];
+      this._y1 = 0;
+      next_1.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var _in = this.inputs[0];
+      var b1  = this._b1;
+      var b1_next = this.inputs[1][0];
+      var y1 = this._y1;
+      var x1 = this._x1;
+      var x0, b1_slope;
+      var i;
+      
+      if (b1 === b1_next) {
+        for (i = 0; i < inNumSamples; ++i) {
+          x0 = _in[i];
+          out[i] = y1 = x0 - x1 + b1 * y1;
+          x1 = x0;
+        }
+      } else {
+        b1_slope = (b1_next - b1) * this.rate.filterSlope;
+        for (i = 0; i < inNumSamples; ++i) {
+          x0 = _in[i];
+          out[i] = y1 = x0 - x1 + b1 * y1;
+          x1 = x0;
+          b1 += b1_slope;
+        }
+        this._b1 = b1_next;
+      }
+      this._x1 = x1;
+      this._y1 = y1;
+    };
+    var next_i = function(inNumSamples) {
+      var out = this.outputs[0];
+      var _in = this.inputs[0];
+      var b1  = this._b1;
+      var y1  = this._y1;
+      var x1  = this._x1;
+      var x0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        x0 = _in[i];
+        out[i] = y1 = x0 - x1 + b1 * y1;
+        x1 = x0;
+      }
+      this._x1 = x1;
+      this._y1 = y1;
+    };
+    var next_1 = function() {
+      var b1 = this._b1 = this.inputs[1][0];
+      var y1 = this._y1;
+      var x1 = this._x1;
+      var x0 = this.inputs[0][0];
+      this.outputs[0][0] = y1 = x0 - x1 + b1 * y1;
+      x1 = x0;
+      this._x1 = x1;
+      this._y1 = y1;
+    };
+    return ctor;
+  })();
   
   cc.ugen.specs.RLPF = {
     $ar: {
