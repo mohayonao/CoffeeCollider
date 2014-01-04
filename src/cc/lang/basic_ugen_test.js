@@ -37,6 +37,7 @@ define(function(require, exports, module) {
     testTools.mock("instanceOfUGen", function(obj) {
       return obj instanceof UGen || (_UGen && obj instanceof _UGen);
     });
+    testTools.mock("Out", UGen);
     
     before(function() {
       basic_ugen = require("./basic_ugen")
