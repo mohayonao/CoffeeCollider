@@ -176,7 +176,7 @@ define(function(require, exports, module) {
       var y2 = this._y2;
       var y0;
       for (var i = 0; i < inNumSamples; ++i) {
-        out[i] = y0 = Math.abs(y1 * paramf - y2 - 0.05);
+        out[i] = y0 = Math.abs(y1 * paramf - y2 - 0.05) || 0;
         y2 = y1;
         y1 = y0;
       }
