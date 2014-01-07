@@ -182,6 +182,38 @@ define(function(require, exports, module) {
       expected = [ 1, 6, 2, 6, 3, 6, 1, 6, 2, 6, 3, 6 ];
       assert.deepEqual(actual, expected);
     });
+    it("bubble", function() {
+      var list = [ [1, 2], [3, 4, [ 5, 6, 7, 8 ] ] ];
+      actual   = utils.bubble(list, 0, 0);
+      expected = [ [ [1, 2], [3, 4, [ 5, 6, 7, 8 ] ] ] ];
+      assert.deepEqual(actual, expected);
+
+      actual   = utils.bubble(list, 2, 0);
+      expected = [ [ [ 1 ], [ 2 ] ], [ [ 3 ], [ 4 ], [ [ 5, 6, 7, 8 ] ] ] ];
+      assert.deepEqual(actual, expected);
+
+      actual   = utils.bubble(list, 2, 2);
+      expected = [ [ [ [ 1 ] ], [ [ 2 ] ] ], [ [ [ 3 ] ], [ [ 4 ] ], [ [ [ 5, 6, 7, 8 ] ] ] ] ];
+      assert.deepEqual(actual, expected);
+    });
+    it("unbubble", function() {
+      var list = [ [1, 2], [3, 4, [ 5, 6, 7, 8 ] ] ];
+      actual   = utils.unbubble(list, 0, 0);
+      expected = [ [ 1, 2 ], [ 3, 4, [ 5, 6, 7, 8 ] ] ];
+      assert.deepEqual(actual, expected);
+      
+      actual   = utils.unbubble(list, 2, 0);
+      expected = [ [ 1, 2 ], [ 3, 4, [ 5, 6, 7, 8 ] ] ];
+      assert.deepEqual(actual, expected);
+      
+      actual   = utils.unbubble([], 0, 0);
+      expected = [];
+      assert.deepEqual(actual, expected);
+      
+      actual   = utils.unbubble([], 0, 2);
+      expected = undefined;
+      assert.deepEqual(actual, expected);
+    });
     it("maxSizeAtDepth", function() {
       actual   = utils.maxSizeAtDepth([], 0);
       expected = 0;

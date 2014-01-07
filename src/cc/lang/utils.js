@@ -136,6 +136,35 @@ define(function(require, exports, module) {
     return a;
   };
 
+  var bubble = function(list, depth, levels) {
+    if (depth <= 0) {
+      if (levels <= 1) {
+        return [ list ];
+      }
+      return [ bubble(list, depth, levels-1) ];
+    }
+    return list.map(function(list) {
+      return bubble(list, depth-1, levels);
+    });
+  };
+  
+  var unbubble = function(list, depth, levels) {
+    if (!Array.isArray(list)) {
+      return list;
+    }
+    if (depth <= 0) {
+      if (list.length > 1) {
+        return list;
+      }
+      if (levels <= 1) {
+        return list[0] || [];
+      }
+      return unbubble(list[0], depth, levels-1);
+    }
+    return list.map(function(list) {
+      return unbubble(list, depth-1, 1);
+    });
+  };
   
   var maxSizeAtDepth = function(list, rank) {
     var maxsize = 0;
@@ -184,10 +213,12 @@ define(function(require, exports, module) {
     asString    : asString,
     asArray     : asArray,
     asUGenInput : asUGenInput,
-    flop   : flop,
-    flatten: flatten,
-    clump  : clump,
-    lace   : lace,
+    flop    : flop,
+    flatten : flatten,
+    clump   : clump,
+    lace    : lace,
+    bubble  : bubble,
+    unbubble: unbubble,
     maxSizeAtDepth: maxSizeAtDepth,
     
     wrapExtend: wrapExtend,
