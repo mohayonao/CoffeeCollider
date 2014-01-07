@@ -136,6 +136,25 @@ define(function(require, exports, module) {
     return a;
   };
   
+  var maxSizeAtDepth = function(array, rank) {
+    var maxsize = 0;
+    if (rank === 0) {
+      return array.length;
+    }
+    for (var i = 0, imax = array.length; i < imax; ++i) {
+      var sz, sublist = array[i];
+      if (Array.isArray(sublist)) {
+        sz = maxSizeAtDepth(sublist, rank - 1);
+      } else {
+        sz = 1;
+      }
+      if (sz > maxsize) {
+        maxsize = sz;
+      }
+    }
+    return maxsize;
+  };
+  
   var wrapExtend = function(list, size) {
     if (size < list.length) {
       return list.slice(0, size);
@@ -168,6 +187,8 @@ define(function(require, exports, module) {
     flatten: flatten,
     clump  : clump,
     lace   : lace,
+    maxSizeAtDepth: maxSizeAtDepth,
+    
     wrapExtend: wrapExtend,
     
     lang_onmessage: lang_onmessage
