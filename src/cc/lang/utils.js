@@ -41,7 +41,7 @@ define(function(require, exports, module) {
   };
   
   var asString = function(obj) {
-    if (obj === "null") {
+    if (obj === null) {
       return "null";
     } else if (obj === undefined) {
       return "undefined";
@@ -131,18 +131,19 @@ define(function(require, exports, module) {
     var v, wrap = list.length;
     for (var i = 0; i < length; ++i) {
       v = list[i % wrap];
-      a[i] = v[ ((i/wrap)|0) % v.length ] || 0;
+      a[i] = v[ ((i / wrap)|0) % v.length ];
     }
     return a;
   };
+
   
-  var maxSizeAtDepth = function(array, rank) {
+  var maxSizeAtDepth = function(list, rank) {
     var maxsize = 0;
     if (rank === 0) {
-      return array.length;
+      return list.length;
     }
-    for (var i = 0, imax = array.length; i < imax; ++i) {
-      var sz, sublist = array[i];
+    for (var i = 0, imax = list.length; i < imax; ++i) {
+      var sz, sublist = list[i];
       if (Array.isArray(sublist)) {
         sz = maxSizeAtDepth(sublist, rank - 1);
       } else {
