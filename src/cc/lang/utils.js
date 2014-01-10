@@ -93,6 +93,35 @@ define(function(require, exports, module) {
     }
     return result;
   };
+
+  var flopDeep = function(list, rank) {
+    if (rank <= 1) {
+      return flop(list);
+    }
+    var maxsize = maxSizeAtDepth(list, rank);
+    var result = new Array(maxsize);
+    for (var i = 0; i < maxsize; ++i) {
+      result[i] = wrapAtDepth(list, rank, i);
+    }
+    return result;
+  };
+
+  var flat = (function() {
+    var _flat = function(that, list) {
+      var i, imax;
+      for (i = 0, imax = that.length; i < imax; ++i) {
+        if (Array.isArray(that[i])) {
+          list = _flat(that[i], list);
+        } else {
+          list.push(that[i]);
+        }
+      }
+      return list;
+    };
+    return function(list) {
+      return _flat(list, []);
+    };
+  })();
   
   var flatten = (function() {
     var _flatten = function(list, result) {
@@ -196,6 +225,27 @@ define(function(require, exports, module) {
     return a;
   };
   
+  var wrapAtDepth = function(list, rank, index) {
+    if (rank === 0) {
+      return list[index % list.length];
+    }
+    return list.map(function(item) {
+      if (Array.isArray(item)) {
+        return wrapAtDepth(item, rank - 1, index);
+      } else {
+        return item;
+      }
+    });
+  };
+  
+  var filledArray = function(size, value) {
+    var a = new Array(size);
+    for (var i = 0; i < size; ++i) {
+      a[i] = value;
+    }
+    return a;
+  };
+  
   var lang_onmessage = function(e) {
     var msg = e.data;
     if (msg instanceof Uint8Array) {
@@ -214,6 +264,8 @@ define(function(require, exports, module) {
     asArray     : asArray,
     asUGenInput : asUGenInput,
     flop    : flop,
+    flopDeep: flopDeep,
+    flat    : flat,
     flatten : flatten,
     clump   : clump,
     lace    : lace,
@@ -221,7 +273,9 @@ define(function(require, exports, module) {
     unbubble: unbubble,
     maxSizeAtDepth: maxSizeAtDepth,
     
-    wrapExtend: wrapExtend,
+    wrapExtend : wrapExtend,
+    wrapAtDepth: wrapAtDepth,
+    filledArray: filledArray,
     
     lang_onmessage: lang_onmessage
   };

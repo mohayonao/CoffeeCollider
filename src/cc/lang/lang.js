@@ -212,6 +212,7 @@ define(function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
+  require("./ref");
   require("./scale");
   require("./string");
   require("./syncblock");

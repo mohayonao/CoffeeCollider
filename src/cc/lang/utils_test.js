@@ -163,6 +163,26 @@ define(function(require, exports, module) {
       
       assert.deepEqual(utils.flop([]), []);
     });
+    it("flopDeep", function() {
+      var list = [ [1, 2], [3, 4, [ 5, 6, 7, 8 ] ] ];
+      actual   = utils.flopDeep(list, 0);
+      expected = [ [1, 3], [2, 4], [1, [ 5, 6, 7, 8 ] ] ];
+      assert.deepEqual(actual, expected, "rank(0)");
+      
+      actual   = utils.flopDeep(list, 1);
+      expected = [ [1, 3], [2, 4], [1, [ 5, 6, 7, 8 ] ] ];
+      assert.deepEqual(actual, expected, "rank(1)");
+      
+      actual   = utils.flopDeep(list, 2);
+      expected = [ [ [ 1, 2 ], [ 3, 4, 5 ] ], [ [ 1, 2 ], [ 3, 4, 6 ] ], [ [ 1, 2 ], [ 3, 4, 7 ] ], [ [ 1, 2 ], [ 3, 4, 8 ] ] ];
+      assert.deepEqual(actual, expected, "rank(2)");
+    });
+    it("flat", function() {
+      var list = [ 1, [2, [3]], [4, [5, [6]]] ];
+      actual   = utils.flat(list);
+      expected = [ 1, 2, 3, 4, 5, 6 ];
+      assert.deepEqual(actual, expected);
+    });
     it("flatten", function() {
       var list = [ 1, [2, [3]], [4, [5, [6]]] ];
       actual   = utils.flatten(list);
@@ -252,6 +272,25 @@ define(function(require, exports, module) {
 
       actual   = utils.wrapExtend(list, 12);
       expected = [ 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2 ];
+      assert.deepEqual(actual, expected);
+    });
+    it("wrapAtDepth", function() {
+      var list = [ [1, 2], [3, 4, [ 5, 6, 7, 8 ] ] ];
+      actual   = utils.wrapAtDepth(list, 0, 0);
+      expected = [ 1, 2 ];
+      assert.deepEqual(actual, expected, "(0, 0)");
+
+      actual   = utils.wrapAtDepth(list, 1, 0);
+      expected = [ 1, 3 ];
+      assert.deepEqual(actual, expected, "(1, 0)");
+
+      actual   = utils.wrapAtDepth(list, 2, 3);
+      expected = [ [ 1, 2], [ 3, 4, 8 ] ];
+      assert.deepEqual(actual, expected, "(2, 3)");
+    });
+    it("filledArray", function() {
+      actual   = utils.filledArray(5, 10);
+      expected = [ 10, 10, 10, 10, 10 ];
       assert.deepEqual(actual, expected);
     });
   });

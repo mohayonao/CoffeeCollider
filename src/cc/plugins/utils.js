@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var utils     = require("../lang/utils");
   var twopi     = 2 * Math.PI;
   var kSineSize = 8192;
   var kSineMask = kSineSize - 1;
@@ -68,8 +69,8 @@ define(function(require, exports, module) {
     }
     return val - range * Math.floor((val - lo) / range);
   };
-  
-  module.exports = {
+
+  var _ = {
     kSineSize: kSineSize,
     kSineMask: kSineMask,
     kBadValue: kBadValue,
@@ -80,5 +81,11 @@ define(function(require, exports, module) {
     cubicinterp: cubicinterp,
     sc_wrap: sc_wrap
   };
+
+  Object.keys(utils).forEach(function(key) {
+    _[key] = utils[key];
+  });
+  
+  module.exports = _;
 
 });

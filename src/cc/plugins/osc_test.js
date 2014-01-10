@@ -93,6 +93,110 @@ define(function(require, exports, module) {
       }
     });
     
+    unitTestSuite("Klang", [
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          440, 1, 0,  660, 0.75, 0.25,  880, 0.5, 0.5,  1320, 0.25, 0.75
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          440, 1, 0,  660, 0.75, 0.25,  880, 0.5, 0.5,
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          440, 1, 0,  660, 0.75, 0.25
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          440, 1, 0
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+        ]
+      },
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+      }
+    });
+
+    unitTestSuite("Klank", [
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"input", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          { name:"decayscale", value:1 },
+          440, 1, 1,  660, 0.75, 2,  880, 0.5, 3,  1320, 0.25, 0
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"input", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          { name:"decayscale", value:1 },
+          440, 1, 1,  660, 0.75, 2,  880, 0.5, 3,
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"input", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          { name:"decayscale", value:1 },
+          440, 1, 1,  660, 0.75, 2
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"input", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          { name:"decayscale", value:1 },
+          440, 1, 1
+        ]
+      },
+      {
+        rate: C.AUDIO,
+        inputs: [
+          { name:"input", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"freqscale" , value:1 },
+          { name:"freqoffset", value:0 },
+          { name:"decayscale", value:1 },
+        ]
+      },
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+      }
+    });
+    
     ugenTestSuite(["LFSaw", "LFPar", "LFCub", "LFTri"], {
       ar: ["freq",440, "iphase",0],
       kr: ["freq",440, "iphase",0],
