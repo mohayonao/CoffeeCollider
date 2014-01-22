@@ -1955,6 +1955,99 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+
+  cc.ugen.specs.Ringz = {
+    $ar: {
+      defaults: "in=0,freq=440,decaytime=1,mul=1,add=0",
+      ctor: function(_in, freq, decaytime, mul, add) {
+        return this.multiNew(C.AUDIO, _in, freq, decaytime).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,freq=440,decaytime=1,mul=1,add=0",
+      ctor: function(_in, freq, decaytime, mul, add) {
+        return this.multiNew(C.CONTROL, _in, freq, decaytime).madd(mul, add);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.Ringz = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._b1 = 0;
+      this._b2 = 0;
+      this._y1 = 0;
+      this._y2 = 0;
+      this._freq = NaN;
+      this._decayTime = 0;
+      do_next_1(this, next);
+    };
+    var next = function() {
+      var out  = this.outputs[0];
+      var inIn = this.inputs[0];
+      var freq = this.inputs[1][0];
+      var decayTime = this.inputs[2][0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = 0.5;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var rate = this.rate;
+      var i, j = 0;
+      
+      if (freq !== this._freq || decayTime !== this._decayTime) {
+        var ffreq = freq * rate.radiansPerSample;
+        var R = decayTime === 0 ? 0 : Math.exp(log001/(decayTime * rate.sampleRate));
+        var twoR = 2 * R;
+        var R2 = R * R;
+        var cost = (twoR * Math.cos(ffreq)) / (1 + R2);
+        var b1_next = twoR * cost;
+        var b2_next = -R2;
+        var b1_slope = (b1_next - b1) * rate.filterSlope;
+        var b2_slope = (b2_next - b2) * rate.filterSlope;
+        
+        for (i = rate.filterLoops; i--; ) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - y2);
+          
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - y1);
+          
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - y0);
+
+          b1 += b1_slope;
+          b2 += b2_slope;
+        }
+        this._freq = freq;
+        this._decayTime = decayTime;
+        this._b1 = b1_next;
+        this._b2 = b2_next;
+      } else {
+        for (i = rate.filterLoops; i--; ) {
+          y0 = inIn[j] + b1 * y1 + b2 * y2;
+          out[j++] = a0 * (y0 - y2);
+          
+          y2 = inIn[j] + b1 * y0 + b2 * y1;
+          out[j++] = a0 * (y2 - y1);
+          
+          y1 = inIn[j] + b1 * y2 + b2 * y0;
+          out[j++] = a0 * (y1 - y0);
+        }
+      }
+      for (i = rate.filterRemain; i--; ) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * (y0 - y2);
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

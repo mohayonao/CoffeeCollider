@@ -475,11 +475,15 @@ define(function(require, exports, module) {
           assert.deepEqual(actual, expected);
         });
         it("sum", function() {
-          actual   = list.sum();
-          expected = list.reduce(function(a, b) {
-            return a + b;
-          }, 0);
-          assert.equal(actual, expected);
+          testTools.replaceTempNumberPrototype("__add__", function(b) {
+            return this + b;
+          }, function() {
+            actual   = list.sum();
+            expected = list.reduce(function(a, b) {
+              return a + b;
+            }, 0);
+            assert.equal(actual, expected);
+          });
         });
         it("normalize", function() {
           testTools.replaceTempNumberPrototype("linlin", function(inMin, inMax, outMin, outMax) {
@@ -491,9 +495,13 @@ define(function(require, exports, module) {
           });
         });
         it("normalizeSum", function() {
-          actual   = list.normalizeSum();
-          expected = [ -0.125, 0.25, -0.375, 0.625, -1, 1.625 ];
-          assert.deepEqual(actual, expected);
+          testTools.replaceTempNumberPrototype("__add__", function(b) {
+            return this + b;
+          }, function() {
+            actual   = list.normalizeSum();
+            expected = [ -0.125, 0.25, -0.375, 0.625, -1, 1.625 ];
+            assert.deepEqual(actual, expected);
+          });
         });
         it("mirror", function() {
           actual   = list.mirror();

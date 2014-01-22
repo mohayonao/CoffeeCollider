@@ -999,6 +999,71 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
+  cc.ugen.specs.DynKlank = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,input=0,freqscale=1,freqoffset=0,decayscale=1",
+      ctor: function(specificationsArrayRef, input, freqscale, freqoffset, decayscale) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, input, freqscale, freqoffset, decayscale, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var input      = this.inputs[0];
+      var freqscale  = this.inputs[1];
+      var freqoffset = this.inputs[2];
+      var decayscale = this.inputs[3];
+      var ref        = this.inputs[4];
+      var items, freqs, decays, amps;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs  = items[0] || [ 440 ];
+      decays = items[2] || [ 1.0 ];
+      amps   = items[1] || [ 1.0 ];
+      freqs  = freqs.madd(freqscale, freqoffset);
+      decays = decays.madd(decayscale, 0);
+      
+      return cc.global.Ringz(this.rate, input, freqs, decays, amps).sum();
+    }
+  };
+
+  cc.ugen.specs.DynKlang = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,freqscale=1,freqoffset=0",
+      ctor: function(specificationsArrayRef, freqscale, freqoffset) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, freqscale, freqoffset, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var freqscale  = this.inputs[0];
+      var freqoffset = this.inputs[1];
+      var ref        = this.inputs[2];
+      var items, freqs, phases, amps;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs  = items[0] || [ 440 ];
+      phases = items[2] || [ 0.0 ];
+      amps   = items[1] || [ 1.0 ];
+      freqs  = freqs.madd(freqscale, freqoffset);
+      
+      return cc.global.SinOsc(this.rate, freqs, phases, amps).sum();
+    }
+  };
+  
   cc.ugen.specs.LFSaw = {
     $ar: {
       defaults: "freq=440,iphase=0,mul=1,add=0",

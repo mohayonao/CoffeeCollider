@@ -547,7 +547,7 @@ define(function(require, exports, module) {
   fn.defineProperty(Array.prototype, "sum", function() {
     var value = 0;
     for (var i = 0, imax = this.length; i < imax; ++i) {
-      value += this[i];
+      value = value.__add__(this[i]);
     }
     return value;
   });
