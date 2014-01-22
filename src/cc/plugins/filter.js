@@ -1956,6 +1956,285 @@ define(function(require, exports, module) {
     return ctor;
   })();
 
+  cc.ugen.specs.FOS = {
+    $ar: {
+      defaults: "in=0,a0=0,a1=0,b1=0,mul=1,add=0",
+      ctor: function(_in, a0, a1, b1, mul, add) {
+        return this.multiNew(C.AUDIO, _in, a0, a1, b1).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,a0=0,a1=0,b1=0,mul=1,add=0",
+      ctor: function(_in, a0, a1, b1, mul, add) {
+        return this.multiNew(C.CONTROL, _in, a0, a1, b1).madd(mul, add);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+  
+  cc.unit.specs.FOS = (function() {
+    var ctor = function() {
+      if (this.bufLength === 1) {
+        this.process = next_1;
+      } else {
+        var inRates = this.inRates;
+        if (inRates[1] === C.AUDIO && inRates[2] === C.AUDIO && inRates[3] === C.AUDIO) {
+          this.process = next_a;
+        } else {
+          this.process = next_k;
+        }
+      }
+      this._y1 = 0;
+      this._a0 = 0;
+      this._a1 = 0;
+      this._b1 = 0;
+      next_1.call(this, 1);
+    };
+    var next_a = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var a0In = this.inputs[1];
+      var a1In = this.inputs[2];
+      var b1In = this.inputs[3];
+      var y1 = this._y1, y0;
+      for (var i = 0; i < inNumSamples; ++i) {
+        y0 = inIn[i] + b1In[i] * y1;
+        out[i] = a0In[i] * y0 + a1In[i] * y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+    };
+    var next_1 = function() {
+      var _in = this.inputs[0][0];
+      var a0  = this.inputs[1][0];
+      var a1  = this.inputs[2][0];
+      var b1  = this.inputs[3][0];
+      var y1  = this._y1;
+      var y0  = _in + b1 * y1;
+      this.outputs[0][0] = a0 * y0 + a1 * y1;
+      y1 = y0;
+      this._y1 = y1;
+    };
+    var next_k = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var next_a0 = this.inputs[1][0];
+      var next_a1 = this.inputs[2][0];
+      var next_b1 = this.inputs[3][0];
+      var filterSlope = this.rate.filterSlope;
+      var y0;
+      var y1 = this._y1;
+      var a0 = this._a0;
+      var a1 = this._a1;
+      var b1 = this._b1;
+      var a0_slope = (next_a0 - a0) * filterSlope;
+      var a1_slope = (next_a1 - a1) * filterSlope;
+      var b1_slope = (next_b1 - b1) * filterSlope;
+      for (var i = 0; i < inNumSamples; ++i) {
+        y0 = inIn[i] + b1 * y1;
+        out[i] = a0 * y0 + a1 * y1;
+        y1 = y0;
+        
+        a0 += a0_slope;
+        a1 += a1_slope;
+        b1 += b1_slope;
+      }
+      this._y1 = y1;
+      this._a0 = a0;
+      this._a1 = a1;
+      this._b1 = b1;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.SOS = {
+    $ar: {
+      defaults: "in=0,a0=0,a1=0,a2=0,b1=0,b2=0,mul=1,add=0",
+      ctor: function(_in, a0, a1, a2, b1, b2, mul, add) {
+        return this.multiNew(C.AUDIO, _in, a0, a1, a2, b1, b2).madd(mul, add);
+      }
+    },
+    $kr: {
+      defaults: "in=0,a0=0,a1=0,a2=0,b1=0,b2=0,mul=1,add=0",
+      ctor: function(_in, a0, a1, a2, b1, b2, mul, add) {
+        return this.multiNew(C.CONTROL, _in, a0, a1, a2, b1, b2).madd(mul, add);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.SOS = (function() {
+    var ctor = function() {
+      var inRates = this.inRates;
+      if (this.bufLength !== 1) {
+        if (inRates[1] === C.AUDIO && inRates[2] === C.AUDIO && inRates[3] === C.AUDIO && inRates[4] === C.AUDIO && inRates[5] === C.AUDIO) {
+          this.process = next_a;
+        } else if (inRates[1] === C.SCALAR && inRates[2] === C.SCALAR && inRates[3] === C.SCALAR && inRates[4] === C.SCALAR && inRates[5] === C.SCALAR) {
+          this.process = next_i;
+        } else {
+          this.process = next_k;
+        }
+      } else {
+        this.process = next_1;
+      }
+      this._y1 = 0;
+      this._y2 = 0;
+      this._a0 = this.inputs[1][0];
+      this._a1 = this.inputs[2][0];
+      this._a2 = this.inputs[3][0];
+      this._b1 = this.inputs[4][0];
+      this._b2 = this.inputs[5][0];
+      next_1.call(this, 1);
+    };
+    var next_a = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var a0In = this.inputs[1];
+      var a1In = this.inputs[2];
+      var a2In = this.inputs[3];
+      var b1In = this.inputs[4];
+      var b2In = this.inputs[5];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var rate = this.rate;
+      var i, j = 0;
+
+      for (i = rate.filterLoops; i--; ) {
+        y0 = inIn[j] + b1In[j] * y1 + b2In[j] * y2;
+        out[j] = a0In[j] * y0 + a1In[j] * y1 + a2In[j] * y2;
+        j++;
+        
+        y2 = inIn[j] + b1In[j] * y0 + b2In[j] * y1;
+        out[j] = a0In[j] * y2 + a1In[j] * y0 + a2In[j] * y1;
+        j++;
+
+        y1 = inIn[j] + b1In[j] * y2 + b2In[j] * y0;
+        out[j] = a0In[j] * y1 + a1In[j] * y2 + a2In[j] * y0;
+        j++;
+      }
+      for (i = rate.filterRemain; i--; ) {
+        y0 = inIn[j] + b1In[j] * y1 + b2In[j] * y2;
+        out[j] = a0In[j] * y0 + a1In[j] * y1 + a2In[j] * y2;
+        j++;
+        y2 = y1;
+        y1 = y0;
+      }
+
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    var next_k = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var next_a0 = this.inputs[1][0];
+      var next_a1 = this.inputs[2][0];
+      var next_a2 = this.inputs[3][0];
+      var next_b1 = this.inputs[4][0];
+      var next_b2 = this.inputs[5][0];
+      
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var a1 = this._a1;
+      var a2 = this._a2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var rate = this.rate;
+
+      var a0_slope = (next_a0 - a0) * rate.filterSlope;
+      var a1_slope = (next_a1 - a1) * rate.filterSlope;
+      var a2_slope = (next_a2 - a2) * rate.filterSlope;
+      var b1_slope = (next_b1 - b1) * rate.filterSlope;
+      var b2_slope = (next_b2 - b2) * rate.filterSlope;
+      
+      var i, j = 0;
+      for (i = rate.filterLoops; i--; ) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * y0 + a1 * y1 + a2 * y2;
+
+        y2 = inIn[j] + b1 * y0 + b2 * y1;
+        out[j++] = a0 * y2 + a1 * y0 + a2 * y1;
+        
+        y1 = inIn[j] + b1 * y2 + b2 * y0;
+        out[j++] = a0 * y1 + a1 * y2 + a2 * y0;
+        
+        a0 += a0_slope;
+        a1 += a1_slope;
+        a2 += a2_slope;
+        b1 += b1_slope;
+        b2 += b2_slope;
+      }
+      for (i = rate.filterRemain; i--; ) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * y0 + a1 * y1 + a2 * y2;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._a0 = a0;
+      this._a1 = a1;
+      this._a2 = a2;
+      this._b1 = b1;
+      this._b2 = b2;
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    var next_i = function() {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+      var a0 = this._a0;
+      var a1 = this._a1;
+      var a2 = this._a2;
+      var b1 = this._b1;
+      var b2 = this._b2;
+      var rate = this.rate;
+      var i, j = 0;
+      for (i = rate.filterLoops; i--; ) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * y0 + a1 * y1 + a2 * y2;
+
+        y2 = inIn[j] + b1 * y0 + b2 * y1;
+        out[j++] = a0 * y2 + a1 * y0 + a2 * y1;
+        
+        y1 = inIn[j] + b1 * y2 + b2 * y0;
+        out[j++] = a0 * y1 + a1 * y2 + a2 * y0;
+      }
+      for (i = rate.filterRemain; i--; ) {
+        y0 = inIn[j] + b1 * y1 + b2 * y2;
+        out[j++] = a0 * y0 + a1 * y1 + a2 * y2;
+        y2 = y1;
+        y1 = y0;
+      }
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    var next_1 = function() {
+      var _in = this.inputs[0][0];
+      var a0  = this.inputs[1][0];
+      var a1  = this.inputs[2][0];
+      var a2  = this.inputs[3][0];
+      var b1  = this.inputs[4][0];
+      var b2  = this.inputs[5][0];
+
+      var y0;
+      var y1 = this._y1;
+      var y2 = this._y2;
+
+      y0 = _in + b1 * y1 + b2 * y2;
+      this.outputs[0][0] = a0 * y0 + a1 * y1 + a2 * y2;
+      y2 = y1;
+      y1 = y0;
+      
+      this._y1 = y1;
+      this._y2 = y2;
+    };
+    return ctor;
+  })();
+  
   cc.ugen.specs.Ringz = {
     $ar: {
       defaults: "in=0,freq=440,decaytime=1,mul=1,add=0",
@@ -2045,6 +2324,57 @@ define(function(require, exports, module) {
       }
       this._y1 = y1;
       this._y2 = y2;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.DetectSilence = {
+    $ar: {
+      defaults: "in=0,amp=0.0001,time=0.1,doneAction=0",
+      ctor: function(_in, amp, time, doneAction) {
+        return this.multiNew(C.AUDIO, _in, amp, time, doneAction);
+      }
+    },
+    $kr: {
+      defaults: "in=0,amp=0.0001,time=0.1,doneAction=0",
+      ctor: function(_in, amp, time, doneAction) {
+        return this.multiNew(C.CONTROL, _in, amp, time, doneAction);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
+  };
+
+  cc.unit.specs.DetectSilence = (function() {
+    var ctor = function() {
+      this.process = next;
+      this._thresh = this.inputs[1][0];
+      this._endCounter = (this.rate.sampleRate * this.inputs[2][0])|0;
+      this._counter    = -1;
+    };
+    var next = function(inNumSamples) {
+      var thresh  = this._thresh;
+      var counter = this._counter;
+      var val;
+
+      var inIn = this.inputs[0];
+      var out  = this.outputs[0];
+      for (var i = 0; i < inNumSamples; ++i) {
+        val = Math.abs(inIn[i]);
+        if (val > thresh) {
+          counter = 0;
+          out[i] = 0;
+        } else if (counter >= 0) {
+          if (++counter >= this._endCounter) {
+            this.doneAction(this.inputs[3][0]|0);
+            out[i] = 1;
+          } else {
+            out[i] = 0;
+          }
+        } else {
+          out[i] = 0;
+        }
+      }
+      this._counter = counter;
     };
     return ctor;
   })();
