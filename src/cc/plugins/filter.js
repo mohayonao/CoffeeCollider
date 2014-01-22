@@ -1999,7 +1999,7 @@ define(function(require, exports, module) {
       var y1 = this._y1, y0;
       for (var i = 0; i < inNumSamples; ++i) {
         y0 = inIn[i] + b1In[i] * y1;
-        out[i] = a0In[i] * y0 + a1In[i] * y1;
+        out[i] = (a0In[i] * y0 + a1In[i] * y1) || 0;
         y1 = y0;
       }
       this._y1 = y1;
@@ -2011,7 +2011,7 @@ define(function(require, exports, module) {
       var b1  = this.inputs[3][0];
       var y1  = this._y1;
       var y0  = _in + b1 * y1;
-      this.outputs[0][0] = a0 * y0 + a1 * y1;
+      this.outputs[0][0] = (a0 * y0 + a1 * y1)  || 0;
       y1 = y0;
       this._y1 = y1;
     };
@@ -2032,7 +2032,7 @@ define(function(require, exports, module) {
       var b1_slope = (next_b1 - b1) * filterSlope;
       for (var i = 0; i < inNumSamples; ++i) {
         y0 = inIn[i] + b1 * y1;
-        out[i] = a0 * y0 + a1 * y1;
+        out[i] = (a0 * y0 + a1 * y1) || 0;
         y1 = y0;
         
         a0 += a0_slope;
