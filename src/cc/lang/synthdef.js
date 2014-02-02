@@ -313,6 +313,7 @@ define(function(require, exports, module) {
     });
     
     var ugenList = topoSort(children).filter(filterUGen);
+    var heapSize = param.values.length;
     
     var defList = ugenList.map(function(ugen) {
       var inputs = [];
@@ -324,12 +325,15 @@ define(function(require, exports, module) {
       var outputs = [];
       if (ugen.channels) {
         outputs = ugen.channels.map(getRate);
-      } else if (ugen.numOfOutputs === 1) {
+      } else if (ugen.numOutputs === 1) {
         outputs = [ ugen.rate ];
+      }
+      for (var i = 0, imax = outputs.length; i < imax; ++i) {
+        heapSize += outputs[i] === C.AUDIO ? 64 : 1;
       }
       return [ ugen.klassName, ugen.rate, ugen.specialIndex|0, inputs, outputs ];
     });
-    return { name:name, consts:consts, params:param, defList:defList, variants:{} };
+    return { name:name, consts:consts, params:param, defList:defList, variants:{}, heapSize:heapSize };
   };
   
   var topoSort = (function() {

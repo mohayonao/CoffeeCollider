@@ -10,7 +10,7 @@ define(function(require, exports, module) {
       this.channels   = 0;
       this.strmLength = 0;
       this.bufLength  = 0;
-      this.instance = null;
+      this.world = null;
       this.rates    = null;
       this.strm     = null;
       this.timer    = cc.createTimer();
@@ -25,7 +25,7 @@ define(function(require, exports, module) {
     SynthServer.prototype.recvFromLang = function(msg, userId) {
       userId = userId|0;
       if (msg instanceof Uint8Array) {
-        this.instance.doBinayCommand(msg, userId);
+        this.world.doBinayCommand(msg, userId);
       } else {
         var func = commands[msg[0]];
         if (func) {
@@ -58,8 +58,8 @@ define(function(require, exports, module) {
         this.busOutLen = this.bufLength << 1;
         this.busOutL   = new Float32Array(this.busOut.buffer, 0         , bufLength);
         this.busOutR   = new Float32Array(this.busOut.buffer, bufLength4, bufLength);
-        if (!this.instance) {
-          this.instance = cc.createInstance(0);
+        if (!this.world) {
+          this.world = cc.createWorld(0);
         }
         this.rates = [];
         this.rates[C.AUDIO  ] = cc.createRate(this.sampleRate, this.bufLength);
@@ -70,7 +70,7 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.play = function(msg, userId) {
       userId = userId|0;
-      this.instance.play(userId);
+      this.world.run(true, userId);
       if (!this.timer.isRunning()) {
         var that = this;
         this.timer.start(function() { that.process(); }, C.PROCESSING_INTERVAL);
@@ -81,9 +81,9 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.pause = function(msg, userId) {
       userId = userId|0;
-      this.instance.pause(userId);
+      this.world.run(false, userId);
       if (this.timer.isRunning()) {
-        if (!this.instance.isRunning()) {
+        if (!this.world.isRunning()) {
           this.timer.stop();
         }
       }
@@ -93,13 +93,13 @@ define(function(require, exports, module) {
     };
     SynthServer.prototype.reset = function(msg, userId) {
       userId = userId|0;
-      this.instance.reset(userId);
+      this.world.reset(userId);
     };
     SynthServer.prototype.pushToTimeline = function(msg, userId) {
       userId = userId|0;
       var timeline = msg[1];
       if (timeline.length) {
-        this.instance.pushToTimeline(timeline, userId);
+        this.world.pushToTimeline(timeline, userId);
       }
     };
     SynthServer.prototype.process = function() {
@@ -142,7 +142,7 @@ define(function(require, exports, module) {
   require("./unit");
   require("./buffer");
   require("./node");
-  require("./instance");
+  require("./world");
   require("./server-worker");
   require("./server-nodejs");
   require("./server-socket");

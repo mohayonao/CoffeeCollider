@@ -683,9 +683,9 @@ define(function(require, exports, module) {
       segmented.insertLocalVariables(tokens, localVars);
       tokens.push(["["      , "[" , _],
                   ["INDENT" , 2   , _]);
-      var numOfSegments = 0;
+      var numSegments = 0;
       while (body.length) {
-        if (numOfSegments++) {
+        if (numSegments++) {
           tokens.push(["TERMINATOR", "\n", _]);
         }
         segmented.beginOfSegment(tokens, args);

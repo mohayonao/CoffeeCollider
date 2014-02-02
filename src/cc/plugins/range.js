@@ -236,96 +236,322 @@ define(function(require, exports, module) {
     return ctor;
   })();
   
-  var linlin_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
-    var scale  = (dsthi.__sub__(dstlo)).__div__(srchi.__sub__(srclo));
-    var offset = dstlo.__sub__(scale.__mul__(srclo));
-    return cc.createMulAdd(_in, scale, offset);
-  };
-  
   cc.ugen.specs.LinLin = {
     $ar: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linlin_ctor
+      ctor: function(_in, srclo, srchi, dstlo, dsthi) {
+        return this.multiNew(C.AUDIO, _in, srclo, srchi, dstlo, dsthi);
+      }
     },
     $kr: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linlin_ctor
-    },
-    $ir: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linlin_ctor
-    }
-  };
-  
-  var linexp_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
-    // Math.pow(dsthi / dstlo, (_in-srclo)/(srchi-srclo)) * dstlo
-    return dsthi.__div__(dstlo).pow(
-      (_in.__sub__(srclo)).__div__(srchi.__sub__(srclo))
-    ).__mul__(dstlo);
-  };
-  
-  cc.ugen.specs.LinExp = {
-    $ar: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linexp_ctor
-    },
-    $kr: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linexp_ctor
-    },
-    $ir: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: linexp_ctor
-    }
-  };
+      ctor: function(_in, srclo, srchi, dstlo, dsthi) {
+        return this.multiNew(C.CONTROL, _in, srclo, srchi, dstlo, dsthi);
+      }
 
-  var explin_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
-    // Math.log(_in/srclo) / Math.log(srchi/srclo) * (dsthi-dstlo) + dstlo
-    return _in.__div__(srclo).log().__div__(
-      srchi.__div__(srclo).log()
-    ).__mul__(
-      dsthi.__sub__(dstlo)
-    ).__add__(dstlo);
-  };
-  
-  cc.ugen.specs.ExpLin = {
-    $ar: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: explin_ctor
-    },
-    $kr: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: explin_ctor
     },
     $ir: {
       defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: explin_ctor
-    }
+      ctor: function(_in, srclo, srchi, dstlo, dsthi) {
+        return this.multiNew(C.SCALAR, _in, srclo, srchi, dstlo, dsthi);
+      }
+    },
+    checkInputs: cc.ugen.checkSameRateAsFirstInput
   };
+  
+  cc.unit.specs.LinLin = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_1;
+      }
+      this._srclo = 0;
+      this._srchi = 0;
+      this._dstlo = 0;
+      this._dsthi = 0;
+      this._scale  = 1;
+      this._offset = 0;
+      next_1.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var next_srclo = this.inputs[1][0];
+      var next_srchi = this.inputs[2][0];
+      var next_dstlo = this.inputs[3][0];
+      var next_dsthi = this.inputs[4][0];
+      var srclo = this._srclo;
+      var srchi = this._srchi;
+      var dstlo = this._dstlo;
+      var dsthi = this._dsthi;
+      var scale = this._scale;
+      var offset = this._offset;
+      var i;
+      if (srclo !== next_srclo || srchi !== next_srchi ||
+          dstlo !== next_dstlo || dsthi !== next_dsthi) {
+        var next_scale  = ((next_dsthi - next_dstlo) / (next_srchi - next_srclo)) || 0;
+        var next_offset = next_dstlo - (next_scale * next_srclo);
+        var scale_slope  = (next_scale  - scale ) * this.rate.slopeFactor;
+        var offset_slope = (next_offset - offset) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = inIn[i] * scale + offset;
+          scale  += scale_slope;
+          offset += offset_slope;
+        }
+        this._srclo = next_srclo;
+        this._srchi = next_srchi;
+        this._dstlo = next_dstlo;
+        this._dsthi = next_dsthi;
+        this._scale  = next_scale;
+        this._offset = next_offset;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = inIn[i] * scale + offset;
+        }
+      }
+    };
+    var next_1 = function() {
+      var _in   = this.inputs[0][0];
+      var srclo = this.inputs[1][0];
+      var srchi = this.inputs[2][0];
+      var dstlo = this.inputs[3][0];
+      var dsthi = this.inputs[4][0];
+      if (this._srclo !== srclo || this._srchi !== srchi ||
+          this._dstlo !== dstlo || this._dsthi !== dsthi) {
+        this._srclo = srclo;
+        this._srchi = srchi;
+        this._dstlo = dstlo;
+        this._dsthi = dsthi;
+        this._scale  = ((dsthi - dstlo) / (srchi - srclo)) || 0;
+        this._offset = dstlo - (this._scale * srclo);
+      }
+      this.outputs[0][0] = _in * this._scale + this._offset;
+    };
+    return ctor;
+  })();
+  
+  
+  cc.ugen.specs.LinExp = cc.ugen.specs.LinLin;
 
-  var expexp_ctor = function(_in, srclo, srchi, dstlo, dsthi) {
-    // Math.pow(dsthi/dstlo, Math.log(_in/srclo) / Math.log(srchi-srclo)) * dstlo
-    return dsthi.__div__(dstlo).pow(
-      _in.__div__(srclo).log().__div__(
-        srchi.__div__(srclo).log()
-      )
-    ).__mul__(dstlo);
-  };
+  cc.unit.specs.LinExp = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_1;
+      }
+      this._srclo = 0;
+      this._srchi = 0;
+      this._dstlo = 0;
+      this._dsthi = 0;
+      this._x = 0;
+      this._y = 0;
+      next_1.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var next_srclo = this.inputs[1][0];
+      var next_srchi = this.inputs[2][0];
+      var next_dstlo = this.inputs[3][0] || 0.001;
+      var next_dsthi = this.inputs[4][0] || 0.001;
+      var srclo = this._srclo;
+      var srchi = this._srchi;
+      var dstlo = this._dstlo;
+      var dsthi = this._dsthi;
+      var x = this._x;
+      var y = this._y;
+      var i;
+      if (srclo !== next_srclo || srchi !== next_srchi ||
+          dstlo !== next_dstlo || dsthi !== next_dsthi) {
+        var next_x = dsthi / dstlo;
+        var next_y = (srchi - srclo) || 0.001;
+        var x_slope = (next_x - x) * this.rate.slopeFactor;
+        var y_slope = (next_y - y) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = Math.pow(x, (inIn[i] - srclo) / y) * dstlo;
+          x += x_slope;
+          y += y_slope;
+        }
+        this._srclo = next_srclo;
+        this._srchi = next_srchi;
+        this._dstlo = next_dstlo;
+        this._dsthi = next_dsthi;
+        this._x = next_x;
+        this._y = next_y;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = Math.pow(x, (inIn[i] - srclo) / y) * dstlo;
+        }
+      }
+    };
+    var next_1 = function() {
+      var _in   = this.inputs[0][0];
+      var srclo = this.inputs[1][0];
+      var srchi = this.inputs[2][0];
+      var dstlo = this.inputs[3][0] || 0.001;
+      var dsthi = this.inputs[4][0] || 0.001;
+      if (this._srclo !== srclo || this._srchi !== srchi ||
+          this._dstlo !== dstlo || this._dsthi !== dsthi) {
+        this._srclo = srclo;
+        this._srchi = srchi;
+        this._dstlo = dstlo;
+        this._dsthi = dsthi;
+        this._x = dsthi / dstlo;
+        this._y = (srchi - srclo) || 0.001;
+      }
+      this.outputs[0][0] = Math.pow(this._x, (_in - srclo) / this._y) * dstlo;
+    };
+    return ctor;
+  })();
   
-  cc.ugen.specs.ExpExp = {
-    $ar: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: expexp_ctor
-    },
-    $kr: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: expexp_ctor
-    },
-    $ir: {
-      defaults: "in=0,srclo=0,srchi=1,dstlo=1,dsthi=2",
-      ctor: expexp_ctor
-    }
-  };
+  
+  cc.ugen.specs.ExpLin = cc.ugen.specs.LinLin;
+
+  cc.unit.specs.ExpLin = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_1;
+      }
+      this._srclo = 0;
+      this._srchi = 0;
+      this._dstlo = 0;
+      this._dsthi = 0;
+      this._x = 0;
+      next_1.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var next_srclo = this.inputs[1][0] || 0.001;
+      var next_srchi = this.inputs[2][0] || 0.001;
+      var next_dstlo = this.inputs[3][0];
+      var next_dsthi = this.inputs[4][0];
+      var srclo = this._srclo;
+      var srchi = this._srchi;
+      var dstlo = this._dstlo;
+      var dsthi = this._dsthi;
+      var x = this._x;
+      var i, _in;
+      if (srclo !== next_srclo || srchi !== next_srchi ||
+          dstlo !== next_dstlo || dsthi !== next_dsthi) {
+        var next_x = Math.log(Math.abs(srchi / srclo));
+        var x_slope = (next_x - x) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i] || 0.001;
+          out[i] = Math.log(Math.abs(_in / srclo)) / x * (dsthi - dstlo) + dstlo;
+          x += x_slope;
+        }
+        this._srclo = next_srclo;
+        this._srchi = next_srchi;
+        this._dstlo = next_dstlo;
+        this._dsthi = next_dsthi;
+        this._x = next_x;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i] || 0.001;
+          out[i] = Math.log(Math.abs(_in / srclo)) / x * (dsthi - dstlo) + dstlo;
+        }
+      }
+    };
+    var next_1 = function() {
+      var _in   = this.inputs[0][0] || 0.001;
+      var srclo = this.inputs[1][0] || 0.001;
+      var srchi = this.inputs[2][0] || 0.001;
+      var dstlo = this.inputs[3][0];
+      var dsthi = this.inputs[4][0];
+      if (this._srclo !== srclo || this._srchi !== srchi ||
+          this._dstlo !== dstlo || this._dsthi !== dsthi) {
+        this._srclo = srclo;
+        this._srchi = srchi;
+        this._dstlo = dstlo;
+        this._dsthi = dsthi;
+        this._x = Math.log(Math.abs(srchi / srclo));
+      }
+      this.outputs[0][0] = Math.log(Math.abs(_in / srclo)) / this._x * (dsthi - dstlo) + dstlo;
+    };
+    return ctor;
+  })();
+  
+  
+  cc.ugen.specs.ExpExp = cc.ugen.specs.LinLin;
+  
+  cc.unit.specs.ExpExp = (function() {
+    var ctor = function() {
+      if (this.calcRate === C.AUDIO) {
+        this.process = next;
+      } else {
+        this.process = next_1;
+      }
+      this._srclo = 0;
+      this._srchi = 0;
+      this._dstlo = 0;
+      this._dsthi = 0;
+      this._x = 0;
+      this._y = 0;
+      next_1.call(this, 1);
+    };
+    var next = function(inNumSamples) {
+      var out   = this.outputs[0];
+      var inIn  = this.inputs[0];
+      var next_srclo = this.inputs[1][0] || 0.001;
+      var next_srchi = this.inputs[2][0] || 0.001;
+      var next_dstlo = this.inputs[3][0] || 0.001;
+      var next_dsthi = this.inputs[4][0] || 0.001;
+      var srclo = this._srclo;
+      var srchi = this._srchi;
+      var dstlo = this._dstlo;
+      var dsthi = this._dsthi;
+      var x = this._x;
+      var y = this._y;
+      var i, _in;
+      if (srclo !== next_srclo || srchi !== next_srchi ||
+          dstlo !== next_dstlo || dsthi !== next_dsthi) {
+        var next_x = dsthi / dstlo;
+        var next_y = Math.log(Math.abs(srchi / srclo));
+        var x_slope = (next_x - x) * this.rate.slopeFactor;
+        var y_slope = (next_y - y) * this.rate.slopeFactor;
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i] || 0.001;
+          out[i] = Math.pow(x, Math.log(Math.abs(_in / srclo)) / y) * dstlo;
+          x += x_slope;
+          y += y_slope;
+        }
+        this._srclo = next_srclo;
+        this._srchi = next_srchi;
+        this._dstlo = next_dstlo;
+        this._dsthi = next_dsthi;
+        this._x = next_x;
+        this._y = next_y;
+      } else {
+        for (i = 0; i < inNumSamples; ++i) {
+          _in = inIn[i] || 0.001;
+          out[i] = Math.pow(x, Math.log(Math.abs(_in / srclo)) / y) * dstlo;
+        }
+      }
+    };
+    var next_1 = function() {
+      var _in   = this.inputs[0][0] || 0.001;
+      var srclo = this.inputs[1][0] || 0.001;
+      var srchi = this.inputs[2][0] || 0.001;
+      var dstlo = this.inputs[3][0] || 0.001;
+      var dsthi = this.inputs[4][0] || 0.001;
+      if (this._srclo !== srclo || this._srchi !== srchi ||
+          this._dstlo !== dstlo || this._dsthi !== dsthi) {
+        this._srclo = srclo;
+        this._srchi = srchi;
+        this._dstlo = dstlo;
+        this._dsthi = dsthi;
+        this._x = dsthi / dstlo;
+        this._y = Math.log(Math.abs(srchi / srclo));
+      }
+      this.outputs[0][0] = Math.pow(this._x, Math.log(Math.abs(_in / srclo)) / this._y) * dstlo;
+    };
+    return ctor;
+  })();
   
   module.exports = {};
 

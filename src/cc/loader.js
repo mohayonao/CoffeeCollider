@@ -51,9 +51,11 @@ define(function(require, exports, module) {
       cc.lang   = cc.createSynthLang();
       cc.server = cc.createSynthServer();
       cc.client.impl.sendToLang = cc.lang.recvFromClient.bind(cc.lang);
+      cc.client.impl.sendToLangWithTransferable = cc.lang.recvFromClient.bind(cc.lang);
       cc.lang.sendToServer = cc.server.recvFromLang.bind(cc.server);
       cc.server.sendToLang = cc.lang.recvFromServer.bind(cc.lang);
       cc.lang.sendToClient = cc.client.impl.recvFromLang.bind(cc.client.impl);
+      cc.lang.sendToClientWithTransferable = cc.client.impl.recvFromLang.bind(cc.client.impl);
       cc.server.connect();
       return cc.client;
     };

@@ -1,6 +1,7 @@
 define(function(require, exports, module) {
   "use strict";
 
+  var utils     = require("../lang/utils");
   var twopi     = 2 * Math.PI;
   var kSineSize = 8192;
   var kSineMask = kSineSize - 1;
@@ -39,18 +40,7 @@ define(function(require, exports, module) {
       wavetable[j++] = val2 - val1;
     })(gSine, gSineWavetable, kSineSize);
   })();
-
-  var zapgremlins = function(a) {
-    if (a < 0) {
-      if (-1e-6 < a) {
-        a = 0;
-      }
-    } else if (a < +1e-6) {
-      a = 0;
-    }
-    return a;
-  };
-
+  
   var cubicinterp = function(x, y0, y1, y2, y3) {
     var c0 = y1;
     var c1 = 0.5 * (y2 - y0);
@@ -79,8 +69,8 @@ define(function(require, exports, module) {
     }
     return val - range * Math.floor((val - lo) / range);
   };
-  
-  module.exports = {
+
+  var _ = {
     kSineSize: kSineSize,
     kSineMask: kSineMask,
     kBadValue: kBadValue,
@@ -88,9 +78,14 @@ define(function(require, exports, module) {
     gInvSine      : gInvSine,
     gSineWavetable: gSineWavetable,
 
-    zapgremlins: zapgremlins,
     cubicinterp: cubicinterp,
     sc_wrap: sc_wrap
   };
+
+  Object.keys(utils).forEach(function(key) {
+    _[key] = utils[key];
+  });
+  
+  module.exports = _;
 
 });

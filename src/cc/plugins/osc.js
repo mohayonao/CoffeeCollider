@@ -12,6 +12,7 @@ define(function(require, exports, module) {
   var gSineWavetable = utils.gSineWavetable;
   var gSine    = utils.gSine;
   var gInvSine = utils.gInvSine;
+  var log001 = Math.log(0.001);
 
   var osc_next_aa = function(unit, inNumSamples, calc) {
     var out = unit.outputs[0];
@@ -128,8 +129,8 @@ define(function(require, exports, module) {
     }
     unit._x = x;
   };
-  var get_table = function(unit, instance, shift) {
-    var buffer = instance.buffers[unit._bufnumIn[0]|0];
+  var get_table = function(unit, shift) {
+    var buffer = unit.world.buffers[unit._bufnumIn[0]|0];
     if (buffer) {
       var samples = buffer.samples;
       if (samples.length) {
@@ -200,28 +201,28 @@ define(function(require, exports, module) {
       var index = (pphase & mask) << 1;
       return table[index] + (pphase-(pphase|0)) * table[index+1];
     };
-    var next_aa = function(inNumSamples, instance) {
-      if (get_table(this, instance, 1)) {
+    var next_aa = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_aa(this, inNumSamples, wcalc);
       }
     };
-    var next_ak = function(inNumSamples, instance) {
-      if (get_table(this, instance, 1)) {
+    var next_ak = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ak(this, inNumSamples, wcalc);
       }
     };
-    var next_ai = function(inNumSamples, instance) {
-      if (get_table(this, instance, 1)) {
+    var next_ai = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ai(this, inNumSamples, wcalc);
       }
     };
-    var next_ka = function(inNumSamples, instance) {
-      if (get_table(this, instance, 1)) {
+    var next_ka = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_ka(this, inNumSamples, wcalc);
       }
     };
-    var next_kk = function(inNumSamples, instance) {
-      if (get_table(this, instance, 1)) {
+    var next_kk = function(inNumSamples) {
+      if (get_table(this, 1)) {
         osc_next_kk(this, inNumSamples, wcalc);
       }
     };
@@ -430,28 +431,28 @@ define(function(require, exports, module) {
     var calc = function(table, mask, pphase) {
       return table[pphase & mask];
     };
-    var next_aa = function(inNumSamples, instance) {
-      if (get_table(this, instance, 0)) {
+    var next_aa = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_aa(this, inNumSamples, calc);
       }
     };
-    var next_ak = function(inNumSamples, instance) {
-      if (get_table(this, instance, 0)) {
+    var next_ak = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ak(this, inNumSamples, calc);
       }
     };
-    var next_ai = function(inNumSamples, instance) {
-      if (get_table(this, instance, 0)) {
+    var next_ai = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ai(this, inNumSamples, calc);
       }
     };
-    var next_ka = function(inNumSamples, instance) {
-      if (get_table(this, instance, 0)) {
+    var next_ka = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_ka(this, inNumSamples, calc);
       }
     };
-    var next_kk = function(inNumSamples, instance) {
-      if (get_table(this, instance, 0)) {
+    var next_kk = function(inNumSamples) {
+      if (get_table(this, 0)) {
         osc_next_kk(this, inNumSamples, calc);
       }
     };
@@ -514,6 +515,554 @@ define(function(require, exports, module) {
     };
     return ctor;
   })();
+  
+  
+  cc.ugen.specs.Klang = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,freqscale=1,freqoffset=0",
+      ctor: function(specificationsArrayRef, freqscale, freqoffset) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, freqscale, freqoffset, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var ref = this.inputs.pop();
+      var items, freqs, amps, phases;
+      var specs;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs  = items[0] || [];
+      amps   = items[1] || utils.filledArray(freqs.length, 1);
+      phases = items[2] || utils.filledArray(freqs.length, 0);
+      specs  = utils.flat(utils.flop([ freqs, amps, phases ]));
+      
+      specs.push.apply(this.inputs, specs);
+      
+      return this;
+    }
+  };
+
+  cc.unit.specs.Klang = (function() {
+    var ctor = function() {
+      this.process = next;
+
+      var rate = this.rate;
+      var numpartials = (this.numInputs - 2) / 3;
+      var numcoefs    = numpartials * 3;
+      var coefs       = new Float32Array(numcoefs);
+
+      var inputs = this.inputs;
+      var freqscale  = inputs[0][0] * rate.radiansPerSample;
+      var freqoffset = inputs[1][0] * rate.radiansPerSample;
+      var level, phase;
+      var outf = 0;
+      var i, j = 2, k = -1, w;
+      
+      for (i = 0; i < numpartials; ++i) {
+        w = inputs[j++][0] * freqscale + freqoffset;
+        level = inputs[j++][0];
+        phase = inputs[j++][0];
+        if (phase !== 0) {
+          outf += coefs[++k] = level * Math.sin(phase); // y1;
+          coefs[++k] = level * Math.sin(phase - w);     // y2;
+        } else {
+          outf += coefs[++k] = 0;            // y1;
+          coefs[++k] = level * -Math.sin(w); // y2;
+        }
+        coefs[++k] = 2 * Math.cos(w); // b1
+      }
+      this._numpartials = numpartials;
+      this._coefs = coefs;
+      this.outputs[0][0] = outf;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var y0_0, y1_0, y2_0, b1_0;
+      var y0_1, y1_1, y2_1, b1_1;
+      var y0_2, y1_2, y2_2, b1_2;
+      var y0_3, y1_3, y2_3, b1_3;
+      var outf;
+      var i, j = 0;
+      
+      var rate  = this.rate;
+      var coefs = this._coefs;
+      var numpartials = this._numpartials;
+      var n = numpartials >> 2;
+      
+      switch (numpartials & 3) {
+      case 3:
+        y1_0 = coefs[0]; y2_0 = coefs[1]; b1_0 = coefs[2];
+        y1_1 = coefs[3]; y2_1 = coefs[4]; b1_1 = coefs[5];
+        y1_2 = coefs[6]; y2_2 = coefs[7]; b1_2 = coefs[8];
+
+        for (i = rate.filterLoops; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          outf += y0_2 = b1_2 * y1_2 - y2_2;
+          out[j++] = outf;
+
+          outf  = y2_0 = b1_0 * y0_0 - y1_0;
+          outf += y2_1 = b1_1 * y0_1 - y1_1;
+          outf += y2_2 = b1_2 * y0_2 - y1_2;
+          out[j++] = outf;
+
+          outf  = y1_0 = b1_0 * y2_0 - y0_0;
+          outf += y1_1 = b1_1 * y2_1 - y0_1;
+          outf += y1_2 = b1_2 * y2_2 - y0_2;
+          out[j++] = outf;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          outf += y0_2 = b1_2 * y1_2 - y2_2;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+          y2_2 = y1_2; y1_2 = y0_2;
+          out[j++] = outf;
+        }
+        coefs[0] = y1_0; coefs[1] = y2_0;
+        coefs[3] = y1_1; coefs[4] = y2_1;
+        coefs[6] = y1_2; coefs[7] = y2_2;
+        break;
+        
+      case 2:
+        y1_0 = coefs[0]; y2_0 = coefs[1]; b1_0 = coefs[2];
+        y1_1 = coefs[3]; y2_1 = coefs[4]; b1_1 = coefs[5];
+
+        for (i = rate.filterLoops; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          out[j++] = outf;
+
+          outf  = y2_0 = b1_0 * y0_0 - y1_0;
+          outf += y2_1 = b1_1 * y0_1 - y1_1;
+          out[j++] = outf;
+
+          outf  = y1_0 = b1_0 * y2_0 - y0_0;
+          outf += y1_1 = b1_1 * y2_1 - y0_1;
+          out[j++] = outf;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+          out[j++] = outf;
+        }
+        coefs[0] = y1_0; coefs[1] = y2_0;
+        coefs[3] = y1_1; coefs[4] = y2_1;
+        break;
+
+      case 1:
+        y1_0 = coefs[0]; y2_0 = coefs[1]; b1_0 = coefs[2];
+        
+        for (i = rate.filterLoops; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          out[j++] = outf;
+
+          outf  = y2_0 = b1_0 * y0_0 - y1_0;
+          out[j++] = outf;
+
+          outf  = y1_0 = b1_0 * y2_0 - y0_0;
+          out[j++] = outf;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          y2_0 = y1_0; y1_0 = y0_0;
+          out[j++] = outf;
+        }
+        coefs[0] = y1_0; coefs[1] = y2_0;
+        break;
+        
+      case 0:
+        for (i = 0; i < inNumSamples; ++i) {
+          out[i] = 0;
+        }
+        break;
+      }
+
+      while (n--) {
+        y1_0 = coefs[0]; y2_0 = coefs[ 1]; b1_0 = coefs[ 2];
+        y1_1 = coefs[3]; y2_1 = coefs[ 4]; b1_1 = coefs[ 5];
+        y1_2 = coefs[6]; y2_2 = coefs[ 7]; b1_2 = coefs[ 8];
+        y1_3 = coefs[9]; y2_3 = coefs[10]; b1_3 = coefs[11];
+
+        for (i = rate.filterLoops; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          outf += y0_2 = b1_2 * y1_2 - y2_2;
+          outf += y0_3 = b1_3 * y1_3 - y2_3;
+          out[j++] = outf;
+
+          outf  = y2_0 = b1_0 * y0_0 - y1_0;
+          outf += y2_1 = b1_1 * y0_1 - y1_1;
+          outf += y2_2 = b1_2 * y0_2 - y1_2;
+          outf += y2_3 = b1_3 * y0_3 - y1_3;
+          out[j++] = outf;
+
+          outf  = y1_0 = b1_0 * y2_0 - y0_0;
+          outf += y1_1 = b1_1 * y2_1 - y0_1;
+          outf += y1_2 = b1_2 * y2_2 - y0_2;
+          outf += y1_3 = b1_3 * y2_3 - y0_3;
+          out[j++] = outf;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          outf  = y0_0 = b1_0 * y1_0 - y2_0;
+          outf += y0_1 = b1_1 * y1_1 - y2_1;
+          outf += y0_2 = b1_2 * y1_2 - y2_2;
+          outf += y0_3 = b1_3 * y1_3 - y2_3;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+          y2_2 = y1_2; y1_2 = y0_2;
+          y2_3 = y1_3; y1_3 = y0_3;
+          out[j++] = outf;
+        }
+        coefs[0] = y1_0; coefs[ 1] = y2_0;
+        coefs[3] = y1_1; coefs[ 4] = y2_1;
+        coefs[6] = y1_2; coefs[ 7] = y2_2;
+        coefs[9] = y1_3; coefs[10] = y2_3;
+      }
+    };
+    return ctor;
+  })();
+
+  cc.ugen.specs.Klank = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,input=0,freqscale=1,freqoffset=0,decayscale=1",
+      ctor: function(specificationsArrayRef, input, freqscale, freqoffset, decayscale) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, input, freqscale, freqoffset, decayscale, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var ref = this.inputs.pop();
+      var items, freqs, amps, times;
+      var specs;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs = items[0] || [];
+      amps  = items[1] || utils.filledArray(freqs.length, 1);
+      times = items[2] || utils.filledArray(freqs.length, 1);
+      specs  = utils.flat(utils.flop([ freqs, amps, times ]));
+      
+      specs.push.apply(this.inputs, specs);
+
+      return this;
+    }
+  };
+
+  cc.unit.specs.Klank = (function() {
+    var ctor = function() {
+      this.process = next;
+      
+      var rate = this.rate;
+      var numpartials = (this.numInputs - 4) / 3;
+      var numcoefs    = ((numpartials + 3) & ~3) * 5;
+      var coefs = new Float32Array(numcoefs + this.bufLength);
+      var buf   = new Float32Array(coefs.buffer, numcoefs * 4);
+
+      var inputs = this.inputs;
+      var freqscale  = inputs[1][0] * rate.radiansPerSample;
+      var freqoffset = inputs[2][0] * rate.radiansPerSample;
+      var decayscale = inputs[3][0];
+
+      var level, time;
+      var R, twoR, R2, cost;
+      var sampleRate = rate.sampleRate;
+
+      var i, j = 4, k, w;
+
+      for (i = 0; i < numpartials; ++i) {
+        w = inputs[j++][0] * freqscale + freqoffset;
+        level = inputs[j++][0];
+        time  = inputs[j++][0] * decayscale;
+        R = time === 0 ? 0 : Math.exp(log001 / (time * sampleRate));
+        twoR = 2 * R;
+        R2 = R * R;
+        cost = (twoR * Math.cos(w)) / (1 + R2);
+
+        k = 20 * (i >> 2) + (i & 3);
+        coefs[k]   = 0;             // y1
+        coefs[k+4] = 0;             // y2
+        coefs[k+8] = twoR * cost;   // b1
+        coefs[k+12] = -R2;          // b2
+        coefs[k+16] = level * 0.25; // a0
+      }
+      
+      this._numpartials = numpartials;
+      this._coefs = coefs;
+      this._buf   = buf;
+      this._x1 = 0;
+      this._x2 = 0;
+    };
+    var next = function(inNumSamples) {
+      var out = this.outputs[0];
+      var inIn = this.inputs[0];
+      var y0_0, y1_0, y2_0, a0_0, b1_0, b2_0;
+      var y0_1, y1_1, y2_1, a0_1, b1_1, b2_1;
+      var y0_2, y1_2, y2_2, a0_2, b1_2, b2_2;
+      var y0_3, y1_3, y2_3, a0_3, b1_3, b2_3;
+      var inf;
+      var i, j = 0;
+
+      var rate  = this.rate;
+      var coefs = this._coefs;
+      var numpartials = this._numpartials;
+      var buf = this._buf;
+      var n = numpartials >> 2;
+      var k = n * 20;
+      switch (numpartials & 3) {
+      case 3:
+        y1_0 = coefs[k+0]; y2_0 = coefs[k+4]; b1_0 = coefs[k+ 8]; b2_0 = coefs[k+12]; a0_0 = coefs[k+16];
+        y1_1 = coefs[k+1]; y2_1 = coefs[k+5]; b1_1 = coefs[k+ 9]; b2_1 = coefs[k+13]; a0_1 = coefs[k+17];
+        y1_2 = coefs[k+2]; y2_2 = coefs[k+6]; b1_2 = coefs[k+10]; b2_2 = coefs[k+14]; a0_2 = coefs[k+18];
+        for (i = rate.filterLoops; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          y0_2 = inf + b1_2 * y1_2 + b2_2 * y2_2;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1 + a0_2 * y0_2;
+
+          inf = inIn[j];
+          y2_0 = inf + b1_0 * y0_0 + b2_0 * y1_0;
+          y2_1 = inf + b1_1 * y0_1 + b2_1 * y1_1;
+          y2_2 = inf + b1_2 * y0_2 + b2_2 * y1_2;
+          buf[j++] = a0_0 * y2_0 + a0_1 * y2_1 + a0_2 * y2_2;
+
+          inf = inIn[j];
+          y1_0 = inf + b1_0 * y2_0 + b2_0 * y0_0;
+          y1_1 = inf + b1_1 * y2_1 + b2_1 * y0_1;
+          y1_2 = inf + b1_2 * y2_2 + b2_2 * y0_2;
+          buf[j++] = a0_0 * y1_0 + a0_1 * y1_1 + a0_2 * y1_2;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          y0_2 = inf + b1_2 * y1_2 + b2_2 * y2_2;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1 + a0_2 * y0_2;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+          y2_2 = y1_2; y1_2 = y0_2;
+        }
+        coefs[k+0] = y1_0; coefs[k+4] = y2_0;
+        coefs[k+1] = y1_1; coefs[k+5] = y2_1;
+        coefs[k+2] = y1_2; coefs[k+6] = y2_2;
+        break;
+        
+      case 2:
+        y1_0 = coefs[k+0]; y2_0 = coefs[k+4]; b1_0 = coefs[k+ 8]; b2_0 = coefs[k+12]; a0_0 = coefs[k+16];
+        y1_1 = coefs[k+1]; y2_1 = coefs[k+5]; b1_1 = coefs[k+ 9]; b2_1 = coefs[k+13]; a0_1 = coefs[k+17];
+        for (i = rate.filterLoops; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1;
+
+          inf = inIn[j];
+          y2_0 = inf + b1_0 * y0_0 + b2_0 * y1_0;
+          y2_1 = inf + b1_1 * y0_1 + b2_1 * y1_1;
+          buf[j++] = a0_0 * y2_0 + a0_1 * y2_1;
+
+          inf = inIn[j];
+          y1_0 = inf + b1_0 * y2_0 + b2_0 * y0_0;
+          y1_1 = inf + b1_1 * y2_1 + b2_1 * y0_1;
+          buf[j++] = a0_0 * y1_0 + a0_1 * y1_1;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+        }
+        coefs[k+0] = y1_0; coefs[k+4] = y2_0;
+        coefs[k+1] = y1_1; coefs[k+5] = y2_1;
+        break;
+
+      case 1:
+        y1_0 = coefs[k+0]; y2_0 = coefs[k+4]; b1_0 = coefs[k+ 8]; b2_0 = coefs[k+12]; a0_0 = coefs[k+16];
+        for (i = rate.filterLoops; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          buf[j++] = a0_0 * y0_0;
+
+          inf = inIn[j];
+          y2_0 = inf + b1_0 * y0_0 + b2_0 * y1_0;
+          buf[j++] = a0_0 * y2_0;
+
+          inf = inIn[j];
+          y1_0 = inf + b1_0 * y2_0 + b2_0 * y0_0;
+          buf[j++] = a0_0 * y1_0;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          buf[j++] = a0_0 * y0_0;
+          y2_0 = y1_0; y1_0 = y0_0;
+        }
+        coefs[k+0] = y1_0; coefs[k+4] = y2_0;
+        break;
+        
+      case 0:
+        for (i = 0; i < inNumSamples; ++i) {
+          buf[i] = 0;
+        }
+        break;
+      }
+
+      j = k = 0;
+      while (n--) {
+        y1_0 = coefs[k+0]; y2_0 = coefs[k+4]; b1_0 = coefs[k+ 8]; b2_0 = coefs[k+12]; a0_0 = coefs[k+16];
+        y1_1 = coefs[k+1]; y2_1 = coefs[k+5]; b1_1 = coefs[k+ 9]; b2_1 = coefs[k+13]; a0_1 = coefs[k+17];
+        y1_2 = coefs[k+2]; y2_2 = coefs[k+6]; b1_2 = coefs[k+10]; b2_2 = coefs[k+14]; a0_2 = coefs[k+18];
+        y1_3 = coefs[k+3]; y2_3 = coefs[k+7]; b1_3 = coefs[k+11]; b2_3 = coefs[k+15]; a0_3 = coefs[k+19];
+        for (i = rate.filterLoops; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          y0_2 = inf + b1_2 * y1_2 + b2_2 * y2_2;
+          y0_3 = inf + b1_3 * y1_3 + b2_3 * y2_3;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1 + a0_2 * y0_2 + a0_3 * y0_3;
+
+          inf = inIn[j];
+          y2_0 = inf + b1_0 * y0_0 + b2_0 * y1_0;
+          y2_1 = inf + b1_1 * y0_1 + b2_1 * y1_1;
+          y2_2 = inf + b1_2 * y0_2 + b2_2 * y1_2;
+          y2_3 = inf + b1_3 * y0_3 + b2_3 * y1_3;
+          buf[j++] = a0_0 * y2_0 + a0_1 * y2_1 + a0_2 * y2_2 + a0_3 * y2_3;
+
+          inf = inIn[j];
+          y1_0 = inf + b1_0 * y2_0 + b2_0 * y0_0;
+          y1_1 = inf + b1_1 * y2_1 + b2_1 * y0_1;
+          y1_2 = inf + b1_2 * y2_2 + b2_2 * y0_2;
+          y1_3 = inf + b1_3 * y2_3 + b2_3 * y0_3;
+          buf[j++] = a0_0 * y1_0 + a0_1 * y1_1 + a0_2 * y1_2 + a0_3 * y1_3;
+        }
+        for (i = rate.filterRemain; i--; ) {
+          inf = inIn[j];
+          y0_0 = inf + b1_0 * y1_0 + b2_0 * y2_0;
+          y0_1 = inf + b1_1 * y1_1 + b2_1 * y2_1;
+          y0_2 = inf + b1_2 * y1_2 + b2_2 * y2_2;
+          y0_3 = inf + b1_3 * y1_3 + b2_3 * y2_3;
+          buf[j++] = a0_0 * y0_0 + a0_1 * y0_1 + a0_2 * y0_2 + a0_3 * y0_3;
+          y2_0 = y1_0; y1_0 = y0_0;
+          y2_1 = y1_1; y1_1 = y0_1;
+          y2_2 = y1_2; y1_2 = y0_2;
+          y2_3 = y1_3; y1_3 = y0_3;
+        }
+        coefs[k+0] = y1_0; coefs[k+4] = y2_0;
+        coefs[k+1] = y1_1; coefs[k+5] = y2_1;
+        coefs[k+2] = y1_2; coefs[k+6] = y2_2;
+        coefs[k+3] = y1_3; coefs[k+7] = y2_3;
+        k += 20;
+      }
+
+      var x0;
+      var x1 = this._x1;
+      var x2 = this._x2;
+      
+      j = 0;
+      for (i = rate.filterLoops; i--;) {
+        x0 = buf[j];
+        out[j++] = x0 - x2;
+        x2 = buf[j];
+        out[j++] = x2 - x1;
+        x1 = buf[j];
+        out[j++] = x1 - x0;
+      }
+      for (i = rate.filterRemain; i--;) {
+        x0 = buf[j];
+        out[j++] = x0 - x2;
+        x2 = x1;
+        x1 = x0;
+      }
+      
+      this._x1 = x1;
+      this._x2 = x2;
+    };
+    return ctor;
+  })();
+  
+  cc.ugen.specs.DynKlank = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,input=0,freqscale=1,freqoffset=0,decayscale=1",
+      ctor: function(specificationsArrayRef, input, freqscale, freqoffset, decayscale) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, input, freqscale, freqoffset, decayscale, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var input      = this.inputs[0];
+      var freqscale  = this.inputs[1];
+      var freqoffset = this.inputs[2];
+      var decayscale = this.inputs[3];
+      var ref        = this.inputs[4];
+      var items, freqs, decays, amps;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs  = items[0] || [ 440 ];
+      decays = items[2] || [ 1.0 ];
+      amps   = items[1] || [ 1.0 ];
+      freqs  = freqs.madd(freqscale, freqoffset);
+      decays = decays.madd(decayscale, 0);
+      
+      return cc.global.Ringz(this.rate, input, freqs, decays, amps).sum();
+    }
+  };
+
+  cc.ugen.specs.DynKlang = {
+    $ar: {
+      defaults: "specificationsArrayRef=0,freqscale=1,freqoffset=0",
+      ctor: function(specificationsArrayRef, freqscale, freqoffset) {
+        if (specificationsArrayRef.multichannelExpandRef) {
+          specificationsArrayRef = specificationsArrayRef.multichannelExpandRef(2);
+        } else {
+          specificationsArrayRef = utils.asArray(specificationsArrayRef);
+        }
+        return this.multiNewList([C.AUDIO, freqscale, freqoffset, specificationsArrayRef]);
+      }
+    },
+    init: function() {
+      var freqscale  = this.inputs[0];
+      var freqoffset = this.inputs[1];
+      var ref        = this.inputs[2];
+      var items, freqs, phases, amps;
+      if (ref.dereference) {
+        items = ref.dereference();
+      } else {
+        items = utils.asArray(items);
+      }
+      freqs  = items[0] || [ 440 ];
+      phases = items[2] || [ 0.0 ];
+      amps   = items[1] || [ 1.0 ];
+      freqs  = freqs.madd(freqscale, freqoffset);
+      
+      return cc.global.SinOsc(this.rate, freqs, phases, amps).sum();
+    }
+  };
   
   cc.ugen.specs.LFSaw = {
     $ar: {

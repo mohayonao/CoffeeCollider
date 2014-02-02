@@ -11,8 +11,7 @@ define(function(require, exports, module) {
   describe("server/server.js", function() {
     testTools.mock("lang");
     testTools.mock("createTimer");
-    testTools.mock("createInstance");
-    testTools.mock("createInstanceManager");
+    testTools.mock("createWorld");
     
     describe("SynthServer", function() {
       describe("createSynthServer", function() {
@@ -28,36 +27,36 @@ define(function(require, exports, module) {
         });
       });
       describe("messaging", function() {
-        var instance, sendToLang;
+        var s, sendToLang;
         beforeEach(function() {
           sendToLang = [""];
           cc.opmode = "worker";
-          instance = cc.createSynthServer();
-          instance.sendToLang = function(msg) {
+          s = cc.createSynthServer();
+          s.sendToLang = function(msg) {
             sendToLang = msg;
           };
         });
         it("/init", function() {
-          instance.recvFromLang(["/init", 8000, 1]);
-          assert.equal(instance.sampleRate, 8000);
-          assert.equal(instance.channels  ,    1);
+          s.recvFromLang(["/init", 8000, 1]);
+          assert.equal(s.sampleRate, 8000);
+          assert.equal(s.channels  ,    1);
         });
         it("/play", function() {
-          instance.init();
-          instance.recvFromLang(["/play"]);
+          s.init();
+          s.recvFromLang(["/play"]);
         });
         it("/pause", function() {
-          instance.init();
-          instance.recvFromLang(["/pause"]);
+          s.init();
+          s.recvFromLang(["/pause"]);
         });
         it("/reset", function() {
-          instance.init();
-          instance.recvFromLang(["/reset"]);
+          s.init();
+          s.recvFromLang(["/reset"]);
         });
         it("/processed", function() {
-          instance.init();
-          instance.recvFromLang(["/processed", [0]]);
-          assert.deepEqual(cc.createInstance.called, [ "pushToTimeline" ]);
+          s.init();
+          s.recvFromLang(["/processed", [0]]);
+          assert.deepEqual(cc.createWorld.called, [ "pushToTimeline" ]);
         });
       });
     });

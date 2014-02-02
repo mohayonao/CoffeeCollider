@@ -16,17 +16,19 @@ define(function(require, exports, module) {
       this.rootNode    = cc.createLangRootNode();
       this.taskManager = cc.createTaskManager();
       this.timelineResult  = [];
-      this.bufferRequestId = 0;
-      this.bufferRequestCallback = {};
       this.phase = 0;
       this.random = new random.Random();
       this.currentTime = 0;
+      this.callbacks   = [];
       
       this.extendCommands(commands);
     }
     
     SynthLang.prototype.sendToClient = function() {
       throw "SynthLang#sendToClient: should be overridden[" + cc.opmode + "]";
+    };
+    SynthLang.prototype.sendToClientWithTransferable = function() {
+      throw "SynthLang#sendToClientWithTransferable: should be overridden[" + cc.opmode + "]";
     };
     SynthLang.prototype.recvFromClient = function(msg) {
       if (msg) {
@@ -64,7 +66,6 @@ define(function(require, exports, module) {
     };
     SynthLang.prototype.reset = function(msg) {
       this.currentTime = 0;
-      cc.resetBuffer();
       cc.resetNode();
       cc.resetBuiltin();
       cc.resetMessage();
@@ -75,14 +76,23 @@ define(function(require, exports, module) {
       if (!(typeof path === "string" && typeof callback === "function")) {
         return;
       }
-      var requestId = this.bufferRequestId++;
-      this.bufferRequestCallback[requestId] = callback;
-      this.sendToClient(["/buffer/request", path, requestId]);
+      var callbackId = this.setCallback(callback);
+      this.sendToClient(["/buffer/request", path, callbackId]);
     };
     SynthLang.prototype.process = function() {
       throw "SynthLang#process: should be overridden";
     };
     SynthLang.prototype.extendCommands = function() {
+    };
+    SynthLang.prototype.setCallback = function(callback) {
+      var callbackId = this.callbacks.length;
+      this.callbacks[callbackId] = callback;
+      return callbackId;
+    };
+    SynthLang.prototype.getCallback = function(callbackId) {
+      var callback = this.callbacks[callbackId];
+      this.callbacks[callbackId] = null;
+      return callback;
     };
     
     return SynthLang;
@@ -139,16 +149,38 @@ define(function(require, exports, module) {
   };
   commands["/buffer/response"] = function(msg) {
     var buffer = msg[1];
-    var requestId = msg[2];
-    var callback = this.bufferRequestCallback[requestId];
+    var callbackId = msg[2];
+    var callback = this.getCallback(callbackId);
     if (callback) {
       callback(buffer);
-      delete this.bufferRequestCallback[requestId];
     }
   };
   commands["/send"] = function(msg) {
     var args = msg[1];
     cc.global.Message.emit.apply(cc.global.Message, args);
+  };
+
+  commands["/b_get"] = function(msg) {
+    var callbackId = msg[1];
+    var callback = this.getCallback(callbackId);
+    if (callback) {
+      callback(msg[2]);
+    }
+  };
+  commands["/b_getn"] = function(msg) {
+    var callbackId = msg[1];
+    var callback = this.callbacks[callbackId];
+    if (callback) {
+      callback(msg.slice(2));
+      this.callbacks[callbackId] = null;
+    }
+  };
+  commands[C.BINARY_CMD_SET_BUFFER] = function(binary) {
+    var callbackId = (binary[3] << 8) + binary[2];
+    var callback = this.getCallback(callbackId);
+    if (callback) {
+      callback(binary);
+    }
   };
   
   cc.SynthLang = SynthLang;
@@ -180,6 +212,7 @@ define(function(require, exports, module) {
   require("./number");
   require("./object");
   require("./pattern");
+  require("./ref");
   require("./scale");
   require("./string");
   require("./syncblock");

@@ -7,61 +7,6 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
   var slice = [].slice;
   
-  var BufferSource = (function() {
-    var bufSrcId = 0;
-    var cache = {};
-    function BufferSource(source, id) {
-      this.bufSrcId = bufSrcId++;
-      
-      // binary data format
-      //  0 command
-      //  1
-      //  2 bufSrcId
-      //  3
-      //  4 (not use)
-      //  5
-      //  6 channels
-      //  7
-      //  8 sampleRate
-      //  9
-      // 10
-      // 11
-      // 12 numFrames
-      // 13
-      // 14
-      // 15
-      // 16.. samples
-      
-      var uint8 = new Uint8Array(C.BUFSRC_HEADER_SIZE + source.samples.length * 4);
-      var int16 = new Uint16Array(uint8.buffer);
-      var int32 = new Uint32Array(uint8.buffer);
-      var f32   = new Float32Array(uint8.buffer);
-      int16[0] = C.BINARY_CMD_SET_BUFSRC;
-      int16[1] = this.bufSrcId;
-      int16[3] = source.numChannels;
-      int32[2] = source.sampleRate;
-      int32[3] = source.numFrames;
-      f32.set(source.samples, 4);
-      cc.lang.sendToServer(uint8);
-      
-      if (id) {
-        cache[id] = this;
-      }
-    }
-    BufferSource.prototype.bind = function(buffer, startFrame, numFrames) {
-      cc.lang.pushToTimeline([
-        "/b_bind", buffer.bufnum, this.bufSrcId, startFrame, numFrames
-      ]);
-    };
-    BufferSource.get = function(id) {
-      return cache[id];
-    };
-    BufferSource.reset = function() {
-      cache = {};
-    };
-    return BufferSource;
-  })();
-  
   var Buffer = (function() {
     var bufnum = 0;
     function Buffer(frames, channels) {
@@ -103,7 +48,52 @@ define(function(require, exports, module) {
       return this;
     };
     Buffer.prototype.setn = Buffer.prototype.set;
+    
+    Buffer.prototype.get = function(index, action) {
+      index = index|0;
+      if (typeof action === "function") {
+        var callbackId = cc.lang.setCallback(action);
+        cc.lang.pushToTimeline([
+          "/b_get", this.bufnum, index, callbackId
+        ]);
+      }
+      return this;
+    };
+    
+    Buffer.prototype.getn = function(index, count, action) {
+      index = index|0;
+      count = count|0;
+      if (typeof action === "function") {
+        var callbackId = cc.lang.setCallback(action);
+        cc.lang.pushToTimeline([
+          "/b_getn", this.bufnum, index, count, callbackId
+        ]);
+      }
+      return this;
+    };
+    
+    Buffer.prototype.normalize = function(newmax, asWaveable) {
+      cc.lang.pushToTimeline([
+        "/b_gen", this.bufnum, "normalize", asWaveable ? 2 : 0, utils.asNumber(newmax)
+      ]);
+      return this;
+    };
+    
+    Buffer.prototype.fill = function() {
+      cc.lang.pushToTimeline([
+        "/b_fill", this.bufnum, slice.call(arguments)
+      ]);
+      return this;
+    };
 
+    Buffer.prototype.copyData = fn(function(buf, dstStartAt, srcStartAt, numSamples) {
+      buf = buf.bufnum|0;
+      cc.lang.pushToTimeline([
+        "/b_gen", this.bufnum, "copy", 0, buf, dstStartAt, srcStartAt, numSamples
+      ]);
+      return this;
+    }).defaults("buf=0,dstStartAt=0,srcStartAt=0,numSamples=-1").build();
+    
     var calcFlag = function(normalize, asWavetable, clearFirst) {
       return (normalize ? 1 : 0) + (asWavetable ? 2 : 0) + (clearFirst ? 4 : 0);
     };
@@ -160,23 +150,37 @@ define(function(require, exports, module) {
     return Buffer;
   })();
   
+  var sendBufferData = function(buffer, data) {
+    var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + data.samples.length * 4);
+    var int16 = new Uint16Array(uint8.buffer);
+    var int32 = new Uint32Array(uint8.buffer);
+    var f32   = new Float32Array(uint8.buffer);
+    int16[0] = C.BINARY_CMD_SET_BUFFER;
+    int16[1] = buffer.bufnum;
+    int16[3] = data.channels;
+    int32[2] = data.sampleRate;
+    int32[3] = data.frames;
+    f32.set(data.samples, 4);
+    cc.lang.sendToServer(uint8);
+  };
+  
   cc.global.Buffer = fn(function(numFrames, numChannels, source) {
     if (Array.isArray(numFrames)) {
       numFrames = new Float32Array(numFrames);
     }
     if (numFrames instanceof Float32Array) {
       source = {
-        sampleRate : cc.lang.sampleRate,
-        numChannels: 1,
-        numFrames  : numFrames.length,
-        samples    : numFrames
+        sampleRate: cc.lang.sampleRate,
+        channels  : 1,
+        frames    : numFrames.length,
+        samples   : numFrames
       };
-      numFrames   = source.numFrames;
-      numChannels = source.numChannels;
+      numFrames   = source.frames;
+      numChannels = source.channels;
     }
     var buffer = new Buffer(numFrames, numChannels);
     if (source) {
-      new BufferSource(source).bind(buffer, 0, -1);
+      sendBufferData(buffer, source);
     }
     return buffer;
   }).defaults("numFrames=0,numChannels=1,source").build();
@@ -187,19 +191,52 @@ define(function(require, exports, module) {
     if (typeof path !== "string") {
       throw new TypeError("Buffer.Read: path should be a string.");
     }
-    var bufSrc = BufferSource.get(path);
     var buffer = new Buffer();
-    if (bufSrc) {
-      bufSrc.bind(buffer, startFrame, numFrames);
-    } else {
-      cc.lang.requestBuffer(path, function(result) {
-        if (result) {
-          buffer.sampleRate = result.sampleRate;
-          buffer.path       = path;
-          new BufferSource(result, path).bind(buffer, startFrame, numFrames);
+    cc.lang.requestBuffer(path, function(binary) {
+      var channels   = (binary[7] << 8) + binary[6];
+      var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
+      var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
+      var samples    = new Float32Array(binary.buffer, C.SET_BUFFER_HEADER_SIZE);
+      
+      var data = {
+        sampleRate: sampleRate,
+        channels  : channels,
+        frames    : frames,
+        samples   : samples
+      };
+      
+      buffer.sampleRate = data.sampleRate;
+      buffer.path       = path;
+      
+      samples    = data.samples;
+      startFrame = Math.max( 0, Math.min(startFrame|0, data.frames));
+      numFrames  = Math.max(-1, Math.min(numFrames |0, data.frames - startFrame));
+      var numChannels = data.channels;
+      
+      if (startFrame === 0) {
+        if (numFrames !== -1) {
+          data.samples   = new Float32Array(
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE, numFrames * numChannels
+          );
+          buffer.frames = numFrames;
+          data.frames   = numFrames;
         }
-      });
-    }
+      } else {
+        if (numFrames === -1) {
+          data.samples = new Float32Array(
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE + startFrame * numChannels * 4
+          );
+          buffer.frames = data.samples.length / numChannels;
+        } else {
+          data.samples = new Float32Array(
+            samples.buffer, C.SET_BUFFER_HEADER_SIZE + startFrame * numChannels * 4, numFrames * numChannels
+          );
+          buffer.frames = numFrames;
+        }
+        data.frames = buffer.frames;
+      }
+      sendBufferData(buffer, data);
+    });
     return buffer;
   }).defaults("path,startFrame=0,numFrames=-1").build();
   
@@ -207,13 +244,8 @@ define(function(require, exports, module) {
     return obj instanceof Buffer;
   };
   
-  cc.resetBuffer = function() {
-    BufferSource.reset();
-  };
-  
   module.exports = {
-    BufferSource: BufferSource,
-    Buffer      : Buffer
+    Buffer: Buffer
   };
 
 });

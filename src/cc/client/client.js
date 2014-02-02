@@ -87,7 +87,7 @@ define(function(require, exports, module) {
   })();
 
   var SynthClientImpl = (function() {
-    function SynthClientImpl(exports, opts) {
+    function SynthClientImpl(client, opts) {
       emitter.mixin(this);
       
       this.compiler = cc.createCompiler("coffee");
@@ -95,7 +95,7 @@ define(function(require, exports, module) {
       this.isPlaying = false;
       this.execId = 0;
       this.execCallbacks = {};
-
+      
       this.sampleRate = 44100;
       this.channels   = 2;
       this.api = cc.createAudioAPI(this, opts);
@@ -320,6 +320,11 @@ define(function(require, exports, module) {
         this.lang.postMessage(msg);
       }
     };
+    SynthClientImpl.prototype.sendToLangWithTransferable = function(uint8) {
+      if (this.lang) {
+        this.lang.postMessage(uint8, [uint8.buffer]);
+      }
+    };
     SynthClientImpl.prototype.recvFromLang = function(msg) {
       if (msg instanceof Float32Array) {
         this.strmList[this.strmListWriteIndex & C.STRM_LIST_MASK] = msg;
@@ -402,10 +407,20 @@ define(function(require, exports, module) {
   };
   commands["/buffer/request"] = function(msg) {
     var that = this;
-    var requestId = msg[2];
-    this.readAudioFile(msg[1], function(err, buffer) {
+    var callbackId = msg[2];
+    this.readAudioFile(msg[1], function(err, result) {
       if (!err) {
-        that.sendToLang(["/buffer/response", buffer, requestId]);
+        var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + result.samples.length * 4);
+        var int16 = new Uint16Array(uint8.buffer);
+        var int32 = new Uint32Array(uint8.buffer);
+        var f32   = new Float32Array(uint8.buffer);
+        int16[0] = C.BINARY_CMD_SET_BUFFER;
+        int16[1] = callbackId;
+        int16[3] = result.channels;
+        int32[2] = result.sampleRate;
+        int32[3] = result.frames;
+        f32.set(result.samples, 4);
+        that.sendToLangWithTransferable(uint8);
       }
     });
   };
@@ -424,8 +439,8 @@ define(function(require, exports, module) {
   cc.createSynthClient = function(opts) {
     return new SynthClient(opts);
   };
-  cc.createSynthClientImpl = function(exports, opts) {
-    return new SynthClientImpl(exports, opts);
+  cc.createSynthClientImpl = function(client, opts) {
+    return new SynthClientImpl(client, opts);
   };
   
   // TODO: moved

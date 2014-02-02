@@ -74,7 +74,7 @@ define(function(require, exports, module) {
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a];
-      this.numOfInputs = 1;
+      this.numInputs = 1;
       return this;
     };
     
@@ -155,7 +155,7 @@ define(function(require, exports, module) {
       this.selector = selector;
       this.specialIndex = index;
       this.inputs = [a, b];
-      this.numOfInputs = 2;
+      this.numInputs = 2;
       return this;
     };
     
@@ -369,6 +369,33 @@ define(function(require, exports, module) {
   
   cc.ugen.specs.Out = {
     Klass: cc.Out,
+    $ar: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.multiNewList([C.AUDIO, bus].concat(channelsArray));
+        return 0; // Out has no output
+      }
+    },
+    $kr: {
+      defaults: "bus=0,channelsArray=0",
+      ctor: function(bus, channelsArray) {
+        this.multiNewList([C.CONTROL, bus].concat(channelsArray));
+        return 0; // Out has no output
+      }
+    }
+  };
+  
+  var ReplaceOut = (function() {
+    function ReplaceOut() {
+      cc.UGen.call(this, "ReplaceOut");
+    }
+    extend(ReplaceOut, cc.Out);
+    
+    return ReplaceOut;
+  })();
+  
+  cc.ugen.specs.ReplaceOut = {
+    Klass: ReplaceOut,
     $ar: {
       defaults: "bus=0,channelsArray=0",
       ctor: function(bus, channelsArray) {

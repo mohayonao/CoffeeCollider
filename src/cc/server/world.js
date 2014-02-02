@@ -6,8 +6,8 @@ define(function(require, exports, module) {
   
   var commands = {};
   
-  var Instance = (function() {
-    function Instance(userId) {
+  var World = (function() {
+    function World(userId) {
       this.userId  = userId|0;
       this.bus      = new Float32Array(cc.server.busClear);
       this.busClear = cc.server.busClear;
@@ -20,23 +20,18 @@ define(function(require, exports, module) {
       this.nodes   = { 0:this.rootNode };
       this.fixNums = {};
       this.defs    = {};
-      this.buffers = {};
+      this.buffers = [];
       this.bufSrc  = {};
       this.syncItems     = new Uint8Array(C.SYNC_ITEM_LEN);
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
     }
-    Instance.prototype.play = function() {
-      this.rootNode.running = true;
+    World.prototype.run = function(flag) {
+      this.rootNode.run(flag);
       this.bus.set(this.busClear);
       this.timeline = [];
     };
-    Instance.prototype.pause = function() {
-      this.rootNode.running = false;
-      this.bus.set(this.busClear);
-      this.timeline = [];
-    };
-    Instance.prototype.reset = function() {
+    World.prototype.reset = function() {
       this.bus.set(this.busClear);
       this.timeline = [];
       this.rootNode = cc.createServerRootNode(this);
@@ -46,25 +41,25 @@ define(function(require, exports, module) {
       this.buffers = {};
       this.bufSrc  = {};
     };
-    Instance.prototype.isRunning = function() {
+    World.prototype.isRunning = function() {
       return this.rootNode.running;
     };
-    Instance.prototype.pushToTimeline = function(timeline) {
+    World.prototype.pushToTimeline = function(timeline) {
       push.apply(this.timeline, timeline);
     };
-    Instance.prototype.doBinayCommand = function(binary) {
+    World.prototype.doBinayCommand = function(binary) {
       var func  = commands[(binary[1] << 8) + binary[0]];
       if (func) {
         func(this, binary);
       }
     };
-    Instance.prototype.getFixNum = function(value) {
+    World.prototype.getFixNum = function(value) {
       var fixNums = this.fixNums;
       return fixNums[value] || (fixNums[value] = {
         outputs: [ new Float32Array([value]) ]
       });
     };
-    Instance.prototype.process = function(bufLength) {
+    World.prototype.process = function(bufLength) {
       var timeline = this.timeline;
       var args, func;
       
@@ -79,138 +74,146 @@ define(function(require, exports, module) {
       this.rootNode.process(bufLength, this);
     };
     
-    return Instance;
+    return World;
   })();
   
-  commands["/n_run"] = function(instance, args) {
+  commands["/n_run"] = function(world, args) {
     var nodeId = args[1]|0;
     var flag   = !!args[2];
-    var target = instance.nodes[nodeId];
+    var target = world.nodes[nodeId];
     if (target) {
-      target.running = flag;
+      target.run(flag);
     }
   };
-  commands["/n_free"] = function(instance, args) {
+  commands["/n_free"] = function(world, args) {
     var nodeId = args[1]|0;
-    var target = instance.nodes[nodeId];
+    var target = world.nodes[nodeId];
     if (target) {
       target.doneAction(2);
     }
   };
-  commands["/n_set"] = function(instance, args) {
+  commands["/n_set"] = function(world, args) {
     var nodeId = args[1]|0;
     var controls = args[2];
-    var target = instance.nodes[nodeId];
+    var target = world.nodes[nodeId];
     if (target) {
       target.set(controls);
     }
   };
-  commands["/g_new"] = function(instance, args) {
+  commands["/g_new"] = function(world, args) {
     var nodeId       = args[1]|0;
     var addAction    = args[2]|0;
     var targetNodeId = args[3]|0;
-    var target = instance.nodes[targetNodeId];
+    var target = world.nodes[targetNodeId];
     if (target) {
-      instance.nodes[nodeId] = cc.createServerGroup(nodeId, target, addAction, instance);
+      world.nodes[nodeId] = cc.createServerGroup(world, nodeId, target, addAction);
     }
   };
-  commands["/s_def"] = function(instance, args) {
+  commands["/s_def"] = function(world, args) {
     var defId = args[1]|0;
     var specs = args[2];
-    instance.defs[defId] = specs;
+    world.defs[defId] = specs;
   };
-  commands["/s_new"] = function(instance, args) {
+  commands["/s_new"] = function(world, args) {
     var nodeId       = args[1]|0;
     var addAction    = args[2]|0;
     var targetNodeId = args[3]|0;
     var defId        = args[4]|0;
     var controls     = args[5];
-    var target = instance.nodes[targetNodeId];
+    var target = world.nodes[targetNodeId];
     if (target) {
-      instance.nodes[nodeId] = cc.createServerSynth(nodeId, target, addAction, defId, controls, instance);
+      world.nodes[nodeId] = cc.createServerSynth(world, nodeId, target, addAction, defId, controls);
     }
   };
-  commands["/b_new"] = function(instance, args) {
+  commands["/b_new"] = function(world, args) {
     var bufnum   = args[1]|0;
     var frames   = args[2]|0;
     var channels = args[3]|0;
-    instance.buffers[bufnum] = cc.createServerBuffer(bufnum, frames, channels);
+    world.buffers[bufnum] = cc.createServerBuffer(world, bufnum, frames, channels);
   };
-  commands["/b_bind"] = function(instance, args) {
-    var bufnum     = args[1]|0;
-    var bufSrcId   = args[2]|0;
-    var startFrame = args[3]|0;
-    var frames     = args[4]|0;
-    var buffer = instance.buffers[bufnum];
-    var bufSrc = instance.bufSrc[bufSrcId];
-    if (buffer) {
-      if (bufSrc) {
-        buffer.bindBufferSource(bufSrc, startFrame, frames);
-      } else {
-        bufSrc = cc.createServerBufferSource(bufSrcId);
-        bufSrc.pendings.push([buffer, startFrame, frames]);
-        instance.bufSrc[bufSrcId] = bufSrc;
-      }
-    }
-  };
-  commands["/b_free"] = function(instance, args) {
+  commands["/b_free"] = function(world, args) {
     var bufnum = args[1]|0;
-    delete instance.buffers[bufnum];
+    world.buffers[bufnum] = null;
   };
-  commands["/b_zero"] = function(instance, args) {
+  commands["/b_zero"] = function(world, args) {
     var bufnum = args[1]|0;
-    var buffer = instance.buffers[bufnum];
+    var buffer = world.buffers[bufnum];
     if (buffer) {
       buffer.zero();
     }
   };
-  commands["/b_set"] = function(instance, args) {
+  commands["/b_set"] = function(world, args) {
     var bufnum = args[1]|0;
     var params = args[2];
-    var buffer = instance.buffers[bufnum];
+    var buffer = world.buffers[bufnum];
     if (buffer) {
       buffer.set(params);
     }
   };
-  commands["/b_gen"] = function(instance, args) {
+  commands["/b_get"] = function(world, args) {
+    var bufnum = args[1]|0;
+    var index  = args[2]|0;
+    var callbackId = args[3]|0;
+    var buffer = world.buffers[bufnum];
+    if (buffer) {
+      buffer.get(index, callbackId);
+    }
+  };
+  commands["/b_getn"] = function(world, args) {
+    var bufnum = args[1]|0;
+    var index  = args[2]|0;
+    var count  = args[3]|0;
+    var callbackId = args[4]|0;
+    var buffer = world.buffers[bufnum];
+    if (buffer) {
+      buffer.getn(index, count, callbackId);
+    }
+  };
+  commands["/b_fill"] = function(world, args) {
+    var bufnum = args[1]|0;
+    var params = args[2];
+    var buffer = world.buffers[bufnum];
+    if (buffer) {
+      buffer.fill(params);
+    }
+  };
+  commands["/b_gen"] = function(world, args) {
     var bufnum = args[1]|0;
     var cmd    = args[2];
     var flag   = args[3]|0;
     var params = args.slice(4);
-    var buffer = instance.buffers[bufnum];
+    var buffer = world.buffers[bufnum];
     if (buffer) {
       buffer.gen(cmd, flag, params);
     }
   };
   
-  commands[C.BINARY_CMD_SET_SYNC] = function(instance, binary) {
-    instance.syncItems.set(binary);
+  commands[C.BINARY_CMD_SET_SYNC] = function(world, binary) {
+    world.syncItems.set(binary);
     var server    = cc.server;
     var syncCount = new Uint32Array(binary.buffer)[C.SYNC_COUNT];
     if (server.sysSyncCount < syncCount) {
       server.sysSyncCount = syncCount;
     }
   };
-  commands[C.BINARY_CMD_SET_BUFSRC] = function(instance, binary) {
-    var bufSrcId = (binary[3] << 8) + binary[2];
+  commands[C.BINARY_CMD_SET_BUFFER] = function(world, binary) {
+    var bufnum   = (binary[3] << 8) + binary[2];
     var channels = (binary[7] << 8) + binary[6];
     var sampleRate = (binary[11] << 24) + (binary[10] << 16) + (binary[ 9] << 8) + binary[ 8];
     var frames     = (binary[15] << 24) + (binary[14] << 16) + (binary[13] << 8) + binary[12];
-    var samples = new Float32Array(binary.buffer, C.BUFSRC_HEADER_SIZE);
-    var bufSrc = instance.bufSrc[bufSrcId];
-    if (!bufSrc) {
-      bufSrc = cc.createServerBufferSource(bufSrcId);
+    var samples = new Float32Array(binary.buffer, C.SET_BUFFER_HEADER_SIZE);
+    var buffer  = world.buffers[bufnum];
+    if (buffer) {
+      buffer.bind(sampleRate, channels, frames, samples);
     }
-    bufSrc.set(channels, sampleRate, frames, samples);
-    instance.bufSrc[bufSrcId] = bufSrc;
   };
   
-  cc.createInstance = function(userId) {
-    return new Instance(userId);
+  cc.createWorld = function(userId) {
+    return new World(userId);
   };
   
   module.exports = {
-    Instance: Instance,
+    World   : World,
     commands: commands
   };
 

@@ -65,7 +65,7 @@ define(function(require, exports, module) {
       this.process = next;
       this._prevtrig  = 0;
       this._prevreset = 0;
-      this._prevout   = new Float32Array(this.numOfOutputs);
+      this._prevout   = new Float32Array(this.numOutputs);
     };
     var next = function(inNumSamples) {
       var outputs = this.outputs;
@@ -76,19 +76,19 @@ define(function(require, exports, module) {
       var prevtrig  = this._prevtrig;
       var prevreset = this._prevreset;
       var ztrig, zreset, x;
-      var numOfInputs = this.numOfInputs;
+      var numInputs = this.numInputs;
       var j, k;
       
       for (var i = 0; i < inNumSamples; ++i) {
         ztrig  = trigIn[i];
         zreset = resetIn[i];
         if (zreset > 0 && prevreset <= 0) {
-          for (j = 2; j < numOfInputs; ++j) {
+          for (j = 2; j < numInputs; ++j) {
             resetDemandInput(this, j);
           }
         }
         if (ztrig > 0 && prevtrig <= 0) {
-          for (j = 2, k = 0; j < numOfInputs; ++j) {
+          for (j = 2, k = 0; j < numInputs; ++j) {
             x = inputDemandA(this, j, i + 1);
             if (isNaN(x)) {
               x = prevout[k];
@@ -99,7 +99,7 @@ define(function(require, exports, module) {
             outputs[k][i] = x;
           }
         } else {
-          for (j = 2, k = 0; j < numOfInputs; ++j) {
+          for (j = 2, k = 0; j < numInputs; ++j) {
             outputs[k][i] = prevout[k];
           }
         }
@@ -316,7 +316,7 @@ define(function(require, exports, module) {
           this._repeats = isNaN(x) ? 0 : Math.floor(x + 0.5);
         }
         while (true) {
-          if (this._index >= this.numOfInputs) {
+          if (this._index >= this.numInputs) {
             this._index = 1;
           }
           if (this._repeatCount >= this._repeats) {
@@ -373,7 +373,7 @@ define(function(require, exports, module) {
         }
         attempts = 0;
         while (true) {
-          if (this._index >= this.numOfInputs) {
+          if (this._index >= this.numInputs) {
             this._index = 1;
             this._repeatCount++;
           }
@@ -401,7 +401,7 @@ define(function(require, exports, module) {
             this._needToResetChild = true;
             return;
           }
-          if (attempts++ > this.numOfInputs) {
+          if (attempts++ > this.numInputs) {
             return;
           }
         }
@@ -420,7 +420,7 @@ define(function(require, exports, module) {
   cc.unit.specs.Dshuf = (function() {
     var ctor = function() {
       this.process = next;
-      var indices = new Array(this.numOfInputs - 1);
+      var indices = new Array(this.numInputs - 1);
       for (var i = 0, imax = indices.length; i < imax; ++i) {
         indices[i] = i + 1;
       }
@@ -440,7 +440,7 @@ define(function(require, exports, module) {
         }
         attempts = 0;
         while (true) {
-          if (this._index >= this.numOfInputs - 1) {
+          if (this._index >= this.numInputs - 1) {
             this._index = 0;
             this._repeatCount++;
           }
@@ -469,7 +469,7 @@ define(function(require, exports, module) {
             this._needToResetChild = true;
             return;
           }
-          if (attempts++ > this.numOfInputs) {
+          if (attempts++ > this.numInputs) {
             return;
           }
         }
@@ -511,7 +511,7 @@ define(function(require, exports, module) {
             }
             x = inputDemandA(this, this._index, inNumSamples);
             if (isNaN(x)) {
-              this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+              this._index = ((Math.random() * (this.numInputs-1))|0)+1;
               this._repeatCount++;
               this._needToResetChild = true;
             } else {
@@ -520,7 +520,7 @@ define(function(require, exports, module) {
             }
           } else {
             out[0] = this.inputs[this._index][0];
-            this._index = ((Math.random() * (this.numOfInputs-1))|0)+1;
+            this._index = ((Math.random() * (this.numInputs-1))|0)+1;
             this._repeatCount++;
             this._needToResetChild = true;
             return;

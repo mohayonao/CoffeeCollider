@@ -195,7 +195,7 @@ define(function(require, exports, module) {
       checker: function(statistics) {
         // console.log(statistics);
         assert.isFalse(statistics.hasNaN);
-        assert.isTrue(!!unitTestSuite.instance.nodes[1].end.called);
+        assert.isTrue(!!unitTestSuite.world.nodes[1].end.called);
       }
     },
     {
@@ -207,15 +207,15 @@ define(function(require, exports, module) {
       checker: function(statistics) {
         // console.log(statistics);
         assert.isFalse(statistics.hasNaN);
-        assert.isFalse(!!unitTestSuite.instance.nodes[1].end.called);
+        assert.isFalse(!!unitTestSuite.world.nodes[1].end.called);
       }
     },
   ], {
     before: function() {
-      unitTestSuite.instance = {
+      unitTestSuite.world = {
         nodes: [null, {
           end: function() {
-            unitTestSuite.instance.nodes[1].end.called = true;
+            unitTestSuite.world.nodes[1].end.called = true;
           }
         }]
       }
@@ -250,7 +250,7 @@ define(function(require, exports, module) {
       checker: function(statistics) {
         // console.log(statistics);
         assert.isFalse(statistics.hasNaN);
-        assert.isTrue(!!unitTestSuite.instance.nodes[1].run.state);
+        assert.isTrue(!!unitTestSuite.world.nodes[1].run.state);
       }
     },
     {
@@ -262,15 +262,15 @@ define(function(require, exports, module) {
       checker: function(statistics) {
         // console.log(statistics);
         assert.isFalse(statistics.hasNaN);
-        assert.isFalse(!!unitTestSuite.instance.nodes[1].run.state);
+        assert.isFalse(!!unitTestSuite.world.nodes[1].run.state);
       }
     },
   ], {
     before: function() {
-      unitTestSuite.instance = {
+      unitTestSuite.world = {
         nodes: [null, {
           run: function(state) {
-            unitTestSuite.instance.nodes[1].run.state = state;
+            unitTestSuite.world.nodes[1].run.state = state;
           }
         }]
       }

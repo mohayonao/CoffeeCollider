@@ -538,11 +538,31 @@ define(function(require, exports, module) {
           var path = null;
           instance.readAudioFile = function(_path, callback) {
             path = _path;
-            callback(null, "done");
+            callback(null, {
+              sampleRate: 44100,
+              channels  : 2,
+              frames    : 2,
+              samples   : new Float32Array([ 1, 2, 3, 4 ])
+            });
           };
           instance.recvFromLang(["/buffer/request", "/path/to/audio", 1]);
           assert.equal(path, "/path/to/audio");
-          assert.deepEqual(posted, [["/buffer/response", "done", 1]]);
+
+          var uint8 = new Uint8Array(C.SET_BUFFER_HEADER_SIZE + 4 * 4);
+          var int16 = new Uint16Array(uint8.buffer);
+          var int32 = new Uint32Array(uint8.buffer);
+          var f32   = new Float32Array(uint8.buffer);
+          int16[0] = C.BINARY_CMD_SET_BUFFER;
+          int16[1] = 1;
+          int16[3] = 2;
+          int32[2] = 44100;
+          int32[3] = 2;
+          f32[4] = 1;
+          f32[5] = 2;
+          f32[6] = 3;
+          f32[7] = 4;
+          
+          assert.deepEqual(posted, [uint8]);
         });
         it("/buffer/request (error)", function() {
           var path = null;

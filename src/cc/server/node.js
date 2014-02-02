@@ -4,320 +4,96 @@ define(function(require, exports, module) {
   var cc = require("./cc");
   var extend = require("../common/extend");
   
-  var graphFunc  = {};
-  var doneAction = {};
-  
-  graphFunc[C.ADD_TO_HEAD] = function(target, node) {
-    var prev;
-    if (target instanceof Group) {
-      if (target.head === null) {
-        target.head = target.tail = node;
-      } else {
-        prev = target.head.prev;
-        if (prev) {
-          prev.next = node;
-        }
-        node.next = target.head;
-        target.head.prev = node;
-        target.head = node;
-      }
-      node.parent = target;
-    }
-  };
-  graphFunc[C.ADD_TO_TAIL] = function(target, node) {
-    var next;
-    if (target instanceof Group) {
-      if (target.tail === null) {
-        target.head = target.tail = node;
-      } else {
-        next = target.tail.next;
-        if (next) {
-          next.prev = node;
-        }
-        node.prev = target.tail;
-        target.tail.next = node;
-        target.tail = node;
-      }
-      node.parent = target;
-    }
-  };
-  graphFunc[C.ADD_BEFORE] = function(target, node) {
-    var prev = target.prev;
-    target.prev = node;
-    node.prev = prev;
-    if (prev) {
-      prev.next = node;
-    }
-    node.next = target;
-    if (target.parent && target.parent.head === target) {
-      target.parent.head = node;
-    }
-    node.parent = target.parent;
-  };
-  graphFunc[C.ADD_AFTER] = function(target, node) {
-    var next = target.next;
-    target.next = node;
-    node.next = next;
-    if (next) {
-      next.prev = node;
-    }
-    node.prev = target;
-    if (target.parent && target.parent.tail === target) {
-      target.parent.tail = node;
-    }
-    node.parent = target.parent;
-  };
-  graphFunc[C.REPLACE] = function(target, node) {
-    node.next = target.next;
-    node.prev = target.prev;
-    node.head = target.head;
-    node.tail = target.tail;
-    node.parent = target.parent;
-    if (target.prev) {
-      target.prev.next = node;
-    }
-    if (target.next) {
-      target.next.prev = node;
-    }
-    if (target.parent && target.parent.head === target) {
-      target.parent.head = node;
-    }
-    if (target.parent && target.parent.tail === target) {
-      target.parent.tail = node;
-    }
-  };
-  
-  doneAction[0] = function() {
-    // do nothing when the UGen is finished
-  };
-  doneAction[1] = function() {
-    // pause the enclosing synth, but do not free it
-    this.running = false;
-  };
-  doneAction[2] = function() {
-    // free the enclosing synth
-    free.call(this);
-  };
-  doneAction[3] = function() {
-    // free both this synth and the preceding node
-    var prev = this.prev;
-    if (prev) {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[4] = function() {
-    // free both this synth and the following node
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      free.call(next);
-    }
-  };
-  doneAction[5] = function() {
-    // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
-    var prev = this.prev;
-    if (prev instanceof Group) {
-      g_freeAll(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[6] = function() {
-    // free this synth; if the following node is a group then do g_freeAll on it, else free it
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      g_freeAll(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[7] = function() {
-    // free this synth and all preceding nodes in this group
-    var next = this.parent.head;
-    if (next) {
-      var node = next;
-      while (node && node !== this) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-    free.call(this);
-  };
-  doneAction[8] = function() {
-    // free this synth and all following nodes in this group
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[9] = function() {
-    // free this synth and pause the preceding node
-    var prev = this.prev;
-    free.call(this);
-    if (prev) {
-      prev.running = false;
-    }
-  };
-  doneAction[10] = function() {
-    // free this synth and pause the following node
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      next.running = false;
-    }
-  };
-  doneAction[11] = function() {
-    // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
-    var prev = this.prev;
-    if (prev instanceof Group) {
-      g_deepFree(prev);
-    } else {
-      free.call(prev);
-    }
-    free.call(this);
-  };
-  doneAction[12] = function() {
-    // free this synth and if the following node is a group then do g_deepFree on it, else free it
-    var next = this.next;
-    free.call(this);
-    if (next) {
-      g_deepFree(next);
-    } else {
-      free.call(next);
-    }
-  };
-  doneAction[13] = function() {
-    // free this synth and all other nodes in this group (before and after)
-    var next = this.parent.head;
-    if (next) {
-      var node = next;
-      while (node) {
-        next = node.next;
-        free.call(node);
-        node = next;
-      }
-    }
-  };
-  doneAction[14] = function() {
-    // free the enclosing group and all nodes within it (including this synth)
-    g_deepFree(this);
-  };
-  var free = function() {
-    if (this.prev) {
-      this.prev.next = this.next;
-    }
-    if (this.next) {
-      this.next.prev = this.prev;
-    }
-    if (this.parent) {
-      if (this.parent.head === this) {
-        this.parent.head = this.next;
-      }
-      if (this.parent.tail === this) {
-        this.parent.tail = this.prev;
-      }
-
-      var userId;
-      if (this.instance) {
-        userId = this.instance.userId;
-      }
-    }
-    this.prev = null;
-    this.next = null;
-    this.parent = null;
-    this.blocking = false;
-    if (this.instance) {
-      delete this.instance.nodes[this.nodeId];
-    }
-  };
-  var g_freeAll = function(node) {
-    var next = node.head;
-    free.call(node);
-    node = next;
-    while (node) {
-      next = node.next;
-      free.call(node);
-      node = next;
-    }
-  };
-  var g_deepFree = function(node) {
-    var next = node.head;
-    free.call(node);
-    node = next;
-    while (node) {
-      next = node.next;
-      free.call(node);
-      if (node instanceof Group) {
-        g_deepFree(node);
-      }
-      node = next;
-    }
-  };
+  var graphFunc  = [];
+  var doneAction = [];
   
   var Node = (function() {
-    function Node(nodeId, instance) {
-      this.nodeId = nodeId|0;
-      this.next   = null;
-      this.prev   = null;
-      this.parent = null;
+    function Node(world, nodeId) {
+      this.world   = world;
+      this.nodeId  = nodeId|0;
+      this.next    = null;
+      this.prev    = null;
+      this.parent  = null;
       this.running = true;
-      this.instance = instance;
     }
-    Node.prototype.play = function() {
-      this.running = true;
+    
+    Node.prototype.run = function(inRun) {
+      this.running = !!inRun;
     };
-    Node.prototype.pause = function() {
+    
+    Node.prototype.end = function() {
+      if (this.nodeId !== 0) {
+        if (this.prev) {
+          this.prev.next = this.next;
+        }
+        if (this.next) {
+          this.next.prev = this.prev;
+        }
+        if (this.parent.head === this) {
+          this.parent.head = this.next;
+        }
+        if (this.parent.tail === this) {
+          this.parent.tail = this.prev;
+        }
+        this.prev   = null;
+        this.next   = null;
+        this.parent = null;
+        this.world.nodes[this.nodeId] = null;
+      }
       this.running = false;
     };
-    Node.prototype.stop = function() {
-      free.call(this);
-    };
-    Node.prototype.run = function(inRun) {
-      this.running = !!inRun; // TODO
-    };
-    Node.prototype.end = function() {
-      this.running = false; // TODO
-    };
+    
     Node.prototype.doneAction = function(action) {
       var func = doneAction[action];
       if (func) {
-        func.call(this);
-        var userId;
-        if (this.instance) {
-          userId = this.instance.userId;
-        }
+        func(this);
       }
     };
+    
     return Node;
   })();
-
+  
   var Group = (function() {
-    function Group(nodeId, target, addAction, instance) {
-      Node.call(this, nodeId, instance);
+    function Group(world, nodeId, target, addAction) {
+      Node.call(this, world, nodeId);
       this.head = null;
       this.tail = null;
       if (target) {
-        graphFunc[addAction](target, this);
+        graphFunc[addAction](this, target);
       }
     }
     extend(Group, Node);
+
+    Group.prototype.endAll = function() {
+      var next, node = this.head;
+      while (node) {
+        next = node.next;
+        node.end();
+        node = next;
+      }
+      this.end();
+    };
+
+    Group.prototype.endDeep = function() {
+      var next, node = this.head;
+      while (node) {
+        next = node.next;
+        if (node instanceof Group) {
+          node.endDeep();
+        } else {
+          node.end();
+        }
+        node = next;
+      }
+      this.end();
+    };
     
-    Group.prototype.process = function(inNumSamples, instance) {
+    Group.prototype.process = function(inNumSamples) {
       if (this.head && this.running) {
-        this.head.process(inNumSamples, instance);
+        this.head.process(inNumSamples);
       }
       if (this.next) {
-        this.next.process(inNumSamples, instance);
+        this.next.process(inNumSamples);
       }
     };
     
@@ -325,108 +101,317 @@ define(function(require, exports, module) {
   })();
 
   var Synth = (function() {
-    function Synth(nodeId, target, addAction, defId, controls, instance) {
-      Node.call(this, nodeId, instance);
-      if (instance) {
-        var specs = instance.defs[defId];
-        if (specs) {
-          this.build(specs, controls, instance);
-        }
+    function Synth(world, nodeId, target, addAction, defId, controls) {
+      Node.call(this, world, nodeId);
+      var specs = world.defs[defId];
+      if (specs) {
+        this.build(specs, controls);
       }
       if (target) {
-        graphFunc[addAction](target, this);
+        graphFunc[addAction](this, target);
       }
     }
     extend(Synth, Node);
     
-    Synth.prototype.build = function(specs, controls, instance) {
-      this.specs = specs;
-      var list, value, unit, i, imax;
-      var fixNumList, unitList, filteredUnitList;
+    Synth.prototype.build = function(specs, controls) {
+      var list, fixNumList, unitList = [];
+      var world = this.world;
+      var heap = new Float32Array(specs.heapSize);
+      var unit, inputs, inRates, fromUnits, inSpec;
+      var i, imax, j, jmax, k, u, x1, x2;
+      
+      this.specs  = specs;
+      this.params = specs.params;
+      
+      this.heap      = heap;
+      this.heapIndex = this.params.values.length;
+      heap.set(this.params.values);
+      
+      this.controls = heap;
+      this.set(controls);
+      
       list = specs.consts;
       fixNumList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
-        value = list[i];
-        fixNumList[i] = instance.getFixNum(value);
+        fixNumList[i] = world.getFixNum(list[i]);
       }
+      
       list = specs.defList;
-      unitList = new Array(list.length);
       for (i = 0, imax = list.length; i < imax; ++i) {
-        unitList[i] = cc.createUnit(this, list[i]);
-      }
-      
-      this.params   = specs.params;
-      this.controls = new Float32Array(this.params.values);
-      this.set(controls);
-      
-      this.unitList = filteredUnitList = [];
-      for (i = 0, imax = unitList.length; i < imax; ++i) {
-        unit = unitList[i];
-        var inputs    = unit.inputs;
-        var inRates   = unit.inRates;
-        var fromUnits = unit.fromUnits;
-        var inSpec  = unit.specs[3];
-        for (var j = 0, jmax = inputs.length; j < jmax; ++j) {
-          var j2 = j << 1;
-          if (inSpec[j2] === -1) {
-            inputs[j]  = fixNumList[inSpec[j2+1]].outputs[0];
+        unit      = cc.createUnit(this, list[i]);
+        inputs    = unit.inputs;
+        inRates   = unit.inRates;
+        fromUnits = unit.fromUnits;
+        inSpec    = unit.specs[3];
+        for (j = k = 0, jmax = inputs.length; j < jmax; ++j) {
+          x1 = inSpec[k++];
+          x2 = inSpec[k++];
+          if (x1 === -1) {
+            inputs[j]  = fixNumList[x2].outputs[0];
             inRates[j] = C.SCALAR;
           } else {
-            inputs[j]    = unitList[inSpec[j2]].outputs[inSpec[j2+1]];
-            inRates[j]   = unitList[inSpec[j2]].outRates[inSpec[j2+1]];
-            fromUnits[j] = unitList[inSpec[j2]];
+            u = unitList[x1];
+            inputs[j]    = u.outputs[x2];
+            inRates[j]   = u.outRates[x2];
+            fromUnits[j] = u;
           }
         }
         unit.init();
-        if (unit.process) {
-          filteredUnitList.push(unit);
+        if (unit.process && unit.rate !== C.DEMAND) {
+          unitList.push(unit);
         }
       }
+      this.unitList = unitList;
+      
       return this;
     };
-
-    Synth.prototype.set = function(controls) {
-      for (var i = 0, imax = controls.length; i < imax; i += 2) {
-        var index = controls[i    ];
-        var value = controls[i + 1];
-        this.controls[index] = value;
+    
+    Synth.prototype.set = function(params) {
+      var controls = this.controls;
+      for (var i = 0, imax = params.length; i < imax; i += 2) {
+        controls[params[i]] = params[i + 1];
       }
     };
     
-    Synth.prototype.process = function(inNumSamples, instance) {
-      if (this.running && this.unitList) {
+    Synth.prototype.process = function(inNumSamples) {
+      if (this.running) {
         var unitList = this.unitList;
         for (var i = 0, imax = unitList.length; i < imax; ++i) {
           var unit = unitList[i];
-          if (unit.calcRate !== C.DEMAND) {
-            unit.process(unit.rate.bufLength, instance);
-          }
+          unit.process(unit.rate.bufLength);
         }
       }
       if (this.next) {
-        this.next.process(inNumSamples, instance);
+        this.next.process(inNumSamples);
       }
     };
     
     return Synth;
   })();
   
-  cc.createServerRootNode = function(instance) {
-    return new Group(0, 0, 0, instance);
+  graphFunc[C.ADD_TO_HEAD] = function(child, addThisOne) {
+    if (child.nodeId !== 0 && addThisOne instanceof Group) {
+      child.prev = null;
+      child.next = addThisOne.head;
+      if (addThisOne.head) {
+        addThisOne.head.prev = child;
+        addThisOne.head = child;
+      } else {
+        addThisOne.head = addThisOne.tail = child;
+      }
+      child.parent = addThisOne;
+    }
+  };
+  graphFunc[C.ADD_TO_TAIL] = function(child, addThisOne) {
+    if (child.nodeId !== 0 && addThisOne instanceof Group) {
+      child.prev = addThisOne.tail;
+      child.next = null;
+      if (addThisOne.tail) {
+        addThisOne.tail.next = child;
+        addThisOne.tail = child;
+      } else {
+        addThisOne.head = addThisOne.tail = child;
+      }
+      child.parent = addThisOne;
+    }
+  };
+  graphFunc[C.ADD_BEFORE] = function(node, beforeThisOne) {
+    if (node.nodeId !== 0 && beforeThisOne.parent) {
+      node.parent = beforeThisOne.parent;
+      node.prev = beforeThisOne.prev;
+      node.next = beforeThisOne;
+      
+      if (beforeThisOne.prev) {
+        beforeThisOne.prev.next = node;
+      } else {
+        node.parent.head = node;
+      }
+      beforeThisOne.prev = node;
+    }
+  };
+  graphFunc[C.ADD_AFTER] = function(node, afterThisOne) {
+    if (node.nodeId !== 0 && afterThisOne.parent) {
+      node.parent = afterThisOne.parent;
+      node.prev = afterThisOne;
+      node.next = afterThisOne.next;
+      
+      if (afterThisOne.next) {
+        afterThisOne.next.prev = node;
+      } else {
+        node.parent.tail = node;
+      }
+      afterThisOne.next = node;
+    }
+  };
+  graphFunc[C.REPLACE] = function(node, replaceThisOne) {
+    if (node.node !== 0 && replaceThisOne.parent) {
+      var parent = node.parent = replaceThisOne.parent;
+      node.prev = replaceThisOne.prev;
+      node.next = replaceThisOne.next;
+      
+      if (node instanceof Group) {
+        node.head = replaceThisOne.head;
+        node.tail = replaceThisOne.tail;
+      }
+      
+      if (replaceThisOne.prev) {
+        replaceThisOne.prev.next = node;
+      }
+      if (replaceThisOne.next) {
+        replaceThisOne.next.prev = node;
+      }
+      if (parent.head === replaceThisOne) {
+        parent.head = node;
+      }
+      if (parent.tail === replaceThisOne) {
+        parent.tail = node;
+      }
+    }
+  };
+  
+  // do nothing when the UGen is finished
+  doneAction[0] = null;
+  
+  // pause the enclosing synth, but do not free it
+  doneAction[1] = function(node) {
+    node.running = false;
+  };
+  
+  // free the enclosing synth
+  doneAction[2] = function(node) {
+    node.end();
   };
 
-  cc.createServerGroup = function(nodeId, target, addAction, instance) {
-    return new Group(nodeId, target, addAction, instance);
+  // free both this synth and the preceding node
+  doneAction[3] = function(node) {
+    if (node.prev) {
+      node.prev.end();
+    }
+    node.end();
   };
 
-  cc.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
-    return new Synth(nodeId, target, addAction, defId, controls, instance);
+  // free both this synth and the following node
+  doneAction[4] = function(node) {
+    if (node.next) {
+      node.next.end();
+    }
+    node.end();
+  };
+  
+  // free this synth; if the preceding node is a group then do g_freeAll on it, else free it
+  doneAction[5] = function(node) {
+    var prev = node.prev;
+    if (prev instanceof Group) {
+      prev.endAll();
+    } else if (prev) {
+      prev.end();
+    }
+    node.end();
+  };
+  
+  // free this synth; if the following node is a group then do g_freeAll on it, else free it
+  doneAction[6] = function(node) {
+    var next = node.next;
+    node.end();
+    if (next instanceof Group) {
+      next.endAll();
+    } else if (next) {
+      next.end();
+    }
+  };
+
+  // free this synth and all preceding nodes in this group
+  doneAction[7] = function(node) {
+    var prev;
+    while (node) {
+      prev = node.prev;
+      node.end();
+      node = prev;
+    }
+  };
+  
+  // free this synth and all following nodes in this group
+  doneAction[8] = function(node) {
+    var next;
+    while (node) {
+      next = node.next;
+      node.end();
+      node = next;
+    }
+  };
+  
+  // free this synth and pause the preceding node
+  doneAction[9] = function(node) {
+    if (node.prev) {
+      node.prev.running = false;
+    }
+    node.end();
+  };
+  
+  // free this synth and pause the following node
+  doneAction[10] = function(node) {
+    if (node.next) {
+      node.next.running = false;
+    }
+    node.end();
+  };
+  
+  // free this synth and if the preceding node is a group then do g_deepFree on it, else free it
+  doneAction[11] = function(node) {
+    var prev = node.prev;
+    if (prev instanceof Group) {
+      prev.endDeep();
+    } else if (prev) {
+      prev.end();
+    }
+    node.end();
+  };
+
+  // free this synth and if the following node is a group then do g_deepFree on it, else free it
+  doneAction[12] = function(node) {
+    var next = node.next;
+    if (next instanceof Group) {
+      next.endDeep();
+    } else if (next) {
+      next.end();
+    }
+    node.end();
+  };
+  
+  // free this synth and all other nodes in this group (before and after)
+  doneAction[13] = function(node) {
+    var next;
+    node = node.parent.head;
+    while (node) {
+      next = node.next;
+      node.end();
+      node = next;
+    }
+  };
+  
+  // free the enclosing group and all nodes within it (including this synth)
+  doneAction[14] = function(node) {
+    node.parent.endDeep();
+  };
+  
+  
+  cc.createServerRootNode = function(world) {
+    return new Group(world, 0, 0, 0);
+  };
+
+  cc.createServerGroup = function(world, nodeId, target, addAction) {
+    return new Group(world, nodeId, target, addAction);
+  };
+
+  cc.createServerSynth = function(world, nodeId, target, addAction, defId, controls) {
+    return new Synth(world, nodeId, target, addAction, defId, controls);
   };
   
   module.exports = {
     Node : Node,
     Group: Group,
-    Synth: Synth
+    Synth: Synth,
+    graphFunc: graphFunc
   };
 
 });

@@ -233,35 +233,39 @@ define(function(require, exports, module) {
       };
     };
     testSuite.audio = function() {
-      var instance = new cc.UGen("Audio");
-      instance.rate = C.AUDIO;
+      var ugen = new cc.UGen("Audio");
+      ugen.rate = C.AUDIO;
       this.inputs   = [ 1 ];
-      return instance;
+      return ugen;
     };
     testSuite.control = function() {
-      var instance = new cc.UGen("Control");
-      instance.rate = C.CONTROL;
+      var ugen = new cc.UGen("Control");
+      ugen.rate = C.CONTROL;
       this.inputs   = [ 2 ];
-      return instance;
+      return ugen;
     };
     testSuite.scalar = function() {
-      var instance = new cc.UGen("Scalar");
-      instance.rate = C.SCALAR;
+      var ugen = new cc.UGen("Scalar");
+      ugen.rate = C.SCALAR;
       this.inputs   = [ 3 ];
-      return instance;
+      return ugen;
     };
     testSuite.demand = function() {
-      var instance = new cc.UGen("Demand");
-      instance.rate = C.DEMAND;
+      var ugen = new cc.UGen("Demand");
+      ugen.rate = C.DEMAND;
       this.inputs   = [ 4 ];
-      return instance;
+      return ugen;
     };
     return testSuite;
   })();
+
+  var heap = new Float32Array(1024 * 32);
   
   var unitTestSuite = (function() {
     var parent = {
-      controls:new Float32Array(16)
+      heap     : heap,
+      heapIndex: 0,
+      controls : new Float32Array(16)
     };
     parent.doneAction = function(action) {
       parent.doneAction.action = action;
@@ -341,7 +345,7 @@ define(function(require, exports, module) {
       opts = opts || {};
       
       var test = function(items) {
-        testSuite.instance = {};
+        testSuite.world = {};
 
         if (opts.before) beforeEach(opts.before);
         if (opts.after ) afterEach (opts.after );
@@ -404,7 +408,7 @@ define(function(require, exports, module) {
     var unitTest = function(spec, inputSpecs, checker, opts) {
       opts = opts || {};
 
-      var bufLength = opts.bufLength || 16384;
+      var bufLength = opts.bufLength || 4096;
       var saved_rate = mock.server.rates[C.AUDIO];
       
       mock.server.rates[C.AUDIO] = {
@@ -425,10 +429,12 @@ define(function(require, exports, module) {
       }
       
       var i, imax, j;
+      parent.heapIndex = 0;
       var unit = cc.createUnit(parent, spec);
       var imax = Math.ceil(unit.rate.sampleRate / unit.rate.bufLength);
+      unit.world = testSuite.world;
       
-      for (i = 0; i < unit.numOfInputs; ++i) {
+      for (i = 0; i < unit.numInputs; ++i) {
         unit.inRates[i] = inputSpecs[i].rate;
         switch (unit.inRates[i]) {
         case C.AUDIO:
@@ -473,26 +479,26 @@ define(function(require, exports, module) {
       var begin, end;
       for (i = 0; i < imax; ++i) {
         statistics.process += 1;
-        for (j = unit.numOfInputs; j--; ) {
+        for (j = unit.numInputs; j--; ) {
           if (inputSpecs[j].rate !== C.SCALAR) {
             unit.inputs[j].setScalar(0);
             inputSpecs[j].process.call(inputSpecs[j], unit.inputs[j], i, imax);
           }
         }
         if (unit.process) {
-          for (j = unit.allOutputs.length; j--; ) {
-            unit.allOutputs[j] = NaN;
+          for (j = unit.heap.length; j--; ) {
+            unit.heap[j] = NaN;
           }
           if (opts.preProcess) {
             opts.preProcess.call(unit, i, imax);
           }
           begin = Date.now();
-          unit.process(unit.rate.bufLength, testSuite.instance);
+          unit.process(unit.rate.bufLength, testSuite.world);
           end   = Date.now();
           statistics.time += end - begin;
         }
-        for (j = unit.allOutputs.length; j--; ) {
-          var x = unit.allOutputs[j];
+        for (j = unit.heap.length; j--; ) {
+          var x = unit.heap[j];
           statistics.samples += 1;
           if (isNaN(x)) {
             statistics.hasNaN = true;
@@ -623,25 +629,36 @@ define(function(require, exports, module) {
     sendToClient: function(cmd) {
       cc.lang.sendToClient.result.push(cmd);
     },
+    setCallback: function(action) {
+      cc.lang.setCallback.result = action;
+      return 1000;
+    },
     requestBuffer: function(path, callback) {
       callback({
-        samples    : new Float32Array([0, 1, 2, 3]),
-        numChannels: 1,
-        sampleRate : 8000,
-        numFrames  : 4
+        sampleRate: 8000,
+        channels  : 1,
+        frames    : 4,
+        samples   : new Float32Array([0, 1, 2, 3])
       });
     },
     $beforeEach: function() {
       cc.lang.pushToTimeline.result = [];
       cc.lang.sendToServer.result   = [];
       cc.lang.sendToClient.result   = [];
+      cc.lang.setCallback.result    = null;
     }
   };
-
+  
   mock.server = {
     sampleRate: 44100,
     rates: [],
     busClear: new Float32Array(1024),
+    sendToLang: function(cmd) {
+      cc.server.sendToLang.result.push(cmd);
+    },
+    $beforeEach: function() {
+      cc.server.sendToLang.result = [];
+    }
   };
   mock.server.rates[C.AUDIO] = {
     sampleRate      : 44100,
@@ -690,84 +707,42 @@ define(function(require, exports, module) {
   mock.createTaskManager.$beforeEach = function() {
     mock.createTaskManager.called = [];
   };
-
-  mock.createInstanceManager = function() {
-    return {
-      init: function() {
-        mock.createInstanceManager.called.push("init");
-      },
-      play: function() {
-        mock.createInstanceManager.called.push("play");
-      },
-      pause: function() {
-        mock.createInstanceManager.called.push("pause");
-      },
-      reset: function() {
-        mock.createInstanceManager.called.push("reset");
-      },
-      pushToTimeline: function() {
-        mock.createInstanceManager.called.push("pushToTimeline");
-      },
-      append: function() {
-        mock.createInstanceManager.called.push("append");
-        return mock.createInstance();
-      },
-      remove: function() {
-        mock.createInstanceManager.called.push("remove");
-      },
-      process:function() {
-        mock.createInstanceManager.called.push("process");
-      }
-    };
-  };
-  mock.createInstanceManager.$beforeEach = function() {
-    mock.createInstanceManager.called = [];
-  };
   
-  mock.createInstance = function() {
+  mock.createWorld = function() {
     return {
-      play: function() {
-        mock.createInstance.called.push("play");
-      },
-      pause: function() {
-        mock.createInstance.called.push("pause");
+      run: function(flag) {
+        mock.createWorld.called.push("run:" + flag);
       },
       reset: function() {
-        mock.createInstance.called.push("reset");
+        mock.createWorld.called.push("reset");
       },
       pushToTimeline: function() {
-        mock.createInstance.called.push("pushToTimeline");
+        mock.createWorld.called.push("pushToTimeline");
       },
       process: function() {
-        mock.createInstance.called.push("process");
+        mock.createWorld.called.push("process");
       },
       isRunning: function() {
         return false;
       }
     };
   };
-  mock.createInstance.$beforeEach = function() {
-    mock.createInstance.called = [];
+  mock.createWorld.$beforeEach = function() {
+    mock.createWorld.called = [];
   };
 
-  mock.createServerGroup = function(nodeId, target, addAction, instance) {
-    return [nodeId, target, addAction, instance ];
+  mock.createServerGroup = function(world, nodeId, target, addAction) {
+    return [ world, nodeId, target, addAction ];
+  };
+  
+  mock.createServerSynth = function(world, nodeId, target, addAction, defId, controls) {
+    return [ world, nodeId, target, addAction, defId, controls ];
   };
 
-  mock.createServerSynth = function(nodeId, target, addAction, defId, controls, instance) {
-    return [ nodeId, target, addAction, defId, controls, instance ];
-  };
-
-  mock.createServerBuffer = function(bufnum, frames, channels) {
+  mock.createServerBuffer = function(world, bufnum, frames, channels) {
     return [ bufnum, frames, channels ];
   };
   
-  mock.resetBuffer = function() {
-    mock.resetBuffer.result = true;
-  };
-  mock.resetBuffer.$beforeEach = function() {
-    mock.resetBuffer.result = null;
-  };
   mock.resetNode = function() {
     mock.resetNode.result = true;
   };

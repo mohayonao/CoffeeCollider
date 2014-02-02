@@ -91,7 +91,7 @@ define(function(require, exports, module) {
         counter = Math.max(1, (dur * this.rate.sampleRate)|0) + counterOffset;
         this._stage = numstages;
         this._shape = shape_Linear;
-        this._endLevel = this.inputs[this.numOfInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
+        this._endLevel = this.inputs[this.numInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
         this._grow     = (this._endLevel - level) / counter;
         this._released = true;
         checkGate = true;
@@ -133,7 +133,7 @@ define(function(require, exports, module) {
 
         if (initSegment) {
           stageOffset = (this._stage << 2) + kEnvGen_nodeOffset;
-          if (stageOffset + 4 > this.numOfInputs) {
+          if (stageOffset + 4 > this.numInputs) {
             // oops;
             return;
           }
@@ -313,7 +313,7 @@ define(function(require, exports, module) {
         counter = Math.max(1, (dur * this.rate.sampleRate)|0) + counterOffset;
         this._stage = numstages;
         this._shape = shape_Linear;
-        this._endLevel = this.inputs[this.numOfInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
+        this._endLevel = this.inputs[this.numInputs - 4][0] * this.inputs[kEnvGen_levelScale][0] + this.inputs[kEnvGen_levelBias][0];
         this._grow     = (this._endLevel - level) / counter;
         this._released = true;
         checkGate = true;
@@ -353,7 +353,7 @@ define(function(require, exports, module) {
 
       if (initSegment) {
         stageOffset = (this._stage << 2) + kEnvGen_nodeOffset;
-        if (stageOffset + 4 > this.numOfInputs) {
+        if (stageOffset + 4 > this.numInputs) {
           // oops;
           return;
         }
@@ -571,13 +571,13 @@ define(function(require, exports, module) {
       this._prevtrig = 0;
       this.process(1);
     };
-    var next = function(inNumSamples, instance) {
+    var next = function() {
       var trig = this.inputs[0][0];
       var id, node;
       if (trig > 0 && this._prevtrig <= 0) {
         id = this.inputs[1][0]|0;
         if (id) { // 0 is ignored
-          node = instance.nodes[id];
+          node = this.world.nodes[id];
           if (node) {
             node.end();
           }
@@ -659,7 +659,7 @@ define(function(require, exports, module) {
       this._state = 1;
       this.outputs[0][0] = this.inputs[0][0];
     };
-    var next = function(inNumSamples, instance) {
+    var next = function() {
       var _in = this.inputs[0][0];
       var state = (_in === 0) ? 0 : 1;
       var id, node;
@@ -667,7 +667,7 @@ define(function(require, exports, module) {
         this._state = state;
         id = this.inputs[1][0]|0;
         if (id) { // 0 is ignored
-          node = instance.nodes[id];
+          node = this.world.nodes[id];
           if (node) {
             node.run(state);
           }

@@ -153,6 +153,43 @@ define(function(require, exports, module) {
       }
     });
 
+    ugenTestSuite("LeakDC", {
+      ar: {
+        ok: ["+in","audio", "coef",0.995],
+        ng: ["+in","control"]
+      },
+      kr: {
+        ok: ["+in","control", "coef",0.995],
+        ng: ["+in","audio"]
+      }
+    }).unitTestSuite([
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"coef", rate:C.AUDIO, value:[ 1, 0.995, 0.995, 0.8 ] }
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in"  , rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"coef", value:0.995 }
+        ]
+      },
+      { rate  : C.CONTROL,
+        inputs: [
+          { name:"in"  , rate:C.CONTROL, value:unitTestSuite.in1 },
+          { name:"coef", value:0.995 }
+        ]
+      },
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
+    
     ugenTestSuite(["RLPF", "RHPF"], {
       ar: {
         ok: ["+in","audio", "freq",440, "rq",1],
@@ -351,6 +388,132 @@ define(function(require, exports, module) {
         // assert.ok(statistics.max <= +1.0);
       }
     });
-  });
+    
+    ugenTestSuite("FOS", {
+      ar: {
+        ok: ["+in","audio", "a0",0, "a1",0, "b1",0],
+        ng: ["+in","control"]
+      },
+      kr: {
+        ok: ["+in","control", "a0",0, "a1",0, "b1",0],
+        ng: ["+in","audio"]
+      }
+    }).unitTestSuite([
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"a0", rate:C.AUDIO, value:[ +1, +0.5, 0, -0.5, -1 ] },
+          { name:"a1", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5, +1, +0.75 ] },
+          { name:"b1", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5 ] },
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in", rate:C.AUDIO  , value:unitTestSuite.in0 },
+          { name:"a0", rate:C.CONTROL, value:[ +1, +0.5, 0, -0.5, -1 ] },
+          { name:"a1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5, +1, +0.75 ] },
+          { name:"b1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5 ] },
+        ]
+      },
+      { rate  : C.CONTROL,
+        inputs: [
+          { name:"in", rate:C.AUDIO  , value:unitTestSuite.in1 },
+          { name:"a0", rate:C.CONTROL, value:[ +1, +0.5, 0, -0.5, -1 ] },
+          { name:"a1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5, +1, +0.75 ] },
+          { name:"b1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5 ] },
+        ]
+      }
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
 
+    ugenTestSuite("SOS", {
+      ar: {
+        ok: ["+in","audio", "a0",0, "a1",0, "a2",0, "b1",0, "b2",0],
+        ng: ["+in","control"]
+      },
+      kr: {
+        ok: ["+in","control", "a0",0, "a1",0, "a2",0, "b1",0, "b2",0],
+        ng: ["+in","audio"]
+      }
+    }).unitTestSuite([
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"a0", rate:C.AUDIO, value:[ +1, +0.5, 0, -0.5, -1 ] },
+          { name:"a1", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5, +1, +0.75 ] },
+          { name:"a2", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5 ] },
+          { name:"b1", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5 ] },
+          { name:"b2", rate:C.AUDIO, value:[ -1, -0.5, 0, +0.5, 0.25 ] },
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"a0", rate:C.CONTROL, value:[ +1, +0.5, 0, -0.5, -1 ] },
+          { name:"a1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5, +1, +0.75 ] },
+          { name:"a2", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5 ] },
+          { name:"b1", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5 ] },
+          { name:"b2", rate:C.CONTROL, value:[ -1, -0.5, 0, +0.5, 0.25 ] },
+        ]
+      },
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in", rate:C.AUDIO, value:unitTestSuite.in0 },
+          { name:"a0", value:0.5 },
+          { name:"a1", value:0.25 },
+          { name:"a2", value:0.15 },
+          { name:"b1", value:0.05 },
+          { name:"b2", value:0.025 },
+        ]
+      },
+      { rate  : C.CONTROL,
+        inputs: [
+          { name:"in", rate:C.CONTROL, value:unitTestSuite.in1 },
+          { name:"a0", value:0.5 },
+          { name:"a1", value:0.25 },
+          { name:"a2", value:0.15 },
+          { name:"b1", value:0.05 },
+          { name:"b2", value:0.025 },
+        ]
+      },
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+        // assert.ok(statistics.min >= -1.0);
+        // assert.ok(statistics.max <= +1.0);
+      }
+    });
+    
+    ugenTestSuite("Ringz", {
+      ar: {
+        ok: [ ["+in","audio", "freq",440, "decaytime",1] ],
+        ng: ["+in","control"]
+      },
+      kr: {
+        ok: ["+in","control", "freq",440, "decaytime",1],
+        ng: ["+in","audio"]
+      }
+    }).unitTestSuite([
+      { rate  : C.AUDIO,
+        inputs: [
+          { name:"in"       , rate:C.AUDIO  , value:unitTestSuite.in0   },
+          { name:"freq"     , rate:C.CONTROL, value:[ 440, 660, 1000 ] },
+          { name:"decaytime", rate:C.CONTROL, value:[ 0.1, 0.25, 0.5, 1 ] },
+        ]
+      }
+    ], {
+      checker: function(statistics) {
+        // console.log(statistics);
+        assert.isFalse(statistics.hasNaN);
+      }
+    });
+  });
+  
 });

@@ -16,7 +16,7 @@ define(function(require, exports, module) {
       this.rate = rate;
       this.channels = [];
       this.inputs   = [];
-      this.numOfOutputs = 0;
+      this.numOutputs = 0;
     };
     Control.prototype.init = function(values, lags) {
       lags = Array.isArray(lags) ? lags : [];
@@ -29,7 +29,7 @@ define(function(require, exports, module) {
           lag      : lags[index]||0
         };
       }, this);
-      this.numOfOutputs = values.length;
+      this.numOutputs = values.length;
       return this.channels.length === 1 ? this.channels[0] : this.channels;
     };
     return Control;
@@ -223,30 +223,31 @@ define(function(require, exports, module) {
             consts  : [],
             params  : { names:[], indices:[], length:[], values:[] },
             defList : [],
-            variants: {}
+            variants: {},
+            heapSize: 0
           };
           assert.deepEqual(actual, expected);
         });
         it("non args", function() {
           children[0] = {
-            klassName   : "Freq",
-            rate        : C.CONTROL,
-            inputs      : [ 440 ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "Freq",
+            rate       : C.CONTROL,
+            inputs     : [ 440 ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[1] = {
-            klassName   : "SinOsc",
-            rate        : C.AUDIO  ,
-            inputs      : [ children[0], 0 ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "SinOsc",
+            rate       : C.AUDIO  ,
+            inputs     : [ children[0], 0 ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[2] = {
-            klassName   : "Out",
-            rate        : C.AUDIO,
-            inputs      : [ children[1] ],
-            outputIndex : 0,
+            klassName  : "Out",
+            rate       : C.AUDIO,
+            inputs     : [ children[1] ],
+            outputIndex: 0,
           };
           actual   = synthdef.asJSON(name, controls, children);
           expected = {
@@ -258,76 +259,77 @@ define(function(require, exports, module) {
               [ "SinOsc", ar, 0, [  0, 0, -1, 0 ], [ ar ] ],
               [ "Out"   , ar, 0, [  1, 0        ], [    ] ],
             ],
-            variants: {}
+            variants: {},
+            heapSize: (1 + 64) + 0
           };
           assert.deepEqual(actual, expected);
         });
         it("with args", function() {
           children[0] = {
-            klassName   : "TrigControl",
-            rate        : C.CONTROL,
-            inputs      : [ 1 ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "TrigControl",
+            rate       : C.CONTROL,
+            inputs     : [ 1 ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[1] = {
-            klassName: "OutputProxy",
-            rate     : C.CONTROL,
-            inputs   : [ children[0] ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "OutputProxy",
+            rate       : C.CONTROL,
+            inputs     : [ children[0] ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[0].channels = [ children[1] ];
           
           children[2] = {
-            klassName   : "Control",
-            rate        : C.CONTROL,
-            inputs      : [ 880, 882, 0.5 ],
-            numOfOutputs: 2,
-            outputIndex : 0,
+            klassName  : "Control",
+            rate       : C.CONTROL,
+            inputs     : [ 880, 882, 0.5 ],
+            numOutputs : 2,
+            outputIndex: 0,
           };
           children[3] = {
-            klassName: "OutputProxy",
-            rate     : C.CONTROL,
-            inputs   : [ children[2] ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "OutputProxy",
+            rate       : C.CONTROL,
+            inputs     : [ children[2] ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[4] = {
-            klassName: "OutputProxy",
-            rate     : C.CONTROL,
-            inputs   : [ children[2] ],
-            numOfOutputs: 1,
-            outputIndex : 1,
+            klassName  : "OutputProxy",
+            rate       : C.CONTROL,
+            inputs     : [ children[2] ],
+            numOutputs : 1,
+            outputIndex: 1,
           };
           children[5] = {
-            klassName: "OutputProxy",
-            rate     : C.CONTROL,
-            inputs   : [ children[2] ],
-            numOfOutputs: 2,
-            outputIndex : 1,
+            klassName  : "OutputProxy",
+            rate       : C.CONTROL,
+            inputs     : [ children[2] ],
+            numOutputs : 2,
+            outputIndex: 1,
           };
           children[2].channels = [ children[3], children[4], children[5] ];
           
           children[6] = {
-            klassName   : "TSinOsc",
-            rate        : C.AUDIO  ,
-            inputs      : [ children[1], children[3], children[5] ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "TSinOsc",
+            rate       : C.AUDIO  ,
+            inputs     : [ children[1], children[3], children[5] ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[7] = {
-            klassName   : "TSinOsc",
-            rate        : C.AUDIO  ,
-            inputs      : [ children[1], children[4], children[5] ],
-            numOfOutputs: 1,
-            outputIndex : 0,
+            klassName  : "TSinOsc",
+            rate       : C.AUDIO  ,
+            inputs     : [ children[1], children[4], children[5] ],
+            numOutputs : 1,
+            outputIndex: 0,
           };
           children[6] = {
-            klassName   : "Out",
-            rate        : C.AUDIO,
-            inputs      : [ children[6], children[7] ],
-            outputIndex : 0,
+            klassName  : "Out",
+            rate       : C.AUDIO,
+            inputs     : [ children[6], children[7] ],
+            outputIndex: 0,
           };
           controls = [
             { index:0, name:"freq" , type:KR, value:[880, 882], lag:0 },
@@ -351,7 +353,8 @@ define(function(require, exports, module) {
               [ "TSinOsc"    , ar, 0, [  1, 0,  0, 0,  0, 1 ], [ ar         ] ],
               [ "Out"        , ar, 0, [  3, 0,  2, 0        ], [            ] ],
             ],
-            variants: {}
+            variants: {},
+            heapSize: ((1 + 1 + 1) + 1 + 64 + 64) + 4
           };
           assert.deepEqual(actual, expected);
         });

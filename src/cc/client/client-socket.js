@@ -5,12 +5,12 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
 
   var SynthClientSocketImpl = (function() {
-    function SynthClientSocketImpl(exports, opts) {
+    function SynthClientSocketImpl(client, opts) {
       cc.opmode = "socket";
       this.strmLength = C.SOCKET_STRM_LENGTH;
       this.bufLength  = C.SOCKET_BUF_LENGTH;
       
-      cc.SynthClientImpl.call(this, exports, opts);
+      cc.SynthClientImpl.call(this, client, opts);
       
       var that = this;
       this.lang = cc.createWebWorker(cc.coffeeColliderPath + "#socket");
@@ -18,7 +18,7 @@ define(function(require, exports, module) {
         that.recvFromLang(e.data);
       };
       
-      exports.socket = {
+      client.socket = {
         open: function() {
           that.sendToLang([ "/socket/open", opts.socket ]);
         },
@@ -35,10 +35,10 @@ define(function(require, exports, module) {
     return SynthClientSocketImpl;
   })();
   
-  cc.createSynthClientSocketImpl = function(exports, opts) {
-    return new SynthClientSocketImpl(exports, opts);
+  cc.createSynthClientSocketImpl = function(client, opts) {
+    return new SynthClientSocketImpl(client, opts);
   };
   
   module.exports = {};
-  
+
 });

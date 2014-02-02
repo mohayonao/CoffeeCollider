@@ -38,7 +38,9 @@ define(function(require, exports, module) {
       this._blocking = false;
       return this;
     };
-
+    
+    Node.prototype.free = Node.prototype.stop;
+    
     Node.prototype.set = function(args) {
       var controls = args2controls(args, this.params);
       if (controls.length) {

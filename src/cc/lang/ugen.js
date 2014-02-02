@@ -48,8 +48,8 @@ define(function(require, exports, module) {
       this.signalRange = opts.signalRange || C.BIPOLAR;
       this.specialIndex = 0;
       this.outputIndex  = 0;
-      this.numOfInputs  = 0;
-      this.numOfOutputs = 1;
+      this.numInputs    = 0;
+      this.numOutputs   = 1;
       this.inputs = [];
     }
     extend(UGen, cc.Object);
@@ -83,7 +83,7 @@ define(function(require, exports, module) {
         addToSynthDef(this);
       }
       this.inputs = slice.call(arguments, 1);
-      this.numOfInputs = this.inputs.length;
+      this.numInputs = this.inputs.length;
       return this;
     };
     
@@ -352,7 +352,7 @@ define(function(require, exports, module) {
         channels[i] = new OutputProxy(rate, this, i);
       }
       this.channels = channels;
-      this.numOfOutputs = channels.length;
+      this.numOutputs = channels.length;
       return (numChannels === 1) ? channels[0] : channels;
     };
     
@@ -364,7 +364,7 @@ define(function(require, exports, module) {
       UGen.call(this, "OutputProxy");
       this.init(rate);
       this.inputs = [ source ];
-      this.numOfOutputs = 1;
+      this.numOutputs = 1;
       this.outputIndex  = index;
     }
     extend(OutputProxy, UGen);

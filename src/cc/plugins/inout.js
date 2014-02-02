@@ -20,7 +20,7 @@ define(function(require, exports, module) {
     },
     init: function(numChannels) {
       this.inputs = slice.call(arguments, 1);
-      this.numOfInputs = this.inputs.length;
+      this.numInputs = this.inputs.length;
       return this.initOutputs(numChannels, this.rate);
     }
   };
@@ -35,17 +35,17 @@ define(function(require, exports, module) {
         this._busOffset = this.bufLength * C.AUDIO_BUS_LEN;
       }
     };
-    var next_a = function(inNumSamples, instance) {
+    var next_a = function(inNumSamples) {
       var out = this.outputs[0];
-      var bus  = instance.bus;
+      var bus  = this.world.bus;
       var bufLength = this.bufLength;
       var offset = (this.inputs[0][0] * bufLength)|0;
       for (var i = 0; i < inNumSamples; ++i) {
         out[i] = bus[offset + i];
       }
     };
-    var next_k = function(inNumSamples, instance) {
-      var value = instance.bus[this._busOffset + (this.inputs[0][0]|0)];
+    var next_k = function() {
+      var value = this.world.bus[this._busOffset + (this.inputs[0][0]|0)];
       this.outputs[0][0] = value;
     };
     return ctor;

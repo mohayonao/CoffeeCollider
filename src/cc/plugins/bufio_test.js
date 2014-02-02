@@ -20,17 +20,17 @@ define(function(require, exports, module) {
         // assert.ok(statistics.max <= +1.0);
       },
       before: function() {
-        unitTestSuite.instance = {
+        unitTestSuite.world = {
           buffers: [ null ]
         };
       },
       preProcess: function(i) {
         if (i === 0) {
-          this.allOutputs.setScalar(0);
+          this.heap.setScalar(0);
         }
         if (i === 1) {
           var samples = new Float32Array(1024 * 4);
-          unitTestSuite.instance.buffers[0] = {
+          unitTestSuite.world.buffers[0] = {
             samples : samples,
             channels: 4,
             frames  : 1024,

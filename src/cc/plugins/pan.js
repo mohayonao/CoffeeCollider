@@ -25,7 +25,7 @@ define(function(require, exports, module) {
         cc.createOutputProxy(this.rate, this, 0),
         cc.createOutputProxy(this.rate, this, 1)
       ];
-      this.numOfOutputs = 2;
+      this.numOutputs = 2;
       return this.channels;
     },
     checkInputs: function() {

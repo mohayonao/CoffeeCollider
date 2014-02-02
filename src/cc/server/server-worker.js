@@ -28,7 +28,7 @@ define(function(require, exports, module) {
         return;
       }
       var strm = this.strm;
-      var instance = this.instance;
+      var world = this.world;
       var strmLength = this.strmLength;
       var bufLength  = this.bufLength;
       var busOut  = this.busOut;
@@ -39,8 +39,8 @@ define(function(require, exports, module) {
       var offsetR = strmLength;
       for (var i = 0, imax = strmLength / bufLength; i < imax; ++i) {
         lang.process();
-        instance.process(bufLength);
-        busOut.set(instance.bus);
+        world.process(bufLength);
+        busOut.set(world.bus);
         strm.set(busOutL, offsetL);
         strm.set(busOutR, offsetR);
         offsetL += bufLength;

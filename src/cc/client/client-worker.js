@@ -5,12 +5,12 @@ define(function(require, exports, module) {
   var extend = require("../common/extend");
 
   var SynthClientWorkerImpl = (function() {
-    function SynthClientWorkerImpl(exports, opts) {
+    function SynthClientWorkerImpl(client, opts) {
       cc.opmode = "worker";
       this.strmLength = C.WORKER_STRM_LENGTH;
       this.bufLength  = C.WORKER_BUF_LENGTH;
       
-      cc.SynthClientImpl.call(this, exports, opts);
+      cc.SynthClientImpl.call(this, client, opts);
       
       var that = this;
       this.lang = cc.createWebWorker(cc.coffeeColliderPath);
@@ -23,8 +23,8 @@ define(function(require, exports, module) {
     return SynthClientWorkerImpl;
   })();
   
-  cc.createSynthClientWorkerImpl = function(exports, opts) {
-    return new SynthClientWorkerImpl(exports, opts);
+  cc.createSynthClientWorkerImpl = function(client, opts) {
+    return new SynthClientWorkerImpl(client, opts);
   };
   
   module.exports = {};

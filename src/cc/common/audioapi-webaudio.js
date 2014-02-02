@@ -79,10 +79,10 @@ define(function(require, exports, module) {
               }
             }
             callback(null, {
-              sampleRate : buffer.sampleRate,
-              numChannels: buffer.numberOfChannels,
-              numFrames  : buffer.length,
-              samples    : samples
+              sampleRate: buffer.sampleRate,
+              channels  : buffer.numberOfChannels,
+              frames    : buffer.length,
+              samples   : samples
             });
           }, function(err) {
             callback(err);
