@@ -16,5 +16,8 @@
   "browser" : true,
   "worker"  : true,
   "node"    : true,
-  "predef"  : [ "define", "C" ]
+  "globals" : {
+    "define": true,
+    "C"     : true
+  }
 }
