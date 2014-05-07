@@ -22725,15 +22725,15 @@ define('cc/server/world', function(require, exports, module) {
 
   var cc = require("./cc");
   var push = [].push;
-  
+
   var commands = {};
-  
+
   var World = (function() {
     function World(userId) {
       this.userId  = userId|0;
       this.bus      = new Float32Array(cc.server.busClear);
       this.busClear = cc.server.busClear;
-      
+
       this.busIndex = 0;
       this.busAmp   = 0.8;
       this.timeline = [];
@@ -22747,6 +22747,7 @@ define('cc/server/world', function(require, exports, module) {
       this.syncItems     = new Uint8Array(20);
       this.i16_syncItems = new Int16Array(this.syncItems.buffer);
       this.f32_syncItems = new Float32Array(this.syncItems.buffer);
+      this._pendingBinaryCmdSetBuffer = {};
     }
     World.prototype.run = function(flag) {
       this.rootNode.run(flag);
@@ -22784,21 +22785,21 @@ define('cc/server/world', function(require, exports, module) {
     World.prototype.process = function(bufLength) {
       var timeline = this.timeline;
       var args, func;
-      
+
       while ((args = timeline.shift())) {
         func = commands[args[0]];
         if (func) {
           func(this, args);
         }
       }
-      
+
       this.bus.set(this.busClear);
       this.rootNode.process(bufLength, this);
     };
-    
+
     return World;
   })();
-  
+
   commands["/n_run"] = function(world, args) {
     var nodeId = args[1]|0;
     var flag   = !!args[2];
@@ -22852,6 +22853,11 @@ define('cc/server/world', function(require, exports, module) {
     var frames   = args[2]|0;
     var channels = args[3]|0;
     world.buffers[bufnum] = cc.createServerBuffer(world, bufnum, frames, channels);
+    if (world._pendingBinaryCmdSetBuffer[bufnum]) {
+      var binary = world._pendingBinaryCmdSetBuffer[bufnum];
+      delete world._pendingBinaryCmdSetBuffer[bufnum];
+      commands[1](world, binary);
+    }
   };
   commands["/b_free"] = function(world, args) {
     var bufnum = args[1]|0;
@@ -22909,7 +22915,7 @@ define('cc/server/world', function(require, exports, module) {
       buffer.gen(cmd, flag, params);
     }
   };
-  
+
   commands[0] = function(world, binary) {
     world.syncItems.set(binary);
     var server    = cc.server;
@@ -22927,13 +22933,15 @@ define('cc/server/world', function(require, exports, module) {
     var buffer  = world.buffers[bufnum];
     if (buffer) {
       buffer.bind(sampleRate, channels, frames, samples);
+    } else {
+      world._pendingBinaryCmdSetBuffer[bufnum] = binary;
     }
   };
-  
+
   cc.createWorld = function(userId) {
     return new World(userId);
   };
-  
+
   module.exports = {
     World   : World,
     commands: commands
