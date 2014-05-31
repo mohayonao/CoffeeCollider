@@ -38,8 +38,9 @@ https://github.com/mohayonao/CoffeeCollider/wiki/_pages
 1. Fork me
 2. Create a branch for your changes: `git checkout -b my-new-feature`
 3. Add your changes, and please include tests: `git commit -am 'Add some feature'`
-4. Make sure the tests pass by running: `grunt test`
-5. Create a pull request :D
+4. Install dependencies: `npm install`
+5. Make sure the tests pass by running: `grunt test`
+6. Create a pull request :D
 
 ## License
 MIT
