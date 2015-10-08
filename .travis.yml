@@ -1,5 +1,5 @@
 env:
-  - CXX=g++-4.8
+  - CXX=g++-4.8 npm_config_mpg123_backend=dummy
 addons:
   apt:
     sources:
