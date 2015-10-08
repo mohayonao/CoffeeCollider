@@ -1,4 +1,5 @@
-env: npm_config_mpg123_backend=dummy
+env:
+  - npm_config_mpg123_backend=dummy CXX=gcc-4.2
 language: node_js
 node_js:
   - 4.1.2
