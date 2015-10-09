@@ -31,7 +31,7 @@
   "dependencies": {
     "coffee-script": "~1.6.3",
     "ws": "~0.4.31",
-    "speaker": "0.0.10",
+    "speaker": "0.2.6",
     "optparse": "~1.0.4"
   },
   "devDependencies": {

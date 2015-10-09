@@ -1,6 +1,14 @@
-env: npm_config_mpg123_backend=dummy
+env:
+  - CXX=g++-4.8 npm_config_mpg123_backend=dummy
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+      - libasound2-dev
 language: node_js
 node_js:
-  - 0.10
+  - 4.1.2
 before_script:
   - npm install -g grunt-cli
